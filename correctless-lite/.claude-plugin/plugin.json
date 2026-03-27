@@ -1,0 +1,5 @@
+{
+  "name": "correctless-lite",
+  "description": "Lightweight correctness-oriented development workflow. Enforced TDD with agent separation, spec-before-code, skeptical review, and living documentation.",
+  "version": "1.8.0"
+}

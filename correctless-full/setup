@@ -1,0 +1,500 @@
+#!/usr/bin/env bash
+# Correctless — install script
+# Auto-detects project language, test runner, and tools.
+# Registers hooks, creates templates, generates config.
+# Supports both Lite and Full modes.
+# Idempotent — re-running never overwrites user-edited files.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+info()  { echo "  $*"; }
+ok()    { echo "  ✓ $*"; }
+skip()  { echo "  - $* (already exists)"; }
+warn()  { echo "  ! $*"; }
+
+# ---------------------------------------------------------------------------
+# Detect project language
+# ---------------------------------------------------------------------------
+
+detect_language() {
+  if [ -f "$REPO_ROOT/go.mod" ]; then
+    echo "go"
+  elif [ -f "$REPO_ROOT/package.json" ]; then
+    echo "typescript"
+  elif [ -f "$REPO_ROOT/Cargo.toml" ]; then
+    echo "rust"
+  elif [ -f "$REPO_ROOT/pyproject.toml" ] || [ -f "$REPO_ROOT/requirements.txt" ] || [ -f "$REPO_ROOT/setup.py" ]; then
+    echo "python"
+  elif [ -f "$REPO_ROOT/pom.xml" ] || [ -f "$REPO_ROOT/build.gradle" ]; then
+    echo "java"
+  else
+    echo "other"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Detect commands and patterns per language
+# ---------------------------------------------------------------------------
+
+detect_config() {
+  local lang="$1"
+  local name
+  name="$(basename "$REPO_ROOT")"
+
+  case "$lang" in
+    go)
+      cat <<GOEOF
+{
+  "project": {
+    "name": "$name",
+    "language": "go",
+    "description": ""
+  },
+  "commands": {
+    "test": "go test ./...",
+    "test_verbose": "go test -v ./...",
+    "coverage": "go test -coverprofile=coverage.out ./...",
+    "lint": "go vet ./...",
+    "build": "go build ./..."
+  },
+  "patterns": {
+    "test_file": "*_test.go",
+    "source_file": "*.go",
+    "test_fail_pattern": "FAIL",
+    "build_error_pattern": "cannot|undefined|syntax error"
+  },
+  "workflow": {
+    "min_qa_rounds": 1,
+    "require_review": true,
+    "auto_update_antipatterns": true
+  },
+  "paths": {
+    "architecture_doc": "ARCHITECTURE.md",
+    "agent_context": "AGENT_CONTEXT.md",
+    "antipatterns": ".claude/antipatterns.md",
+    "docs": "docs/",
+    "specs": "docs/specs/",
+    "artifacts": ".claude/artifacts/",
+    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+  }
+}
+GOEOF
+      ;;
+    typescript)
+      # Detect package manager and test runner
+      local test_cmd="npm test"
+      local test_verbose="npm test -- --verbose"
+      local coverage="npm test -- --coverage"
+      local lint="npm run lint"
+      local build="npm run build"
+
+      if [ -f "$REPO_ROOT/pnpm-lock.yaml" ]; then
+        test_cmd="pnpm test"
+        test_verbose="pnpm test -- --verbose"
+        coverage="pnpm test -- --coverage"
+        lint="pnpm run lint"
+        build="pnpm run build"
+      elif [ -f "$REPO_ROOT/yarn.lock" ]; then
+        test_cmd="yarn test"
+        test_verbose="yarn test --verbose"
+        coverage="yarn test --coverage"
+        lint="yarn lint"
+        build="yarn build"
+      fi
+
+      cat <<TSEOF
+{
+  "project": {
+    "name": "$name",
+    "language": "typescript",
+    "description": ""
+  },
+  "commands": {
+    "test": "$test_cmd",
+    "test_verbose": "$test_verbose",
+    "coverage": "$coverage",
+    "lint": "$lint",
+    "build": "$build"
+  },
+  "patterns": {
+    "test_file": "*.test.ts|*.test.tsx|*.spec.ts|*.spec.tsx",
+    "source_file": "*.ts|*.tsx",
+    "test_fail_pattern": "FAIL|failing",
+    "build_error_pattern": "error TS|Cannot find|SyntaxError"
+  },
+  "workflow": {
+    "min_qa_rounds": 1,
+    "require_review": true,
+    "auto_update_antipatterns": true
+  },
+  "paths": {
+    "architecture_doc": "ARCHITECTURE.md",
+    "agent_context": "AGENT_CONTEXT.md",
+    "antipatterns": ".claude/antipatterns.md",
+    "docs": "docs/",
+    "specs": "docs/specs/",
+    "artifacts": ".claude/artifacts/",
+    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+  }
+}
+TSEOF
+      ;;
+    python)
+      local test_cmd="pytest"
+      local coverage="pytest --cov"
+      local lint="ruff check ."
+      [ -f "$REPO_ROOT/.flake8" ] || grep -q 'flake8' "$REPO_ROOT/pyproject.toml" 2>/dev/null && lint="flake8 ."
+
+      cat <<PYEOF
+{
+  "project": {
+    "name": "$name",
+    "language": "python",
+    "description": ""
+  },
+  "commands": {
+    "test": "$test_cmd",
+    "test_verbose": "pytest -v",
+    "coverage": "$coverage",
+    "lint": "$lint",
+    "build": ""
+  },
+  "patterns": {
+    "test_file": "test_*.py|*_test.py",
+    "source_file": "*.py",
+    "test_fail_pattern": "FAILED|ERROR",
+    "build_error_pattern": "SyntaxError|ImportError"
+  },
+  "workflow": {
+    "min_qa_rounds": 1,
+    "require_review": true,
+    "auto_update_antipatterns": true
+  },
+  "paths": {
+    "architecture_doc": "ARCHITECTURE.md",
+    "agent_context": "AGENT_CONTEXT.md",
+    "antipatterns": ".claude/antipatterns.md",
+    "docs": "docs/",
+    "specs": "docs/specs/",
+    "artifacts": ".claude/artifacts/",
+    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+  }
+}
+PYEOF
+      ;;
+    rust)
+      cat <<RSEOF
+{
+  "project": {
+    "name": "$name",
+    "language": "rust",
+    "description": ""
+  },
+  "commands": {
+    "test": "cargo test",
+    "test_verbose": "cargo test -- --nocapture",
+    "coverage": "cargo tarpaulin",
+    "lint": "cargo clippy",
+    "build": "cargo build"
+  },
+  "patterns": {
+    "test_file": "*_test.rs|tests/*.rs",
+    "source_file": "*.rs",
+    "test_fail_pattern": "FAILED|failures",
+    "build_error_pattern": "error\\[E|cannot find"
+  },
+  "workflow": {
+    "min_qa_rounds": 1,
+    "require_review": true,
+    "auto_update_antipatterns": true
+  },
+  "paths": {
+    "architecture_doc": "ARCHITECTURE.md",
+    "agent_context": "AGENT_CONTEXT.md",
+    "antipatterns": ".claude/antipatterns.md",
+    "docs": "docs/",
+    "specs": "docs/specs/",
+    "artifacts": ".claude/artifacts/",
+    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+  }
+}
+RSEOF
+      ;;
+    *)
+      cat <<OTHEREOF
+{
+  "project": {
+    "name": "$name",
+    "language": "other",
+    "description": ""
+  },
+  "commands": {
+    "test": "",
+    "test_verbose": "",
+    "coverage": "",
+    "lint": "",
+    "build": ""
+  },
+  "patterns": {
+    "test_file": "",
+    "source_file": "",
+    "test_fail_pattern": "",
+    "build_error_pattern": ""
+  },
+  "workflow": {
+    "min_qa_rounds": 1,
+    "require_review": true,
+    "auto_update_antipatterns": true
+  },
+  "paths": {
+    "architecture_doc": "ARCHITECTURE.md",
+    "agent_context": "AGENT_CONTEXT.md",
+    "antipatterns": ".claude/antipatterns.md",
+    "docs": "docs/",
+    "specs": "docs/specs/",
+    "artifacts": ".claude/artifacts/",
+    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+  }
+}
+OTHEREOF
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Install hooks to stable project-local path
+# ---------------------------------------------------------------------------
+
+install_hooks() {
+  local hook_dest="$REPO_ROOT/.claude/hooks"
+  mkdir -p "$hook_dest"
+
+  cp "$SCRIPT_DIR/hooks/workflow-gate.sh" "$hook_dest/workflow-gate.sh"
+  cp "$SCRIPT_DIR/hooks/workflow-advance.sh" "$hook_dest/workflow-advance.sh"
+  chmod +x "$hook_dest/workflow-gate.sh" "$hook_dest/workflow-advance.sh"
+  ok "Installed hooks to .claude/hooks/"
+}
+
+# ---------------------------------------------------------------------------
+# Register hooks in .claude/settings.json
+# ---------------------------------------------------------------------------
+
+register_hooks() {
+  local settings="$REPO_ROOT/.claude/settings.json"
+  local hook_path=".claude/hooks/workflow-gate.sh"
+  local advance_path=".claude/hooks/workflow-advance.sh"
+
+  mkdir -p "$(dirname "$settings")"
+
+  if [ ! -f "$settings" ]; then
+    cat > "$settings" <<HEOF
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
+        "command": "$hook_path",
+        "timeout_ms": 5000
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash($advance_path *)"
+    ]
+  }
+}
+HEOF
+    ok "Created $settings with hooks"
+    return
+  fi
+
+  # Check if hook already registered
+  if grep -q "workflow-gate" "$settings" 2>/dev/null; then
+    skip "Hook already registered in settings.json"
+    return
+  fi
+
+  # Append hook to existing settings using jq
+  if command -v jq >/dev/null 2>&1; then
+    local tmp="$settings.tmp"
+    jq --arg cmd "$hook_path" --arg adv "$advance_path" '
+      .hooks.PreToolUse = (.hooks.PreToolUse // []) + [{
+        matcher: "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
+        command: $cmd,
+        timeout_ms: 5000
+      }]
+      | .permissions.allow = (.permissions.allow // []) + ["Bash(\($adv) *)"]
+    ' "$settings" > "$tmp" && mv "$tmp" "$settings"
+    ok "Registered hooks in existing settings.json"
+  else
+    warn "Cannot auto-register hooks (jq not found). Add manually to $settings"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Create file if it doesn't exist
+# ---------------------------------------------------------------------------
+
+create_if_missing() {
+  local dest="$1"
+  local src="$2"
+  local desc="$3"
+
+  mkdir -p "$(dirname "$dest")"
+  if [ -f "$dest" ]; then
+    skip "$desc"
+  else
+    cp "$src" "$dest"
+    ok "$desc"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Detect Full mode tools
+# ---------------------------------------------------------------------------
+
+detect_full_tools() {
+  # Mutation testing
+  if command -v go-mutesting >/dev/null 2>&1; then ok "Mutation tool: go-mutesting"; fi
+  if command -v npx >/dev/null 2>&1 && npx stryker --version >/dev/null 2>&1; then ok "Mutation tool: Stryker"; fi
+  if command -v cargo-mutants >/dev/null 2>&1; then ok "Mutation tool: cargo-mutants"; fi
+  if command -v mutmut >/dev/null 2>&1; then ok "Mutation tool: mutmut"; fi
+
+  # Alloy — check $ALLOY_JAR env var, then common install locations
+  if [ -n "${ALLOY_JAR:-}" ] && [ -f "$ALLOY_JAR" ]; then
+    ok "Alloy Analyzer: $ALLOY_JAR"
+  elif command -v alloy >/dev/null 2>&1; then
+    ok "Alloy Analyzer: alloy CLI found in PATH"
+  else
+    info "  Alloy: not found (set \$ALLOY_JAR or install to PATH to enable formal modeling)"
+  fi
+
+  # External model CLIs
+  if command -v codex >/dev/null 2>&1; then ok "External model: codex CLI"; fi
+  if command -v gemini >/dev/null 2>&1; then ok "External model: gemini CLI"; fi
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+echo ""
+echo "Correctless — Setup"
+echo "==================="
+echo ""
+
+# Detect language
+DETECTED_LANG="$(detect_language)"
+ok "Detected: $DETECTED_LANG project"
+
+# Check if config already exists and if it's Full mode
+CONFIG_DEST="$REPO_ROOT/.claude/workflow-config.json"
+IS_FULL="false"
+if [ -f "$CONFIG_DEST" ]; then
+  skip "workflow-config.json (already exists)"
+  if jq -e '.workflow.intensity' "$CONFIG_DEST" >/dev/null 2>&1; then
+    IS_FULL="true"
+    ok "Mode: Full (intensity: $(jq -r '.workflow.intensity' "$CONFIG_DEST"))"
+  else
+    ok "Mode: Lite"
+  fi
+else
+  mkdir -p "$(dirname "$CONFIG_DEST")"
+  detect_config "$DETECTED_LANG" > "$CONFIG_DEST"
+  ok "Generated workflow-config.json (Lite mode — edit to add intensity for Full mode)"
+fi
+
+# Create common templates
+create_if_missing "$REPO_ROOT/ARCHITECTURE.md" "$SCRIPT_DIR/templates/ARCHITECTURE.md" "ARCHITECTURE.md"
+create_if_missing "$REPO_ROOT/AGENT_CONTEXT.md" "$SCRIPT_DIR/templates/AGENT_CONTEXT.md" "AGENT_CONTEXT.md"
+create_if_missing "$REPO_ROOT/.claude/antipatterns.md" "$SCRIPT_DIR/templates/antipatterns.md" "antipatterns.md"
+
+# Create directory structure
+mkdir -p "$REPO_ROOT/docs/specs" "$REPO_ROOT/docs/features"
+ok "Created docs/ directories"
+
+mkdir -p "$REPO_ROOT/.claude/artifacts"
+ok "Created .claude/artifacts/"
+
+# Full mode: create additional directories and meta files
+if [ "$IS_FULL" = "true" ]; then
+  mkdir -p "$REPO_ROOT/docs/models" "$REPO_ROOT/docs/diagrams" "$REPO_ROOT/docs/verification" "$REPO_ROOT/docs/decisions"
+  ok "Created Full mode docs/ directories (models, diagrams, verification, decisions)"
+
+  mkdir -p "$REPO_ROOT/.claude/meta"
+  create_if_missing "$REPO_ROOT/.claude/meta/workflow-effectiveness.json" "$SCRIPT_DIR/templates/workflow-effectiveness.json" "workflow-effectiveness.json"
+  create_if_missing "$REPO_ROOT/.claude/meta/drift-debt.json" "$SCRIPT_DIR/templates/drift-debt.json" "drift-debt.json"
+  create_if_missing "$REPO_ROOT/.claude/meta/external-review-history.json" "$SCRIPT_DIR/templates/external-review-history.json" "external-review-history.json"
+
+  echo ""
+  info "Full mode tools:"
+  detect_full_tools
+fi
+
+# Install hooks to project-local path and register in settings
+install_hooks
+register_hooks
+
+# Update .gitignore
+GITIGNORE="$REPO_ROOT/.gitignore"
+if [ -f "$GITIGNORE" ] && grep -q '.claude/artifacts/' "$GITIGNORE" 2>/dev/null; then
+  skip ".gitignore already includes .claude/artifacts/"
+else
+  echo "" >> "$GITIGNORE" 2>/dev/null || true
+  echo "# Correctless — transient workflow state" >> "$GITIGNORE"
+  echo ".claude/artifacts/" >> "$GITIGNORE"
+  ok "Updated .gitignore"
+fi
+
+# Update CLAUDE.md
+CLAUDEMD="$REPO_ROOT/CLAUDE.md"
+if [ -f "$CLAUDEMD" ] && grep -q 'Correctless' "$CLAUDEMD" 2>/dev/null; then
+  skip "CLAUDE.md already references Correctless"
+else
+  if [ "$IS_FULL" = "true" ]; then
+    cat >> "$CLAUDEMD" <<'CMDEOF'
+
+## Correctless
+
+This project uses Correctless for correctness-oriented development.
+Read AGENT_CONTEXT.md before starting any work.
+Available commands: /cspec, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /cstatus, /csummary, /cmetrics, /cdebug
+CMDEOF
+  else
+    cat >> "$CLAUDEMD" <<'CMDEOF'
+
+## Correctless Lite
+
+This project uses Correctless Lite for structured development.
+Read AGENT_CONTEXT.md before starting any work.
+Available commands: /cspec, /creview, /ctdd, /cverify, /cdocs, /cstatus, /csummary, /cmetrics, /cdebug
+CMDEOF
+  fi
+  ok "Updated CLAUDE.md"
+fi
+
+echo ""
+echo "Created:"
+echo "  .claude/workflow-config.json  <- review and adjust"
+echo "  ARCHITECTURE.md               <- fill in your project's architecture"
+echo "  AGENT_CONTEXT.md              <- fill in or run /cdocs to auto-generate"
+if [ "$IS_FULL" = "true" ]; then
+  echo "  .claude/meta/                 <- workflow learning data"
+fi
+echo ""
+echo "Next steps:"
+echo "  1. Review .claude/workflow-config.json — check detected commands"
+if [ "$IS_FULL" != "true" ]; then
+  echo "     To enable Full mode: add \"intensity\": \"standard\" to workflow section"
+fi
+echo "  2. Fill in ARCHITECTURE.md — even 5 bullet points helps"
+echo "  3. Try it: git checkout -b feature/my-feature && then run /cspec"
+echo ""

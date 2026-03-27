@@ -1,0 +1,53 @@
+{
+  "project": {
+    "name": "",
+    "language": "",
+    "description": ""
+  },
+  "commands": {
+    "test": "",
+    "test_json": "",
+    "test_race": "",
+    "test_verbose": "",
+    "coverage": "",
+    "lint": "",
+    "build": "",
+    "format": "",
+    "mutation_tool": ""
+  },
+  "patterns": {
+    "test_file": "",
+    "source_file": "",
+    "test_fail_pattern": "",
+    "build_error_pattern": ""
+  },
+  "workflow": {
+    "intensity": "standard",
+    "min_qa_rounds": 2,
+    "max_audit_rounds": 5,
+    "require_external_review": false,
+    "external_models": {},
+    "external_review_threshold": "high",
+    "mutation_count": 10,
+    "require_stride": true,
+    "formal_model": false,
+    "alloy_jar": null,
+    "auto_update_antipatterns": true,
+    "fail_closed_when_no_state": false,
+    "merge_strategy": "squash",
+    "min_new_package_coverage": 60,
+    "drift_debt_age_threshold_days": 90
+  },
+  "paths": {
+    "architecture_doc": "ARCHITECTURE.md",
+    "agent_context": "AGENT_CONTEXT.md",
+    "antipatterns": ".claude/antipatterns.md",
+    "docs": "docs/",
+    "diagrams": "docs/diagrams/",
+    "specs": "docs/specs/",
+    "models": "docs/models/",
+    "meta": ".claude/meta/",
+    "artifacts": ".claude/artifacts/",
+    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+  }
+}

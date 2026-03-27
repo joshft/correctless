@@ -1,0 +1,21 @@
+{
+  "name": "correctless",
+  "owner": {
+    "name": "Josh Terry",
+    "url": "https://github.com/joshft/correctless"
+  },
+  "plugins": [
+    {
+      "name": "correctless-lite",
+      "source": "./correctless-lite",
+      "description": "Lightweight correctness workflow for everyday development. 10 skills for structured development: spec-before-code, skeptical review with security checklist, enforced TDD with agent separation, verification, documentation, debugging, and metrics. Enforced TDD with agent separation, spec-before-code, skeptical review. ~5 min overhead per feature.",
+      "version": "1.8.0"
+    },
+    {
+      "name": "correctless",
+      "source": "./correctless-full",
+      "description": "Full correctness workflow for security-critical systems. 16 skills including formal modeling, multi-agent adversarial review, convergence auditing, mutation testing, and postmortem feedback loops. ~15-30 min overhead per feature.",
+      "version": "1.8.0"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test artifacts
+/tmp/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Claude local overrides
+.claude/settings.local.json
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Implementation plans
+IMPLEMENTATION_PLAN.md

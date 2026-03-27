@@ -1,0 +1,34 @@
+{
+  "project": {
+    "name": "",
+    "language": "",
+    "description": ""
+  },
+  "commands": {
+    "test": "",
+    "test_verbose": "",
+    "coverage": "",
+    "lint": "",
+    "build": ""
+  },
+  "patterns": {
+    "test_file": "",
+    "source_file": "",
+    "test_fail_pattern": "",
+    "build_error_pattern": ""
+  },
+  "workflow": {
+    "min_qa_rounds": 1,
+    "require_review": true,
+    "auto_update_antipatterns": true
+  },
+  "paths": {
+    "architecture_doc": "ARCHITECTURE.md",
+    "agent_context": "AGENT_CONTEXT.md",
+    "antipatterns": ".claude/antipatterns.md",
+    "docs": "docs/",
+    "specs": "docs/specs/",
+    "artifacts": ".claude/artifacts/",
+    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+  }
+}

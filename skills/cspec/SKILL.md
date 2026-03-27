@@ -1,0 +1,344 @@
+---
+name: cspec
+description: Create a structured specification with testable invariants for a new feature. Researches current best practices before writing invariants. Adapts format to workflow intensity.
+allowed-tools: Read, Grep, Glob, Bash(git log*), Bash(git diff*), Bash(git branch*), Bash(*workflow-advance.sh*), Write(docs/specs/*), Write(.claude/artifacts/research/*), WebSearch, WebFetch
+---
+
+# /cspec — Write a Feature Specification
+
+You are the spec agent. Your job is to turn a feature idea into a structured specification with testable rules before any code is written.
+
+## Detect Mode
+
+Read `.claude/workflow-config.json`. If it has `workflow.intensity` set (low/standard/high/critical), you're in **Full mode** — use the full invariant format. If it only has `workflow.min_qa_rounds` (no intensity field), you're in **Lite mode** — use the simple rules format.
+
+## Before You Start
+
+1. Read `AGENT_CONTEXT.md` for project context.
+2. Read `ARCHITECTURE.md` for design patterns and conventions.
+3. Read `.claude/antipatterns.md` for known bug classes.
+4. **Full mode**: Read `.claude/meta/drift-debt.json` for outstanding drift debt.
+5. **Full mode**: Read `.claude/meta/workflow-effectiveness.json` for phase effectiveness history.
+6. Read `.claude/artifacts/qa-findings-*.json` (if any exist) — patterns QA historically finds in this project.
+7. Run `git log --oneline -20` to understand recent context.
+8. Grep/glob relevant source code areas based on the feature description.
+
+## Workflow State
+
+Check current workflow state:
+```bash
+.claude/hooks/workflow-advance.sh status
+```
+
+If no workflow is active, initialize one:
+```bash
+.claude/hooks/workflow-advance.sh init "task description"
+```
+
+This creates the state file and sets the phase to `spec`. If you're on `main` or `master`, tell the user to create a feature branch first.
+
+## How to Write the Spec
+
+### Step 0: Socratic Brainstorm
+
+Before writing any rules, challenge the developer's assumptions about the feature. This is not optional — even a developer who "knows exactly what they want" benefits from 2-3 questions that reframe the problem.
+
+Ask these questions, adapting to the developer's confidence level:
+
+1. **"What problem does this solve? Not the feature — the problem."** Forces the developer to articulate the WHY, not just the WHAT. Often reveals that the feature as described doesn't actually solve the stated problem, or solves it partially.
+
+2. **"Who uses this and what does their workflow look like?"** Reveals edge cases: what if the user is on mobile? What if they have slow internet? What if they're not the primary account holder?
+
+3. **"What's the simplest version that would be useful? What can you cut?"** Prevents scope creep before the spec even starts. The developer often describes the ideal v2 feature when v1 would ship faster and validate assumptions.
+
+4. **"What would make this feature actively harmful if it went wrong?"** Surfaces failure modes at a high level to inform scope. Step 1 will pin down the exact failure mode classification (fail-open/fail-closed/etc.) for each specific behavior — this question identifies WHICH failure modes exist, Step 1 classifies them. "If the payment double-charges" or "if the auth check fails open" — these become prohibitions in the spec.
+
+5. **"Is there an existing pattern in the codebase that does something similar?"** Check ARCHITECTURE.md and the codebase. If a similar pattern exists, the new feature should compose with it, not reinvent it.
+
+**Proportionality:** If the developer clearly understands the domain and has a well-formed idea, this step takes 2-3 exchanges. If the idea is vague ("I want to add payments"), this step takes longer and does more work. Read the developer's confidence from their responses — a product security engineer describing a network proxy doesn't need five Socratic questions. A junior developer adding their first auth system does.
+
+**Output:** Summarize the brainstorm in 2-3 sentences before moving to Step 1. This summary captures the refined scope, surfaced failure modes, and any assumptions that were challenged. Present it to the human: "Based on our discussion, here's what I understand: [summary]. Proceeding with this scope." This summary becomes the foundation for the spec's Context section. The brainstorm may change the scope, surface new requirements, or eliminate unnecessary complexity before a single rule is written.
+
+### Step 1: Ask What They're Building
+
+Using the refined understanding from the brainstorm, gather the specific details needed for the spec. Batch related questions — don't force unnecessary round trips.
+
+Key questions:
+- What is the feature? (functional description — refined by brainstorm)
+- What does "correct" mean? (the answer becomes invariants/rules)
+- What must this feature NEVER do? (the answer becomes prohibitions/rules)
+- What happens when this fails? (failure mode — fail-open, fail-closed, passthrough, crash)
+- **Full mode, if `require_stride` is true**: What is the adversary model? Who is trying to break this?
+- **Full mode**: What existing abstractions does this touch? (reference ARCHITECTURE.md ABS-xxx entries)
+
+### Step 2: Research Current State (when needed)
+
+After understanding what the human wants to build, assess whether your training data might be stale for this feature. **Be honest about this.** Don't confidently spec based on potentially outdated knowledge.
+
+**Spawn the research subagent when ANY of these signals are present:**
+
+**Explicit signals:**
+- The human mentions a specific library, framework, or protocol version ("use Passkeys," "integrate with Stripe's new Payment Element," "implement OAuth 2.1")
+- The human asks "what's the best way to do X?" — they're unsure and want current guidance
+- The human references something recent ("announced last month," "the new version supports Y")
+- The feature involves security-sensitive integration (auth, payments, crypto, certificates) where stale guidance is dangerous
+
+**Inferred signals (detect these yourself):**
+- You're not confident about current best practices for this topic
+- Your knowledge about a library or protocol feels incomplete or potentially outdated
+- The feature involves a rapidly-evolving area (frontend frameworks, auth protocols, cloud APIs, AI/ML tooling)
+- The feature builds on existing project dependencies that may have changed status since adoption
+
+**When triggered, say:** "This involves [topic] which may have evolved since my training data. Let me research current best practices before writing the spec."
+
+**Spawn a research subagent** (forked context) with this prompt:
+
+> You are a research agent supporting the spec phase. Your job is to find CURRENT best practices, recent changes, and known issues for the topics you're given. The spec agent will use your findings to write accurate invariants grounded in today's reality, not stale training data.
+>
+> RESEARCH TOPIC: {topic from the feature description}
+> CONTEXT: {feature description}
+> PROJECT: {project type from AGENT_CONTEXT.md}
+>
+> Search for:
+> 1. Current official documentation for the libraries/protocols involved
+> 2. Recent security advisories and CVEs (last 12 months)
+> 3. Current recommended patterns and architecture guidance
+> 4. Recent breaking changes or deprecations in relevant libraries
+> 5. Production experience reports from teams using this in production
+> 6. Reference implementations from library authors
+> 7. Dependency health: for every major dependency this feature touches (new AND existing), check EOL status, maintenance activity, deprecation announcements. A dependency with no releases in 12+ months is a red flag even without a formal EOL announcement.
+>
+> For each finding:
+> - Include the source URL
+> - Note the date (recency matters)
+> - Explain relevance to the planned feature
+> - State the implication for spec rules — what should the spec include or avoid?
+>
+> BE SKEPTICAL of your own training data. If your training says "use foo()" but search reveals foo() was deprecated and replaced by bar(), report the current state. Your value is in finding what's NEW.
+>
+> DO NOT: summarize training data (the spec agent has it), report without sources, include tangents, make design recommendations (that's the spec agent's job).
+>
+> Produce a structured brief:
+>
+> ```markdown
+> # Research Brief: {Topic}
+> # Searched: {date}
+>
+> ## Current State
+> {2-3 paragraph summary}
+>
+> ## Key Findings
+> ### {Finding 1}
+> - **Source**: {URL}
+> - **Relevance**: {how this affects the spec}
+> - **Implication for rules**: {what rules should reflect this}
+>
+> ## Recommended Patterns
+> {Current best practice with sources}
+>
+> ## Things to Avoid
+> {Deprecated patterns, insecure approaches — with sources}
+>
+> ## Version Pins
+> {Specific versions recommended, with rationale}
+>
+> ## Dependency Health
+> | Dependency | Version | Status | Last Release | Notes |
+> |------------|---------|--------|--------------|-------|
+> | library-x  | 4.2.1   | Active | 2026-02-15   | |
+> | library-y  | 2.0.3   | Deprecated | 2025-08-01 | Use library-z instead |
+>
+> ## Open Questions
+> {Things research couldn't resolve}
+> ```
+
+The research subagent should have `allowed-tools: WebSearch, WebFetch, Read, Grep`.
+
+Write the brief to `.claude/artifacts/research/{task-slug}-research.md`. Then read the brief before drafting the spec. Reference findings in the spec's invariants where relevant.
+
+**If no research signals are present** (straightforward feature using well-understood patterns), skip this step. Don't research for the sake of researching.
+
+### Step 3: Draft the Spec
+
+Write the spec to `docs/specs/{task-slug}.md`.
+
+**Lite mode** — use 5 sections (What, Rules with R-xxx IDs, Won't Do, Risks, Open Questions). Keep it simple.
+
+**Full mode** — use the full format. **Artifact weight scales with intensity**:
+- `low` intensity: Metadata, Context, Scope, Invariants, Prohibitions (5 sections)
+- `standard`: add Boundary Conditions
+- `high`/`critical`: all sections including Complexity Budget, STRIDE, Environment Assumptions, Design Decisions
+
+**Full mode spec format:**
+
+```markdown
+# Spec: {Task Title}
+
+## Metadata
+- **Created**: ISO timestamp
+- **Status**: draft | reviewed | approved
+- **Impacts**: (other spec slugs whose invariants may be affected)
+- **Branch**: feature branch name
+- **Research**: (path to research brief if research was conducted, null otherwise)
+
+## Context
+What this feature does and why. One paragraph.
+
+## Scope
+What this covers and — critically — what it does NOT.
+
+## Complexity Budget (standard+)
+- **Estimated LOC**: ~X
+- **Files touched**: ~Y
+- **New abstractions**: N
+- **Trust boundaries touched**: N (refs: TB-xxx)
+- **Risk surface delta**: low | medium | high
+
+## Invariants
+### INV-001: {short name}
+- **Type**: must | must-not
+- **Category**: functional | security | concurrency | data-integrity | resource-lifecycle | parity
+- **Statement**: {precise testable statement}
+- **Boundary**: {ref TB-xxx or ABS-xxx}
+- **Violated when**: {specific condition}
+- **Guards against**: {AP-xxx or null}
+- **Test approach**: unit | property-based | integration
+- **Risk**: low | medium | high | critical
+- **Implemented in**: {filled during GREEN phase}
+
+## Prohibitions
+### PRH-001: {short name}
+- **Statement**: {what must never happen}
+- **Detection**: {test, linter, grep}
+- **Consequence**: {what goes wrong}
+
+## Boundary Conditions (standard+)
+### BND-001: {short name}
+- **Boundary**: {ref TB-xxx}
+- **Input from**: {untrusted source}
+- **Validation required**: {what to check}
+- **Failure mode**: {fail-open? fail-closed?}
+
+## STRIDE Analysis (high+ with require_stride)
+### STRIDE for TB-xxx: {boundary name}
+- Spoofing / Tampering / Repudiation / Info Disclosure / DoS / Elevation of Privilege
+
+## Environment Assumptions (high+)
+- **EA-001**: {assumption} — refs ENV-xxx — {consequence if wrong}
+
+## Open Questions
+- **OQ-001**: {question} — {why it matters}
+```
+
+**Lite mode spec format:**
+
+```markdown
+# Spec: {Task Title}
+
+## What
+One paragraph.
+
+## Rules
+- **R-001** [unit]: {testable statement}
+- **R-002** [integration]: {testable statement}
+- **R-003** [unit]: {testable statement}
+
+Test level guide:
+- [unit] — logic, validation, transformation. Can test in isolation.
+- [integration] — wiring, config reaching runtime, lifecycle, middleware chains,
+  cross-component communication. Must test through the real system path.
+
+If a rule involves connecting components (parsed config → handler, registered callback →
+invoked on event, middleware added → actually runs in chain), it MUST be [integration].
+A unit test with hand-constructed mocks will not catch missing wiring.
+
+## Won't Do
+- {out of scope}
+
+## Risks
+- {risk} — {mitigation or "accepted"}
+
+## Open Questions
+- {question}
+```
+
+### Step 4: Load Invariant Templates (Full Mode)
+
+In Full mode, check which invariant template categories apply to this feature. Templates are shipped with Correctless (in the plugin or git-clone install). Search for them:
+- `concurrency.md` — if feature involves goroutines, channels, mutexes, shared state
+- `resource-lifecycle.md` — if feature allocates resources
+- `config-lifecycle.md` — if feature adds/modifies config fields
+- `network-protocol.md` — if feature involves network, TLS, protocols
+- `security-detection.md` — if feature involves detection rules or security decisions
+- `data-integrity.md` — if feature transforms, stores, or transmits data
+
+Walk through applicable template items with the human. Relevant items become draft invariants. Skip irrelevant items with a noted reason.
+
+### Step 5: Check Antipatterns
+
+For each AP-xxx entry in `.claude/antipatterns.md`, ask: does this feature risk repeating this bug class? If yes, add a rule/invariant that prevents it (with `guards_against: AP-xxx` in Full mode).
+
+### Step 6: Check Drift Debt (Full Mode)
+
+Read `.claude/meta/drift-debt.json`. If any open drift items involve files or abstractions this feature touches, surface them to the human.
+
+### Step 7: Recommend Intensity (Full Mode)
+
+After drafting the spec, recommend an intensity level:
+- Touches a trust boundary → recommend `high` or `critical`
+- Security-categorized invariants → recommend `high` or `critical`
+- Concurrency invariants → recommend at least `standard`
+- Pure functional change → `low` is fine
+
+The recommendation is advisory — the human decides.
+
+### Step 8: Present to Human
+
+Walk through the rules/invariants with the human. Present them in small groups, ask for confirmation or correction. Open questions must be resolved before moving forward.
+
+### Step 9: Advance State
+
+Once the human approves the spec, advance to review. **Review is MANDATORY — never skip it, regardless of feature size.** The review always finds issues.
+
+```bash
+# Lite mode:
+.claude/hooks/workflow-advance.sh review
+
+# Full mode (with formal modeling):
+.claude/hooks/workflow-advance.sh model
+
+# Full mode (without formal modeling):
+.claude/hooks/workflow-advance.sh review-spec
+```
+
+After advancing, tell the human to run `/creview` (Lite) or `/creview-spec` (Full). Do NOT proceed to `/ctdd` yourself. The review must happen first.
+
+## Claude Code Feature Integration
+
+### Task Lists
+Structure the spec process as tasks:
+- Socratic brainstorm (challenge assumptions, refine scope)
+- Read context (ARCHITECTURE.md, antipatterns, drift debt, QA findings)
+- Research phase (if triggered): spawning research agent, searching, producing brief
+- Conversation with human (questions asked, answers received)
+- Draft spec (writing each section)
+- Template loading (which templates applied, which skipped)
+- Antipattern check
+- Present to human for review
+
+### /btw
+When presenting the spec for review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."
+
+### /export
+After spec approval, suggest: "Consider exporting this conversation as a decision record: `/export docs/decisions/{task-slug}-spec.md` — captures why these specific rules were chosen."
+
+## Constraints
+
+- **NEVER write code.** Not even test stubs. This skill produces a spec document, nothing else.
+- **Every rule/invariant MUST be testable.** If you can't describe a test for it, rewrite it until you can or remove it.
+- **If on main branch**, tell the user to create a feature branch first.
+- **Do NOT produce a self-assessment.** You are biased toward your own spec. The review skill will assess it with fresh eyes.
+- **Batch questions by theme** when the human clearly understands the domain. Reserve one-at-a-time for genuinely ambiguous answers.
+- **Full mode**: NEVER skip STRIDE for features touching trust boundaries (unless `require_stride` is false).
+- **NEVER skip the Socratic Brainstorm (Step 0).** Even experienced developers benefit from 2-3 reframing questions. The brainstorm is sequential and not subject to question batching.
+- **NEVER skip review.** Do not advance directly to tests. Do not suggest skipping review because the feature is small. The review step is enforced by the state machine and always produces value.

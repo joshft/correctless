@@ -1,0 +1,5 @@
+{
+  "name": "correctless",
+  "description": "Full correctness-oriented development workflow for security-critical systems. Formal modeling, multi-agent adversarial review, convergence auditing, mutation testing, and postmortem feedback loops.",
+  "version": "1.8.0"
+}

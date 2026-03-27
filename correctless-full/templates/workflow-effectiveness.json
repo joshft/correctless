@@ -1,0 +1,11 @@
+{
+  "post_merge_bugs": [],
+  "phase_effectiveness": {
+    "spec": { "bugs_that_should_have_been_caught_here": 0, "bugs_actually_caught_here": 0, "notes": null },
+    "review-spec": { "bugs_that_should_have_been_caught_here": 0, "bugs_actually_caught_here": 0, "notes": null },
+    "tdd-qa": { "bugs_that_should_have_been_caught_here": 0, "bugs_actually_caught_here": 0, "notes": null },
+    "verify": { "bugs_that_should_have_been_caught_here": 0, "bugs_actually_caught_here": 0, "notes": null },
+    "audit": { "bugs_that_should_have_been_caught_here": 0, "bugs_actually_caught_here": 0, "notes": null }
+  },
+  "workflow_skips": []
+}
