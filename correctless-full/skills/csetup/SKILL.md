@@ -10,6 +10,24 @@ You are the onboarding agent. Your job is to get a project from zero to ready-to
 
 **For existing projects:** Tell the user upfront: "Setting up on an existing project takes a few minutes — I need to scan your codebase to learn your conventions, architecture, and tooling. Larger projects take longer. I'll show you what I find as I go."
 
+## Progress Visibility (MANDATORY)
+
+Setup on existing projects takes several minutes. The user must see progress throughout.
+
+**Before starting**, create a task list:
+1. Detect project (language, test runner, package manager)
+2. Run setup script
+3. Review config interactively
+4. Discover architecture and populate ARCHITECTURE.md
+5. Mine conventions
+6. Bootstrap AGENT_CONTEXT.md
+7. Health check (17 items across security, quality, testing, CI, docs, git)
+8. Source control configuration
+
+**Between each step**, print a 1-line status: "Project detected — {language} with {test runner}. Running setup script..." During the health check, announce each category as it completes: "Security checks done — {N}/{M} passing. Running code quality checks..."
+
+Mark each task complete as it finishes.
+
 ## Step 1: Detect the Project
 
 Scan the project root silently. Then present findings conversationally:
@@ -702,17 +720,7 @@ When `/csetup` is run on a project that's already configured:
 ## Claude Code Feature Integration
 
 ### Task Lists
-Use the TaskCreate tool to create tasks and TaskUpdate to mark them complete as each step finishes. This gives the user real-time visibility into progress.
-
-Structure the health check as tasks with real-time results:
-- Each security check as a sub-task (✓/✗ with status)
-- Each code quality check as a sub-task
-- Each testing check as a sub-task
-- Each CI/CD check as a sub-task
-- Each documentation check as a sub-task
-- Each git hygiene check as a sub-task
-- Final score
-- Fix generation for each accepted fix
+See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ## Constraints
 

@@ -15,6 +15,30 @@ This workflow optimizes for correctness, not speed. Every step exists because sk
 
 The full pipeline: **RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge.**
 
+## Progress Visibility (MANDATORY)
+
+The TDD workflow can take 15-30+ minutes. The user must see what's happening at all times. Silence is not acceptable.
+
+**Before starting any work**, create a task list showing the full pipeline:
+1. RED: Write failing tests from spec
+2. Test audit: Check test quality before implementation
+3. GREEN: Implement to make tests pass
+4. /simplify: Clean up code quality
+5. QA: Independent review of tests + implementation
+6. (If QA finds issues: Fix round N → re-QA)
+
+**Between every phase**, print a 1-line status update:
+- "Spawning test-writing agent — reading spec ({N} rules), ARCHITECTURE.md, antipatterns..."
+- "RED complete — {N} test files, {M} test cases, all failing as expected. Running test audit..."
+- "Test audit passed — {N} suggestions applied. Spawning implementation agent..."
+- "GREEN complete — all {M} tests passing. Running /simplify..."
+- "/simplify done. Spawning QA agent..."
+- "QA found {N} issues ({C} critical, {H} high). Starting fix round 1..."
+
+**When spawning a subagent**, tell the user what it's doing. When it completes, immediately announce results before moving to the next step.
+
+Mark each task complete as it finishes. The user should watch the pipeline progress in real time.
+
 ## Core Principle: Agent Separation
 
 The RED phase (test writing) and GREEN phase (implementation) MUST be executed by **different agents**. If the same agent writes both, it will write tests that are easy to satisfy, or implement code that games the specific test cases.
@@ -271,15 +295,7 @@ Edit the spec, then `workflow-advance.sh tests` to resume from RED.
 ## Claude Code Feature Integration
 
 ### Task Lists
-Use the TaskCreate tool to create tasks and TaskUpdate to mark them complete as each step finishes. This gives the user real-time visibility into progress.
-
-Structure each phase as task list items so the user sees progress. Create tasks for:
-- Each RED phase step (read spec, write tests, create stubs, verify tests fail)
-- Each GREEN phase step (read tests, implement each file, run tests, run race detector)
-- /simplify step
-- Each QA step (check rules, review test-edit log, check antipatterns, report)
-- Fix rounds and re-QA as sub-tasks under the round number
-Mark tasks complete as they finish. The user should see the pipeline converge in real time.
+See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### Background Tasks
 - Run mutation testing as a background task during QA — continue with rule coverage, antipattern checks, and test-edit log review while mutations run

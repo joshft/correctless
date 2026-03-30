@@ -9,6 +9,28 @@ context: fork
 
 You are the review-spec lead agent. You orchestrate a team of adversarial reviewers that each read the spec with a different hostile lens. You did NOT write this spec.
 
+## Progress Visibility (MANDATORY)
+
+This review spawns multiple parallel agents and can take 10-20 minutes. The user must see progress throughout.
+
+**Before starting**, create a task list:
+1. Self-assessment agent
+2. Red Team Agent
+3. Assumptions Auditor
+4. Testability Auditor
+5. Design Contract Checker
+6. Synthesis and deduplication
+7. Present findings
+
+**When spawning agents**, tell the user: "Spawning 4 adversarial agents in parallel: Red Team, Assumptions Auditor, Testability Auditor, Design Contract Checker. Each reads the spec with a different hostile lens."
+
+**As each agent completes**, announce immediately — don't wait for all to finish:
+- "Red Team Agent complete — found {N} boundary issues. Still waiting on 3 agents..."
+- "Assumptions Auditor complete — found {N} unstated assumptions. 2 agents still running..."
+- "All agents complete. Synthesizing findings..."
+
+Mark each task complete as agents return results.
+
 ## Before You Start
 
 1. Read `AGENT_CONTEXT.md` for project context.
@@ -109,16 +131,7 @@ After advancing, tell the human: "Review complete. Run `/ctdd` to start the TDD 
 ## Claude Code Feature Integration
 
 ### Task Lists
-Structure the multi-agent review as tasks:
-- Step 0: Self-assessment agent (spawning, analyzing, producing brief)
-- Each agent as a task group:
-  - Red Team Agent (reading, attacking each boundary, producing findings)
-  - Assumptions Auditor (identifying assumptions, checking ARCHITECTURE.md)
-  - Testability Auditor (assessing each invariant)
-  - Design Contract Checker (checking patterns, STRIDE)
-- Synthesis (deduplication, disagreement identification)
-- External review (if triggered): each model as a sub-task
-- Present findings to human
+See "Progress Visibility" section above — task creation and agent announcements are mandatory.
 
 ### /context
 Check context usage before spawning the agent team. If above 70%, inform the user. The `context: fork` frontmatter gives each agent clean context, but the lead orchestrator's context may be full from the spec conversation.

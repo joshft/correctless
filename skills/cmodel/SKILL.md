@@ -13,6 +13,21 @@ You are the modeling agent. Your job is to translate spec invariants into a form
 
 Features that involve: state machines, protocol handling, access control, trust boundary transitions, resource ownership. Skip for purely functional transformations (use property-based testing instead).
 
+## Progress Visibility (MANDATORY)
+
+Formal modeling takes 10-15 minutes, with the Alloy Analyzer potentially running 30+ seconds per assertion. The user must see progress throughout.
+
+**Before starting**, create a task list:
+1. Identify modelable scope
+2. Generate Alloy model
+3. Run Alloy Analyzer (each assertion as a sub-task)
+4. Interpret results (spawn interpreter subagent)
+5. Present to human for model review
+
+**Between each step**, print a 1-line status: "Modelable scope identified — {N} state machines, {M} trust boundaries. Generating Alloy model..." When the analyzer runs, announce each assertion: "Checking {assertion} (INV-xxx)..." If auto-retrying syntax errors: "Syntax error — fixing and retrying (attempt {N}/3)..." When the interpreter subagent completes, announce: "Interpreter complete — {N} counterexamples translated to domain scenarios."
+
+Mark each task complete as it finishes.
+
 ## Before You Start
 
 Check current phase: `.claude/hooks/workflow-advance.sh status`. You should be in the `model` phase. If not, tell the human to run `/cspec` first to enter the correct phase. Do not advance state from the wrong phase.
@@ -105,13 +120,7 @@ After advancing, tell the human: "Model complete. Run `/creview-spec` for multi-
 ## Claude Code Feature Integration
 
 ### Task Lists
-Structure the modeling process as tasks:
-- Identify modelable scope (which parts of spec are amenable to Alloy)
-- Generate Alloy model (signatures, facts, predicates, assertions)
-- Run Alloy Analyzer (each assertion as a sub-task with result)
-- Auto-retry on syntax errors (attempt 1, 2, 3)
-- Interpret results (spawn interpreter agent)
-- Present to human for model review
+See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### Background Tasks
 Run the Alloy Analyzer (`java -jar`) as a background task while preparing the counterexample interpretation context. The JAR can take 30+ seconds for complex state spaces.

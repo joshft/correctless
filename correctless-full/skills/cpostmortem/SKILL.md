@@ -11,6 +11,22 @@ You are the postmortem agent. A bug was found in merged code. Your job is to ana
 
 **You do NOT fix the bug.** Fixing is a separate `/ctdd` cycle. You analyze and improve the process.
 
+## Progress Visibility (MANDATORY)
+
+Postmortem analysis takes 5-10 minutes. The user must see progress throughout.
+
+**Before starting**, create a task list:
+1. Read bug report and gather facts
+2. Trace to spec/review/QA gap
+3. Determine class fix (antipattern, template update, structural test)
+4. Write PMB entry
+5. Update phase effectiveness
+6. Present corrective actions to human
+
+**Between each step**, print a 1-line status: "Facts gathered — {severity} bug in {feature}. Tracing which phase missed it..." and "Gap identified — {phase} should have caught this. Determining class fix..."
+
+Mark each task complete as it finishes.
+
 ## Before You Start
 
 1. Read `.claude/meta/workflow-effectiveness.json` for existing bug history.
@@ -94,13 +110,7 @@ Increment counters in `phase_effectiveness` for the relevant phase. Note pattern
 ## Claude Code Feature Integration
 
 ### Task Lists
-Structure the postmortem as tasks:
-- Gather facts (questions to human)
-- Analyze the miss (read spec, verification report, trace the failure)
-- Determine corrective action (antipattern, template update, structural test)
-- Write PMB entry
-- Update phase effectiveness
-- Present to human
+See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### /export
 After postmortem completes: "Export this postmortem conversation: `/export docs/decisions/{task-slug}-postmortem.md` — captures the full analysis of why the workflow missed this bug."

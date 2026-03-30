@@ -13,6 +13,22 @@ You are the Olympics orchestrator. You run convergence-based audits using parall
 
 The TDD cycle catches feature-level bugs. The Olympics catch systemic and adversarial bugs that TDD misses — because the agents have different lenses. A TDD agent asks "does this feature work?" An Olympics agent asks "how does this feature break everything else?" or "how does an attacker abuse this feature?"
 
+## Progress Visibility (MANDATORY)
+
+Olympics audits run multiple convergence rounds, each spawning parallel agents. This can take 30-60+ minutes. The user must see what's happening at every stage.
+
+**Before starting**, create a task list for Round 1 with each specialist agent. Update between rounds.
+
+**Before each round**, announce: "Starting Round {N} — spawning {M} specialist agents ({preset} preset). Looking for: {what each agent hunts for}."
+
+**As each agent completes**, announce immediately: "{Agent name} complete — submitted {N} findings ({C} confirmed, {P} probable, {S} suspicious). {M} agents still running..."
+
+**After triage**, announce: "Triage complete — {N} raw findings → {M} validated, {K} rejected. {H} high-severity fixes needed."
+
+**After each fix round**, announce: "Fix round complete — {N}/{M} findings resolved. Running regression tests..."
+
+**Between rounds**, show the convergence trend: "Round 1: 12 findings → Round 2: 4 findings → Round 3: 1 finding. {Converging/Not yet converging}."
+
 ## Parameters
 
 Invoke with: `/caudit [preset] [scope]`
@@ -342,16 +358,7 @@ When a finding category recurs across runs, it's a systemic issue that belongs i
 ## Claude Code Feature Integration
 
 ### Task Lists
-Use the TaskCreate tool to create tasks and TaskUpdate to mark them complete as each step finishes. This gives the user real-time visibility into progress.
-
-Structure each round as a task list so the user watches convergence:
-- Round N header with agent spawning status
-- Each specialist agent as a sub-task (scanning → findings submitted)
-- Triage step (N raw → M validated, K rejected)
-- Each fix as a sub-task with finding ID and severity
-- Commit step
-- Convergence check result
-Show finding count trend across rounds so the user sees it dropping.
+See "Progress Visibility" section above — task creation and round-by-round narration are mandatory.
 
 ### Background Tasks
 - When fix rounds involve TDD (write test then fix), run the test suite in the background while preparing the next fix

@@ -25,6 +25,23 @@ Every system has trust boundaries — places where identity, privilege, data sen
 
 Your source code access lets you map these boundaries precisely. Read the code to understand where the system draws lines, then systematically test whether those lines actually hold.
 
+## Progress Visibility (MANDATORY)
+
+Red team assessments can run for hours. The user must see progress throughout — especially for overnight runs where the task list becomes the attack narrative.
+
+**Before starting**, create a task list:
+1. Isolation check (verify private IP/localhost)
+2. Boundary mapping (source code analysis)
+3. Seam identification and attack path ranking
+4. Attack execution (each path as a sub-task)
+5. Report writing
+
+**Between each phase**, print a 1-line status: "Isolation verified — target at {IP}. Reading source code to map trust boundaries..." For each attack path, announce: "Attacking seam: {description}..." and when it resolves: "Path {N}: {succeeded/blocked by defense}. {Chaining to next boundary / Pivoting to path {M}}..."
+
+If subagents are spawned (team mode), announce each agent's completion and findings count immediately.
+
+Mark each task complete as it finishes.
+
 ## Before You Start: Isolation Check
 
 **MANDATORY.** Before doing anything, verify the target environment is isolated:
@@ -279,19 +296,7 @@ Devil's Advocate (periodic)
 ## Claude Code Feature Integration
 
 ### Task Lists
-Structure the assessment as an attack narrative:
-- Isolation check (verify private IP/localhost)
-- Source code analysis (trust boundary mapping, each boundary as sub-task)
-- Attack paths identified (ranked by likelihood)
-- Each attack path as a task group:
-  - Craft payload/technique
-  - Execute against live target
-  - Result: ✓ succeeded / ✗ blocked (with defense that stopped it)
-  - If succeeded: chain to next boundary
-- Report generation
-- Regression test writing (if objective achieved)
-
-For overnight runs, this task list becomes the attack narrative the user reads in the morning.
+See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### Background Tasks
 Run crafted payloads and network probes as background tasks where possible — prepare the next attack path while waiting for the response from the current one.

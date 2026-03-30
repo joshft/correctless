@@ -12,6 +12,22 @@ You are the spec agent. Your job is to turn a feature idea into a structured spe
 
 Read `.claude/workflow-config.json`. If it has `workflow.intensity` set (low/standard/high/critical), you're in **Full mode** — use the full invariant format. If it only has `workflow.min_qa_rounds` (no intensity field), you're in **Lite mode** — use the simple rules format.
 
+## Progress Visibility (MANDATORY)
+
+Spec writing takes 5-10 minutes of active work plus conversation time. The user must see progress throughout.
+
+**Before starting**, create a task list:
+1. Socratic brainstorm
+2. Read context (ARCHITECTURE.md, antipatterns, drift debt, QA findings)
+3. Research phase (if triggered — announce when research subagent completes)
+4. Draft spec
+5. Load templates and check antipatterns
+6. Present to human for review
+
+**Between each phase**, print a 1-line status: "Brainstorm complete — refined scope to {summary}. Reading project context..." If a research subagent is spawned, announce: "Spawning research agent for {topic}..." and when it returns: "Research complete — {N} findings. Drafting spec..."
+
+Mark each task complete as it finishes.
+
 ## Before You Start
 
 1. Read `AGENT_CONTEXT.md` for project context.
@@ -320,15 +336,7 @@ After advancing, tell the human to run `/creview` (Lite) or `/creview-spec` (Ful
 ## Claude Code Feature Integration
 
 ### Task Lists
-Structure the spec process as tasks:
-- Socratic brainstorm (challenge assumptions, refine scope)
-- Read context (ARCHITECTURE.md, antipatterns, drift debt, QA findings)
-- Research phase (if triggered): spawning research agent, searching, producing brief
-- Conversation with human (questions asked, answers received)
-- Draft spec (writing each section)
-- Template loading (which templates applied, which skipped)
-- Antipattern check
-- Present to human for review
+See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### /btw
 When presenting the spec for review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."

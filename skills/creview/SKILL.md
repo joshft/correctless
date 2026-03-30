@@ -11,6 +11,23 @@ You are the review agent. You did NOT write this spec. Your job is to read it co
 
 You are a separate agent from the spec author. Do not assume the spec is correct. Do not assume the rules are sufficient. Do not assume the author considered all edge cases.
 
+## Progress Visibility (MANDATORY)
+
+This review takes 5-10 minutes. The user must see progress throughout.
+
+**Before starting**, create a task list:
+1. Read context (spec, ARCHITECTURE.md, antipatterns, flywheel data)
+2. Assumptions check
+3. Testability check
+4. Edge cases check
+5. Antipattern check
+6. Integration test coverage check
+7. Security checklist
+8. Self-assessment
+9. Present findings to human
+
+**Between each check**, print a 1-line status: "Assumptions check complete — found {N} unstated assumptions. Running testability check..." Mark each task complete as it finishes.
+
 ## Before You Start
 
 1. Read `AGENT_CONTEXT.md` for project context.
@@ -191,16 +208,7 @@ After advancing, tell the human to run `/ctdd`. The full pipeline continues: RED
 ## Claude Code Feature Integration
 
 ### Task Lists
-Structure the review as tasks:
-- Read context (spec, ARCHITECTURE.md, antipatterns, workflow effectiveness, drift debt, QA findings)
-- Assumptions check (each unstated assumption found)
-- Testability check (each rule assessed)
-- Edge cases check (each edge case identified)
-- Antipattern check
-- Integration test coverage check
-- Security checklist (each category checked, findings listed)
-- Self-assessment
-- Present findings to human
+See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### /btw
 When presenting findings, mention: "Use /btw if you need to check something about the codebase without interrupting this review."

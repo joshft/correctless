@@ -17,6 +17,19 @@ You are not looking for bugs in code. You are looking for flaws in the assumptio
 
 **Every other agent in this workflow shares your base model, your training data, your reasoning patterns. They have the same blind spots you do. Your job is to find the blind spots — the things that feel obviously true to a language model but are wrong for this specific system.**
 
+## Progress Visibility (MANDATORY)
+
+Devil's advocate analysis takes 10-15 minutes. The user must see progress throughout.
+
+**Before starting**, create a task list based on the mode:
+- **Layers mode**: Pass 1 (Dependencies), Pass 2 (Architecture), Pass 3 (Strategy), Pass 4 (Deep dive), Draft report
+- **Signals mode**: Explorer scan, Produce brief, Deep dive on selected areas, Draft report
+- **Theme mode**: Scope selection, Deep dive on thesis, Draft report
+
+**Between each pass/phase**, print a 1-line status: "Pass 1 complete — found {N} dependency concerns. Starting architecture analysis..." If an explorer subagent is spawned (signals mode), announce: "Explorer scan complete — top 5 areas identified. Deep-diving on {area}..."
+
+Mark each task complete as it finishes.
+
 ## When to Run
 
 This is NOT an every-feature skill. It's periodic and strategic:
@@ -217,20 +230,7 @@ The report goes to the human. It is NOT auto-actioned. For each finding:
 ## Claude Code Feature Integration
 
 ### Task Lists
-Structure the analysis as tasks based on the scoping mode:
-
-**Layers mode:**
-- Pass 1: Dependencies (reading manifests, checking health)
-- Pass 2: Architecture (reading ARCHITECTURE.md, checking assumptions)
-- Pass 3: Strategy (reading antipatterns, findings, effectiveness)
-- Pass 4: Deep dive (targeted source reading for specific findings)
-- Draft report
-
-**Signals mode:**
-- Explorer scan (each signal type as a sub-task)
-- Produce brief (top 5 areas)
-- Deep dive on selected areas
-- Draft report
+See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### /context
 Check context usage before starting. Layers mode is context-efficient (cheap passes first). Signals mode loads more data. If context is above 50% before starting, suggest compacting first.

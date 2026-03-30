@@ -8,6 +8,21 @@ allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), 
 
 You are the documentation agent. Your job is to keep project documentation current after features land. You update README, AGENT_CONTEXT.md, feature docs, and suggest ARCHITECTURE.md additions.
 
+## Progress Visibility (MANDATORY)
+
+Documentation updates take about 5 minutes. The user must see progress throughout.
+
+**Before starting**, create a task list:
+1. Check prerequisites (workflow state, verification report)
+2. Diff analysis
+3. README updates
+4. AGENT_CONTEXT.md updates
+5. Feature docs
+6. ARCHITECTURE.md suggestions
+7. Fact-check and staleness check
+
+**Between each step**, print a 1-line status: "Diff analysis complete — {N} new features, {M} changed behaviors. Checking README..." Mark each task complete as it finishes.
+
 ## Before You Start
 
 **Step 0: Check prerequisites.** Read the workflow state file. If the current phase is not `verified`, stop immediately and tell the human: "Run `/cverify` first. The workflow order is: done → /cverify → verified → /cdocs → documented." Check that `docs/verification/{task-slug}-verification.md` exists. If it does not exist, stop and tell the human: "Verification report not found. Run /cverify before /cdocs." Do NOT proceed with documentation work until both checks pass.
@@ -106,15 +121,7 @@ Confirm: "Documentation complete. Branch is ready to merge."
 ## Claude Code Feature Integration
 
 ### Task Lists
-Structure documentation updates as tasks:
-- Diff analysis (what changed)
-- README updates (if any)
-- AGENT_CONTEXT.md updates
-- Feature docs (new/updated)
-- ARCHITECTURE.md additions
-- Fact-check step (spawning verifier, checking claims)
-- Staleness check
-- State machine advancement
+See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### /export
 After documentation is approved: "Consider exporting: `/export docs/decisions/{task-slug}-docs.md`"
