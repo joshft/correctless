@@ -1,7 +1,7 @@
 ---
 name: caudit
 description: Olympics audit system. Convergence-based auditing with parallel specialized agents, confidence tiers, bounty/penalty economics, and find/fix loops. Presets: QA, Hacker, Performance, Custom.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/findings/*), Write(.claude/antipatterns.md), Write(*test*), Write(*spec*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/*), Write(.claude/antipatterns.md), Write(*test*), Write(*spec*), Edit
 context: fork
 ---
 
@@ -63,7 +63,8 @@ After each round's fixes are committed, write/update the checkpoint:
 ```json
 {
   "skill": "caudit",
-  "slug": "{preset}-{date}",
+  "slug": "{preset}-{date}-{N}",
+  "branch": "{current-branch}",
   "completed_phases": ["round-1", "round-2"],
   "current_phase": "round-3",
   "timestamp": "ISO"

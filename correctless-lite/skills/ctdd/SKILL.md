@@ -53,7 +53,7 @@ The RED phase (test writing) and GREEN phase (implementation) MUST be executed b
 
 ### Checkpoint Resume
 
-Check for `.claude/artifacts/checkpoint-ctdd-{slug}.json` (derive slug from the workflow state file's task field).
+After reading the workflow state (step 5 below), check for `.claude/artifacts/checkpoint-ctdd-{slug}.json` (derive slug from the workflow state file's spec_file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
 - **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify the current phase:
   - After `red`: test files exist and fail when run
@@ -70,6 +70,7 @@ After each major phase (`red`, `test-audit`, `green`, `simplify`, `qa`) complete
 {
   "skill": "ctdd",
   "slug": "{task-slug}",
+  "branch": "{current-branch}",
   "completed_phases": ["red", "test-audit"],
   "current_phase": "green",
   "timestamp": "ISO"
@@ -379,7 +380,7 @@ After workflow completes (done phase), suggest: "Consider exporting this convers
 - **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
 - **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
 - **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
-- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch.
+- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch. Also delete the checkpoint file: `rm -f .claude/artifacts/checkpoint-ctdd-*.json`
 
 ## Constraints
 

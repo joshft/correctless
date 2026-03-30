@@ -1,6 +1,6 @@
 # Correctless Lite: Structured Development Workflow
 
-> **Note:** This is the original design specification. The implementation has evolved — 7 skills were added (/csetup, /cstatus, /csummary, /cmetrics, /cdebug, /cpr-review, /crefactor), the security checklist was added to /creview, and the research agent was added to /cspec. Lite now has 13 skills; Full has 20. See the [README](README.md) and the actual [skill files](skills/) for the current implementation.
+> **Note:** This is the original design specification. The implementation has evolved — 8 skills were added (/csetup, /cstatus, /csummary, /cmetrics, /cdebug, /cpr-review, /crefactor, /chelp), the security checklist was added to /creview, and the research agent was added to /cspec. Lite now has 13 skills; Full has 20. See the [README](README.md) and the actual [skill files](skills/) for the current implementation.
 
 
 

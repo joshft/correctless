@@ -12,7 +12,7 @@ Show the user the workflow pipeline, available commands, and current status. Kee
 
 ### 1. Detect Mode
 
-Read `.claude/workflow-config.json`. If `workflow.intensity` is set → Full mode. Otherwise → Lite mode. If the config file doesn't exist → not set up yet.
+Check if `.claude/workflow-config.json` exists. If not → not set up yet. If it exists, read it: if `workflow.intensity` is set → Full mode. Otherwise → Lite mode.
 
 ### 2. Show Pipeline
 
@@ -46,6 +46,7 @@ Other:
   /crefactor    Structured refactoring (tests must pass before + after)
   /cpr-review   Review someone else's PR
   /cdebug       Structured bug investigation
+  /cpostmortem  Post-merge bug analysis (when bugs escape to production)
   /cstatus      Where am I? What's next?
   /csummary     What did the workflow catch this feature?
   /cmetrics     Project-wide health dashboard
@@ -60,7 +61,6 @@ Full mode additions:
   /creview-spec Adversarial 4-agent review (~15 min, critical features)
   /caudit       Olympics audit (QA/Hacker/Performance)
   /cupdate-arch Update ARCHITECTURE.md
-  /cpostmortem  Post-merge bug analysis
   /cdevadv      Devil's advocate — challenge assumptions
   /credteam     Live red team assessment
 ```

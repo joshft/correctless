@@ -1,7 +1,7 @@
 ---
 name: creview-spec
 description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, and design contract checker. Use after /cspec or /cmodel.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.claude/artifacts/reviews/*), Write(docs/specs/*), Write(.claude/meta/external-review-history.json)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.claude/artifacts/*), Write(docs/specs/*), Write(.claude/meta/external-review-history.json)
 context: fork
 ---
 
@@ -39,7 +39,7 @@ Mark each task complete as agents return results.
 
 ### Checkpoint Resume
 
-Check for `.claude/artifacts/checkpoint-creview-spec-{slug}.json` (derive slug from the spec file's task field).
+After reading the spec artifact (step 2 below), check for `.claude/artifacts/checkpoint-creview-spec-{slug}.json` (derive slug from the spec file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
 - **If found and <24 hours old**: Read `completed_phases`. Phases: `self-assessment`, `red-team`, `assumptions`, `testability`, `design-contract`. For parallel agents, checkpoint only after ALL 4 complete, not individually — partial agent results are not useful without synthesis. Verification is weak here (agent output lives in conversation context, not artifacts), so if the checkpoint says agents completed but you cannot access their findings: "Checkpoint found but agent outputs are not recoverable. Restarting agent team." Re-spawning is safer than skipping.
   If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}."
@@ -51,6 +51,7 @@ After each major phase completes, write/update the checkpoint:
 {
   "skill": "creview-spec",
   "slug": "{task-slug}",
+  "branch": "{current-branch}",
   "completed_phases": ["self-assessment", "red-team", "assumptions", "testability", "design-contract"],
   "current_phase": "synthesis",
   "timestamp": "ISO"

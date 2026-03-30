@@ -38,7 +38,7 @@ Mark each task complete as it finishes.
 
 ### Checkpoint Resume
 
-Check for `.claude/artifacts/checkpoint-crefactor-{slug}.json` (derive slug from the refactor intent filename).
+After capturing the refactor intent (below), check for `.claude/artifacts/checkpoint-crefactor-{slug}.json` (derive slug from the intent filename). If no intent file exists yet, no checkpoint can exist — proceed normally. Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
 - **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify each phase:
   - After `coverage-assessed`: refactor intent artifact exists
@@ -54,6 +54,7 @@ After each major phase (`coverage-assessed`, `characterization-tests`, `phase-1`
 {
   "skill": "crefactor",
   "slug": "{refactor-slug}",
+  "branch": "{current-branch}",
   "completed_phases": ["coverage-assessed", "characterization-tests", "phase-1"],
   "current_phase": "phase-2",
   "timestamp": "ISO"
