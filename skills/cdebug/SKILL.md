@@ -18,11 +18,12 @@ Bug investigation takes 5-15 minutes depending on complexity. The user must see 
 **Before starting**, create a task list:
 1. Reproduce the bug
 2. Root cause investigation (code path, git blame, tests, antipatterns)
-3. Hypothesis 1
-4. Fix: write failing test
-5. Fix: spawn implementation agent
-6. Fix: verify all tests pass
-7. Class fix assessment
+3. (Optional) Automated bisect — if regression with reliable test
+4. Hypothesis 1
+5. Fix: write failing test
+6. Fix: spawn implementation agent
+7. Fix: verify all tests pass
+8. Class fix assessment
 
 **Between each phase**, print a 1-line status: "Reproduction confirmed — bug triggers on {condition}. Tracing code path..." For hypotheses: "Hypothesis 1: {statement} — {confirmed/denied}." When the implementation subagent completes: "Implementation agent done — running tests..."
 
@@ -62,6 +63,31 @@ Trace the code path from trigger to failure. Do not guess.
 
 1. **Read the code path**: starting from the entry point (the API endpoint, the function call, the event handler), trace the execution path to where the bug manifests. Read every function in the chain.
 2. **Check git blame**: when did the behavior change? Was it an intentional change or a side effect? Who changed it and what was the commit message?
+
+### Automated Bisect (optional)
+
+If the bug has a reliable failing test from Phase 1, offer:
+
+> "I have a failing test that reproduces this bug. I can run `git bisect` to find the exact commit that introduced it — takes 1-3 minutes. Want me to?"
+
+**Only offer if:** the test is fast (<30 seconds), the bug is a regression (not a new feature), and the user agrees.
+
+**If yes:**
+1. Stash uncommitted changes: `git stash`
+2. Find the known-good commit: `git merge-base HEAD main`
+3. Write a bisect test script to `.claude/artifacts/debug-bisect-test.sh`:
+   ```bash
+   #!/usr/bin/env bash
+   set -e
+   {test_command_for_the_specific_failing_test}
+   ```
+4. Run: `git bisect start HEAD {good-commit} && git bisect run .claude/artifacts/debug-bisect-test.sh`
+5. Capture the first bad commit
+6. Clean up: `git bisect reset && git stash pop && rm .claude/artifacts/debug-bisect-test.sh`
+7. Report: "Bisect found commit `{sha}`: `{message}`. Changed: {files}."
+
+Feed the bisect result into Phase 3 — the identified commit narrows the hypothesis dramatically.
+
 3. **Read the tests**: what IS tested for this code path? What's NOT tested? The gap between "tested" and "failing" is often where the bug lives.
 4. **Check antipatterns** (`.claude/antipatterns.md`): is this a known bug class? If AP-003 is "config wiring missing" and this looks like a config wiring issue, you may already know the pattern.
 5. **Check QA findings** (`.claude/artifacts/qa-findings-*.json`): has this code area had issues before? What were they? Is this a recurrence?

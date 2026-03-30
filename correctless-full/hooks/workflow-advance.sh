@@ -881,7 +881,7 @@ case "$cmd" in
     echo "  status             Print current workflow state"
     echo "  status-all         Print all active workflows across branches"
     echo ""
-    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /cstatus /csummary /cmetrics /cdebug"
+    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /cpr-review /cstatus /csummary /cmetrics /cdebug"
     echo "Full:   /cmodel /creview-spec /caudit /cupdate-arch /cpostmortem /cdevadv /credteam"
     exit 1
     ;;

@@ -147,6 +147,30 @@ If the spec was updated during TDD, note what changed and why.
 
 ## After Verification
 
+### Commit Metadata (Git Trailers)
+
+If `workflow.git_trailers` is `true` in `workflow-config.json`, stage the verification report and commit with trailers:
+```
+verify(task-slug): verification complete
+
+Spec: docs/specs/{task-slug}.md
+Rules-covered: R-001 through R-{N}
+QA-rounds: {N}
+Verified-by: /cverify
+```
+
+The `Verified-by: /cverify` trailer signals that this commit passed structured verification. Queryable: `git log --format='%(trailers:key=Verified-by)'`.
+
+### Git Notes (optional)
+
+If `workflow.git_notes` is `true` in `workflow-config.json`, attach a verification summary as a git note:
+
+```bash
+git notes add -f -m "Verified by /cverify: {N}/{M} rules covered, {K} drift items, {J} findings" HEAD
+```
+
+Reviewers can see this with `git notes show HEAD` or `git log --notes`.
+
 Advance the state machine:
 ```bash
 .claude/hooks/workflow-advance.sh verified

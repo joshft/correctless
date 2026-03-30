@@ -36,7 +36,9 @@
     "fail_closed_when_no_state": false,
     "merge_strategy": "squash",
     "min_new_package_coverage": 60,
-    "drift_debt_age_threshold_days": 90
+    "drift_debt_age_threshold_days": 90,
+    "git_trailers": false,
+    "git_notes": false
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",

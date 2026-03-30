@@ -135,7 +135,7 @@ Then restart Claude Code.
 
 ## Commands
 
-### Lite (10 skills)
+### Lite (11 skills)
 
 ```
 /csetup       Project health check + workflow setup
@@ -144,13 +144,14 @@ Then restart Claude Code.
 /ctdd         Enforced TDD: RED → test audit → GREEN → /simplify → QA
 /cverify      Verify implementation matches spec, write verification report
 /cdocs        Update documentation (reads verification report)
+/cpr-review   Multi-lens PR review (architecture, security, tests, antipatterns)
 /cstatus      Show current phase and next steps
 /csummary     Feature summary — what the workflow caught
 /cmetrics     Project-wide metrics dashboard
 /cdebug       Structured bug investigation with TDD fix
 ```
 
-### Full (17 skills — includes all Lite skills)
+### Full (18 skills — includes all Lite skills)
 
 ```
 /csetup       Health check + workflow setup + intensity selection
@@ -166,6 +167,7 @@ Then restart Claude Code.
 /cpostmortem  Post-merge bug analysis, class fixes
 /cdevadv      Devil's advocate — challenge assumptions (theme/signals/layers)
 /credteam     Live red team assessment against running system
+/cpr-review   Multi-lens PR review + concurrency, trust boundaries, cross-spec impact
 /cstatus      Show current phase and next steps
 /csummary     Feature summary — what the workflow caught
 /cmetrics     Project-wide metrics dashboard and ROI
@@ -206,7 +208,7 @@ Mutation testing, property-based testing, and PBT helpers are Full-only. Lite wo
 
 | | Lite | Full |
 |---|------|------|
-| Skills | 10 | 17 |
+| Skills | 11 | 18 |
 | Spec format | 5 sections, simple rules | 12+ sections, typed invariants |
 | Spec research | Current best practices, dependency health | Same |
 | Review | Single-pass + auto security checklist | 4-agent adversarial team |

@@ -69,7 +69,9 @@ detect_config() {
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
-    "auto_update_antipatterns": true
+    "auto_update_antipatterns": true,
+    "git_trailers": false,
+    "git_notes": false
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",
@@ -128,7 +130,9 @@ GOEOF
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
-    "auto_update_antipatterns": true
+    "auto_update_antipatterns": true,
+    "git_trailers": false,
+    "git_notes": false
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",
@@ -171,7 +175,9 @@ TSEOF
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
-    "auto_update_antipatterns": true
+    "auto_update_antipatterns": true,
+    "git_trailers": false,
+    "git_notes": false
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",
@@ -209,7 +215,9 @@ PYEOF
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
-    "auto_update_antipatterns": true
+    "auto_update_antipatterns": true,
+    "git_trailers": false,
+    "git_notes": false
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",
@@ -247,7 +255,9 @@ RSEOF
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
-    "auto_update_antipatterns": true
+    "auto_update_antipatterns": true,
+    "git_trailers": false,
+    "git_notes": false
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",
@@ -591,7 +601,7 @@ else
 
 This project uses Correctless for correctness-oriented development.
 Read AGENT_CONTEXT.md before starting any work.
-Available commands: /cspec, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /cstatus, /csummary, /cmetrics, /cdebug
+Available commands: /cspec, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /cpr-review, /cstatus, /csummary, /cmetrics, /cdebug
 CMDEOF
   else
     cat >> "$CLAUDEMD" <<'CMDEOF'
@@ -600,7 +610,7 @@ CMDEOF
 
 This project uses Correctless Lite for structured development.
 Read AGENT_CONTEXT.md before starting any work.
-Available commands: /cspec, /creview, /ctdd, /cverify, /cdocs, /cstatus, /csummary, /cmetrics, /cdebug
+Available commands: /cspec, /creview, /ctdd, /cverify, /cdocs, /cpr-review, /cstatus, /csummary, /cmetrics, /cdebug
 CMDEOF
   fi
   ok "Updated CLAUDE.md"

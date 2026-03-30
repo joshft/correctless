@@ -45,17 +45,18 @@ cp -r helpers/* correctless-full/helpers/
 info "PBT helpers → correctless-full"
 
 # --- Lite skills ---
-for skill in csetup cspec creview ctdd cverify cdocs cstatus csummary cmetrics cdebug; do
+for skill in csetup cspec creview ctdd cverify cdocs cpr-review cstatus csummary cmetrics cdebug; do
+  mkdir -p "correctless-lite/skills/$skill"
   cp "skills/$skill/SKILL.md" "correctless-lite/skills/$skill/SKILL.md"
 done
-info "Lite skills (10) → correctless-lite"
+info "Lite skills (11) → correctless-lite"
 
 # --- Full skills (all) ---
-for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam cstatus csummary cmetrics cdebug; do
+for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam cpr-review cstatus csummary cmetrics cdebug; do
   mkdir -p "correctless-full/skills/$skill"
   cp "skills/$skill/SKILL.md" "correctless-full/skills/$skill/SKILL.md"
 done
-info "Full skills (17) → correctless-full"
+info "Full skills (18) → correctless-full"
 
 echo ""
 echo "Done. Verify with: git diff --stat"

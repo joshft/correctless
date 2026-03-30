@@ -190,6 +190,31 @@ Spawn an **implementation agent** as a separate forked subagent:
 
 After the implementation agent completes and tests pass, run `/simplify` to clean up code quality issues before QA. If `/simplify` is not available (it is a built-in Claude Code skill, not part of Correctless), skip this step and proceed to QA.
 
+### Commit Metadata (Git Trailers)
+
+Read `.claude/workflow-config.json`. If `workflow.git_trailers` is `true`, include structured trailers in all commits during TDD. If the field is absent or `false`, commit normally without trailers.
+
+**Format for implementation commits (GREEN phase):**
+```
+feat(task-slug): implement rules R-001, R-002
+
+Spec: docs/specs/{task-slug}.md
+Rules-covered: R-001, R-002
+```
+
+**Format for QA fix-round commits:**
+```
+fix(task-slug): address QA finding QA-001
+
+Spec: docs/specs/{task-slug}.md
+QA-round: {N}
+QA-finding: QA-001
+```
+
+Read the spec path from workflow state (`.spec_file`). Read the QA round from `.qa_rounds`. Determine covered rules by matching test assertions to spec rule IDs.
+
+Trailers go after a blank line at the end of the commit message. They are queryable: `git log --format='%(trailers:key=Spec)'` shows which specs produced which commits.
+
 Then advance:
 ```bash
 .claude/hooks/workflow-advance.sh qa

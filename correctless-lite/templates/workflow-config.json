@@ -20,7 +20,9 @@
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
-    "auto_update_antipatterns": true
+    "auto_update_antipatterns": true,
+    "git_trailers": false,
+    "git_notes": false
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",
