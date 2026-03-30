@@ -58,11 +58,20 @@ If neither CLI is available: "Install `gh` (GitHub) or `glab` (GitLab) to use /c
 ### Detect Dependency Bump PRs
 
 After fetching PR info, check if this is a dependency bump:
-- PR author is `dependabot[bot]`, `renovate[bot]`, `renovate-bot`, or similar
+- PR author is `dependabot[bot]`, `renovate[bot]`, `renovate-bot`, `snyk-bot`, `greenkeeper[bot]`, `mend-bolt-for-github[bot]`, or similar
 - OR: the only changed files are dependency manifests (package.json, go.mod, Cargo.toml, requirements.txt, pyproject.toml, Gemfile, pnpm-lock.yaml, yarn.lock, go.sum, Cargo.lock)
-- OR: PR title matches patterns like "Bump X from Y to Z", "Update X to Z", "chore(deps): ..."
+- OR: PR title matches patterns like "Bump X from Y to Z", "Update X to Z", "chore(deps): ...", "chore(deps-dev): ...", "fix(deps): ..."
 
-**If dependency bump detected**, skip the standard code review (Steps 2-8) entirely and run the dependency-specific lens instead:
+**If dependency bump detected**, replace the task list with dep-specific tasks:
+1. Run test suite
+2. Analyze project usage of bumped dependency
+3. Fetch changelog / release notes
+4. Check CVE (if security update)
+5. Assess breaking changes
+6. Check transitive impact
+7. Present recommendation
+
+Then run the dependency-specific lens (skip Steps 3-9, but still run Step 2 for project context):
 
 **Priority order** (most reliable signal first):
 
@@ -73,7 +82,7 @@ Run the project's test suite. If tests pass, the bump is likely safe. If tests f
 Grep the project for imports/usage of the bumped dependency. Check whether deprecated APIs are used. Flag affected files: "Found {N} files importing {package}. {M} use APIs deprecated in the new version: {list}."
 
 **3. Changelog review (context):**
-Extract the dependency name and version range from the diff. If GitHub-hosted: `gh api repos/{owner}/{repo}/releases` to fetch release notes. Otherwise search for CHANGELOG.md or release notes. Summarize breaking changes and notable fixes.
+Extract the dependency name and version range from the diff. To find the upstream repo: check the `repository` field in the package manifest (package.json, Cargo.toml, go.mod) or lockfile. If GitHub-hosted: `gh api repos/{owner}/{repo}/releases` to fetch release notes. If owner/repo cannot be determined, look for CHANGELOG.md in `node_modules/{package}/` or equivalent, or skip changelog review. Summarize breaking changes and notable fixes.
 
 **4. CVE check (if security update):**
 Read the PR body for CVE references. Assess severity and whether the project's usage is affected by the specific vulnerability.
@@ -101,8 +110,14 @@ For package.json bumps, check if the lockfile changes affect other packages. For
 ### CVE (if applicable)
 {ID, severity, affected versions, whether project usage is affected}
 
+### Changelog Summary
+{notable changes, fixes, deprecations from release notes — or "no changelog found"}
+
 ### Breaking Changes
 {from changelog, or "none found"}
+
+### Transitive Impact
+{lockfile changes affecting other packages, or "no transitive changes"}
 
 ### Recommendation
 {merge / merge after fixing deprecated API usage / needs migration work / block — tests fail}
@@ -110,7 +125,7 @@ For package.json bumps, check if the lockfile changes affect other packages. For
 
 The recommendation should be primarily driven by test results, not changelog reading. If tests pass and no deprecated APIs are used, recommend merge. If tests fail, the failures ARE the review.
 
-**This replaces the standard review flow for dep bumps** — don't run architecture compliance, security checklist, etc. Those are for code changes, not version bumps.
+**This replaces the standard code review checks (Steps 3-9) for dep bumps** — don't run architecture compliance, security checklist, etc. Those are for code changes, not version bumps. **Still run Step 2 (Read Project Context)** — the dep lens needs antipatterns.md and ARCHITECTURE.md for usage pattern context.
 
 ## Step 2: Read Project Context
 

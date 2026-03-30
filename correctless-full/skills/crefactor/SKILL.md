@@ -1,7 +1,7 @@
 ---
 name: crefactor
 description: Structured refactoring with behavioral equivalence enforcement. Tests must pass before AND after. Any test change requires explicit approval. Writes characterization tests for low-coverage code.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/*), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md), Edit(ARCHITECTURE.md), Edit(AGENT_CONTEXT.md)
 context: fork
 ---
 
@@ -33,6 +33,8 @@ Refactoring can take 15-60+ minutes depending on scope. The user must see progre
 Mark each task complete as it finishes.
 
 ## Step 1: Capture Refactor Intent
+
+First, check for an active workflow: `.claude/hooks/workflow-advance.sh status 2>/dev/null`. If a TDD workflow is active on this branch, warn the user: "There's an active workflow on this branch. Running /crefactor here may conflict. Consider finishing the current feature or using a separate branch."
 
 Ask the user:
 - **What** are you refactoring? (specific files, modules, layers)
@@ -112,13 +114,12 @@ Store in `.claude/artifacts/refactor-baseline-{slug}.json`:
   "test_count": N,
   "all_passing": true,
   "test_names": ["TestA", "TestB", ...],
-  "test_file_checksums": {
-    "src/user.test.ts": "abc123",
-    "tests/integration/auth.test.ts": "def456"
-  },
+  "git_commit_before": "abc123",
   "timestamp": "ISO"
 }
 ```
+
+The `git_commit_before` allows the verification agent to detect test file changes via `git diff --name-only {commit_before} HEAD` filtered against test patterns.
 
 Print: "Baseline captured — {N} tests all passing. This is the behavioral contract."
 
@@ -148,17 +149,19 @@ For each phase, spawn TWO agents:
 **Refactor agent** (forked subagent):
 > You are the refactor agent. Restructure the code as described in the phase plan. Focus on structure, not behavior. Do NOT modify test files. If you believe a test is wrong, halt and report — do not "fix" it.
 >
-> The refactor agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Edit, Write(source files inside project root), Bash(test and build commands)`
+> The refactor agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Edit(source files only — NOT test files), Write(source files only — NOT test files), Bash(test and build commands)`. Explicitly exclude files matching `patterns.test_file` from Edit and Write. If the agent attempts to edit a test file, the orchestrator must intercept and trigger the test-change gate.
 
 **Verification agent** (forked subagent, spawned AFTER refactor agent completes):
 > You are the verification agent. You did NOT write the refactored code. Your job is to verify behavioral equivalence.
 >
 > 1. Run the full test suite. Compare against baseline ({N} tests, all passing).
 > 2. If any test fails: HALT. Report which tests failed and what the refactor agent changed. This is a behavioral change, not a structural one.
-> 3. If any test FILE was modified (compare checksums against baseline): HALT. Report which test files changed. The refactor agent was told not to modify tests.
+> 3. Check for test file modifications: `git diff --name-only` filtered against test file patterns from `workflow-config.json`. If ANY test file was modified: HALT. Report which test files changed.
 > 4. If test count decreased: HALT. Tests were removed.
 > 5. Run coverage on refactored files — did coverage decrease? Flag if so.
 > 6. If all checks pass: "Phase {N} verified — {M} tests passing, behavioral equivalence confirmed."
+>
+> The verification agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Bash(git diff*, git status*, test and build commands)` — NO Edit or Write. This is a read-only verification role.
 
 **Between phases**, announce: "Phase {N} complete — {M}/{total} tests passing. Starting phase {N+1}..."
 
@@ -192,8 +195,10 @@ After all phases complete, spawn a **QA agent** (forked subagent):
 > 5. Look for behavioral drift: API response shapes, error messages, log formats, config behavior — things that tests might not cover but downstream consumers depend on
 > 6. Check for deleted code that was reachable — dead code removal is fine, but removing code that's called from outside the refactored module is a behavioral change
 > 7. Present findings
+>
+> The QA agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Bash(git*, test commands)` — NO Edit or Write.
 
-QA findings follow the same format as `/ctdd` QA — each finding needs an instance fix AND class fix (or N/A with reason).
+QA findings follow the same format as `/ctdd` QA — each finding needs an instance fix AND class fix (or N/A with reason). Persist findings to `.claude/artifacts/qa-findings-refactor-{slug}.json` (the orchestrator writes this, not the QA agent).
 
 ## Step 8: Final Verification
 
@@ -221,14 +226,24 @@ Read `.claude/workflow-config.json`. If `workflow.intensity` is set:
 
 ## After Refactoring
 
-Advance the workflow:
-```bash
-.claude/hooks/workflow-advance.sh done
+Write the refactor summary to `.claude/artifacts/refactor-summary-{slug}.md`:
+```markdown
+# Refactor Summary: {Title}
+
+## Intent: {what was refactored and why}
+## Baseline: {N} tests passing before refactor
+## Result: {N} tests passing after refactor
+## Test Changes: {list of approved test changes with reasons, or "none"}
+## Characterization Tests: {N written, if applicable}
+## QA Findings: {count and summary}
+## Coverage: {before}% → {after}% on refactored files
 ```
 
-Then follow the standard post-TDD pipeline: `/cverify` → `/cdocs` → merge.
+Tell the user: "Refactor complete — {N} tests passing, behavioral equivalence verified. Summary written to `.claude/artifacts/refactor-summary-{slug}.md`."
 
-Tell the user: "Refactor complete. Run `/cverify` to verify against any linked spec, then `/cdocs` to update documentation."
+If the refactor was part of an active feature workflow (check `workflow-advance.sh status`), the user should continue that workflow. If standalone, the refactor is done — suggest updating ARCHITECTURE.md and committing.
+
+**Note:** `/crefactor` does NOT use the TDD state machine. It is a standalone workflow. Do not call `workflow-advance.sh done/verified/documented`. The refactor intent document and summary artifact serve as the audit trail instead of a spec + verification report.
 
 ## Claude Code Feature Integration
 
@@ -241,7 +256,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ## Constraints
 
-- **The test suite is the spec.** If it passes, the refactor is correct. If it fails, the refactor broke behavior.
+- **The test suite is the primary spec.** Tests passing is necessary but not sufficient — the QA agent checks for behavioral drift that tests don't cover (API shapes, log formats, error messages). Tests failing is always a blocker.
 - **Never silently modify tests.** Every test change requires explicit human approval with a stated reason.
 - **Characterization tests capture reality, not intent.** A characterization test that asserts a bug is still correct — it tells you the refactor changed behavior.
 - **Phase by phase.** Large refactors must be broken into phases that leave tests passing. No "I'll fix the tests after I'm done restructuring."

@@ -28,7 +28,9 @@ Read everything in the accumulation layer. Skip files that don't exist.
 6. **Olympics findings** — `glob .claude/artifacts/findings/audit-*-history.md` — all audit runs
 7. **Specs** — `glob docs/specs/*.md` — count of features that went through the workflow
 8. **Feature summaries** — `glob .claude/artifacts/summary-*.md` — per-feature summaries (from /csummary)
-9. **Git log** — commit history to measure feature velocity and branch durations
+9. **Decision records** — `glob docs/decisions/*.md` — for staleness checks (revisit-when/revisit-by markers)
+10. **Workflow state files** — `glob .claude/artifacts/workflow-state-*.json` — for spec_updates counts per feature
+11. **Git log** — commit history to measure feature velocity and branch durations
 
 ### Derived metrics:
 
@@ -153,7 +155,7 @@ Print to conversation AND write to `.claude/artifacts/metrics-{date}.md`:
 - **QA Round Trend:** {e.g., "Averaging 2.3 rounds — trending down from 3.1 last quarter."}
 - **Antipattern Growth:** {e.g., "Error handling category growing fastest (+4 in 3 months). Consider architectural pattern."}
 - **Drift Staleness:** {e.g., "3 drift items older than 90 days. Schedule /cdevadv layers analysis."}
-- **Olympics Convergence:** {e.g., "Last 5 runs converged in ≤2 rounds — consider rotating presets."}
+- **Olympics Convergence (Full only):** {e.g., "Last 5 runs converged in ≤2 rounds — consider rotating presets." Omit this bullet in Lite mode.}
 - **Decision Record Staleness:** {e.g., "2 decisions have expired revisit-by dates."}
 - **Spec Revision Rate:** {e.g., "Specs revised mid-TDD in 60% of features — spec phase may need more brainstorm time."}
 - **Cross-Metric Correlations:** {e.g., "Spec revision rate is high AND antipattern growth is accelerating in error handling — spec phase isn't learning from antipatterns."}
@@ -214,6 +216,7 @@ Use TaskCreate/TaskUpdate:
 - Reading Olympics history
 - Reading git log
 - Calculating metrics
+- Reading decision records
 - Analyzing health indicators
 - Generating dashboard
 
