@@ -28,12 +28,12 @@ Same model, same weights — but the framing determines what the agent finds.
 For web apps, APIs, CLI tools, and everyday development. Lightweight specs, enforced TDD with agent separation, automatic security checklist, project health check.
 
 ```
-/cspec → /creview → /ctdd [RED → test audit → GREEN → /simplify → QA] → /cverify → /cdocs
+/cspec → /creview → /ctdd [RED (write failing tests) → test audit → GREEN (implement) → /simplify → QA] → /cverify → /cdocs
 ```
 
 `/simplify` is a built-in Claude Code skill that runs between implementation and QA to clean up code quality issues before the QA agent reviews.
 
-**~10-15 minutes of overhead per feature.** You get: specs before code with current best practice research, a skeptical review that auto-checks for OWASP vulnerabilities, enforced TDD with test quality audit, living documentation, and a project health check that catches hardcoded secrets, missing CI, and security gaps on first run.
+**~10-15 minutes per feature** (after initial setup — first run takes longer if `/csetup` finds secrets or missing CI). You get: specs before code with current best practice research, a skeptical review that auto-checks for OWASP vulnerabilities, enforced TDD with test quality audit, living documentation, and a project health check that catches hardcoded secrets, missing CI, and security gaps on first run.
 
 [Full spec &rarr;](correctless-lite.md)
 
@@ -42,7 +42,7 @@ For web apps, APIs, CLI tools, and everyday development. Lightweight specs, enfo
 For security-critical infrastructure, network proxies, financial systems, and anything where a bug is a vulnerability. Formal modeling, multi-agent adversarial review, convergence-based Olympics auditing, live red team assessment, devil's advocate analysis.
 
 ```
-/cspec → /cmodel → /creview-spec → /ctdd [RED → test audit → GREEN → /simplify → QA] → /cverify → /cupdate-arch → /cdocs → /caudit
+/cspec → /cmodel → /creview-spec → /ctdd [RED (write failing tests) → test audit → GREEN (implement) → /simplify → QA] → /cverify → /cupdate-arch → /cdocs → /caudit
 ```
 
 **~1-2 hours of overhead per feature — but the code that ships is tested, reviewed, and has had its assumptions challenged.** Everything in Lite plus: formal Alloy modeling, STRIDE threat analysis, multi-agent adversarial spec review, mutation testing, drift debt tracking, postmortem feedback loops, Olympics audit system (QA/Hacker/Performance presets with bounty/penalty economics), live red team penetration testing, and devil's advocate assumption challenges.
@@ -95,6 +95,8 @@ After each feature merge, Correctless learns:
 Six months in, the workflow knows your project's failure modes better than any individual developer. The bug escape rate drops because every escaped bug makes the workflow smarter.
 
 ## Quick Start
+
+You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and a Claude Max subscription ($100-200/mo). Not sure which version? See [Which One?](#which-one) below.
 
 ### Via Plugin Marketplace (recommended)
 
@@ -263,6 +265,11 @@ Optional (Full only):
 | **Convergence** | Run multiple audit rounds until findings stabilize (no new critical/high issues). |
 | **Drift** | Code that no longer matches documented architecture. Detected by `/cverify`, tracked in drift-debt.json. |
 | **Antipattern** | A known bug class from your project's history. Stored in `.claude/antipatterns.md`, checked by every future spec and review. |
+| **Spec** | A document defining what "correct" means for a feature: testable rules, edge cases, security assumptions. Not a design doc — a spec that can't be tested is incomplete. |
+| **Invariant** | A rule that must always be true: "auth tokens expire after 24 hours" or "requests require a valid session." Specs are lists of invariants. |
+| **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Full mode only. |
+| **STRIDE** | Threat modeling framework: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege. Used in Full mode spec review. |
+| **RED / GREEN** | TDD phases. RED = write tests that fail (proving they test something). GREEN = write code to make tests pass. |
 
 ## Status
 

@@ -122,10 +122,6 @@ is_full_mode() {
   [ -n "$intensity" ] && [ "$intensity" != "null" ]
 }
 
-get_intensity() {
-  read_config_field '.workflow.intensity' 2>/dev/null || echo "standard"
-}
-
 is_fail_closed() {
   local val
   val="$(read_config_field '.workflow.fail_closed_when_no_state' 2>/dev/null || echo "false")"

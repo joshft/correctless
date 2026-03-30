@@ -252,8 +252,9 @@ classify_file() {
 }
 
 # For MultiEdit, find the most restrictive classification across all files.
-# If ANY file is source/test, the gate must apply phase rules to it.
+# Collect ALL source files (needed for per-file STUB:TDD checks in RED phase).
 MOST_RESTRICTIVE="other"
+ALL_SOURCE_FILES=""
 while IFS= read -r _check_file; do
   [ -z "$_check_file" ] && continue
   _rel="${_check_file#$REPO_ROOT/}"
@@ -261,7 +262,8 @@ while IFS= read -r _check_file; do
   if [ "$_cls" = "source" ]; then
     MOST_RESTRICTIVE="source"
     REL_FILE="$_rel"
-    break  # source is the most restrictive, no need to check further
+    ALL_SOURCE_FILES="${ALL_SOURCE_FILES:+$ALL_SOURCE_FILES
+}$_rel"
   elif [ "$_cls" = "test" ] && [ "$MOST_RESTRICTIVE" != "source" ]; then
     MOST_RESTRICTIVE="test"
     REL_FILE="$_rel"
@@ -297,34 +299,37 @@ case "$PHASE" in
 
   tdd-tests)
     # RED phase: test files allowed, source files only with STUB:TDD
+    # For MultiEdit, check EVERY source file (not just the first)
     if [ "$FILE_CLASS" = "source" ]; then
-      # Check if the file exists and contains STUB:TDD
-      if [ -f "$REPO_ROOT/$REL_FILE" ]; then
-        if ! grep -q 'STUB:TDD' "$REPO_ROOT/$REL_FILE" 2>/dev/null; then
-          # File exists but no STUB:TDD — check if the edit adds it
-          if [ "$TOOL_NAME" != "Bash" ]; then
-            NEW_CONTENT="$(echo "$TOOL_INPUT" | jq -r '.new_string // .content // empty')"
-            if echo "$NEW_CONTENT" | grep -q 'STUB:TDD'; then
-              exit 0  # Edit is adding STUB:TDD — allow
+      while IFS= read -r _src_rel; do
+        [ -z "$_src_rel" ] && continue
+        if [ -f "$REPO_ROOT/$_src_rel" ]; then
+          if ! grep -q 'STUB:TDD' "$REPO_ROOT/$_src_rel" 2>/dev/null; then
+            # File exists but no STUB:TDD — check if the edit adds it
+            if [ "$TOOL_NAME" != "Bash" ]; then
+              NEW_CONTENT="$(echo "$TOOL_INPUT" | jq -r '.new_string // .content // empty')"
+              if echo "$NEW_CONTENT" | grep -q 'STUB:TDD'; then
+                continue  # Edit is adding STUB:TDD to this file — allow
+              fi
             fi
-          fi
-          block "RED phase — write tests first, not implementation.
-  Source files are blocked unless they contain structural stubs marked with STUB:TDD.
+            block "RED phase — write tests first, not implementation.
+  Source file '$_src_rel' is blocked — no STUB:TDD marker found.
   What to do: write your test files first. For type signatures that tests need to compile,
   create stub functions with '// STUB:TDD' in the body and zero-value returns.
   When tests exist and fail: .claude/hooks/workflow-advance.sh impl  (unlocks source files)"
-        fi
-      else
-        # New file — check if content contains STUB:TDD
-        if [ "$TOOL_NAME" != "Bash" ]; then
-          NEW_CONTENT="$(echo "$TOOL_INPUT" | jq -r '.content // .new_string // empty')"
-          if [ -n "$NEW_CONTENT" ] && ! echo "$NEW_CONTENT" | grep -q 'STUB:TDD'; then
-            block "RED phase — new source files must contain STUB:TDD tag.
+          fi
+        else
+          # New file — check if content contains STUB:TDD
+          if [ "$TOOL_NAME" != "Bash" ]; then
+            NEW_CONTENT="$(echo "$TOOL_INPUT" | jq -r '.content // .new_string // empty')"
+            if [ -n "$NEW_CONTENT" ] && ! echo "$NEW_CONTENT" | grep -q 'STUB:TDD'; then
+              block "RED phase — new source file '$_src_rel' must contain STUB:TDD tag.
   Add '// STUB:TDD' (or '# STUB:TDD' in Python) to function bodies.
   Stub bodies should contain only the tag, zero-value returns, or panic(\"not implemented\")."
+            fi
           fi
         fi
-      fi
+      done <<< "$ALL_SOURCE_FILES"
     fi
     # Test files are allowed
     ;;

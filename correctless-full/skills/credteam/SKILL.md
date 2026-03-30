@@ -1,7 +1,7 @@
 ---
 name: credteam
 description: "Live adversarial red team assessment against a running system. Goal-directed penetration testing with source code access. Requires isolated environment."
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/redteam/*), Write(.claude/antipatterns.md), Write(*test*), Write(*spec*)
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/redteam/*), Write(.claude/antipatterns.md), Write(*test*), Write(*spec*), Write(docker-compose*.yml)
 context: fork
 ---
 

@@ -701,7 +701,7 @@ End with clear next steps:
 2. Run `/cspec` to write a spec for what you're building
 3. The workflow guides you from there: spec → review → tests → implementation → QA → verify → docs
 
-Current commands available: `/cspec`, `/creview`, `/ctdd`, `/cverify`, `/cdocs`, `/crefactor`, `/cpr-review`, `/cstatus`, `/csummary`, `/cmetrics`, `/cdebug`
+Current commands available: `/csetup`, `/cspec`, `/creview`, `/ctdd`, `/cverify`, `/cdocs`, `/crefactor`, `/cpr-review`, `/cstatus`, `/csummary`, `/cmetrics`, `/cdebug`
 Check workflow state anytime: `.claude/hooks/workflow-advance.sh status`
 
 Want to start a feature now?"
