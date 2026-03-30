@@ -84,30 +84,15 @@ Hooks block source code edits until tests exist. The test agent writes from the 
 
 The state machine enforces: done → verified (requires verification report) → documented → ready to merge. No step is skippable. `/cverify` writes a verification report, drift debt entries, and checks QA class fixes. `/cdocs` reads the verification report and updates documentation. You cannot say "ready to merge" until both have run.
 
-### 6. The Flywheel
+### 6. The Compounding Effect
 
-Everything compounds. Antipatterns grow from postmortems and audits. QA findings accumulate from every feature. Templates get refined. The review agent reads all of this history. Six months in, the workflow knows more about your project's failure modes than any individual developer:
+After each feature merge, Correctless learns:
+- **Antipatterns** capture bugs that escaped testing — every future `/cspec` and `/creview` checks new features against them
+- **QA findings** accumulate — `/cspec` tailors rules to avoid recurrent bugs in the same code areas
+- **Workflow effectiveness** tracks which phases catch what — the review agent pushes harder on historically weak areas
+- **Templates** get refined from postmortems — invariant templates evolve to catch the bug classes your project actually hits
 
-```
-/cspec reads → antipatterns, drift debt, QA findings, workflow effectiveness, research
-    ↓
-/creview reads → antipatterns, drift debt, QA findings, workflow effectiveness
-    ↓
-/ctdd: RED → test audit → GREEN → /simplify → QA (writes findings) → done
-    ↓
-/cverify reads QA findings → writes verification report + drift debt
-    ↓
-/cdocs reads verification report → updates docs
-    ↓
-(merge)
-    ↓
-/cpostmortem → antipatterns (Full only), templates, workflow effectiveness
-/caudit → antipatterns, regression tests, Olympics findings (Full only)
-/cdevadv → challenges assumptions, architecture, strategy (Full only)
-/credteam → proves exploitability against live system (Full only)
-    ↓
-(loops back to /cspec for next feature — smarter each time)
-```
+Six months in, the workflow knows your project's failure modes better than any individual developer. The bug escape rate drops because every escaped bug makes the workflow smarter.
 
 ## Quick Start
 
