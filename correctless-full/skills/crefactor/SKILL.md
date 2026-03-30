@@ -34,6 +34,8 @@ Mark each task complete as it finishes.
 
 ## Step 1: Capture Refactor Intent
 
+**First-run check**: If `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate ARCHITECTURE.md and AGENT_CONTEXT.md, or you can run `/csetup` for the full experience." If they want the quick scan: glob for key directories, populate ARCHITECTURE.md, then continue. This improves refactor planning and architecture update suggestions.
+
 First, check for an active workflow: `.claude/hooks/workflow-advance.sh status 2>/dev/null`. If a TDD workflow is active on this branch, warn the user: "There's an active workflow on this branch. Running /crefactor here may conflict. Consider finishing the current feature or using a separate branch."
 
 Ask the user:
@@ -258,10 +260,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ## If Something Goes Wrong
 
-- **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
-- **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
-- **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
-- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch.
+- **Agent crashes mid-refactor**: Re-run `/crefactor`. The refactor intent document (`.claude/artifacts/refactor-intent-{slug}.md`) and baseline (`.claude/artifacts/refactor-baseline-{slug}.json`) persist — the skill can pick up context from these. However, partially completed refactor phases may need manual review.
+- **Rate limit hit**: Wait 2-3 minutes and re-run.
+- **Tests fail after a refactor phase**: This is working as designed — the verification agent caught a behavioral change. Fix the issue or revert the phase.
+- **Want to start over**: Revert uncommitted changes with `git checkout .` and re-run from Step 1.
 
 ## Constraints
 

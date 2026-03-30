@@ -84,10 +84,9 @@ If ARCHITECTURE.md exceeds ~5000 words after updates, suggest fragmentation:
 
 ## If Something Goes Wrong
 
-- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
-- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
-- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
-- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
+- **Skill interrupted**: Re-run `/cupdate-arch`. It scans the codebase fresh each time. Partially written entries can be reviewed and corrected.
+- **Rate limit hit**: Wait 2-3 minutes and re-run.
+- **Wrong entries written**: Edit ARCHITECTURE.md directly to fix or remove incorrect entries.
 
 ## Constraints
 

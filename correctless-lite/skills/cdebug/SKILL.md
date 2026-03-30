@@ -180,10 +180,10 @@ When presenting the root cause analysis: "Use /btw if you need to check somethin
 
 ## If Something Goes Wrong
 
-- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
-- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
-- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
-- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
+- **Skill interrupted**: Re-run `/cdebug`. The investigation artifact (`.claude/artifacts/debug-investigation-{slug}.md`) persists — the skill can resume from your last hypothesis.
+- **Rate limit hit**: Wait 2-3 minutes and re-run.
+- **3 failed hypotheses**: This is expected — escalation to architectural review is the designed recovery path, not a failure.
+- **Bisect fails**: Bisect cleans up after itself. Proceed with manual investigation.
 
 ## Constraints
 

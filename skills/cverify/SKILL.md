@@ -190,6 +190,9 @@ Next step is mandatory:
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
+### Context Check
+Verification reads many files (spec, all changed files, tests, ARCHITECTURE.md, QA findings, git diff). Before starting mutation testing, check context usage. If above 70%: "Context is getting full. Consider running `/compact` before continuing — remaining checks may produce incomplete results if context is truncated."
+
 ### Background Tasks
 - Run mutation testing in the background while doing rule coverage analysis, prohibition checks, and antipattern matching
 - Run coverage report in the background while doing drift detection

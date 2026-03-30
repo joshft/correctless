@@ -374,10 +374,10 @@ After each round, report: findings found, findings fixed, findings rejected, cum
 
 ## If Something Goes Wrong
 
-- **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
-- **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
-- **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
-- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch.
+- **Agent crashes mid-round**: Re-run `/caudit`. Prior round findings are persisted in `.claude/artifacts/findings/` — the skill reads these and can determine which round to start from. However, a partially completed round will restart from the beginning of that round.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. Convergence state persists in artifacts.
+- **Stuck in audit phase**: `workflow-advance.sh audit-done` to mark audit complete and move on.
+- **Want to start over**: Delete the audit branch and audit artifacts, then re-run.
 
 ## Constraints
 

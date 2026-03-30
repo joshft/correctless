@@ -36,9 +36,13 @@ PR reviews take 5-15 minutes depending on PR size and mode. The user must see pr
 
 ## Step 1: Fetch PR Info
 
-**Prerequisite check**: Verify `gh` or `glab` is installed: `command -v gh || command -v glab`. If neither is available: "Neither `gh` (GitHub CLI) nor `glab` (GitLab CLI) is installed. Install one to use /cpr-review, or paste the PR diff manually and I'll review it without CLI access."
+**Prerequisite check**: Verify `gh` or `glab` is installed: `command -v gh || command -v glab`.
 
-Detect platform from git remote:
+If neither is available, tell the user: "Neither `gh` (GitHub CLI) nor `glab` (GitLab CLI) is installed. I can still review if you paste the PR diff. I won't be able to: detect the PR author (for dep bump detection), read the PR description (for spec links), or post review comments. But architecture, security, test coverage, and antipattern checks all work from the diff alone."
+
+If the user provides a manual diff, skip dep bump auto-detection (ask the user: "Is this a dependency version bump, or a code change?") and skip the "Post to PR" step at the end. Proceed with all other steps using the provided diff.
+
+**If CLI is available**, detect platform from git remote:
 ```bash
 remote_url="$(git remote get-url origin 2>/dev/null)"
 ```
@@ -52,8 +56,6 @@ Fetch PR details:
 Fetch the diff:
 - GitHub: `gh pr diff {number}`
 - GitLab: `glab mr diff {number}`
-
-If neither CLI is available: "Install `gh` (GitHub) or `glab` (GitLab) to use /cpr-review. Or provide the diff manually."
 
 **Parse the PR body** for spec references: look for links to `docs/specs/*.md` or mentions of spec files.
 
@@ -331,8 +333,9 @@ When reviewing PRs with more than 10 changed files or 300+ lines of diff, remind
 
 ## If Something Goes Wrong
 
-- These skills are read-only — they don't modify workflow state or source code. Re-run anytime safely.
-- If data is missing or incomplete, check that the prerequisite skills have run (e.g., `/csummary` needs QA findings from `/ctdd`).
+- **CLI not available**: Paste the PR diff manually. The skill reviews the diff without needing `gh` or `glab` (but can't post comments or detect PR author for dep bump detection).
+- **Rate limit hit**: Wait 2-3 minutes and re-run.
+- **Re-run is always safe**: This skill is read-only for project files — it only reads code and optionally posts PR comments.
 
 ## Constraints
 

@@ -54,7 +54,8 @@ The RED phase (test writing) and GREEN phase (implementation) MUST be executed b
 1. Read `AGENT_CONTEXT.md` for project context.
 2. Read the approved spec (path from workflow state).
 3. Read `.claude/workflow-config.json` for test commands and patterns.
-4. Check current phase: `.claude/hooks/workflow-advance.sh status`
+4. **Verify the test runner works**: Run `commands.test` from the config. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.claude/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
+5. Check current phase: `.claude/hooks/workflow-advance.sh status`
 
 ## Pre-Execution: Task Graph (for features with 5+ rules)
 
@@ -103,8 +104,6 @@ For each independent track, spawn separate RED and GREEN agent pairs. Each track
 **For features with fewer than 5 rules**, skip the task graph — execute sequentially as normal. The overhead of parallelization analysis isn't worth it for small features.
 
 ## Phase: RED (tdd-tests)
-
-**Prerequisite check**: Verify the test command works. Read `commands.test` from `.claude/workflow-config.json` and run it. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.claude/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
 
 Spawn a **test agent** as a forked subagent with these instructions:
 

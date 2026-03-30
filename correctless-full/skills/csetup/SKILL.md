@@ -724,8 +724,9 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ## If Something Goes Wrong
 
-- These skills are read-only — they don't modify workflow state or source code. Re-run anytime safely.
-- If data is missing or incomplete, check that the prerequisite skills have run (e.g., `/csummary` needs QA findings from `/ctdd`).
+- **Setup is idempotent** — the bash script skips files that already exist and never overwrites user-edited content. Re-running is safe.
+- **The interactive skill (Steps 3-9) asks before writing.** If interrupted, re-run. Already-completed steps (config review, health check) will re-run but won't overwrite previous choices.
+- **If the health check is wrong**: The health check reads your project state at that moment. If you've fixed something, re-run `/csetup` to get an updated health card.
 
 ## Constraints
 

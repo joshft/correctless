@@ -196,15 +196,17 @@ Check your current workflow status with `/cstatus`. For advanced debugging:
 .claude/hooks/workflow-advance.sh reset           # Nuclear — remove all state
 ```
 
-### Quick Fixes Outside the Workflow
+### Quick Fixes During an Active Workflow
 
-For small bug fixes that don't need the full workflow:
+If you need to fix a typo or tweak config while a workflow is active and the gate is blocking you:
 
 ```bash
 .claude/hooks/workflow-advance.sh override "quick bugfix: fixing typo in error message"
 ```
 
 This bypasses the gate for 10 tool calls. Use for: typos, config tweaks, one-line fixes. Don't use for: features, refactors, or anything that should have tests.
+
+When no workflow is active, the gate allows all edits freely — no override needed.
 
 ## Language Support
 

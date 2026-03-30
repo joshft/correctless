@@ -237,10 +237,9 @@ Check context usage before starting. Layers mode is context-efficient (cheap pas
 
 ## If Something Goes Wrong
 
-- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
-- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
-- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
-- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
+- **Skill interrupted**: Re-run `/cdevadv`. The report artifact persists. Analysis can resume from partial findings.
+- **Rate limit hit**: Wait 2-3 minutes and re-run.
+- **Wrong scope**: Re-run with a different mode (theme/signals/layers) — each produces independent output.
 
 ## Constraints
 

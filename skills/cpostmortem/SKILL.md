@@ -117,10 +117,9 @@ After postmortem completes: "Export this postmortem conversation: `/export docs/
 
 ## If Something Goes Wrong
 
-- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
-- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
-- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
-- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
+- **Skill interrupted**: Re-run `/cpostmortem`. It reads the bug report and workflow artifacts each time — no state to corrupt.
+- **Rate limit hit**: Wait 2-3 minutes and re-run.
+- **Wrong analysis**: The postmortem writes to antipatterns.md and workflow-effectiveness.json via Edit (append). If the analysis was wrong, edit those files to remove the incorrect entries.
 
 ## Constraints
 

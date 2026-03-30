@@ -92,11 +92,11 @@ After showing phase and commands, proactively check for issues:
 - If an agent crashed, the state machine is waiting for the next transition — re-running resumes
 - If truly stuck: `workflow-advance.sh override 'resuming after stall'`"
 
-**Empty docs**: Check if ARCHITECTURE.md contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if AGENT_CONTEXT.md contains `{PLACEHOLDER}`. If either is still the template: "ARCHITECTURE.md is still the default template. Run `/csetup` to populate it from your codebase — this significantly improves spec and review quality."
+**Empty docs**: Check if ARCHITECTURE.md contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if AGENT_CONTEXT.md contains `{PROJECT_NAME}` or `{PLACEHOLDERS}`. If either is still the template: "ARCHITECTURE.md / AGENT_CONTEXT.md is still the default template. Run `/csetup` to populate it from your codebase — this significantly improves spec and review quality."
 
 **Override usage**: Read `override_count` from the state file. If ≥2: "You've used {N} overrides on this workflow. If the gate keeps blocking legitimate edits, the workflow config or file patterns may need adjustment. Run `workflow-advance.sh diagnose 'yourfile.ts'` to understand why."
 
-**No active workflow, no problems**: "No active workflow on this branch. You can edit freely. To start a structured workflow: `git checkout -b feature/my-feature` then `/cspec`. For a quick bug fix without the full workflow: `workflow-advance.sh override 'quick bugfix'` gives you 10 edits."
+**No active workflow**: "No active workflow on this branch. You can edit freely — the gate only blocks during active workflows. To start a structured workflow: `git checkout -b feature/my-feature` then `/cspec`."
 
 ### 6. Health Check (if requested)
 

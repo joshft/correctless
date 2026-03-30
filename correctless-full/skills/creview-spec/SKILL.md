@@ -145,9 +145,9 @@ After review approval, suggest: "Consider exporting: `/export docs/decisions/{ta
 
 ## If Something Goes Wrong
 
-- **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
+- **Agent crashes or context overflow**: The workflow state still shows `review-spec` phase. Re-run `/creview-spec` — all agents will be re-spawned from scratch (completed agent work is NOT preserved across re-runs).
 - **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
-- **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
+- **Stuck in review phase**: Run `/cstatus` to see where you are. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
 - **Want to start over**: `workflow-advance.sh reset` clears all state on this branch.
 
 ## Constraints

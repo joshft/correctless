@@ -303,10 +303,10 @@ Run crafted payloads and network probes as background tasks where possible — p
 
 ## If Something Goes Wrong
 
-- **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
-- **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
-- **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
-- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch.
+- **Agent crashes mid-assessment**: Re-run `/credteam`. The report artifact persists at `.claude/artifacts/redteam/`. Partial findings are preserved. The assessment resumes from the attack phase if boundary mapping is already in the report.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. Red team assessments are long-running — rate limits are expected.
+- **Target environment goes down**: Stop the assessment. The report documents what was tested up to that point.
+- **Want to start over**: Delete the report artifact and re-run.
 
 ## Constraints
 
