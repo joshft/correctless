@@ -36,6 +36,8 @@ PR reviews take 5-15 minutes depending on PR size and mode. The user must see pr
 
 ## Step 1: Fetch PR Info
 
+**Prerequisite check**: Verify `gh` or `glab` is installed: `command -v gh || command -v glab`. If neither is available: "Neither `gh` (GitHub CLI) nor `glab` (GitLab CLI) is installed. Install one to use /cpr-review, or paste the PR diff manually and I'll review it without CLI access."
+
 Detect platform from git remote:
 ```bash
 remote_url="$(git remote get-url origin 2>/dev/null)"
@@ -326,6 +328,11 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### /btw
 When reviewing PRs with more than 10 changed files or 300+ lines of diff, remind after reading context (before starting checks): "Use /btw to check something about the codebase without interrupting this review."
+
+## If Something Goes Wrong
+
+- These skills are read-only — they don't modify workflow state or source code. Re-run anytime safely.
+- If data is missing or incomplete, check that the prerequisite skills have run (e.g., `/csummary` needs QA findings from `/ctdd`).
 
 ## Constraints
 

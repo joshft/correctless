@@ -301,6 +301,13 @@ See "Progress Visibility" section above — task creation and narration are mand
 ### Background Tasks
 Run crafted payloads and network probes as background tasks where possible — prepare the next attack path while waiting for the response from the current one.
 
+## If Something Goes Wrong
+
+- **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
+- **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
+- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch.
+
 ## Constraints
 
 - **NEVER run against public internet targets.** Isolation is mandatory.

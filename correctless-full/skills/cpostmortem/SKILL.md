@@ -115,6 +115,13 @@ See "Progress Visibility" section above — task creation and narration are mand
 ### /export
 After postmortem completes: "Export this postmortem conversation: `/export docs/decisions/{task-slug}-postmortem.md` — captures the full analysis of why the workflow missed this bug."
 
+## If Something Goes Wrong
+
+- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
+- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
+- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
+
 ## Constraints
 
 - Every postmortem MUST produce at least one corrective action.

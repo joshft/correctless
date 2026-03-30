@@ -220,6 +220,11 @@ Use TaskCreate/TaskUpdate:
 - Analyzing health indicators
 - Generating dashboard
 
+## If Something Goes Wrong
+
+- These skills are read-only — they don't modify workflow state or source code. Re-run anytime safely.
+- If data is missing or incomplete, check that the prerequisite skills have run (e.g., `/csummary` needs QA findings from `/ctdd`).
+
 ## Constraints
 
 - **Read-only.** This skill aggregates data. It does not modify anything.

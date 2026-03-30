@@ -83,16 +83,36 @@ State management:
 
 Read `.claude/workflow-config.json`. If `workflow.intensity` is set, also show Full mode commands: `/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`
 
-### 5. Health Check (if requested)
+### 5. Detect Problems
+
+After showing phase and commands, proactively check for issues:
+
+**Stale workflow**: Read `phase_entered_at` from the state file. Calculate how long the current phase has been active. If >24 hours: "This workflow has been in `{phase}` for {N} days. If you're stuck:
+- Re-run the skill for this phase (e.g., `/ctdd` for tdd-impl, `/cverify` for done)
+- If an agent crashed, the state machine is waiting for the next transition — re-running resumes
+- If truly stuck: `workflow-advance.sh override 'resuming after stall'`"
+
+**Empty docs**: Check if ARCHITECTURE.md contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if AGENT_CONTEXT.md contains `{PLACEHOLDER}`. If either is still the template: "ARCHITECTURE.md is still the default template. Run `/csetup` to populate it from your codebase — this significantly improves spec and review quality."
+
+**Override usage**: Read `override_count` from the state file. If ≥2: "You've used {N} overrides on this workflow. If the gate keeps blocking legitimate edits, the workflow config or file patterns may need adjustment. Run `workflow-advance.sh diagnose 'yourfile.ts'` to understand why."
+
+**No active workflow, no problems**: "No active workflow on this branch. You can edit freely. To start a structured workflow: `git checkout -b feature/my-feature` then `/cspec`. For a quick bug fix without the full workflow: `workflow-advance.sh override 'quick bugfix'` gives you 10 edits."
+
+### 6. Health Check (if requested)
 
 If the human asks "is everything set up correctly?" or similar, validate:
 - Hooks registered in `.claude/settings.json`
 - Config file valid JSON with required fields
 - Hook scripts exist and are executable at `.claude/hooks/`
-- ARCHITECTURE.md has content
-- AGENT_CONTEXT.md has content
+- ARCHITECTURE.md has content (not template)
+- AGENT_CONTEXT.md has content (not template)
 
 Report any issues with fix instructions.
+
+## If Something Goes Wrong
+
+- These skills are read-only — they don't modify workflow state or source code. Re-run anytime safely.
+- If data is missing or incomplete, check that the prerequisite skills have run (e.g., `/csummary` needs QA findings from `/ctdd`).
 
 ## Constraints
 

@@ -178,6 +178,13 @@ Run the test suite in the background while investigating the code path. Run git 
 ### /btw
 When presenting the root cause analysis: "Use /btw if you need to check something about the codebase without interrupting this investigation."
 
+## If Something Goes Wrong
+
+- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
+- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
+- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
+
 ## Constraints
 
 - **Do not guess-and-patch.** Understand before fixing. A fix without root cause understanding is a future bug.

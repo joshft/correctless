@@ -372,6 +372,13 @@ Check context usage between rounds. If the lead orchestrator's context exceeds 7
 ### Cost Visibility
 After each round, report: findings found, findings fixed, findings rejected, cumulative rounds. The human can decide whether to continue or stop.
 
+## If Something Goes Wrong
+
+- **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
+- **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
+- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch.
+
 ## Constraints
 
 - **All fixes on the audit branch.** Never main.

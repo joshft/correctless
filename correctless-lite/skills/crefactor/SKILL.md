@@ -184,6 +184,8 @@ If the verification agent detects a test file modification:
 
 ## Step 7: QA Review
 
+Before spawning the QA agent, check context usage. If above 70%, warn the user: "Context is getting full after the refactor phases. Consider running `/compact` before QA."
+
 After all phases complete, spawn a **QA agent** (forked subagent):
 
 > You are the QA agent for this refactor. You did NOT participate in the refactoring. Your job is to find regressions the test suite didn't catch.
@@ -253,6 +255,13 @@ See "Progress Visibility" section above — task creation and narration are mand
 ### Background Tasks
 - Run coverage analysis in the background while the refactor agent works
 - Run mutation testing (Full mode) in the background during QA
+
+## If Something Goes Wrong
+
+- **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
+- **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
+- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch.
 
 ## Constraints
 

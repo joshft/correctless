@@ -125,6 +125,13 @@ See "Progress Visibility" section above — task creation and narration are mand
 ### Background Tasks
 Run the Alloy Analyzer (`java -jar`) as a background task while preparing the counterexample interpretation context. The JAR can take 30+ seconds for complex state spaces.
 
+## If Something Goes Wrong
+
+- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
+- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
+- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
+
 ## Constraints
 
 - NEVER claim an invariant is "proven" — Alloy provides bounded verification, not proof.

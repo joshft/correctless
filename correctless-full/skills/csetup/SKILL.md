@@ -722,6 +722,11 @@ When `/csetup` is run on a project that's already configured:
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
+## If Something Goes Wrong
+
+- These skills are read-only — they don't modify workflow state or source code. Re-run anytime safely.
+- If data is missing or incomplete, check that the prerequisite skills have run (e.g., `/csummary` needs QA findings from `/ctdd`).
+
 ## Constraints
 
 - **Be conversational, not transactional.** Don't dump a wall of config at the human.

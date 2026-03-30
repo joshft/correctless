@@ -235,6 +235,13 @@ See "Progress Visibility" section above — task creation and narration are mand
 ### /context
 Check context usage before starting. Layers mode is context-efficient (cheap passes first). Signals mode loads more data. If context is above 50% before starting, suggest compacting first.
 
+## If Something Goes Wrong
+
+- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
+- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
+- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
+
 ## Constraints
 
 - **Operate at the assumption/architecture/strategy level.** "This function has a race condition" is an Olympics finding. "This project's approach to concurrency is fundamentally inadequate because [evidence]" is a devil's advocate finding.

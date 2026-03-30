@@ -196,6 +196,16 @@ Check your current workflow status with `/cstatus`. For advanced debugging:
 .claude/hooks/workflow-advance.sh reset           # Nuclear — remove all state
 ```
 
+### Quick Fixes Outside the Workflow
+
+For small bug fixes that don't need the full workflow:
+
+```bash
+.claude/hooks/workflow-advance.sh override "quick bugfix: fixing typo in error message"
+```
+
+This bypasses the gate for 10 tool calls. Use for: typos, config tweaks, one-line fixes. Don't use for: features, refactors, or anything that should have tests.
+
 ## Language Support
 
 | Language | Test Runner | Mutation Tool | PBT Library |

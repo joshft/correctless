@@ -25,6 +25,8 @@ Documentation updates take about 5 minutes. The user must see progress throughou
 
 ## Before You Start
 
+**First-run check**: If `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate ARCHITECTURE.md and AGENT_CONTEXT.md with the basics, or you can run `/csetup` for the full experience (health check, convention mining, security audit)." If they want the quick scan: glob for key directories, identify 3-5 components and patterns, populate ARCHITECTURE.md with real entries, then continue. This takes 30 seconds and dramatically improves output quality.
+
 **Step 0: Check prerequisites.** Read the workflow state file. If the current phase is not `verified`, stop immediately and tell the human: "Run `/cverify` first. The workflow order is: done → /cverify → verified → /cdocs → documented." Check that `docs/verification/{task-slug}-verification.md` exists. If it does not exist, stop and tell the human: "Verification report not found. Run /cverify before /cdocs." Do NOT proceed with documentation work until both checks pass.
 
 1. Run `git log --oneline -20` to see recent changes.
@@ -125,6 +127,13 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### /export
 After documentation is approved: "Consider exporting: `/export docs/decisions/{task-slug}-docs.md`"
+
+## If Something Goes Wrong
+
+- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
+- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
+- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
 
 ## Constraints
 

@@ -35,6 +35,8 @@ Mark each task complete as agents return results.
 
 ## Before You Start
 
+**First-run check**: If `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate ARCHITECTURE.md and AGENT_CONTEXT.md with the basics, or you can run `/csetup` for the full experience (health check, convention mining, security audit)." If they want the quick scan: glob for key directories, identify 3-5 components and patterns, populate ARCHITECTURE.md with real entries, then continue. This takes 30 seconds and dramatically improves output quality.
+
 1. Read `AGENT_CONTEXT.md` for project context.
 2. Read the spec artifact.
 3. Read `ARCHITECTURE.md`.
@@ -140,6 +142,13 @@ Check context usage before spawning the agent team. If above 70%, inform the use
 
 ### /export
 After review approval, suggest: "Consider exporting: `/export docs/decisions/{task-slug}-review.md`"
+
+## If Something Goes Wrong
+
+- **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
+- **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
+- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch.
 
 ## Constraints
 

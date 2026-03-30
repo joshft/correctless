@@ -82,6 +82,13 @@ If ARCHITECTURE.md exceeds ~5000 words after updates, suggest fragmentation:
 - Move sections to `docs/architecture/{section}.md`
 - Root ARCHITECTURE.md links to fragments
 
+## If Something Goes Wrong
+
+- **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
+- **Rate limit hit**: Wait 2-3 minutes and re-run. Workflow state persists between sessions.
+- **Wrong output**: This skill doesn't modify workflow state until the final advance step. Re-run from scratch safely.
+- **Stuck in a phase**: Run `/cstatus` to see where you are. Use `workflow-advance.sh override "reason"` if the gate is blocking legitimate work.
+
 ## Constraints
 
 - NEVER auto-write entries without human approval.
