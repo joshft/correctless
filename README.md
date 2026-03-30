@@ -33,7 +33,7 @@ For web apps, APIs, CLI tools, and everyday development. Lightweight specs, enfo
 
 `/simplify` is a built-in Claude Code skill that runs between implementation and QA to clean up code quality issues before the QA agent reviews.
 
-**~5 minutes of overhead per feature.** You get: specs before code with current best practice research, a skeptical review that auto-checks for OWASP vulnerabilities, enforced TDD with test quality audit, living documentation, and a project health check that catches hardcoded secrets, missing CI, and security gaps on first run.
+**~10-15 minutes of overhead per feature.** You get: specs before code with current best practice research, a skeptical review that auto-checks for OWASP vulnerabilities, enforced TDD with test quality audit, living documentation, and a project health check that catches hardcoded secrets, missing CI, and security gaps on first run.
 
 [Full spec &rarr;](correctless-lite.md)
 
@@ -45,7 +45,7 @@ For security-critical infrastructure, network proxies, financial systems, and an
 /cspec → /cmodel → /creview-spec → /ctdd [RED → test audit → GREEN → /simplify → QA] → /cverify → /cupdate-arch → /cdocs → /caudit
 ```
 
-**~15-30 minutes of overhead per feature.** Everything in Lite plus: formal Alloy modeling, STRIDE threat analysis, multi-agent adversarial spec review, mutation testing, drift debt tracking, postmortem feedback loops, Olympics audit system (QA/Hacker/Performance presets with bounty/penalty economics), live red team penetration testing, and devil's advocate assumption challenges.
+**~1-2 hours of overhead per feature — but the code that ships is tested, reviewed, and has had its assumptions challenged.** Everything in Lite plus: formal Alloy modeling, STRIDE threat analysis, multi-agent adversarial spec review, mutation testing, drift debt tracking, postmortem feedback loops, Olympics audit system (QA/Hacker/Performance presets with bounty/penalty economics), live red team penetration testing, and devil's advocate assumption challenges.
 
 [Full spec &rarr;](correctless.md)
 
@@ -222,7 +222,7 @@ Mutation testing, property-based testing, and PBT helpers are Full-only. Lite wo
 | Feedback loop | Antipatterns (manual) | Antipatterns + QA findings + drift debt + workflow effectiveness + templates |
 | Project health check | 17 checks + secrets management guide | Same |
 | Bug investigation | Structured debugging + TDD fix | Same + escalation to architectural review |
-| Overhead per feature | ~5 min | ~15-30 min |
+| Overhead per feature | ~10-15 min | ~1-2 hours |
 
 ## Requirements
 
