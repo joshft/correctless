@@ -412,9 +412,14 @@ discover_test_patterns() {
 
   # Merge discovered patterns into config
   if [ -n "$extra" ]; then
-    local current
+    local current merged
     current="$(jq -r '.patterns.test_file' "$config")"
-    jq --arg p "${current}|${extra}" '.patterns.test_file = $p' "$config" > "$config.$$" \
+    if [ -n "$current" ] && [ "$current" != "null" ]; then
+      merged="${current}|${extra}"
+    else
+      merged="${extra}"
+    fi
+    jq --arg p "$merged" '.patterns.test_file = $p' "$config" > "$config.$$" \
       && mv "$config.$$" "$config"
     ok "Merged discovered test patterns into config"
   fi
@@ -601,7 +606,7 @@ else
 
 This project uses Correctless for correctness-oriented development.
 Read AGENT_CONTEXT.md before starting any work.
-Available commands: /cspec, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /cpr-review, /cstatus, /csummary, /cmetrics, /cdebug
+Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /cpr-review, /cstatus, /csummary, /cmetrics, /cdebug
 CMDEOF
   else
     cat >> "$CLAUDEMD" <<'CMDEOF'
@@ -610,7 +615,7 @@ CMDEOF
 
 This project uses Correctless Lite for structured development.
 Read AGENT_CONTEXT.md before starting any work.
-Available commands: /cspec, /creview, /ctdd, /cverify, /cdocs, /cpr-review, /cstatus, /csummary, /cmetrics, /cdebug
+Available commands: /csetup, /cspec, /creview, /ctdd, /cverify, /cdocs, /cpr-review, /cstatus, /csummary, /cmetrics, /cdebug
 CMDEOF
   fi
   ok "Updated CLAUDE.md"

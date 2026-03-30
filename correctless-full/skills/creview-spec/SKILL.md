@@ -1,7 +1,7 @@
 ---
 name: creview-spec
 description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, and design contract checker. Use after /cspec or /cmodel.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*workflow-advance.sh*), Write(.claude/artifacts/reviews/*), Write(docs/specs/*), Write(.claude/meta/external-review-history.json)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.claude/artifacts/reviews/*), Write(docs/specs/*), Write(.claude/meta/external-review-history.json)
 context: fork
 ---
 

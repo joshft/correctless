@@ -146,35 +146,45 @@ get_target_file() {
   local fp
   fp="$(echo "$TOOL_INPUT" | jq -r '.file_path // empty')"
   if [ -z "$fp" ]; then
-    fp="$(echo "$TOOL_INPUT" | jq -r '.edits[0].file_path // empty' 2>/dev/null)"
+    # MultiEdit: output ALL file paths (one per line) so each gets checked
+    fp="$(echo "$TOOL_INPUT" | jq -r '.edits[]?.file_path // empty' 2>/dev/null)"
   fi
   echo "$fp"
 }
 
-TARGET_FILE="$(get_target_file)"
+TARGET_FILES="$(get_target_file)"
 
-# Block edits to state files
-if echo "$TARGET_FILE" | grep -q 'workflow-state-.*\.json'; then
-  echo "BLOCKED: Direct edits to workflow state files are not allowed. Use workflow-advance.sh to change state." >&2
-  exit 2
-fi
+# Check each target file for protected files (state files, config during TDD)
+check_protected_file() {
+  local tf="$1"
+  if echo "$tf" | grep -q 'workflow-state-.*\.json'; then
+    echo "BLOCKED: Direct edits to workflow state files are not allowed. Use workflow-advance.sh to change state." >&2
+    exit 2
+  fi
+  if echo "$tf" | grep -q 'workflow-config\.json'; then
+    case "$PHASE" in
+      tdd-tests|tdd-impl|tdd-qa|tdd-verify)
+        echo "BLOCKED [$PHASE]: workflow-config.json is protected during TDD phases to prevent test command manipulation." >&2
+        exit 2
+        ;;
+    esac
+  fi
+}
 
-# Block edits to workflow config during TDD phases (prevents test command injection)
-if echo "$TARGET_FILE" | grep -q 'workflow-config\.json'; then
-  case "$PHASE" in
-    tdd-tests|tdd-impl|tdd-qa|tdd-verify)
-      echo "BLOCKED [$PHASE]: workflow-config.json is protected during TDD phases to prevent test command manipulation." >&2
-      exit 2
-      ;;
-  esac
-fi
+# For MultiEdit, TARGET_FILES may contain multiple lines — check all
+while IFS= read -r _tf; do
+  [ -z "$_tf" ] && continue
+  check_protected_file "$_tf"
+done <<< "$TARGET_FILES"
 
-# No target file identified → allow
-if [ -z "$TARGET_FILE" ]; then
+# No target files identified → allow
+if [ -z "$TARGET_FILES" ]; then
   exit 0
 fi
 
-# Make path relative to repo root for pattern matching
+# For phase gating below, use the first file for single-file tools.
+# For MultiEdit, check ALL files — block if ANY is in a blocked class.
+TARGET_FILE="$(echo "$TARGET_FILES" | head -1)"
 REL_FILE="${TARGET_FILE#$REPO_ROOT/}"
 
 # ---------------------------------------------------------------------------
@@ -241,7 +251,24 @@ classify_file() {
   echo "other"
 }
 
-FILE_CLASS="$(classify_file "$REL_FILE")"
+# For MultiEdit, find the most restrictive classification across all files.
+# If ANY file is source/test, the gate must apply phase rules to it.
+MOST_RESTRICTIVE="other"
+while IFS= read -r _check_file; do
+  [ -z "$_check_file" ] && continue
+  _rel="${_check_file#$REPO_ROOT/}"
+  _cls="$(classify_file "$_rel")"
+  if [ "$_cls" = "source" ]; then
+    MOST_RESTRICTIVE="source"
+    REL_FILE="$_rel"
+    break  # source is the most restrictive, no need to check further
+  elif [ "$_cls" = "test" ] && [ "$MOST_RESTRICTIVE" != "source" ]; then
+    MOST_RESTRICTIVE="test"
+    REL_FILE="$_rel"
+  fi
+done <<< "$TARGET_FILES"
+
+FILE_CLASS="$MOST_RESTRICTIVE"
 
 # Non-source, non-test files are always allowed
 if [ "$FILE_CLASS" = "other" ]; then

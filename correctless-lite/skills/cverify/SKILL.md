@@ -17,10 +17,10 @@ Verification takes 10-15 minutes with mutation testing running in the background
 1. Read context (spec, implementation, tests, ARCHITECTURE.md)
 2. Rule coverage matrix
 3. Mutation testing (background)
-4. Prohibition verification
-5. Dependency check
+4. Dependency check
+5. Basic smell check
 6. Drift detection
-7. Architecture compliance
+7. Architecture compliance and prohibitions
 8. Write verification report
 
 **Between each check**, print a 1-line status: "Rule coverage complete — {N}/{M} rules covered, {K} weak. Starting mutation testing in background..." When mutation testing completes in the background, announce immediately: "Mutation testing done — {N} mutations, {M} killed, {K} survivors."
@@ -36,7 +36,7 @@ Mark each task complete as it finishes.
 5. Read `ARCHITECTURE.md`.
 6. Read `.claude/meta/workflow-effectiveness.json` — check which phases have historically missed bugs in this area.
 7. Read `.claude/artifacts/qa-findings-*.json` — see what QA found and fixed during TDD.
-8. Run `git diff main...HEAD --stat` to see what changed.
+8. Determine the default branch (check `workflow-config.json` for `workflow.default_branch`, fall back to `main`). Run `git diff {default_branch}...HEAD --stat` to see what changed.
 
 ## What to Check
 
@@ -57,16 +57,17 @@ Result: a table of R-xxx → test name → status (covered / uncovered / weak / 
 Diff the package manifest against the base branch:
 Use the project's default branch (from `workflow-config.json`, usually `main`):
 ```bash
-git diff main...HEAD -- package.json go.mod Cargo.toml requirements.txt pyproject.toml
+git diff {default_branch}...HEAD -- package.json go.mod Cargo.toml requirements.txt pyproject.toml
 ```
 
 For each new dependency: what is it, which file introduced it, was it in the spec?
 
-### 3. Architecture Compliance
+### 3. Architecture Compliance and Prohibitions
 
 Does the implementation follow the patterns in `ARCHITECTURE.md`?
 - Error handling, validation, state management, naming conventions?
 - New patterns introduced? Flag for ARCHITECTURE.md update.
+- **Prohibition check**: For each prohibition in ARCHITECTURE.md, grep the changed files for prohibited imports, patterns, or constructs. Flag any violations.
 
 ### 4. Basic Smell Check
 
@@ -154,7 +155,7 @@ If `workflow.git_trailers` is `true` in `workflow-config.json`, stage the verifi
 verify(task-slug): verification complete
 
 Spec: docs/specs/{task-slug}.md
-Rules-covered: R-001 through R-{N}
+Rules-covered: R-001, R-002, R-003, ...
 QA-rounds: {N}
 Verified-by: /cverify
 ```

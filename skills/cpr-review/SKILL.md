@@ -1,7 +1,7 @@
 ---
 name: cpr-review
 description: Multi-lens PR review. Checks architecture compliance, security, test coverage, antipatterns, spec alignment, and (Full mode) concurrency, trust boundaries, dependency risk, cross-spec impact, drift, and performance.
-allowed-tools: Read, Grep, Glob, Bash(gh*), Bash(glab*), Bash(git*), Bash(*test*), Bash(*lint*)
+allowed-tools: Read, Grep, Glob, Bash(gh*), Bash(glab*), Bash(git*), Bash(*test*), Bash(*lint*), Bash(*audit*), Bash(govulncheck*)
 ---
 
 # /cpr-review — Multi-Lens PR Review
@@ -23,8 +23,13 @@ PR reviews take 5-15 minutes depending on PR size and mode. The user must see pr
 6. Antipattern check
 7. Convention compliance
 8. Spec alignment (if spec linked)
-9. (Full mode) Advanced checks
-10. Present findings
+9. (Full mode) Concurrency analysis
+10. (Full mode) Trust boundary analysis
+11. (Full mode) Cross-spec impact
+12. (Full mode) Drift detection
+13. (Full mode) Performance implications
+14. (Full mode) Dependency risk
+15. Present findings
 
 **Between each check**, print a 1-line status: "Architecture compliance complete — {N} findings. Running security checklist..." Mark each task complete as it finishes.
 
@@ -72,37 +77,47 @@ For each finding: cite the specific ARCHITECTURE.md entry (PAT-xxx, prohibition,
 
 ## Step 4: Security Checklist
 
-Run the same checklist as `/creview`, auto-fired based on what the PR touches. Check the diff for:
+Run a security checklist against the PR diff, auto-fired based on what the PR touches. This covers the most common vulnerability classes — for the full comprehensive checklist, see `/creview`. Check the diff for:
 
 **If PR touches auth/session code:**
 - Password hashing (bcrypt cost ≥ 10, never MD5/SHA for passwords)
 - Session management (secure, httpOnly, sameSite cookies)
 - Token expiration and rotation
-- Auth bypass paths (middleware ordering, missing checks on new endpoints)
+- Auth bypass paths (middleware ordering — the #1 Express.js auth bypass, missing checks on new endpoints)
+- Fail-closed on auth failure (deny by default, not allow by default)
+- Security logging for authentication events, failed logins, privilege changes
 
 **If PR touches user input handling:**
 - Input validation at API boundary (not just client-side)
 - SQL injection (parameterized queries, no string concatenation)
-- XSS (output encoding, CSP headers)
+- XSS (output encoding, sanitization)
 - Path traversal in file operations
-- SSRF in URL handling
+- SSRF in URL handling (block private IPs: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, `file://`, non-HTTP schemes)
 - Mass assignment / over-posting
+- Open redirect (user-controlled redirect URLs must be validated against allowlist)
+- Unsafe deserialization (never deserialize untrusted input with pickle, eval, unserialize)
 
 **If PR touches data storage:**
 - Sensitive data encryption at rest
 - PII handling and logging (no passwords/tokens in logs)
-- Database RLS / tenant isolation (multi-tenant apps)
+- Database RLS / tenant isolation (multi-tenant apps, fail-closed on tenant isolation failure)
+- TOCTOU in authorization checks (check-then-act patterns where state can change between check and action)
 
 **If PR touches APIs/endpoints:**
 - CSRF protection on state-changing operations
 - Rate limiting on auth endpoints
-- Security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
+- Security headers (HSTS, X-Content-Type-Options, X-Frame-Options, Content-Security-Policy)
 - CORS configuration (not wildcard `*` with credentials)
 - Authorization checks (not just authentication)
 
+**If PR touches third-party integrations:**
+- API keys in env vars, not in source (check for hardcoded keys)
+- Webhook signature validation (Stripe, GitHub, etc.)
+- Distinction between publishable and secret keys
+
 **If PR adds dependencies:**
 - Check for known CVEs: `npm audit`, `pip audit`, `cargo audit`, `govulncheck`
-- Check maintenance status: last commit date, open issues, download trends
+- Flag new dependencies for manual review of maintenance status — the agent cannot access package registries directly
 
 ## Step 5: Test Coverage Analysis
 
@@ -147,7 +162,7 @@ If no spec is referenced, skip this step.
 
 ## Full Mode Additional Checks
 
-Read `.claude/workflow-config.json`. If `workflow.intensity` is set, run these additional checks:
+Read `.claude/workflow-config.json`. If `workflow.intensity` is set (any value: `"low"`, `"standard"`, `"high"`, or `"critical"`), you are in Full mode — run these additional checks.
 
 ### Concurrency Analysis
 - Does the PR introduce shared mutable state?
@@ -201,7 +216,10 @@ Group findings by severity:
 {Style issues, documentation gaps, minor improvements}
 
 ### What Looks Good
-{Explicitly note what the PR does well — this isn't just a complaint list}
+{At least 1 item. Note what the PR does well with file references where applicable.
+Look for: thorough test coverage with edge cases, correct use of documented patterns,
+clean security implementation, good error handling, clear naming. If the PR is genuinely
+poor, note the best aspect even if minor — "Tests exist for the happy path" is honest.}
 ```
 
 **For each finding**, include:
@@ -216,9 +234,9 @@ After presenting findings, offer: "Want me to post these findings as a PR commen
 
 If yes:
 - GitHub: `gh pr comment {number} --body "{findings}"`
-- GitLab: `glab mr comment {number} --message "{findings}"`
+- GitLab: `glab mr note {number} --message "{findings}"`
 
-Format the comment as a collapsible details section for large reviews:
+If there are 5 or more findings, format the comment as a collapsible details section:
 ```markdown
 <details>
 <summary>Correctless Review: {N} findings ({C} critical, {H} high)</summary>
@@ -234,7 +252,7 @@ Format the comment as a collapsible details section for large reviews:
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### /btw
-When reviewing large PRs, remind: "Use /btw to check something about the codebase without interrupting this review."
+When reviewing PRs with more than 10 changed files or 300+ lines of diff, remind after reading context (before starting checks): "Use /btw to check something about the codebase without interrupting this review."
 
 ## Constraints
 

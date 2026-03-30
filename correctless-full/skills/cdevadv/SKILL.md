@@ -1,7 +1,7 @@
 ---
 name: cdevadv
 description: "10th Man / Devil's Advocate. Challenges the assumptions, architecture, and strategies that every other agent accepts as true. Periodic deep analysis — not every feature."
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Write(.claude/artifacts/devadv/*), Write(.claude/meta/drift-debt.json)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*test*), Bash(*coverage*), Write(.claude/artifacts/devadv/*), Write(.claude/meta/drift-debt.json)
 context: fork
 ---
 

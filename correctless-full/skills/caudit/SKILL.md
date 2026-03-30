@@ -1,7 +1,7 @@
 ---
 name: caudit
 description: Olympics audit system. Convergence-based auditing with parallel specialized agents, confidence tiers, bounty/penalty economics, and find/fix loops. Presets: QA, Hacker, Performance, Custom.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/findings/*), Write(.claude/antipatterns.md), Write(docs/tests/*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/findings/*), Write(.claude/antipatterns.md), Write(*test*), Write(*spec*), Edit
 context: fork
 ---
 
@@ -42,13 +42,14 @@ Invoke with: `/caudit [preset] [scope]`
 - **Pre-release**: full scope with both QA and Hacker presets.
 - **After incident**: targeted scope to the affected subsystem.
 
-## Branching
+## Branching and State
 
-Create an audit branch before starting:
+Create an audit branch and initialize audit state:
+```bash
+git checkout -b audit/{preset}-{date}
+.claude/hooks/workflow-advance.sh audit-start {preset}
 ```
-audit/{preset}-{date}
-```
-All fixes commit here, never to main. Structured commit messages: `fix(qa-r2): resource leak in connection pool`. Merge to main after convergence.
+All fixes commit here, never to main. Structured commit messages: `fix(qa-r2): resource leak in connection pool`. After convergence, call `workflow-advance.sh audit-done` before merging to main.
 
 ## The Loop
 
@@ -353,7 +354,8 @@ When a finding category recurs across runs, it's a systemic issue that belongs i
 3. Update the persistent findings history.
 4. Check for recurring patterns across runs — flag for ARCHITECTURE.md.
 5. Present summary: total rounds, findings, fixed, recurring patterns, cost.
-6. Merge audit branch to main.
+6. Mark audit complete: `.claude/hooks/workflow-advance.sh audit-done`
+7. Merge audit branch to main.
 
 ## Claude Code Feature Integration
 

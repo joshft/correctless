@@ -1,7 +1,7 @@
 ---
 name: creview
 description: Skeptically review a spec for unstated assumptions, untestable rules, missing edge cases, and security gaps. Run after /cspec.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/specs/*), Write(.claude/artifacts/reviews/*)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/specs/*), Write(.claude/artifacts/reviews/*)
 context: fork
 ---
 

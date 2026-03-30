@@ -73,18 +73,26 @@ If the bug has a reliable failing test from Phase 1, offer:
 **Only offer if:** the test is fast (<30 seconds), the bug is a regression (not a new feature), and the user agrees.
 
 **If yes:**
-1. Stash uncommitted changes: `git stash`
-2. Find the known-good commit: `git merge-base HEAD main`
-3. Write a bisect test script to `.claude/artifacts/debug-bisect-test.sh`:
+1. Find the known-good commit: `git merge-base HEAD main`. If debugging on main (merge-base equals HEAD), ask the user: "You're on main — when did this last work? Provide a commit hash or tag." If no good commit can be identified, skip bisect.
+2. Write the bisect test script to `.claude/artifacts/debug-bisect-test.sh`.
+3. Run the entire bisect as a **single bash call** (variables must survive across steps):
    ```bash
-   #!/usr/bin/env bash
-   set -e
-   {test_command_for_the_specific_failing_test}
+   # Stash if dirty
+   STASHED=false
+   if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+     git stash && STASHED=true
+   fi
+   # Run bisect
+   git bisect start HEAD {good-commit} && git bisect run bash .claude/artifacts/debug-bisect-test.sh
+   RESULT=$?
+   # Clean up (all steps run regardless)
+   git bisect reset
+   [ "$STASHED" = "true" ] && git stash pop
+   rm -f .claude/artifacts/debug-bisect-test.sh
+   exit $RESULT
    ```
-4. Run: `git bisect start HEAD {good-commit} && git bisect run .claude/artifacts/debug-bisect-test.sh`
-5. Capture the first bad commit
-6. Clean up: `git bisect reset && git stash pop && rm .claude/artifacts/debug-bisect-test.sh`
-7. Report: "Bisect found commit `{sha}`: `{message}`. Changed: {files}."
+4. Capture the first bad commit from the output. If bisect is inconclusive (exit non-zero, all bad/good/skipped), report: "Bisect could not isolate the commit — proceeding with manual investigation."
+5. If successful, report: "Bisect found commit `{sha}`: `{message}`. Changed: {files}."
 
 Feed the bisect result into Phase 3 — the identified commit narrows the hypothesis dramatically.
 

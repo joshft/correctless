@@ -109,6 +109,7 @@ Six months in, the workflow knows your project's failure modes better than any i
 ```bash
 git clone https://github.com/joshft/correctless.git .claude/skills/workflow
 cd .claude/skills/workflow && ./setup
+/csetup
 ```
 
 Lite mode by default. To enable Full: add `"intensity": "standard"` (or `"high"` / `"critical"`) to `.claude/workflow-config.json` and re-run setup.
@@ -184,11 +185,11 @@ Correctless integrates with built-in Claude Code skills at specific points:
 
 ### State Management
 
+Check your current workflow status with `/cstatus`. For advanced debugging:
+
 ```bash
-.claude/hooks/workflow-advance.sh status          # Current phase
-.claude/hooks/workflow-advance.sh status-all      # All active workflows
-.claude/hooks/workflow-advance.sh override "why"  # Temporary gate bypass
 .claude/hooks/workflow-advance.sh diagnose "file" # Why a file is blocked
+.claude/hooks/workflow-advance.sh override "why"  # Temporary gate bypass (10 tool calls)
 .claude/hooks/workflow-advance.sh spec-update "why"  # Spec was wrong mid-TDD
 .claude/hooks/workflow-advance.sh reset           # Nuclear — remove all state
 ```
@@ -237,6 +238,17 @@ Optional (Full only):
 - Mutation testing tool for your language
 - External model CLIs (Codex, Gemini) for cross-checking
 - Isolated environment (Docker/VPS) for red team assessments
+
+## Glossary
+
+| Term | Meaning |
+|------|---------|
+| **Agent separation** | Each workflow phase runs in a fresh Claude session. The test writer doesn't know the implementation plan; the QA agent didn't write the tests. Same model, different mindsets — prevents confirmation bias. |
+| **Instance fix** | Fix the one bug here and now. |
+| **Class fix** | Fix the entire category of this bug — add a structural test that prevents recurrence. |
+| **Convergence** | Run multiple audit rounds until findings stabilize (no new critical/high issues). |
+| **Drift** | Code that no longer matches documented architecture. Detected by `/cverify`, tracked in drift-debt.json. |
+| **Antipattern** | A known bug class from your project's history. Stored in `.claude/antipatterns.md`, checked by every future spec and review. |
 
 ## Status
 

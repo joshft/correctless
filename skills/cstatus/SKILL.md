@@ -80,7 +80,7 @@ State management:
   .claude/hooks/workflow-advance.sh override "reason"  Temporarily bypass gate
 ```
 
-For Full mode, also show: `/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`
+Read `.claude/workflow-config.json`. If `workflow.intensity` is set, also show Full mode commands: `/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`
 
 ### 5. Health Check (if requested)
 

@@ -404,7 +404,7 @@ cmd_verify() {
   min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
   [ "$min_rounds" = "null" ] && min_rounds=1
   local qa_rounds
-  qa_rounds="$(read_state | jq -r '.qa_rounds')"
+  qa_rounds="$(read_state | jq -r '.qa_rounds // 0')"
 
   if [ "$qa_rounds" -lt "$min_rounds" ]; then
     die "Only $qa_rounds QA round(s) completed, minimum is $min_rounds. Run another QA round."
@@ -427,7 +427,7 @@ cmd_done() {
   min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
   [ "$min_rounds" = "null" ] && min_rounds=1
   local qa_rounds
-  qa_rounds="$(read_state | jq -r '.qa_rounds')"
+  qa_rounds="$(read_state | jq -r '.qa_rounds // 0')"
 
   if [ "$qa_rounds" -lt "$min_rounds" ]; then
     die "Only $qa_rounds QA round(s) completed, minimum is $min_rounds. Run another QA round."
@@ -785,7 +785,7 @@ cmd_status() {
   info "Task:    $(echo "$state" | jq -r '.task')"
   info "Spec:    $(echo "$state" | jq -r '.spec_file')"
   info "Started: $(echo "$state" | jq -r '.started_at')"
-  info "QA rounds: $(echo "$state" | jq -r '.qa_rounds')"
+  info "QA rounds: $(echo "$state" | jq -r '.qa_rounds // 0')"
 
   local updates
   updates="$(echo "$state" | jq -r '.spec_updates // 0')"
@@ -812,7 +812,7 @@ cmd_status_all() {
     phase="$(jq -r '.phase' "$sf")"
     task="$(jq -r '.task' "$sf")"
     started="$(jq -r '.started_at' "$sf" | cut -c1-10)"
-    qa_rounds="$(jq -r '.qa_rounds' "$sf")"
+    qa_rounds="$(jq -r '.qa_rounds // 0' "$sf")"
     printf "  %-35s phase: %-10s task: %-20s started: %s  qa_rounds: %s\n" "$branch" "$phase" "$task" "$started" "$qa_rounds"
   done
   if [ "$found" = "false" ]; then

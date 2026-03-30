@@ -194,6 +194,15 @@ After the implementation agent completes and tests pass, run `/simplify` to clea
 
 Read `.claude/workflow-config.json`. If `workflow.git_trailers` is `true`, include structured trailers in all commits during TDD. If the field is absent or `false`, commit normally without trailers.
 
+**Format for test commits (RED phase):**
+```
+test(task-slug): write failing tests for R-001, R-002
+
+Spec: docs/specs/{task-slug}.md
+Rules-covered: R-001, R-002
+Phase: RED
+```
+
 **Format for implementation commits (GREEN phase):**
 ```
 feat(task-slug): implement rules R-001, R-002
@@ -207,7 +216,7 @@ Rules-covered: R-001, R-002
 fix(task-slug): address QA finding QA-001
 
 Spec: docs/specs/{task-slug}.md
-QA-round: {N}
+QA-rounds: {N}
 QA-finding: QA-001
 ```
 
