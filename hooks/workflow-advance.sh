@@ -16,7 +16,7 @@ OVERRIDE_LOG="$ARTIFACTS_DIR/override-log.json"
 # Helpers
 # ---------------------------------------------------------------------------
 
-die() { printf "ERROR: %s\n" "$*" >&2; exit 1; }
+die() { printf "ERROR: %b\n" "$*" >&2; exit 1; }
 info() { echo "$*"; }
 
 require_jq() {
@@ -863,6 +863,7 @@ case "$cmd" in
     echo "  review-spec        model|spec → review-spec (multi-agent adversarial review)"
     echo "  verify-phase       tdd-qa → tdd-verify (final verification before done)"
     echo "  audit-start [type] Start audit on audit/* branch (type: qa|hacker|perf|custom)"
+    echo "  audit-done         audit → done (convergence reached, ready to merge)"
     echo "  resolve-drift ID \"reason\"  Mark drift debt item as resolved"
     echo ""
     echo "Utilities:"
@@ -873,7 +874,7 @@ case "$cmd" in
     echo "  status-all         Print all active workflows across branches"
     echo ""
     echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /cstatus"
-    echo "Full:   /cmodel /creview-spec /caudit /cupdate-arch /cpostmortem"
+    echo "Full:   /cmodel /creview-spec /caudit /cupdate-arch /cpostmortem /cdevadv /credteam"
     exit 1
     ;;
 esac

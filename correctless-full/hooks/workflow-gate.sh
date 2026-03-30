@@ -117,7 +117,7 @@ esac
 
 OVERRIDE_ACTIVE="$(jq -r '.override.active // false' "$STATE_FILE")"
 if [ "$OVERRIDE_ACTIVE" = "true" ]; then
-  REMAINING="$(jq -r '.override.remaining_calls' "$STATE_FILE")"
+  REMAINING="$(jq -r '.override.remaining_calls // 0' "$STATE_FILE")"
   if [ "$REMAINING" -gt 0 ]; then
     # Decrement remaining calls
     REMAINING=$((REMAINING - 1))

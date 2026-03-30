@@ -146,7 +146,7 @@ TSEOF
       local test_cmd="pytest"
       local coverage="pytest --cov"
       local lint="ruff check ."
-      [ -f "$REPO_ROOT/.flake8" ] || grep -q 'flake8' "$REPO_ROOT/pyproject.toml" 2>/dev/null && lint="flake8 ."
+      if [ -f "$REPO_ROOT/.flake8" ] || grep -q 'flake8' "$REPO_ROOT/pyproject.toml" 2>/dev/null; then lint="flake8 ."; fi
 
       cat <<PYEOF
 {
@@ -364,7 +364,7 @@ create_if_missing() {
 detect_full_tools() {
   # Mutation testing
   if command -v go-mutesting >/dev/null 2>&1; then ok "Mutation tool: go-mutesting"; fi
-  if command -v npx >/dev/null 2>&1 && npx stryker --version >/dev/null 2>&1; then ok "Mutation tool: Stryker"; fi
+  if command -v npx >/dev/null 2>&1 && npx --no stryker --version 2>/dev/null >/dev/null 2>&1; then ok "Mutation tool: Stryker"; fi
   if command -v cargo-mutants >/dev/null 2>&1; then ok "Mutation tool: cargo-mutants"; fi
   if command -v mutmut >/dev/null 2>&1; then ok "Mutation tool: mutmut"; fi
 

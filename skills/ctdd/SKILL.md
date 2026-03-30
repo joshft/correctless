@@ -239,7 +239,9 @@ This artifact is consumed by `/cverify` (to check class fixes were implemented),
 **Then decide next step:**
 - **If a BLOCKING finding involves a bug that's hard to understand** (unclear root cause, multiple possible explanations): suggest the human run `/cdebug` for structured investigation before attempting the fix round.
 - **If BLOCKING findings exist**: present to human. Each finding must include both the instance fix AND the class fix. Then `workflow-advance.sh fix` to return to GREEN for a fix round. The fix round implements BOTH fixes. Then re-run QA. Update the findings artifact with `status: fixed`.
-- **If no BLOCKING findings**: `workflow-advance.sh done`
+- **If no BLOCKING findings**:
+  - **Lite mode**: `workflow-advance.sh done`
+  - **Full mode**: `workflow-advance.sh verify-phase` (goes to tdd-verify for final verification, then `done`)
 
 ## After TDD Completes: MANDATORY Next Steps
 
