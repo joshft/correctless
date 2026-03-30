@@ -319,8 +319,8 @@ test_full_mode() {
   .claude/skills/workflow/setup >/dev/null 2>&1
 
   # Enable full mode
-  cat .claude/workflow-config.json | jq '.workflow += {"intensity": "high", "min_qa_rounds": 2, "fail_closed_when_no_state": true}' > /tmp/fc.json
-  mv /tmp/fc.json .claude/workflow-config.json
+  jq '.workflow += {"intensity": "high", "min_qa_rounds": 2, "fail_closed_when_no_state": true}' .claude/workflow-config.json > "$TEST_DIR/fc.$$.json"
+  mv "$TEST_DIR/fc.$$.json" .claude/workflow-config.json
 
   # Fail-closed: no state file blocks source edits
   git checkout -q -b feature/test-full

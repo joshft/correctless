@@ -222,8 +222,8 @@ Use TaskCreate/TaskUpdate:
 
 ## If Something Goes Wrong
 
-- These skills are read-only — they don't modify workflow state or source code. Re-run anytime safely.
-- If data is missing or incomplete, check that the prerequisite skills have run (e.g., `/csummary` needs QA findings from `/ctdd`).
+- `/cmetrics` writes a dashboard artifact but does not modify workflow state or source code. Re-run anytime safely.
+- If metrics are sparse, that's normal for new projects — data accumulates with each feature. Key sources: QA findings from `/ctdd`, verification reports from `/cverify`, antipatterns from `/cpostmortem`.
 
 ## Constraints
 

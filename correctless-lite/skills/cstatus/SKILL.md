@@ -50,8 +50,8 @@ If no active workflow, also run:
 | `tdd-impl` | "GREEN phase — implementing. Make the tests pass. When done, advance with `workflow-advance.sh qa`." |
 | `tdd-qa` | "QA review — edits blocked. If issues found: `workflow-advance.sh fix`. If a bug is hard to understand, try `/cdebug`. If clean: `workflow-advance.sh done` (Lite) or `workflow-advance.sh verify-phase` (Full)." |
 | `tdd-verify` | "Final verification — edits blocked. If checks pass: `workflow-advance.sh done`." |
-| `done` | "TDD complete. MANDATORY: run `/cverify` next. Then `workflow-advance.sh verified`." |
-| `verified` | "Verification complete. MANDATORY: run `/cdocs` next. Then `workflow-advance.sh documented`." |
+| `done` | "TDD complete. MANDATORY: run `/cverify` next (it advances the state automatically)." |
+| `verified` | "Verification complete. MANDATORY: run `/cdocs` next (it advances the state automatically)." |
 | `documented` | "All steps complete. Branch is ready to merge." |
 | `audit` | "Audit in progress. Run `/caudit` to continue the convergence loop." |
 
@@ -111,8 +111,8 @@ Report any issues with fix instructions.
 
 ## If Something Goes Wrong
 
-- These skills are read-only — they don't modify workflow state or source code. Re-run anytime safely.
-- If data is missing or incomplete, check that the prerequisite skills have run (e.g., `/csummary` needs QA findings from `/ctdd`).
+- `/cstatus` is read-only — it reads workflow state and project files but modifies nothing. Re-run anytime safely.
+- If status looks wrong, check that `.claude/workflow-config.json` exists and the hook scripts are installed at `.claude/hooks/`.
 
 ## Constraints
 

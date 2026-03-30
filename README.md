@@ -108,7 +108,7 @@ Six months in, the workflow knows your project's failure modes better than any i
 
 ```bash
 git clone https://github.com/joshft/correctless.git .claude/skills/workflow
-cd .claude/skills/workflow && ./setup
+.claude/skills/workflow/setup
 /csetup
 ```
 

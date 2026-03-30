@@ -29,7 +29,7 @@ Mark each task complete as it finishes.
 
 ## Before You Start
 
-**First-run check**: If `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate ARCHITECTURE.md and AGENT_CONTEXT.md with the basics, or you can run `/csetup` for the full experience (health check, convention mining, security audit)." If they want the quick scan: glob for key directories, identify 3-5 components and patterns, populate ARCHITECTURE.md with real entries, then continue. This takes 30 seconds and dramatically improves output quality.
+**First-run check**: If `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: "ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
 
 1. Read `AGENT_CONTEXT.md` for project context.
 2. Read the spec artifact (from workflow state or `docs/specs/`).

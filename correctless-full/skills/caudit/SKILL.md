@@ -374,7 +374,7 @@ After each round, report: findings found, findings fixed, findings rejected, cum
 
 ## If Something Goes Wrong
 
-- **Agent crashes mid-round**: Re-run `/caudit`. Prior round findings are persisted in `.claude/artifacts/findings/` — the skill reads these and can determine which round to start from. However, a partially completed round will restart from the beginning of that round.
+- **Agent crashes mid-round**: Re-run `/caudit`. Prior round findings are persisted in `.claude/artifacts/findings/` and provide context, but the skill restarts from Round 1. It will re-read prior findings and avoid re-reporting already-fixed issues, but there is no automatic round-level resume.
 - **Rate limit hit**: Wait 2-3 minutes and re-run. Convergence state persists in artifacts.
 - **Stuck in audit phase**: `workflow-advance.sh audit-done` to mark audit complete and move on.
 - **Want to start over**: Delete the audit branch and audit artifacts, then re-run.

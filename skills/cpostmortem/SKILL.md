@@ -33,6 +33,7 @@ Mark each task complete as it finishes.
 2. Read `.claude/antipatterns.md` to check if this bug class is already tracked.
 3. Identify the spec artifact for the feature where the bug was introduced.
 4. Read the verification report for that feature if it exists.
+5. Read `.claude/artifacts/debug-investigation-*.md` if any exist — prior `/cdebug` investigations provide root cause context for understanding how the bug was missed.
 
 ## Behavior
 

@@ -371,7 +371,7 @@ detect_file_state() {
   local file="$1"
   if [ ! -f "$file" ]; then
     echo "missing"
-  elif grep -qi '{PROJECT_NAME}\|{PLACEHOLDER}\|{Pattern [Nn]ame}\|{what it does}\|{2-3 sentences}' "$file" 2>/dev/null; then
+  elif grep -qiE '{PROJECT_NAME}|{PLACEHOLDER}|{Pattern [Nn]ame}|{what it does}|{2-3 sentences}' "$file" 2>/dev/null; then
     echo "template"
   else
     echo "existing"

@@ -204,13 +204,16 @@ test_files_exist() {
   # Split pipe-delimited patterns and check each
   local IFS='|'
   for pattern in $test_pattern; do
+    # Convert glob pattern to regex: escape dots, convert * to .*
+    local regex
+    regex="$(printf '%s' "$pattern" | sed 's/\./\\./g; s/\*/.*/g')"
     local count
-    count="$(git diff --name-only "$(git merge-base HEAD "$(git rev-parse --abbrev-ref HEAD@{upstream} 2>/dev/null || echo HEAD~1)" 2>/dev/null)" HEAD 2>/dev/null | grep -c "$pattern" || true)"
+    count="$(git diff --name-only "$(git merge-base HEAD "$(git rev-parse --abbrev-ref HEAD@{upstream} 2>/dev/null || echo HEAD~1)" 2>/dev/null)" HEAD 2>/dev/null | grep -cE "$regex" || true)"
     if [ "$count" -gt 0 ]; then
       return 0
     fi
     # Also check unstaged/staged new files
-    count="$(git status --porcelain | grep -c "$pattern" || true)"
+    count="$(git status --porcelain | grep -cE "$regex" || true)"
     if [ "$count" -gt 0 ]; then
       return 0
     fi
