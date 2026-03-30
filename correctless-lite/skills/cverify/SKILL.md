@@ -1,7 +1,7 @@
 ---
 name: cverify
 description: Verify implementation matches spec. Check rule coverage, undocumented dependencies, architecture compliance. Writes verification report and drift debt. Run after /ctdd completes.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Write(docs/verification/*), Write(.claude/meta/drift-debt.json), Write(.claude/artifacts/*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Edit, Write(docs/verification/*), Write(.claude/meta/drift-debt.json), Write(.claude/artifacts/*)
 context: fork
 ---
 
