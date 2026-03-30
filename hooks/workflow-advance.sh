@@ -74,7 +74,10 @@ now_iso() {
 }
 
 current_branch() {
-  git branch --show-current 2>/dev/null || die "Not in a git repository"
+  local b
+  b="$(git branch --show-current 2>/dev/null)" || die "Not in a git repository"
+  [ -n "$b" ] || die "Detached HEAD — checkout a branch first"
+  echo "$b"
 }
 
 check_branch_match() {
@@ -416,7 +419,8 @@ cmd_verify() {
 
 cmd_done() {
   check_branch_match
-  # Accept tdd-qa (Lite) or tdd-verify (Full)
+  # Accept tdd-qa (Lite, or Full skipping verify-phase) or tdd-verify (Full recommended path)
+  # In Full mode, /ctdd guides users through verify-phase before done, but it is not a hard gate
   require_phase_oneof "tdd-qa" "tdd-verify"
 
   local min_rounds
@@ -562,7 +566,7 @@ cmd_resolve_drift() {
 
   jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
-    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.tmp" && mv "$DRIFT_DEBT_FILE.tmp" "$DRIFT_DEBT_FILE"
+    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
 
   info "Drift item $drift_id marked as resolved: $reason"
 }
@@ -654,8 +658,8 @@ cmd_override() {
     --arg ts "$ts" \
     --arg branch "$(current_branch)" \
     '{phase: $phase, reason: $reason, timestamp: $ts, branch: $branch}')"
-  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.tmp" \
-    && mv "$OVERRIDE_LOG.tmp" "$OVERRIDE_LOG"
+  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
+    && mv "$OVERRIDE_LOG.$$" "$OVERRIDE_LOG"
 
   info "Override active for next 10 tool calls"
   info "Reason logged: $reason"
@@ -674,21 +678,25 @@ cmd_diagnose() {
   info "=== Diagnose: $filepath ==="
   info "Current phase: $phase"
 
-  # Classify file
+  # Classify file (mirrors gate logic: path-based patterns match full path, others match basename)
   local classification="other"
+  local bname
+  bname="$(basename "$filepath")"
   if [ -n "$test_pattern" ] && [ "$test_pattern" != "null" ]; then
     local IFS='|'
     for pat in $test_pattern; do
-      case "$filepath" in
-        *$pat) classification="test"; break ;;
+      case "$pat" in
+        */*) case "$filepath" in $pat) classification="test"; break ;; esac ;;
+        *)   case "$bname" in $pat) classification="test"; break ;; esac ;;
       esac
     done
   fi
   if [ "$classification" = "other" ] && [ -n "$source_pattern" ] && [ "$source_pattern" != "null" ]; then
     local IFS='|'
     for pat in $source_pattern; do
-      case "$filepath" in
-        *$pat) classification="source"; break ;;
+      case "$pat" in
+        */*) case "$filepath" in $pat) classification="source"; break ;; esac ;;
+        *)   case "$bname" in $pat) classification="source"; break ;; esac ;;
       esac
     done
   fi
@@ -805,7 +813,7 @@ cmd_status_all() {
     task="$(jq -r '.task' "$sf")"
     started="$(jq -r '.started_at' "$sf" | cut -c1-10)"
     qa_rounds="$(jq -r '.qa_rounds' "$sf")"
-    printf "  %-35s phase: %-10s started: %s  qa_rounds: %s\n" "$branch" "$phase" "$started" "$qa_rounds"
+    printf "  %-35s phase: %-10s task: %-20s started: %s  qa_rounds: %s\n" "$branch" "$phase" "$task" "$started" "$qa_rounds"
   done
   if [ "$found" = "false" ]; then
     info "  (none)"
@@ -873,7 +881,7 @@ case "$cmd" in
     echo "  status             Print current workflow state"
     echo "  status-all         Print all active workflows across branches"
     echo ""
-    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /cstatus"
+    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /cstatus /csummary /cmetrics /cdebug"
     echo "Full:   /cmodel /creview-spec /caudit /cupdate-arch /cpostmortem /cdevadv /credteam"
     exit 1
     ;;

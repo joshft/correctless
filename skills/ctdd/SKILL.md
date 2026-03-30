@@ -160,6 +160,9 @@ Spawn an **implementation agent** as a separate forked subagent:
 >
 > Read: AGENT_CONTEXT.md, the spec, ARCHITECTURE.md, the failing tests.
 > Write: source files, test files (logged). All files within the project root.
+> Log all test edits to `.claude/artifacts/tdd-test-edits.log` with timestamp and reason.
+>
+> The implementation agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Edit, Write(source and test files inside project root), Write(.claude/artifacts/tdd-test-edits.log), Bash(test and build commands)`
 
 After the implementation agent completes and tests pass, run `/simplify` to clean up code quality issues before QA. If `/simplify` is not available (it is a built-in Claude Code skill, not part of Correctless), skip this step and proceed to QA.
 

@@ -32,13 +32,16 @@ TOOL_INPUT="$(echo "$INPUT" | jq -r '.tool_input // empty')"
 case "$TOOL_NAME" in
   Edit|Write|MultiEdit|NotebookEdit|CreateFile) ;;
   Bash)
+    # Guard: empty/null tool_input is not valid JSON for jq
+    if [ -z "$TOOL_INPUT" ]; then exit 0; fi
     # Check for shell write patterns targeting source files
     COMMAND="$(echo "$TOOL_INPUT" | jq -r '.command // empty')"
     if [ -z "$COMMAND" ]; then
       exit 0
     fi
     # Only inspect commands that contain write-like patterns
-    if ! echo "$COMMAND" | grep -qE '(>>?|tee |sed -i|\bcp\b|\bmv\b|\binstall\b)'; then
+    # Use space-padded matching instead of \b for BSD grep portability
+    if ! echo " $COMMAND " | grep -qE '(>>?|tee |sed -i| cp | mv | install )'; then
       exit 0
     fi
     # Fall through to phase checking with the command as context
@@ -119,15 +122,12 @@ OVERRIDE_ACTIVE="$(jq -r '.override.active // false' "$STATE_FILE")"
 if [ "$OVERRIDE_ACTIVE" = "true" ]; then
   REMAINING="$(jq -r '.override.remaining_calls // 0' "$STATE_FILE")"
   if [ "$REMAINING" -gt 0 ]; then
-    # Decrement remaining calls
-    REMAINING=$((REMAINING - 1))
-    if [ "$REMAINING" -le 0 ]; then
-      jq '.override.active = false | .override.remaining_calls = 0' "$STATE_FILE" > "$STATE_FILE.$$" \
-        && mv "$STATE_FILE.$$" "$STATE_FILE"
-    else
-      jq --argjson r "$REMAINING" '.override.remaining_calls = $r' "$STATE_FILE" > "$STATE_FILE.$$" \
-        && mv "$STATE_FILE.$$" "$STATE_FILE"
-    fi
+    # Atomic read-modify-write: decrement and deactivate in a single jq call
+    jq 'if .override.remaining_calls > 0 then
+          .override.remaining_calls -= 1
+          | if .override.remaining_calls <= 0 then .override.active = false else . end
+        else . end' "$STATE_FILE" > "$STATE_FILE.$$" \
+      && mv "$STATE_FILE.$$" "$STATE_FILE"
     exit 0
   fi
 fi
@@ -193,14 +193,24 @@ classify_file() {
   local bname
   bname="$(basename "$file")"
 
-  # Check test patterns (pipe-delimited globs like "*.test.ts|*.spec.ts")
+  # Check test patterns (pipe-delimited globs like "*.test.ts|*.spec.ts|tests/*.rs")
   if [ -n "$TEST_PATTERN" ]; then
     local oldifs="$IFS"
     IFS='|'
     for pat in $TEST_PATTERN; do
       IFS="$oldifs"
-      case "$bname" in
-        $pat) echo "test"; return ;;
+      # Patterns containing "/" need to match against the full relative path
+      case "$pat" in
+        */*)
+          case "$file" in
+            $pat) echo "test"; return ;;
+          esac
+          ;;
+        *)
+          case "$bname" in
+            $pat) echo "test"; return ;;
+          esac
+          ;;
       esac
     done
     IFS="$oldifs"
@@ -212,8 +222,17 @@ classify_file() {
     IFS='|'
     for pat in $SOURCE_PATTERN; do
       IFS="$oldifs"
-      case "$bname" in
-        $pat) echo "source"; return ;;
+      case "$pat" in
+        */*)
+          case "$file" in
+            $pat) echo "source"; return ;;
+          esac
+          ;;
+        *)
+          case "$bname" in
+            $pat) echo "source"; return ;;
+          esac
+          ;;
       esac
     done
     IFS="$oldifs"

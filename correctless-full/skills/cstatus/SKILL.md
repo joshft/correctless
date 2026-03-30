@@ -44,11 +44,11 @@ If no active workflow, also run:
 | Phase | Show |
 |-------|------|
 | `spec` | "Writing the spec. When done, the human approves and you run `/creview` (Lite) or `/creview-spec` (Full)." |
-| `review` / `review-spec` | "Spec is being reviewed. After approval, run `/ctdd` to start writing tests." |
+| `review` / `review-spec` | "Run `/creview` (Lite) or `/creview-spec` (Full) to review the spec. After review and approval, run `/ctdd` to start writing tests." |
 | `model` | "Formal modeling phase. Run `/cmodel` to generate the Alloy model." |
 | `tdd-tests` | "RED phase — writing tests. Source files are blocked (except stubs with STUB:TDD). When tests exist and fail, advance with `workflow-advance.sh impl`." |
 | `tdd-impl` | "GREEN phase — implementing. Make the tests pass. When done, advance with `workflow-advance.sh qa`." |
-| `tdd-qa` | "QA review — edits blocked. If issues found: `workflow-advance.sh fix`. If a bug is hard to understand, try `/cdebug`. If clean: `workflow-advance.sh done` (Lite) or `workflow-advance.sh verify-phase` (Full)." | — edits are blocked. If issues found: `workflow-advance.sh fix`. If clean: `workflow-advance.sh done` (Lite) or `workflow-advance.sh verify-phase` (Full)." |
+| `tdd-qa` | "QA review — edits blocked. If issues found: `workflow-advance.sh fix`. If a bug is hard to understand, try `/cdebug`. If clean: `workflow-advance.sh done` (Lite) or `workflow-advance.sh verify-phase` (Full)." |
 | `tdd-verify` | "Final verification — edits blocked. If checks pass: `workflow-advance.sh done`." |
 | `done` | "TDD complete. MANDATORY: run `/cverify` next. Then `workflow-advance.sh verified`." |
 | `verified` | "Verification complete. MANDATORY: run `/cdocs` next. Then `workflow-advance.sh documented`." |

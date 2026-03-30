@@ -100,6 +100,8 @@ Write analysis results to `docs/models/{task-slug}-results.md`.
 .claude/hooks/workflow-advance.sh review-spec
 ```
 
+After advancing, tell the human: "Model complete. Run `/creview-spec` for multi-agent adversarial review of the spec."
+
 ## Claude Code Feature Integration
 
 ### Task Lists

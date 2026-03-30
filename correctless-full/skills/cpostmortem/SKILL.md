@@ -33,7 +33,7 @@ Ask the human (batch where appropriate):
 Read the spec and verification report (if they exist):
 - Did a spec invariant cover this bug class? If yes, why didn't the test catch it?
 - If no invariant covered it, should one have existed? Which category?
-- Which workflow phase should have caught this? (spec, review-spec, tdd-qa, verify, audit)
+- Which workflow phase should have caught this? (spec, review/review-spec, tdd-qa, tdd-verify/cverify, audit)
 - Was that phase skipped? If so, would running it have caught the bug?
 - If the phase ran and still missed it, why?
 

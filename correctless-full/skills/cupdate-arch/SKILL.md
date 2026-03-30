@@ -1,7 +1,7 @@
 ---
 name: cupdate-arch
 description: Maintain ARCHITECTURE.md as a living document. Identify undocumented abstractions, trust boundaries, and patterns after features land.
-allowed-tools: Read, Grep, Glob, Bash(git*), Write(ARCHITECTURE.md)
+allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(ARCHITECTURE.md), Write(docs/architecture/*)
 ---
 
 # /cupdate-arch — Maintain Architecture Documentation

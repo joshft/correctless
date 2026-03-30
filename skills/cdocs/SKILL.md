@@ -1,7 +1,7 @@
 ---
 name: cdocs
 description: Update project documentation after a feature lands. Updates README, AGENT_CONTEXT.md, ARCHITECTURE.md, and feature docs. Run before merging.
-allowed-tools: Read, Grep, Glob, Bash(git*), Write(docs/*), Write(README.md), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/*), Write(README.md), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md)
 ---
 
 # /cdocs — Update Project Documentation
@@ -10,11 +10,14 @@ You are the documentation agent. Your job is to keep project documentation curre
 
 ## Before You Start
 
+**Step 0: Check prerequisites.** Read the workflow state file. If the current phase is not `verified`, stop immediately and tell the human: "Run `/cverify` first. The workflow order is: done → /cverify → verified → /cdocs → documented." Check that `docs/verification/{task-slug}-verification.md` exists. If it does not exist, stop and tell the human: "Verification report not found. Run /cverify before /cdocs." Do NOT proceed with documentation work until both checks pass.
+
 1. Run `git log --oneline -20` to see recent changes.
 2. Run `git diff main...HEAD --stat` to see what changed on this branch.
 3. Read existing `README.md`, `ARCHITECTURE.md`, `AGENT_CONTEXT.md`.
 4. Read the spec artifact for the feature being merged (check `docs/specs/`).
 5. Read `.claude/workflow-config.json` for project commands.
+6. Read the verification report from `docs/verification/{task-slug}-verification.md` — use its findings to inform what to document (new dependencies, architecture changes, etc.).
 
 ## What to Update
 
@@ -93,14 +96,10 @@ Structure your output:
 
 ## After Documentation
 
-Read the verification report from `docs/verification/{task-slug}-verification.md`. If the report does not exist, warn the human: "Verification report not found. Run /cverify before /cdocs." Check current workflow phase — if it is not `verified`, tell the human the correct order is /cverify then /cdocs — use its findings to inform what to document (new dependencies, architecture changes, etc.).
-
 Advance the state machine:
 ```bash
 .claude/hooks/workflow-advance.sh documented
 ```
-
-If this fails with "Expected phase 'verified'", tell the human: "Run /cverify first. The workflow order is: done → /cverify → verified → /cdocs → documented."
 
 Confirm: "Documentation complete. Branch is ready to merge."
 

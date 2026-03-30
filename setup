@@ -320,7 +320,7 @@ HEOF
 
   # Append hook to existing settings using jq
   if command -v jq >/dev/null 2>&1; then
-    local tmp="$settings.tmp"
+    local tmp="$settings.$$"
     jq --arg cmd "$hook_path" --arg adv "$advance_path" '
       .hooks.PreToolUse = (.hooks.PreToolUse // []) + [{
         matcher: "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
@@ -391,6 +391,13 @@ echo "Correctless — Setup"
 echo "==================="
 echo ""
 
+# Check for jq — hooks require it
+if ! command -v jq >/dev/null 2>&1; then
+  warn "jq is not installed. The workflow hooks require jq to function."
+  warn "Install: brew install jq (macOS) / apt install jq (Debian) / pacman -S jq (Arch)"
+  echo ""
+fi
+
 # Detect language
 DETECTED_LANG="$(detect_language)"
 ok "Detected: $DETECTED_LANG project"
@@ -418,7 +425,7 @@ create_if_missing "$REPO_ROOT/AGENT_CONTEXT.md" "$SCRIPT_DIR/templates/AGENT_CON
 create_if_missing "$REPO_ROOT/.claude/antipatterns.md" "$SCRIPT_DIR/templates/antipatterns.md" "antipatterns.md"
 
 # Create directory structure
-mkdir -p "$REPO_ROOT/docs/specs" "$REPO_ROOT/docs/features"
+mkdir -p "$REPO_ROOT/docs/specs" "$REPO_ROOT/docs/features" "$REPO_ROOT/docs/verification"
 ok "Created docs/ directories"
 
 mkdir -p "$REPO_ROOT/.claude/artifacts"
@@ -426,8 +433,8 @@ ok "Created .claude/artifacts/"
 
 # Full mode: create additional directories and meta files
 if [ "$IS_FULL" = "true" ]; then
-  mkdir -p "$REPO_ROOT/docs/models" "$REPO_ROOT/docs/diagrams" "$REPO_ROOT/docs/verification" "$REPO_ROOT/docs/decisions"
-  ok "Created Full mode docs/ directories (models, diagrams, verification, decisions)"
+  mkdir -p "$REPO_ROOT/docs/models" "$REPO_ROOT/docs/diagrams" "$REPO_ROOT/docs/decisions"
+  ok "Created Full mode docs/ directories (models, diagrams, decisions)"
 
   mkdir -p "$REPO_ROOT/.claude/meta"
   create_if_missing "$REPO_ROOT/.claude/meta/workflow-effectiveness.json" "$SCRIPT_DIR/templates/workflow-effectiveness.json" "workflow-effectiveness.json"

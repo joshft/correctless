@@ -1,6 +1,6 @@
 # Correctless Lite: Structured Development Workflow
 
-> **Note:** This is the original design specification. The implementation has evolved — 2 skills were added (/csetup, /cstatus), the security checklist was added to /creview, and the research agent was added to /cspec. See the [README](README.md) and the actual [skill files](skills/) for the current implementation.
+> **Note:** This is the original design specification. The implementation has evolved — 5 skills were added (/csetup, /cstatus, /csummary, /cmetrics, /cdebug), the security checklist was added to /creview, and the research agent was added to /cspec. Lite now has 10 skills; Full has 17. See the [README](README.md) and the actual [skill files](skills/) for the current implementation.
 
 
 
@@ -10,7 +10,7 @@ A lightweight set of Claude Code skills that bring structure and discipline to e
 
 The workflow: **Spec → Review → Implement (TDD) → Verify → Document**
 
-Same paradigm as Correctless, stripped to the essentials. Seven skills. Lightweight version of the full thirteen-skill suite. One reviewer instead of an agent team. No Alloy, no STRIDE, no convergence loops, no external model integration.
+Same paradigm as Correctless, stripped to the essentials. Ten skills. Lightweight version of the full seventeen-skill suite. One reviewer instead of an agent team. No Alloy, no STRIDE, no convergence loops, no external model integration.
 
 ### Core Design Principle: The Lens Determines What the Agent Finds
 

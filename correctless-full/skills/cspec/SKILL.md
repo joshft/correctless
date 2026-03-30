@@ -152,9 +152,9 @@ After understanding what the human wants to build, assess whether your training 
 > {Things research couldn't resolve}
 > ```
 
-The research subagent should have `allowed-tools: WebSearch, WebFetch, Read, Grep`.
+The research subagent should have `allowed-tools: WebSearch, WebFetch, Read, Grep`. It returns the brief as text to you (the cspec orchestrator).
 
-Write the brief to `.claude/artifacts/research/{task-slug}-research.md`. Then read the brief before drafting the spec. Reference findings in the spec's invariants where relevant.
+After receiving the research subagent's output, **you** (the cspec agent) write the brief to `.claude/artifacts/research/{task-slug}-research.md`. Then read the brief before drafting the spec. Reference findings in the spec's invariants where relevant.
 
 **If no research signals are present** (straightforward feature using well-understood patterns), skip this step. Don't research for the sake of researching.
 
@@ -264,7 +264,11 @@ A unit test with hand-constructed mocks will not catch missing wiring.
 
 ### Step 4: Load Invariant Templates (Full Mode)
 
-In Full mode, check which invariant template categories apply to this feature. Templates are shipped with Correctless (in the plugin or git-clone install). Search for them:
+In Full mode, check which invariant template categories apply to this feature. Search for templates in these locations (in order of priority — project-specific templates from `/cpostmortem` override shipped defaults):
+1. `.claude/templates/invariants/` — project-specific templates created by `/cpostmortem`
+2. The plugin's `templates/` directory — shipped with Correctless
+
+Template categories:
 - `concurrency.md` — if feature involves goroutines, channels, mutexes, shared state
 - `resource-lifecycle.md` — if feature allocates resources
 - `config-lifecycle.md` — if feature adds/modifies config fields

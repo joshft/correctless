@@ -1,7 +1,7 @@
 ---
 name: creview-spec
 description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, and design contract checker. Use after /cspec or /cmodel.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*workflow-advance.sh*), Write(.claude/artifacts/reviews/*), Write(docs/specs/*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*workflow-advance.sh*), Write(.claude/artifacts/reviews/*), Write(docs/specs/*), Write(.claude/meta/external-review-history.json)
 context: fork
 ---
 
@@ -103,6 +103,8 @@ Incorporate approved changes into the spec.
 ```bash
 .claude/hooks/workflow-advance.sh tests
 ```
+
+After advancing, tell the human: "Review complete. Run `/ctdd` to start the TDD cycle. The full pipeline continues: RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge. Every step runs."
 
 ## Claude Code Feature Integration
 

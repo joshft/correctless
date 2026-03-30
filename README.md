@@ -150,11 +150,12 @@ Then restart Claude Code.
 /cdebug       Structured bug investigation with TDD fix
 ```
 
-### Full (16 skills — includes all Lite skills)
+### Full (17 skills — includes all Lite skills)
 
 ```
 /csetup       Health check + workflow setup + intensity selection
 /cspec        Typed invariants, STRIDE, invariant templates, research agent
+/creview      Skeptical review + security checklist (inherited from Lite)
 /cmodel       Alloy formal modeling
 /creview-spec Multi-agent adversarial review (4 agents)
 /ctdd         TDD + test audit + /simplify + mutation testing + tdd-verify phase
@@ -205,7 +206,7 @@ Mutation testing, property-based testing, and PBT helpers are Full-only. Lite wo
 
 | | Lite | Full |
 |---|------|------|
-| Skills | 10 | 16 |
+| Skills | 10 | 17 |
 | Spec format | 5 sections, simple rules | 12+ sections, typed invariants |
 | Spec research | Current best practices, dependency health | Same |
 | Review | Single-pass + auto security checklist | 4-agent adversarial team |

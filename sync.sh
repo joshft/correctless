@@ -55,7 +55,7 @@ for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdat
   mkdir -p "correctless-full/skills/$skill"
   cp "skills/$skill/SKILL.md" "correctless-full/skills/$skill/SKILL.md"
 done
-info "Full skills (16) → correctless-full"
+info "Full skills (17) → correctless-full"
 
 echo ""
 echo "Done. Verify with: git diff --stat"
