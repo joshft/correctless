@@ -148,7 +148,49 @@ Print to conversation AND write to `.claude/artifacts/metrics-{date}.md`:
 - **Net time saved:** {production fix time} - {workflow time} = {N} hours
 
 {This is a rough estimate. Production bugs take 2-10x longer to fix than pre-merge bugs due to debugging, hotfixes, rollbacks, and incident response. The 2-hour average is conservative.}
+
+## Health Analysis
+- **QA Round Trend:** {e.g., "Averaging 2.3 rounds — trending down from 3.1 last quarter."}
+- **Antipattern Growth:** {e.g., "Error handling category growing fastest (+4 in 3 months). Consider architectural pattern."}
+- **Drift Staleness:** {e.g., "3 drift items older than 90 days. Schedule /cdevadv layers analysis."}
+- **Olympics Convergence:** {e.g., "Last 5 runs converged in ≤2 rounds — consider rotating presets."}
+- **Decision Record Staleness:** {e.g., "2 decisions have expired revisit-by dates."}
+- **Spec Revision Rate:** {e.g., "Specs revised mid-TDD in 60% of features — spec phase may need more brainstorm time."}
+- **Cross-Metric Correlations:** {e.g., "Spec revision rate is high AND antipattern growth is accelerating in error handling — spec phase isn't learning from antipatterns."}
 ```
+
+## Health Analysis
+
+After computing the raw metrics above, analyze them for actionable insights. This is the interpretive layer — raw numbers without analysis are useless.
+
+**QA Round Trends:**
+- Calculate average QA rounds across all features. If trending up across recent features: "QA is finding more issues — check whether specs are getting less thorough or code quality is degrading."
+- If trending down: "QA rounds are decreasing — the workflow is getting more effective."
+- If suspiciously low (every feature passes in 1 round): "Every feature passes QA in 1 round. Either code quality is exceptional or QA intensity is too low. Consider increasing min_qa_rounds or adding more hostile QA lenses."
+
+**Antipattern Growth:**
+- Group antipatterns by category. Flag the fastest-growing: "Error handling antipatterns are growing fastest (4 new in last 3 months). This may indicate an architectural gap, not just individual bugs."
+- If any category has 5+ entries: "Consider whether '{category}' is a systemic issue that needs an ARCHITECTURE.md pattern, not just more antipattern entries."
+
+**Drift Debt Staleness:**
+- Flag items older than 90 days: "{N} drift items are older than 90 days. Stale drift becomes invisible — schedule a `/cdevadv layers` analysis."
+- Compare accumulation vs resolution rate: "Drift is accumulating {N}x faster than it's being resolved."
+
+**Olympics Convergence Speed (Full only):**
+- If last 5 runs all converged in ≤2 rounds: "Olympics are converging suspiciously fast. Possible causes: (1) lenses are stale, (2) codebase is genuinely clean, (3) agent presets need rotation. Try a custom preset."
+- If convergence is getting slower: "Olympics are taking more rounds — new code may be introducing complexity the current lenses don't cover well."
+
+**Decision Record Staleness:**
+- Scan `docs/decisions/` for files with `revisit-when` or `revisit-by` markers. Flag expired conditions.
+
+**Spec Revision Rate:**
+- If specs are frequently revised during TDD (high spec_updates counts across features): "Specs are being revised mid-TDD frequently. The spec phase may not be thorough enough — consider more Socratic brainstorm time or research steps."
+
+**Cross-Metric Correlations (the most valuable insights):**
+- "Spec revision rate is high AND antipattern growth is accelerating in the same category" → spec phase isn't learning from antipatterns
+- "QA rounds are low BUT post-merge bugs are increasing" → QA is too lenient
+- "Drift debt is growing AND Olympics convergence is fast" → drift may be in areas Olympics don't cover
+- "Review phase catches fewer issues over time BUT antipattern count is growing" → review isn't reading antipatterns effectively
 
 ## Trend Tracking
 
@@ -172,6 +214,7 @@ Use TaskCreate/TaskUpdate:
 - Reading Olympics history
 - Reading git log
 - Calculating metrics
+- Analyzing health indicators
 - Generating dashboard
 
 ## Constraints

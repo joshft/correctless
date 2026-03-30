@@ -16,20 +16,21 @@ PR reviews take 5-15 minutes depending on PR size and mode. The user must see pr
 
 **Before starting**, create a task list:
 1. Fetch PR info and diff
-2. Read project context
-3. Architecture compliance check
-4. Security checklist
-5. Test coverage analysis
-6. Antipattern check
-7. Convention compliance
-8. Spec alignment (if spec linked)
-9. (Full mode) Concurrency analysis
-10. (Full mode) Trust boundary analysis
-11. (Full mode) Cross-spec impact
-12. (Full mode) Drift detection
-13. (Full mode) Performance implications
-14. (Full mode) Dependency risk
-15. Present findings
+2. Detect dependency bump (may switch to dep-specific lens)
+3. Read project context
+4. Architecture compliance check
+5. Security checklist
+6. Test coverage analysis
+7. Antipattern check
+8. Convention compliance
+9. Spec alignment (if spec linked)
+10. (Full mode) Concurrency analysis
+11. (Full mode) Trust boundary analysis
+12. (Full mode) Cross-spec impact
+13. (Full mode) Drift detection
+14. (Full mode) Performance implications
+15. (Full mode) Dependency risk
+16. Present findings
 
 **Between each check**, print a 1-line status: "Architecture compliance complete — {N} findings. Running security checklist..." Mark each task complete as it finishes.
 
@@ -53,6 +54,63 @@ Fetch the diff:
 If neither CLI is available: "Install `gh` (GitHub) or `glab` (GitLab) to use /cpr-review. Or provide the diff manually."
 
 **Parse the PR body** for spec references: look for links to `docs/specs/*.md` or mentions of spec files.
+
+### Detect Dependency Bump PRs
+
+After fetching PR info, check if this is a dependency bump:
+- PR author is `dependabot[bot]`, `renovate[bot]`, `renovate-bot`, or similar
+- OR: the only changed files are dependency manifests (package.json, go.mod, Cargo.toml, requirements.txt, pyproject.toml, Gemfile, pnpm-lock.yaml, yarn.lock, go.sum, Cargo.lock)
+- OR: PR title matches patterns like "Bump X from Y to Z", "Update X to Z", "chore(deps): ..."
+
+**If dependency bump detected**, skip the standard code review (Steps 2-8) entirely and run the dependency-specific lens instead:
+
+**Priority order** (most reliable signal first):
+
+**1. Test verification (definitive):**
+Run the project's test suite. If tests pass, the bump is likely safe. If tests fail, the failures point directly to affected usage patterns. Report: "Tests: {all pass / N failures}" with the specific failing test names and files.
+
+**2. Usage pattern analysis (high signal):**
+Grep the project for imports/usage of the bumped dependency. Check whether deprecated APIs are used. Flag affected files: "Found {N} files importing {package}. {M} use APIs deprecated in the new version: {list}."
+
+**3. Changelog review (context):**
+Extract the dependency name and version range from the diff. If GitHub-hosted: `gh api repos/{owner}/{repo}/releases` to fetch release notes. Otherwise search for CHANGELOG.md or release notes. Summarize breaking changes and notable fixes.
+
+**4. CVE check (if security update):**
+Read the PR body for CVE references. Assess severity and whether the project's usage is affected by the specific vulnerability.
+
+**5. Breaking changes assessment:**
+Compare old and new major/minor versions. Major version bump: "Major version bump — likely breaking changes. Review migration guide." Check changelog for "BREAKING" entries.
+
+**6. Transitive impact:**
+For package.json bumps, check if the lockfile changes affect other packages. For go.mod, check indirect dependency changes.
+
+**Output for dep bumps** (replaces standard review format):
+
+```markdown
+## Dependency Review: {package} {old} → {new}
+
+### Update Type: {security patch / minor update / major upgrade}
+
+### Test Result
+{all pass / N failures in {files}}
+
+### Project Usage
+{N files import this dependency}
+{M use deprecated APIs: {list with file:line references}}
+
+### CVE (if applicable)
+{ID, severity, affected versions, whether project usage is affected}
+
+### Breaking Changes
+{from changelog, or "none found"}
+
+### Recommendation
+{merge / merge after fixing deprecated API usage / needs migration work / block — tests fail}
+```
+
+The recommendation should be primarily driven by test results, not changelog reading. If tests pass and no deprecated APIs are used, recommend merge. If tests fail, the failures ARE the review.
+
+**This replaces the standard review flow for dep bumps** — don't run architecture compliance, security checklist, etc. Those are for code changes, not version bumps.
 
 ## Step 2: Read Project Context
 

@@ -136,7 +136,7 @@ Then restart Claude Code.
 
 ## Commands
 
-### Lite (11 skills)
+### Lite (12 skills)
 
 ```
 /csetup       Project health check + workflow setup
@@ -145,14 +145,15 @@ Then restart Claude Code.
 /ctdd         Enforced TDD: RED → test audit → GREEN → /simplify → QA
 /cverify      Verify implementation matches spec, write verification report
 /cdocs        Update documentation (reads verification report)
-/cpr-review   Multi-lens PR review (architecture, security, tests, antipatterns)
+/crefactor    Structured refactoring with behavioral equivalence enforcement
+/cpr-review   Multi-lens PR review (architecture, security, tests, dep bumps)
 /cstatus      Show current phase and next steps
 /csummary     Feature summary — what the workflow caught
-/cmetrics     Project-wide metrics dashboard
+/cmetrics     Project-wide metrics dashboard + health analysis
 /cdebug       Structured bug investigation with TDD fix
 ```
 
-### Full (18 skills — includes all Lite skills)
+### Full (19 skills — includes all Lite skills)
 
 ```
 /csetup       Health check + workflow setup + intensity selection
@@ -168,10 +169,11 @@ Then restart Claude Code.
 /cpostmortem  Post-merge bug analysis, class fixes
 /cdevadv      Devil's advocate — challenge assumptions (theme/signals/layers)
 /credteam     Live red team assessment against running system
-/cpr-review   Multi-lens PR review + concurrency, trust boundaries, cross-spec impact
+/crefactor    Structured refactoring + mutation testing, cross-spec impact
+/cpr-review   Multi-lens PR review + concurrency, trust boundaries, dep bumps
 /cstatus      Show current phase and next steps
 /csummary     Feature summary — what the workflow caught
-/cmetrics     Project-wide metrics dashboard and ROI
+/cmetrics     Project-wide metrics dashboard, health analysis, and ROI
 /cdebug       Structured bug investigation with escalation
 ```
 
@@ -209,7 +211,7 @@ Mutation testing, property-based testing, and PBT helpers are Full-only. Lite wo
 
 | | Lite | Full |
 |---|------|------|
-| Skills | 11 | 18 |
+| Skills | 12 | 19 |
 | Spec format | 5 sections, simple rules | 12+ sections, typed invariants |
 | Spec research | Current best practices, dependency health | Same |
 | Review | Single-pass + auto security checklist | 4-agent adversarial team |

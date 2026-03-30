@@ -69,6 +69,7 @@ Available commands:
   /cstatus        This command — show status and next steps
   /csummary       Feature summary — what the workflow caught
   /cmetrics       Project-wide metrics dashboard
+  /crefactor      Structured refactoring with behavioral equivalence
   /cpr-review     Multi-lens PR review
   /cdebug         Structured bug investigation
   /csetup         Re-run setup / validate configuration
