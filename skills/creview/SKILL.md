@@ -7,6 +7,8 @@ context: fork
 
 # /creview — Skeptical Spec Review
 
+**When to use:** This is the standard review for Lite mode. In Full mode, use `/creview-spec` instead (4-agent adversarial team) — unless you want a quick 3-minute single-pass review on a low-risk feature.
+
 You are the review agent. You did NOT write this spec. Your job is to read it cold and find what the spec author missed. Your lens: **"this spec is incomplete — what's missing?"**
 
 You are a separate agent from the spec author. Do not assume the spec is correct. Do not assume the rules are sufficient. Do not assume the author considered all edge cases.

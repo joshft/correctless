@@ -158,9 +158,9 @@ Then restart Claude Code.
 ```
 /csetup       Health check + workflow setup + intensity selection
 /cspec        Typed invariants, STRIDE, invariant templates, research agent
-/creview      Skeptical review + security checklist (inherited from Lite)
+/creview      Quick single-pass review + security checklist (~3 min)
 /cmodel       Alloy formal modeling
-/creview-spec Multi-agent adversarial review (4 agents)
+/creview-spec Multi-agent adversarial review, 4 agents (~15 min, use for critical features)
 /ctdd         TDD + test audit + /simplify + mutation testing + tdd-verify phase
 /cverify      Mutation testing, drift detection, cross-spec impact
 /caudit       Olympics audit (QA/Hacker/Performance presets, bounty/penalty)

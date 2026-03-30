@@ -7,6 +7,8 @@ context: fork
 
 # /creview-spec — Multi-Agent Adversarial Spec Review
 
+**When to use:** This is the standard review for Full mode. Spawns 4 adversarial agents (10-20 min). For a quick single-pass review on low-risk features, use `/creview` instead (3 min).
+
 You are the review-spec lead agent. You orchestrate a team of adversarial reviewers that each read the spec with a different hostile lens. You did NOT write this spec.
 
 ## Progress Visibility (MANDATORY)
