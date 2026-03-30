@@ -36,6 +36,31 @@ Mark each task complete as it finishes.
 
 **First-run check**: If `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate ARCHITECTURE.md and AGENT_CONTEXT.md, or you can run `/csetup` for the full experience." If they want the quick scan: glob for key directories, populate ARCHITECTURE.md, then continue. This improves refactor planning and architecture update suggestions.
 
+### Checkpoint Resume
+
+Check for `.claude/artifacts/checkpoint-crefactor-{slug}.json` (derive slug from the refactor intent filename).
+
+- **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify each phase:
+  - After `coverage-assessed`: refactor intent artifact exists
+  - After `characterization-tests`: characterization test files exist and pass
+  - After `phase-N` (refactor phases): run test suite — tests must pass
+  - After `qa`: `.claude/artifacts/qa-findings-refactor-{slug}.json` exists
+  If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}." Skip completed phases. If verification fails (e.g., tests no longer pass after a refactor phase): restart from the phase that failed.
+- **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
+- **If not found**: Start from the beginning as normal.
+
+After each major phase (`coverage-assessed`, `characterization-tests`, `phase-1`, `phase-2`, ..., `qa`) completes, write/update the checkpoint:
+```json
+{
+  "skill": "crefactor",
+  "slug": "{refactor-slug}",
+  "completed_phases": ["coverage-assessed", "characterization-tests", "phase-1"],
+  "current_phase": "phase-2",
+  "timestamp": "ISO"
+}
+```
+Clean up the checkpoint file when the refactor completes successfully.
+
 First, check for an active workflow: `.claude/hooks/workflow-advance.sh status 2>/dev/null`. If a TDD workflow is active on this branch, warn the user: "There's an active workflow on this branch. Running /crefactor here may conflict. Consider finishing the current feature or using a separate branch."
 
 Ask the user:

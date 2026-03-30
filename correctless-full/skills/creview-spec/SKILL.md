@@ -37,6 +37,27 @@ Mark each task complete as agents return results.
 
 **First-run check**: If `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: "ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
 
+### Checkpoint Resume
+
+Check for `.claude/artifacts/checkpoint-creview-spec-{slug}.json` (derive slug from the spec file's task field).
+
+- **If found and <24 hours old**: Read `completed_phases`. Phases: `self-assessment`, `red-team`, `assumptions`, `testability`, `design-contract`. For parallel agents, checkpoint only after ALL 4 complete, not individually — partial agent results are not useful without synthesis. Verification is weak here (agent output lives in conversation context, not artifacts), so if the checkpoint says agents completed but you cannot access their findings: "Checkpoint found but agent outputs are not recoverable. Restarting agent team." Re-spawning is safer than skipping.
+  If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}."
+- **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
+- **If not found**: Start from the beginning as normal.
+
+After each major phase completes, write/update the checkpoint:
+```json
+{
+  "skill": "creview-spec",
+  "slug": "{task-slug}",
+  "completed_phases": ["self-assessment", "red-team", "assumptions", "testability", "design-contract"],
+  "current_phase": "synthesis",
+  "timestamp": "ISO"
+}
+```
+Clean up the checkpoint file when the review completes and state advances.
+
 1. Read `AGENT_CONTEXT.md` for project context.
 2. Read the spec artifact.
 3. Read `ARCHITECTURE.md`.

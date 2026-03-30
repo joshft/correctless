@@ -118,7 +118,12 @@ Advance the state machine:
 .claude/hooks/workflow-advance.sh documented
 ```
 
-Confirm: "Documentation complete. Branch is ready to merge."
+Confirm: "Documentation complete. Branch is ready to merge.
+
+After merging to main:
+- If bugs escape to production from this feature → run `/cpostmortem` to trace which phase missed it
+- Run `/cmetrics` periodically to track workflow health and spot trends
+- Full mode: consider `/caudit` for a cross-codebase sweep after major features"
 
 ## Claude Code Feature Integration
 

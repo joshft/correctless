@@ -51,6 +51,32 @@ The RED phase (test writing) and GREEN phase (implementation) MUST be executed b
 
 **First-run check**: If `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: "ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
 
+### Checkpoint Resume
+
+Check for `.claude/artifacts/checkpoint-ctdd-{slug}.json` (derive slug from the workflow state file's task field).
+
+- **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify the current phase:
+  - After `red`: test files exist and fail when run
+  - After `test-audit`: test files exist (audit feedback already applied)
+  - After `green`: run test suite — tests must pass
+  - After `simplify`: run test suite — tests must still pass
+  - After `qa`: `.claude/artifacts/qa-findings-{slug}.json` exists
+  If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}." Skip completed phases. If verification fails: restart from the phase that failed verification.
+- **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
+- **If not found**: Start from the beginning as normal.
+
+After each major phase (`red`, `test-audit`, `green`, `simplify`, `qa`) completes, write/update the checkpoint:
+```json
+{
+  "skill": "ctdd",
+  "slug": "{task-slug}",
+  "completed_phases": ["red", "test-audit"],
+  "current_phase": "green",
+  "timestamp": "ISO"
+}
+```
+Clean up the checkpoint file when the skill completes successfully.
+
 1. Read `AGENT_CONTEXT.md` for project context.
 2. Read the approved spec (path from workflow state).
 3. Read `.claude/workflow-config.json` for test commands and patterns.

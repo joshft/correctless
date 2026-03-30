@@ -8,13 +8,13 @@
     {
       "name": "correctless-lite",
       "source": "./correctless-lite",
-      "description": "Lightweight correctness workflow for everyday development. 12 skills for structured development: spec-before-code, skeptical review with security checklist, enforced TDD with agent separation, verification, documentation, multi-lens PR review, debugging, and metrics. ~10-15 min overhead per feature.",
+      "description": "Lightweight correctness workflow for everyday development. 13 skills for structured development: spec-before-code, skeptical review with security checklist, enforced TDD with agent separation, verification, documentation, multi-lens PR review, debugging, and metrics. ~10-15 min overhead per feature.",
       "version": "1.8.0"
     },
     {
       "name": "correctless",
       "source": "./correctless-full",
-      "description": "Full correctness workflow for security-critical systems. 19 skills including formal modeling, multi-agent adversarial review, convergence auditing, mutation testing, and postmortem feedback loops. ~1-2 hours overhead per feature, but the code ships tested and assumption-challenged.",
+      "description": "Full correctness workflow for security-critical systems. 20 skills including formal modeling, multi-agent adversarial review, convergence auditing, mutation testing, and postmortem feedback loops. ~1-2 hours overhead per feature, but the code ships tested and assumption-challenged.",
       "version": "1.8.0"
     }
   ]

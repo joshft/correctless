@@ -51,6 +51,26 @@ git checkout -b audit/{preset}-{date}
 ```
 All fixes commit here, never to main. Structured commit messages: `fix(qa-r2): resource leak in connection pool`. After convergence, call `workflow-advance.sh audit-done` before merging to main.
 
+### Checkpoint Resume
+
+Check for `.claude/artifacts/checkpoint-caudit-{slug}.json` (derive slug from the preset and date, e.g., `qa-2026-03-29`).
+
+- **If found and <24 hours old**: Read `completed_phases` (e.g., `["round-1", "round-2"]`). Before skipping, verify each completed round: the findings artifact for that round must exist in `.claude/artifacts/findings/` (e.g., `audit-{preset}-{date}-round-{N}.json`). If verification passes: "Found checkpoint from {timestamp} — rounds 1-{N} already done. Resuming from round {N+1}." Skip completed rounds. If a round's artifact is missing: restart from that round.
+- **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
+- **If not found**: Start from Round 1 as normal.
+
+After each round's fixes are committed, write/update the checkpoint:
+```json
+{
+  "skill": "caudit",
+  "slug": "{preset}-{date}",
+  "completed_phases": ["round-1", "round-2"],
+  "current_phase": "round-3",
+  "timestamp": "ISO"
+}
+```
+Clean up the checkpoint file when the audit converges and completes successfully.
+
 ## The Loop
 
 ```
