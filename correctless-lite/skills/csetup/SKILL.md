@@ -8,6 +8,8 @@ allowed-tools: Bash, Read, Write, Glob, Grep, WebSearch, WebFetch
 
 You are the onboarding agent. Your job is to get a project from zero to ready-to-use in one interactive conversation. Don't just run a script and dump output — guide the human through each decision.
 
+**For existing projects:** Tell the user upfront: "Setting up on an existing project takes a few minutes — I need to scan your codebase to learn your conventions, architecture, and tooling. Larger projects take longer. I'll show you what I find as I go."
+
 ## Step 1: Detect the Project
 
 Scan the project root silently. Then present findings conversationally:
@@ -53,42 +55,118 @@ Fix any issues the human flags.
 **Full mode only**: if the config has `workflow.intensity`, ask about intensity:
 - "Intensity is set to `standard`. For context: `low` skips STRIDE and uses fewer QA rounds, `high` adds fail-closed mode, `critical` requires formal modeling. Want to change it?"
 
-## Step 4: Bootstrap ARCHITECTURE.md
+## Step 4: Discover and Bootstrap ARCHITECTURE.md
 
-Read the current `ARCHITECTURE.md`. If it's still the template (no real content), offer to bootstrap it:
+Read `.claude/workflow-config.json` field `setup.architecture_state` to determine mode:
+- `template` or `missing` → **full bootstrap**: scan the codebase and populate from scratch
+- `existing` → **merge mode**: scan, compare with existing content, propose only additions
+- `null` or field absent (older config, or jq was missing at setup time) → **detect manually**: check if ARCHITECTURE.md exists and contains real content (no `{PLACEHOLDER}` or `{PROJECT_NAME}` markers). If real content, use merge mode. If template/missing, use full bootstrap.
 
-"ARCHITECTURE.md is empty. I can scan your codebase and suggest some initial entries. Want me to?"
+**For existing projects, tell the user:** "Your project already has an ARCHITECTURE.md. I'll scan the codebase and suggest Correctless-specific sections to add alongside your existing content. This may take a moment — I'm learning your project."
 
-If yes:
-1. Scan for key directories/modules → suggest a components table
-2. Look for patterns (error handling, validation, state management) → suggest design pattern entries
-3. Look for conventions (naming, file organization) → suggest convention entries
-4. Present each suggestion one at a time: "I see you use Zod schemas in your route handlers for validation. Should I add a design pattern entry for 'validate at API boundary'?"
+### Scanning Protocol
 
-Write approved entries. Skip rejected ones without argument.
+Run these scans in parallel where possible:
 
-## Step 5: Capture Existing Conventions
+**1. Directory structure scan:**
+- Glob for structural directories: `src/*/`, `lib/*/`, `internal/*/`, `pkg/*/`, `app/*/`, `packages/*/`, `cmd/*/`
+- For each candidate directory, read the directory listing and any index/barrel file to determine its purpose
+- Look for architectural layers: `controllers/`, `services/`, `repositories/`, `middleware/`, `models/`, `handlers/`, `routes/`, `utils/`, `hooks/`, `components/`
 
-Ask whether the project has existing conventions, design patterns, or coding guidelines. Most projects have these — they just live in people's heads, a Notion page, a README section, or a Slack message from 6 months ago.
+**2. Pattern mining scan** (grep for these signals):
+- **Validation**: zod, joi, yup, class-validator, pydantic, validator imports — note WHERE validation happens (route handlers? middleware? service layer?)
+- **Error handling**: custom error classes (`extends Error`, `class.*Error`), error middleware, centralized error handlers
+- **Database access**: ORM imports (prisma, sequelize, typeorm, sqlalchemy, gorm, diesel) — is access centralized or scattered?
+- **Auth**: JWT, session, OAuth, auth middleware — how does auth flow through the request lifecycle?
+- **Config**: `process.env`, `os.Getenv`, `os.environ` — centralized config module or scattered env reads?
+- **Logging**: logger imports, `console.log` vs structured logging (winston, pino, slog, logrus)
+- **State management**: Redux, Zustand, Context, signals, stores
+- **API patterns**: Express/Fastify routes, gin/echo handlers, Flask/Django views — how are routes organized?
+
+**3. Test infrastructure scan:**
+- Where are test files? Co-located with source, or separate directories?
+- Test utilities/helpers: `test/utils/`, `test/fixtures/`, `test/factories/`
+- Mock patterns: jest.mock, vitest.mock, httptest, unittest.mock, gomock
+- Configuration: jest.config, vitest.config, pytest.ini, conftest.py
+
+### Full Bootstrap Mode (template/missing)
+
+Populate the entire ARCHITECTURE.md from scan results:
+1. **Key Components table**: one row per significant directory/module discovered
+2. **Design Patterns** (PAT-xxx format): one entry per detected pattern
+3. **Conventions**: naming, file organization, import patterns discovered
+4. Present the complete draft: "Here's what I found in your codebase. Review and correct anything that's wrong."
+5. Write approved version
+
+### Merge Mode (existing)
+
+Read the existing ARCHITECTURE.md fully. Then:
+1. **Compare scan results against what's already documented.** If the existing doc already describes the repository pattern in prose and you find Prisma repos in `src/db/repos/`, don't add a second section — instead note: "Your existing docs already cover database access patterns. I'd add a Correctless-structured ID (PAT-001) to your existing section for reference by other skills. Here's how that would look."
+2. **Identify missing Correctless sections**: Design Patterns with PAT-xxx numbering, Conventions, Trust Boundaries (Full mode). Propose each as an addition that respects the user's existing structure — don't impose the template's format on top of it.
+3. **Never delete or rewrite existing content.** Only append new sections or annotate existing ones.
+4. Present each proposed addition separately for approval.
+
+## Step 5: Mine and Capture Conventions
+
+**Don't ask the user to describe conventions from memory. Mine the codebase first, then confirm.** Describing your own conventions from memory is hard — you forget things, you describe what you wish the conventions were rather than what they are. Being shown what the codebase actually does and saying "yes that's right" or "no, that's a mistake we should fix" is fast and accurate.
+
+### Convention Mining Scan
+
+Before asking the user anything, scan the codebase for implicit conventions:
+
+**1. Naming conventions:**
+- Sample 20 source files: are they `camelCase.ts`, `kebab-case.ts`, `snake_case.ts`, `PascalCase.ts`?
+- Check directory naming: singular (`model/`) vs plural (`models/`)
+- Check exported function/class naming: camelCase vs snake_case vs PascalCase
+
+**Surface inconsistencies as findings:** If 18/20 files use camelCase but 2 use kebab-case, that's a convention with violations: "18/20 files use camelCase naming. 2 files deviate: `old-utils.ts`, `legacy-helper.ts`. Is camelCase the convention? If so, these are cleanup candidates."
+
+**2. Import/module conventions:**
+- Barrel files (`index.ts`, `__init__.py`, `mod.rs`): used consistently?
+- Path aliases (`@/`, `~/`, `#`) in tsconfig.json or package.json
+- Import ordering: eslint rules or visible grouping pattern?
+
+**3. Error handling conventions:**
+- Custom error classes: centralized or scattered?
+- Error response shapes in API handlers: consistent format? If half the routes return `{ error: "message" }` and half return `{ error: { code: "X", message: "Y" } }`, surface it: "I see two different error response formats in your API routes. Want to pick one as the convention?"
+- Error logging: structured vs console, consistent vs ad-hoc
+
+**4. Testing conventions:**
+- Co-located tests (same directory as source) vs separate test directories
+- Test utilities/helpers: shared fixtures, factories, builders
+- Mock patterns: what's mocked, what uses real implementations
+- Naming: `describe/it` nesting, "should..." vs "when..." conventions
+
+**5. Git conventions:**
+- Run `git log --oneline -30`: detect conventional commits, Jira prefixes, ticket numbers, capitalization, tense
+- Check for `.commitlintrc`, `commitlint.config.js`
+
+**6. Configuration:**
+- `.editorconfig` (indentation, line endings)
+- Prettier/biome/eslint configs for formatting rules
+- tsconfig.json strictness settings
+
+### Present Mining Results
+
+Present findings as a categorized summary: "I scanned your codebase and found these conventions:" with one section per category. For each finding, ask: "Is this intentional? Should I document it?"
+
+**Anti-conventions are valuable too.** If you find inconsistent patterns (two error formats, mixed naming styles, different test approaches in different directories), surface them explicitly: "I see two different patterns for X. Want to pick one as the convention? I'll add it to ARCHITECTURE.md and future specs will enforce it." This turns convention capture into a mini-audit for free.
+
+### Then Ask for Undocumented Conventions
+
+After presenting mining results, follow up:
 
 ```
-Do you have existing design patterns or coding guidelines for this project?
+Those are the conventions I detected from code. Are there additional ones not visible in the codebase?
 
-This could be:
-- A style guide or coding standards document
-- Naming conventions (files, functions, variables, API routes)
-- Architecture patterns (repository pattern, service layer, middleware ordering)
-- Error handling conventions (how errors propagate, what gets logged, error response format)
-- Testing conventions (what to mock, how to name tests, test file location)
-- API conventions (versioning, pagination, error shapes, auth headers)
-- Database conventions (migration patterns, naming, query patterns)
-- Git conventions (branch naming, commit message format, PR templates)
+Things like:
+- Architecture decisions that aren't reflected in file structure
+- "Never do X" rules that everyone just knows
+- API versioning or pagination standards
+- Database migration patterns
+- Deployment conventions
 
-You can:
-1. Paste them here (I'll organize and place them)
-2. Point me to a file in the repo
-3. Tell me the key ones conversationally
-4. Skip this — conventions will emerge naturally as features are specced
+You can paste a doc, point me to a file, or describe them.
 ```
 
 ### Where conventions go
@@ -156,18 +234,57 @@ Never use raw SQL or import database packages outside the repo layer.
 
 ## Step 6: Bootstrap AGENT_CONTEXT.md
 
-If `AGENT_CONTEXT.md` is still the template, draft a populated version based on:
-- What you learned from scanning the codebase
-- The ARCHITECTURE.md entries just created
-- The conventions just captured
-- The config file
-- Recent git history
+Read `.claude/workflow-config.json` field `setup.agent_context_state` to determine mode:
+- `template` or `missing` → draft a populated version from scratch
+- `existing` → read existing content, propose only missing Correctless sections (Quick Reference table with commands, Common Pitfalls if absent)
+- `null` or field absent → detect manually: check if AGENT_CONTEXT.md exists and contains real content (no `{PLACEHOLDER}` markers). If real content, use merge mode. If template/missing, use full bootstrap.
 
-Present the draft for approval. Write it.
+For template/missing, populate based on:
+- Codebase scan results from Step 4
+- ARCHITECTURE.md entries just created
+- Conventions captured in Step 5
+- Config file (test/lint/build commands)
+- Recent git history (`git log --oneline -20` — skip if no commits exist yet)
+
+For existing files: read fully, identify what's already covered, propose only additions. Never replace existing content.
+
+Present the draft (or proposed additions) for approval. Write after approval.
 
 ## Step 7: Project Health Check
 
 Run a comprehensive health check and present a health card. This applies to both Lite and Full — project hygiene is the same regardless of workflow mode.
+
+### Detect Existing Tooling First
+
+Before running the 17 checks, scan for existing tool configurations. This changes how findings are reported — acknowledge what exists rather than suggesting duplicates.
+
+**Hook systems:**
+- Check for: `.husky/` directory, `husky` in package.json, `.lintstagedrc*` or `lint-staged` in package.json, `.pre-commit-config.yaml`, `lefthook.yml`
+- If ANY hook system exists: the "Pre-commit hooks" check should acknowledge it. Correctless hooks are Claude Code PreToolUse hooks (registered in `.claude/settings.json`), not git hooks — they coexist without conflict. Note: "Found: husky + lint-staged. Correctless hooks are separate (they gate Claude's file operations, not git commits). No conflict. Consider adding gitleaks to your lint-staged config for secret scanning if not present."
+
+**CI enrichment:**
+- When CI files are found, actually read them. Grep for: test commands, lint commands, coverage steps, security scanning, dependency scanning.
+- Map CI coverage to health check items. If CI runs `npm test -- --coverage`, mark coverage as `Found (via CI)`.
+
+**Coverage config detection:**
+- Check for: `jest.config.*` with `coverageThreshold`, `.coveragerc`, `.nycrc`, `pyproject.toml [tool.coverage]`, `tarpaulin.toml`, `vitest.config.*` coverage settings
+
+**Test pattern validation:**
+- Glob for test files broadly: `**/*.test.*`, `**/*.spec.*`, `**/*_test.*`, `**/test_*.*`, `__tests__/**/*`, `tests/**/*`
+- Compare found files against `workflow-config.json`'s `patterns.test_file`
+- If files exist that don't match the config pattern: "Found 23 test files in `__tests__/` but your config only matches `*.test.ts`. The workflow gate may misclassify these. Want me to update the test pattern?" This prevents frustration during the first `/ctdd` run.
+
+### Health Check Status Vocabulary
+
+Use richer status values than binary pass/fail:
+- `Found` — detected and correctly configured
+- `Found (via CI)` — not a local tool but CI handles it
+- `Found (equivalent)` — using a different tool that serves the same purpose (e.g., husky instead of pre-commit)
+- `Missing` — not found, recommend adding
+- `Partial` — found but incomplete (e.g., linter exists but no config)
+- `N/A` — not applicable to this project type
+
+The score denominator should subtract N/A items: a Go project with 15 applicable checks scoring 12/15 is more meaningful than 12/17.
 
 ### Security
 
@@ -429,41 +546,41 @@ Conventional commits (if detected/configured):
 
 ### Present the Health Card
 
-Format the results as a health card:
+Format the results as a health card using the status vocabulary above:
 
 ```
 Project Health Check — {project-name} ({language}/{framework})
 
 Security:
-  ✓/✗ Dependency scanning: {status}
-  ✓/✗ Secret scanning: {status}
-  ✓/✗ No secrets in source: {status}
-  ✓/✗ .gitignore covers sensitive files: {status}
+  {✓/✗/—} Dependency scanning: {Found|Found (via CI)|Missing|N/A}
+  {✓/✗/—} Secret scanning: {Found|Found (equivalent: husky+gitleaks)|Missing}
+  {✓/✗/—} No secrets in source: {Found: clean|FOUND: N secrets — fix now}
+  {✓/✗/—} .gitignore covers sensitive files: {Found|Partial|Missing}
 
 Code Quality:
-  ✓/✗ Linter: {status}
-  ✓/✗ Formatter: {status}
-  ✓/✗ Type checking: {status}
-  ✓/✗ Pre-commit hooks: {status}
+  {✓/✗/—} Linter: {Found: eslint|Found (via CI)|Missing}
+  {✓/✗/—} Formatter: {Found: prettier|Missing}
+  {✓/✗/—} Type checking: {Found: strict|Partial: not strict|N/A}
+  {✓/✗/—} Pre-commit hooks: {Found: pre-commit|Found (equivalent: husky)|Missing}
 
 Testing:
-  ✓/✗ Test runner: {status}
-  ✓/✗ Coverage reporting: {status}
+  {✓/✗/—} Test runner: {Found: jest (47 tests)|Missing: zero tests}
+  {✓/✗/—} Coverage reporting: {Found (via CI)|Partial: no threshold|Missing}
 
 CI/CD:
-  ✓/✗ CI pipeline: {status}
-  ✓/✗ Branch protection: {status}
+  {✓/✗/—} CI pipeline: {Found: GitHub Actions (runs tests, lint)|Missing}
+  {✓/✗/—} Branch protection: {Found|Missing}
 
 Documentation:
-  ✓/✗ README: {status}
-  ✓/✗ .env.example: {status}
+  {✓/✗/—} README: {Found|Partial: boilerplate|Missing}
+  {✓/✗/—} .env.example: {Found|Missing|N/A: no .env}
 
 Git Hygiene:
-  ✓/✗ .gitignore complete: {status}
-  ✓/✗ No committed build artifacts: {status}
-  ✓/✗ Lock file committed: {status}
+  {✓/✗/—} .gitignore complete: {Found|Partial}
+  {✓/✗/—} No committed build artifacts: {Found: clean|FOUND: node_modules/ tracked}
+  {✓/✗/—} Lock file committed: {Found|Missing}
 
-Score: X/17 checks passing
+Score: X/Y checks passing (Y = applicable checks, excluding N/A)
 ```
 
 ### Prioritize and Offer Fixes
@@ -566,7 +683,7 @@ End with clear next steps:
 2. Run `/cspec` to write a spec for what you're building
 3. The workflow guides you from there: spec → review → tests → implementation → QA → verify → docs
 
-Current commands available: `/cspec`, `/creview`, `/ctdd`, `/cverify`, `/cdocs`, `/cstatus`
+Current commands available: `/cspec`, `/creview`, `/ctdd`, `/cverify`, `/cdocs`, `/cstatus`, `/csummary`, `/cmetrics`, `/cdebug`
 Check workflow state anytime: `.claude/hooks/workflow-advance.sh status`
 
 Want to start a feature now?"

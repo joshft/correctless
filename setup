@@ -354,8 +354,105 @@ create_if_missing() {
 }
 
 # ---------------------------------------------------------------------------
-# Main
+# Detect existing project state for the skill agent
 # ---------------------------------------------------------------------------
+
+detect_file_state() {
+  local file="$1"
+  if [ ! -f "$file" ]; then
+    echo "missing"
+  elif grep -qi '{PROJECT_NAME}\|{PLACEHOLDER}\|{Pattern [Nn]ame}\|{what it does}\|{2-3 sentences}' "$file" 2>/dev/null; then
+    echo "template"
+  else
+    echo "existing"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Discover test patterns beyond defaults
+# ---------------------------------------------------------------------------
+
+discover_test_patterns() {
+  local config="$1"
+  command -v jq >/dev/null 2>&1 || return 0
+
+  local extra=""
+
+  # Check for test directories (maxdepth 5 for monorepos, bail after 100 files)
+  for dir in __tests__ tests test e2e spec; do
+    if find "$REPO_ROOT" -maxdepth 5 -type d -name "$dir" 2>/dev/null | head -1 | grep -q .; then
+      info "  Test directory found: $dir/"
+      case "$dir" in
+        __tests__) extra="${extra:+$extra|}__tests__/**/*" ;;
+        tests)     extra="${extra:+$extra|}tests/**/*" ;;
+        test)      extra="${extra:+$extra|}test/**/*" ;;
+        e2e)       extra="${extra:+$extra|}e2e/**/*" ;;
+        spec)      extra="${extra:+$extra|}spec/**/*" ;;
+      esac
+    fi
+  done
+
+  # Check for non-standard test suffixes
+  for suffix in integration e2e acceptance; do
+    if find "$REPO_ROOT" -maxdepth 5 -name "*.${suffix}.*" -type f 2>/dev/null | head -1 | grep -q .; then
+      info "  Test suffix found: .${suffix}.*"
+      extra="${extra:+$extra|}*.${suffix}.*"
+    fi
+  done
+
+  # Merge discovered patterns into config
+  if [ -n "$extra" ]; then
+    local current
+    current="$(jq -r '.patterns.test_file' "$config")"
+    jq --arg p "${current}|${extra}" '.patterns.test_file = $p' "$config" > "$config.$$" \
+      && mv "$config.$$" "$config"
+    ok "Merged discovered test patterns into config"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Detect existing tooling that might conflict or overlap
+# ---------------------------------------------------------------------------
+
+detect_existing_tools() {
+  echo ""
+  info "Existing tooling:"
+
+  # Hook systems
+  if [ -d "$REPO_ROOT/.husky" ]; then
+    ok "Git hooks: husky"
+  fi
+  if grep -q '"lint-staged"' "$REPO_ROOT/package.json" 2>/dev/null; then
+    ok "Git hooks: lint-staged"
+  fi
+  if [ -f "$REPO_ROOT/.pre-commit-config.yaml" ]; then
+    ok "Git hooks: pre-commit framework"
+  fi
+  if [ -f "$REPO_ROOT/lefthook.yml" ]; then
+    ok "Git hooks: lefthook"
+  fi
+
+  # CI (check all — projects may use multiple)
+  if [ -d "$REPO_ROOT/.github/workflows" ]; then ok "CI: GitHub Actions"; fi
+  if [ -f "$REPO_ROOT/.gitlab-ci.yml" ]; then ok "CI: GitLab CI"; fi
+  if [ -f "$REPO_ROOT/.circleci/config.yml" ]; then ok "CI: CircleCI"; fi
+  if [ -f "$REPO_ROOT/Jenkinsfile" ]; then ok "CI: Jenkins"; fi
+
+  # Coverage
+  for f in .nycrc .nycrc.json .coveragerc tarpaulin.toml; do
+    if [ -f "$REPO_ROOT/$f" ]; then
+      ok "Coverage config: $f"
+      break
+    fi
+  done
+  if grep -q 'coverageThreshold\|collectCoverage' "$REPO_ROOT/jest.config"* 2>/dev/null || \
+     grep -q 'coverageThreshold\|collectCoverage' "$REPO_ROOT/package.json" 2>/dev/null; then
+    ok "Coverage config: jest"
+  fi
+  if grep -q '\[tool\.coverage\]' "$REPO_ROOT/pyproject.toml" 2>/dev/null; then
+    ok "Coverage config: pyproject.toml"
+  fi
+}
 
 # ---------------------------------------------------------------------------
 # Detect Full mode tools
@@ -424,6 +521,23 @@ create_if_missing "$REPO_ROOT/ARCHITECTURE.md" "$SCRIPT_DIR/templates/ARCHITECTU
 create_if_missing "$REPO_ROOT/AGENT_CONTEXT.md" "$SCRIPT_DIR/templates/AGENT_CONTEXT.md" "AGENT_CONTEXT.md"
 create_if_missing "$REPO_ROOT/.claude/antipatterns.md" "$SCRIPT_DIR/templates/antipatterns.md" "antipatterns.md"
 
+# Record file state for the skill agent (template, existing, or missing→template)
+# Detect file states (used for config and summary output)
+ARCH_STATE="$(detect_file_state "$REPO_ROOT/ARCHITECTURE.md")"
+AGENT_STATE="$(detect_file_state "$REPO_ROOT/AGENT_CONTEXT.md")"
+
+if command -v jq >/dev/null 2>&1 && [ -f "$CONFIG_DEST" ]; then
+  jq --arg a "$ARCH_STATE" --arg c "$AGENT_STATE" \
+    '.setup = { architecture_state: $a, agent_context_state: $c }' \
+    "$CONFIG_DEST" > "$CONFIG_DEST.$$" && mv "$CONFIG_DEST.$$" "$CONFIG_DEST"
+  if [ "$ARCH_STATE" = "existing" ]; then
+    info "ARCHITECTURE.md has real content — /csetup will offer to add Correctless sections"
+  fi
+  if [ "$AGENT_STATE" = "existing" ]; then
+    info "AGENT_CONTEXT.md has real content — /csetup will offer to add Correctless sections"
+  fi
+fi
+
 # Create directory structure
 mkdir -p "$REPO_ROOT/docs/specs" "$REPO_ROOT/docs/features" "$REPO_ROOT/docs/verification"
 ok "Created docs/ directories"
@@ -445,6 +559,10 @@ if [ "$IS_FULL" = "true" ]; then
   info "Full mode tools:"
   detect_full_tools
 fi
+
+# Discover test patterns and existing tooling
+discover_test_patterns "$CONFIG_DEST"
+detect_existing_tools
 
 # Install hooks to project-local path and register in settings
 install_hooks
@@ -491,17 +609,25 @@ fi
 echo ""
 echo "Created:"
 echo "  .claude/workflow-config.json  <- review and adjust"
-echo "  ARCHITECTURE.md               <- fill in your project's architecture"
-echo "  AGENT_CONTEXT.md              <- fill in or run /cdocs to auto-generate"
+if [ "$ARCH_STATE" = "template" ]; then
+  echo "  ARCHITECTURE.md               <- /csetup will populate from your codebase"
+else
+  echo "  ARCHITECTURE.md               <- /csetup will offer Correctless sections"
+fi
+if [ "$AGENT_STATE" = "template" ]; then
+  echo "  AGENT_CONTEXT.md              <- /csetup will populate from your codebase"
+else
+  echo "  AGENT_CONTEXT.md              <- /csetup will offer Correctless sections"
+fi
 if [ "$IS_FULL" = "true" ]; then
   echo "  .claude/meta/                 <- workflow learning data"
 fi
 echo ""
 echo "Next steps:"
-echo "  1. Review .claude/workflow-config.json — check detected commands"
+echo "  1. Run /csetup to complete interactive setup (config review, project discovery, health check)"
+echo "     Note: On existing projects, this takes a few minutes — the agent is learning your codebase."
 if [ "$IS_FULL" != "true" ]; then
   echo "     To enable Full mode: add \"intensity\": \"standard\" to workflow section"
 fi
-echo "  2. Fill in ARCHITECTURE.md — even 5 bullet points helps"
-echo "  3. Try it: git checkout -b feature/my-feature && then run /cspec"
+echo "  2. Try it: git checkout -b feature/my-feature && then run /cspec"
 echo ""
