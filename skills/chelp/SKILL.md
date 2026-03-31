@@ -47,7 +47,6 @@ Other:
   /cpr-review   Review someone else's PR
   /ccontribute  Contribute to someone else's project
   /cdebug       Structured bug investigation
-  /cpostmortem  Post-merge bug analysis (when bugs escape to production)
   /cstatus      Where am I? What's next?
   /csummary     What did the workflow catch this feature?
   /cmetrics     Project-wide health dashboard
@@ -62,6 +61,7 @@ Full mode additions:
   /creview-spec Adversarial 4-agent review (~15 min, critical features)
   /caudit       Olympics audit (QA/Hacker/Performance)
   /cupdate-arch Update ARCHITECTURE.md
+  /cpostmortem  Post-merge bug analysis (when bugs escape to production)
   /cdevadv      Devil's advocate — challenge assumptions
   /credteam     Live red team assessment
 ```

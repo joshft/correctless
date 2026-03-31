@@ -10,6 +10,14 @@ You are the contribution agent. Your job is to help the user contribute to a pro
 
 Invoke with: `/ccontribute {issue number or description of what to change}`
 
+## Prerequisites: Fork and Access
+
+Before starting, check whether you have push access to the repo:
+- Run `git push --dry-run 2>&1` or check if the remote is your fork vs the upstream.
+- **If you own or have write access** (work monorepo, collaborator): you can push branches directly. Proceed.
+- **If you don't have write access** (typical open source): you need a fork. Check if the remote is already your fork. If not, tell the user: "You'll need to fork this repo first. Run `gh repo fork` (GitHub) or fork via the GitLab UI, then add your fork as a remote: `git remote add origin {your-fork-url}`. Push to your fork, not upstream."
+- After forking, ensure the branch will create a PR from `your-fork:branch` to `upstream:main`. `gh pr create` handles this automatically when the upstream remote is configured.
+
 ## Progress Visibility (MANDATORY)
 
 Contributing takes 15-30 minutes. The user must see progress throughout.
@@ -41,7 +49,11 @@ Contributing takes 15-30 minutes. The user must see progress throughout.
 - `.gitlab/merge_request_templates/` (GitLab projects)
 
 **Code owners:**
-- `.github/CODEOWNERS` — check who owns the files you'll be changing. This tells you who will review the PR. Read their past review comments (`gh pr list --state merged --reviewer {owner} --limit 5`) to understand what they care about.
+- Check all CODEOWNERS locations: `.github/CODEOWNERS`, `CODEOWNERS` (repo root), `docs/CODEOWNERS`. On GitLab, CODEOWNERS is typically at the root or `docs/`.
+- Identify who owns the files you'll be changing — this tells you who will review.
+- Read their past review comments to understand what they care about:
+  - GitHub: `gh pr list --state merged --reviewer {owner} --limit 5`
+  - GitLab: `glab mr list --state merged --limit 10` and scan for reviews by the owner (glab has no `--reviewer` filter — inspect MR notes manually)
 
 **Code style:**
 - `.eslintrc*`, `.prettierrc*`, `biome.json`, `.golangci-lint.yml`, `ruff.toml`, `pyproject.toml [tool.ruff]`, `rustfmt.toml`, `.editorconfig`
@@ -64,7 +76,7 @@ Contributing takes 15-30 minutes. The user must see progress throughout.
 - Directory layout — understand where your change fits
 
 **Recent PRs** (calibration):
-- `gh pr list --state merged --limit 5` — read merged PR descriptions
+- GitHub: `gh pr list --state merged --limit 5` / GitLab: `glab mr list --state merged --limit 5` — read merged PR/MR descriptions
 - What level of detail do successful contributions include?
 - How do they reference issues? `Closes #123`? `Fixes #123`? `Resolves #123`?
 
@@ -113,7 +125,7 @@ Present the plan for approval.
 
 ### Scope Drift Warning
 
-After implementation, compare the files you modified against the plan from Step 3. If any file was changed that wasn't planned: "Warning: {file} was modified but wasn't in the original plan. Is this intentional, or did the change scope creep? Unplanned files should be removed from this PR and submitted separately."
+After implementation, compare the files you modified against the plan from Step 3. If any file was changed that wasn't planned, **stop and ask**: "Warning: {file} was modified but wasn't in the original plan. Is this intentional, or scope creep? Unplanned files should be removed from this PR and submitted separately." Wait for the user's answer before proceeding to Step 5.
 
 ## Step 5: Pre-Flight Checks
 
@@ -139,7 +151,10 @@ Report: "Pre-flight results: {N}/{M} checks passing." For each failure, explain 
 - Describe the change at the detail level merged PRs use (check calibration from Step 1)
 - Include test output or screenshots if their template requests it
 
-If `gh` is available: present the filled template for approval, then `gh pr create --title "..." --body "..."`. If not: present the description for manual creation.
+Detect platform from `git remote get-url origin`:
+- **GitHub** (`github.com`): present the filled template for approval, then `gh pr create --title "..." --body "..."`. If `gh` is not installed or not authenticated, present the description for manual creation.
+- **GitLab** (`gitlab.com`): present for approval, then `glab mr create --title "..." --description "..."`. If `glab` is not installed, present for manual creation.
+- **Other/unknown**: present the description for manual creation with instructions on where to submit.
 
 **PR title**: Match the project's conventions. If merged PRs use `feat: add X` format, use that. If they use `[category] Description`, use that. Don't invent your own format.
 
@@ -162,14 +177,16 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After any subagent completes (research for unfamiliar patterns), capture `total_tokens` and `duration_ms`. Append to `.claude/artifacts/token-log-{slug}.json`.
+After any subagent completes (research for unfamiliar patterns), capture `total_tokens` and `duration_ms`. Since this skill runs against external projects that may not have `.claude/artifacts/`, skip token logging if the directory doesn't exist. Token data is still visible in the conversation for manual tracking via `/cmetrics`.
 
 ## If Something Goes Wrong
 
-- **Pre-flight checks fail**: Fix the issues and re-run checks. Common: linter format violations (run their formatter), test failures (check if you missed a pattern), commit format (amend with `git commit --amend`).
+- **Pre-flight checks fail**: Fix the issues and re-run checks. Common: linter format violations (run their formatter), test failures (check if you missed a pattern), commit format (single commit: `git commit --amend`; multiple commits: `git rebase -i` to fix messages; DCO sign-off: `git rebase --signoff`).
 - **PR template unfamiliar**: Read 2-3 merged PRs to calibrate expected format and detail level.
 - **Maintainer requests changes**: Re-run `/ccontribute` with the reviewer feedback as input — it will help you address each comment while staying within the project's conventions.
+- **Permission denied on push**: You need a fork. Run `gh repo fork` (GitHub) or fork via GitLab UI, add your fork as a remote, and push there instead.
 - **CI fails after push**: Read the CI output, fix locally, push again.
+- **CLA bot blocks the PR**: Many projects use a CLA bot that comments on your PR. Follow the bot's instructions (usually click a link or reply with a specific comment). This happens after PR creation, not during.
 - **Scope creep during review**: If the maintainer asks for changes outside the original scope, suggest a follow-up PR.
 
 ## Constraints
