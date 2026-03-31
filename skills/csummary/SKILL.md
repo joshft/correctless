@@ -149,3 +149,4 @@ After generating: "Export this summary to include in your PR description: `/expo
 - **Don't inflate numbers.** Only count issues that are genuinely distinct. Deduplicating overlapping findings across phases is more honest than double-counting.
 - **Be specific.** "3 security issues" is less useful than "missing CSRF protection, no rate limiting on login, bcrypt cost factor not specified."
 - **The "would have shipped" classification is a judgment call.** Be conservative — only count issues where the developer clearly would not have caught them without the workflow. When in doubt, classify as "might have been caught."
+- **Redact if sharing.** If this output will be shared externally, apply redaction rules from `templates/redaction-rules.md` first.

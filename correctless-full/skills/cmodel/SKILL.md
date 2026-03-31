@@ -155,6 +155,7 @@ Run the Alloy Analyzer (`java -jar`) as a background task while preparing the co
 - Keep the model readable with comments.
 - Every assertion references a spec invariant ID.
 - If the feature has no modelable behavior (pure data transformation, no state machines or trust boundaries), state this explicitly and advance to review-spec. This is the only valid reason to pass through /cmodel without producing a model.
+- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.
 
 ## Limitations (Be Honest)
 

@@ -197,3 +197,4 @@ After any subagent completes (research for unfamiliar patterns), capture `total_
 - **Fill their template completely.** Empty PR template sections signal low effort.
 - **Keep the PR small.** If the change grows beyond the plan, split it. Small PRs get reviewed. Large PRs get ignored.
 - **All pre-flight checks must pass before pushing.** Don't make the CI the first to find your formatting errors.
+- **Redact before posting.** Before posting any output externally (PR comments, MR notes), apply redaction rules from `templates/redaction-rules.md` — sanitize paths, credentials, hostnames, session IDs.

@@ -441,3 +441,4 @@ After each round, report: findings found, findings fixed, findings rejected, cum
 - **Post-convergence regression tests are mandatory.**
 - **All files inside the project directory.** Never /tmp.
 - **Cost visibility every round.** Human can stop the loop.
+- **Redact if sharing.** If this output will be shared externally, apply redaction rules from `templates/redaction-rules.md` first.

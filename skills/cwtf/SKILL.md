@@ -189,3 +189,4 @@ See "Progress Visibility" section above — task creation and narration are mand
 - **Recommended actions.** Every gap should suggest a specific next step — not auto-fix, just point the user at the right command.
 - **Targeted JSONL queries.** The conversation JSONL can be megabytes. Use `grep` for rule IDs, `jq` for structured extraction. Never `cat` the entire file.
 - **Verdict is honest.** SHORTCUT is a valid assessment. Don't soften it to ADEQUATE if the evidence shows shortcuts. But explain why.
+- **Redact if sharing.** If this output will be shared externally, apply redaction rules from `templates/redaction-rules.md` first.

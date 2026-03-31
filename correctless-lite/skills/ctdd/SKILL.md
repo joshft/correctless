@@ -408,3 +408,4 @@ After workflow completes (done phase), suggest: "Consider exporting this convers
 - **If `workflow-advance.sh` fails**, read the error message and present it to the human. Common causes: wrong phase, missing precondition, not on a feature branch.
 - **All files created by any agent must be inside the project directory.** Never write to /tmp or external paths.
 - **Never skip workflow steps.** The full pipeline is: RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge. Every step runs, every time. No exceptions. "This feature is small" is not a reason to skip. Time is not the constraint — correctness is.
+- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

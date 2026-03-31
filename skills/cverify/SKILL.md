@@ -230,3 +230,4 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 - **Do NOT approve a feature with uncovered rules.** Uncovered rules are BLOCKING.
 - **Be specific about weak tests.** "Weak" means: the test would still pass if the rule were violated.
 - **All files written inside the project directory.** Never /tmp.
+- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

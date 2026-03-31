@@ -195,3 +195,4 @@ After review approval, suggest: "Consider exporting: `/export docs/decisions/{ta
 - Do NOT approve the spec uncritically. Your job is to find problems.
 - Preserve the spec author's intent — challenge weak invariants, don't redesign the feature.
 - Each team member receives: spec, ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, and the self-assessment.
+- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

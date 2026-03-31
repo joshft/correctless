@@ -333,3 +333,4 @@ Run crafted payloads and network probes as background tasks where possible — p
 - **Write an attack narrative, not a findings list.** This is penetration testing, not auditing.
 - **All report files inside the project directory.** Never /tmp.
 - **Regression tests are mandatory for achieved objectives.** The assessment is not complete without them.
+- **Redact if sharing.** If this output will be shared externally, apply redaction rules from `templates/redaction-rules.md` first.

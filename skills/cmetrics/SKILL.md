@@ -374,3 +374,4 @@ Use TaskCreate/TaskUpdate:
 - **Missing data is normal.** A new project will have sparse metrics. Report what exists and note what will accumulate with more features.
 - **Don't compare to other projects.** Each project's metrics only compare to its own history.
 - **The "issues caught" number includes deduplication.** If review and QA both caught the same issue, count it once at the earliest phase.
+- **Redact if sharing.** If this output will be shared externally, apply redaction rules from `templates/redaction-rules.md` first.

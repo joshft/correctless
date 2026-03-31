@@ -162,3 +162,4 @@ After documentation is approved: "Consider exporting: `/export docs/decisions/{t
 - **Don't document internal implementation details** — document behavior, interfaces, configuration.
 - **Present changes for human approval** before writing. Documentation is the project's external face.
 - **Keep AGENT_CONTEXT.md under 1500 words.** It's a briefing, not a novel.
+- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

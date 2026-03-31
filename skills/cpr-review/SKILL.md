@@ -345,3 +345,4 @@ When reviewing PRs with more than 10 changed files or 300+ lines of diff, remind
 - **Include "What Looks Good."** A review that only complains erodes trust. Note what the PR does well.
 - **Don't duplicate CI.** If CI already runs linting, don't re-report lint errors. Focus on what CI can't catch: architecture, security logic, spec alignment.
 - **Respect the PR scope.** Don't flag pre-existing issues in unchanged code. Only review what the PR changes.
+- **Redact before posting.** Before posting any output externally (PR comments, MR notes), apply redaction rules from `templates/redaction-rules.md` — sanitize paths, credentials, hostnames, session IDs.

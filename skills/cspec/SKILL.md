@@ -380,3 +380,4 @@ After spec approval, suggest: "Consider exporting this conversation as a decisio
 - **Full mode**: NEVER skip STRIDE for features touching trust boundaries (unless `require_stride` is false).
 - **NEVER skip the Socratic Brainstorm (Step 0).** Even experienced developers benefit from 2-3 reframing questions. The brainstorm is sequential and not subject to question batching.
 - **NEVER skip review.** Do not advance directly to tests. Do not suggest skipping review because the feature is small. The review step is enforced by the state machine and always produces value.
+- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

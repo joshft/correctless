@@ -251,3 +251,4 @@ After review approval, suggest exporting as a decision record — captures which
 - **Preserve the spec author's intent.** Challenge weak rules, don't rewrite the feature.
 - **This step is NEVER skipped.** The state machine enforces this. Even for small features, review always finds unstated assumptions or untestable rules.
 - **Security checklist fires automatically.** Don't ask the developer if they want security review. If the spec touches auth, user data, payments, or APIs, check it. Most developers who need this most will never ask for it.
+- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

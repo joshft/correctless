@@ -243,3 +243,4 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 - **Be constructive in suggested comments.** "This doesn't follow our convention" is better than "This is wrong." Include what the convention IS, not just that it's violated.
 - **Maintenance burden is the key differentiator.** Any code reviewer can check style. Only a maintainer cares about long-term maintenance cost. Prioritize Step 6 findings.
 - **Security check is light, not comprehensive.** For a full security audit, use `/cpr-review` or `/caudit`. This step catches obvious issues introduced by the contribution.
+- **Redact before posting.** Before posting any output externally (PR comments, MR notes), apply redaction rules from `templates/redaction-rules.md` — sanitize paths, credentials, hostnames, session IDs.
