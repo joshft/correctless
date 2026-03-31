@@ -17,12 +17,15 @@
     "test_fail_pattern": "",
     "build_error_pattern": ""
   },
+  "is_monorepo": false,
+  "packages": {},
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
     "auto_update_antipatterns": true,
     "git_trailers": false,
-    "git_notes": false
+    "git_notes": false,
+    "compliance_checks": []
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",

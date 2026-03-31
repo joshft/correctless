@@ -64,12 +64,26 @@ git diff {default_branch}...HEAD -- package.json go.mod Cargo.toml requirements.
 
 For each new dependency: what is it, which file introduced it, was it in the spec?
 
+### Monorepo: Multi-Package Verification
+If `workflow-config.json` has `is_monorepo: true` and the spec lists "Packages Affected", run tests in ALL listed packages — not just the one where most code changed. Use the per-package test commands from `workflow-config.json`. Report per-package: "Package `api`: all tests pass. Package `web`: 2 tests fail."
+
 ### 3. Architecture Compliance and Prohibitions
 
 Does the implementation follow the patterns in `ARCHITECTURE.md`?
 - Error handling, validation, state management, naming conventions?
 - New patterns introduced? Flag for ARCHITECTURE.md update.
 - **Prohibition check**: For each prohibition in ARCHITECTURE.md, grep the changed files for prohibited imports, patterns, or constructs. Flag any violations.
+
+### Compliance Checks (if configured)
+Read `workflow.compliance_checks` from `workflow-config.json`. For each check where `phase` is `"verify"`:
+1. Run the command
+2. Report results: pass/fail with output
+3. If `blocking: true` and the check fails: this is a BLOCKING finding — verification cannot pass
+
+Compliance checks are custom scripts written by the team. Correctless runs them at the right time and reports results. Example config:
+```json
+"compliance_checks": [{"name": "audit-logging", "command": "./scripts/check-audit-logging.sh", "phase": "verify", "blocking": true}]
+```
 
 ### 4. Basic Smell Check
 

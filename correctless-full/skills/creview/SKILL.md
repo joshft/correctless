@@ -25,8 +25,9 @@ This review takes 5-10 minutes. The user must see progress throughout.
 5. Antipattern check
 6. Integration test coverage check
 7. Security checklist
-8. Self-assessment
-9. Present findings to human
+8. Compliance checks (if configured)
+9. Self-assessment
+10. Present findings to human
 
 **Between each check**, print a 1-line status: "Assumptions check complete — found {N} unstated assumptions. Running testability check..." Mark each task complete as it finishes.
 
@@ -180,7 +181,11 @@ Don't lecture. Don't dump the entire checklist. Only raise items that are releva
 
 If the developer says "I'll handle security later" — add the rules as accepted risks in the Risks section rather than dropping them. They'll show up in `/cverify` as uncovered rules.
 
-### 7. Self-Assessment (That the Spec Author Couldn't Do)
+### 7. Compliance Checks
+
+If `workflow.compliance_checks` in `workflow-config.json` has entries with `phase: "review"`, run them and report pass/fail results before presenting findings.
+
+### 8. Self-Assessment (That the Spec Author Couldn't Do)
 
 Produce what the spec author was not allowed to produce:
 - Which rules are hardest to test and why?

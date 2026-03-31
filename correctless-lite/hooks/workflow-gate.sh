@@ -195,8 +195,57 @@ if [ ! -f "$CONFIG_FILE" ]; then
   exit 0  # No config → can't classify → allow
 fi
 
-TEST_PATTERN="$(jq -r '.patterns.test_file // empty' "$CONFIG_FILE")"
-SOURCE_PATTERN="$(jq -r '.patterns.source_file // empty' "$CONFIG_FILE")"
+# ---------------------------------------------------------------------------
+# Package resolution for monorepos (longest-prefix match with caching)
+# ---------------------------------------------------------------------------
+
+resolve_package() {
+  local file="$1"
+  # Fast bail: not a monorepo
+  jq -e '.is_monorepo' "$CONFIG_FILE" >/dev/null 2>&1 || { echo "."; return; }
+
+  # Check cache (invalidated by config mtime)
+  local cache_file="$ARTIFACTS_DIR/.pkg-cache-$(stat -c %Y "$CONFIG_FILE" 2>/dev/null || stat -f %m "$CONFIG_FILE" 2>/dev/null).json"
+  if [ -f "$cache_file" ]; then
+    local cached
+    cached="$(jq -r --arg f "$file" '.[$f] // empty' "$cache_file" 2>/dev/null)"
+    if [ -n "$cached" ]; then echo "$cached"; return; fi
+  fi
+
+  # Longest-prefix match
+  local best="." best_len=0
+  while IFS= read -r key; do
+    local pkg_path
+    pkg_path="$(jq -r ".packages[\"$key\"].path" "$CONFIG_FILE")"
+    case "$file" in
+      "$pkg_path"/*)
+        if [ ${#pkg_path} -gt $best_len ]; then
+          best="$key"; best_len=${#pkg_path}
+        fi ;;
+    esac
+  done < <(jq -r '.packages | keys[]' "$CONFIG_FILE" 2>/dev/null)
+
+  # Write to cache
+  if [ -d "$ARTIFACTS_DIR" ]; then
+    if [ -f "$cache_file" ]; then
+      jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null
+    else
+      jq -nc --arg f "$file" --arg p "$best" '{($f): $p}' > "$cache_file" 2>/dev/null
+    fi
+  fi
+
+  echo "$best"
+}
+
+# Resolve package for the current file and read appropriate patterns
+PACKAGE_SCOPE="$(resolve_package "$REL_FILE")"
+if [ "$PACKAGE_SCOPE" != "." ]; then
+  TEST_PATTERN="$(jq -r ".packages[\"$PACKAGE_SCOPE\"].patterns.test_file // .patterns.test_file // empty" "$CONFIG_FILE")"
+  SOURCE_PATTERN="$(jq -r ".packages[\"$PACKAGE_SCOPE\"].patterns.source_file // .patterns.source_file // empty" "$CONFIG_FILE")"
+else
+  TEST_PATTERN="$(jq -r '.patterns.test_file // empty' "$CONFIG_FILE")"
+  SOURCE_PATTERN="$(jq -r '.patterns.source_file // empty' "$CONFIG_FILE")"
+fi
 
 classify_file() {
   local file="$1"

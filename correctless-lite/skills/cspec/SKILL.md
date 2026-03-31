@@ -278,7 +278,14 @@ A unit test with hand-constructed mocks will not catch missing wiring.
 
 ## Open Questions
 - {question}
+
+### Packages Affected (monorepo only)
+If `workflow-config.json` has `is_monorepo: true`, add a "Packages Affected" section to the spec listing which packages this feature touches. Rules should note which package they apply to if they're package-specific.
 ```
+
+### Compliance Checks
+
+If `workflow.compliance_checks` in `workflow-config.json` has entries with `phase: "spec"`, run them before presenting the spec. Report pass/fail results to the human.
 
 ### Step 4: Load Invariant Templates (Full Mode)
 

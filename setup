@@ -448,6 +448,22 @@ discover_test_patterns() {
 }
 
 # ---------------------------------------------------------------------------
+# Detect monorepo type
+# ---------------------------------------------------------------------------
+
+detect_monorepo_type() {
+  if [ -f "$REPO_ROOT/pnpm-workspace.yaml" ]; then echo "pnpm"
+  elif [ -f "$REPO_ROOT/lerna.json" ]; then echo "lerna"
+  elif [ -f "$REPO_ROOT/nx.json" ]; then echo "nx"
+  elif [ -f "$REPO_ROOT/turbo.json" ]; then echo "turbo"
+  elif [ -f "$REPO_ROOT/rush.json" ]; then echo "rush"
+  elif [ -f "$REPO_ROOT/go.work" ]; then echo "go-workspace"
+  elif [ -f "$REPO_ROOT/Cargo.toml" ] && grep -q '^\[workspace\]' "$REPO_ROOT/Cargo.toml" 2>/dev/null; then echo "cargo-workspace"
+  else echo "none"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Detect existing tooling that might conflict or overlap
 # ---------------------------------------------------------------------------
 
@@ -548,9 +564,19 @@ if [ -f "$CONFIG_DEST" ]; then
     ok "Mode: Lite"
   fi
 else
+  MONO_TYPE="$(detect_monorepo_type)"
+  if [ "$MONO_TYPE" != "none" ]; then
+    ok "Monorepo detected: $MONO_TYPE"
+    info "Per-package configuration will be set up by /csetup"
+  fi
+
   mkdir -p "$(dirname "$CONFIG_DEST")"
   detect_config "$DETECTED_LANG" > "$CONFIG_DEST"
   ok "Generated workflow-config.json (Lite mode — edit to add intensity for Full mode)"
+
+  if [ "$MONO_TYPE" != "none" ] && command -v jq >/dev/null 2>&1 && [ -f "$CONFIG_DEST" ]; then
+    jq '.is_monorepo = true' "$CONFIG_DEST" > "$CONFIG_DEST.$$" && mv "$CONFIG_DEST.$$" "$CONFIG_DEST"
+  fi
 fi
 
 # Create common templates

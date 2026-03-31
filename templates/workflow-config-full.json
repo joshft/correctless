@@ -21,6 +21,8 @@
     "test_fail_pattern": "",
     "build_error_pattern": ""
   },
+  "is_monorepo": false,
+  "packages": {},
   "workflow": {
     "intensity": "standard",
     "min_qa_rounds": 2,
@@ -38,7 +40,8 @@
     "min_new_package_coverage": 60,
     "drift_debt_age_threshold_days": 90,
     "git_trailers": false,
-    "git_notes": false
+    "git_notes": false,
+    "compliance_checks": []
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",

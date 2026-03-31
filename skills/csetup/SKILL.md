@@ -37,6 +37,13 @@ Scan the project root silently. Then present findings conversationally:
 - Package manager (npm, pnpm, yarn, pip, cargo)
 - Existing config (if `.claude/workflow-config.json` already exists)
 
+**Monorepo detection:**
+- Check for: `pnpm-workspace.yaml`, `lerna.json`, `nx.json`, `turbo.json`, `rush.json`, `go.work`, `Cargo.toml` with `[workspace]`
+- If monorepo detected: enumerate packages by scanning for manifest files (`package.json`, `go.mod`, `Cargo.toml`) under workspace roots
+- For each package: detect language, test runner, linter independently
+- Present: "Found monorepo ({type}) with {N} packages: `packages/api` (Go), `packages/web` (TypeScript). I'll configure each package's test/lint commands independently."
+- If the user confirms: generate the `packages` section in `workflow-config.json` with per-package commands and patterns
+
 Present: "I see a TypeScript project using pnpm with vitest. Does that look right, or should I adjust anything?"
 
 If something looks wrong, let the human correct it before proceeding.
@@ -69,6 +76,8 @@ Read the generated `.claude/workflow-config.json`. Instead of telling the human 
 - "Coverage command is `npm test -- --coverage` — does your test runner support this flag?"
 
 Fix any issues the human flags.
+
+**Monorepo**: if `is_monorepo` is true, walk through each package's detected commands: "Package `api` test command is `go test ./...` — correct? Package `web` lint command is `pnpm run lint` — correct?" Ensure per-package overrides are captured in the `packages` section of `workflow-config.json`.
 
 **Full mode only**: if the config has `workflow.intensity`, ask about intensity:
 - "Intensity is set to `standard`. For context: `low` skips STRIDE and uses fewer QA rounds, `high` adds fail-closed mode, `critical` requires formal modeling. Want to change it?"

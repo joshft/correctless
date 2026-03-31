@@ -122,6 +122,43 @@ is_full_mode() {
   [ -n "$intensity" ] && [ "$intensity" != "null" ]
 }
 
+# Monorepo package resolution (longest-prefix match)
+is_monorepo() {
+  [ -f "$CONFIG_FILE" ] || return 1
+  jq -e '.is_monorepo' "$CONFIG_FILE" >/dev/null 2>&1
+}
+
+# Read a config field with package scope fallback
+# Usage: read_package_config '.commands.test' 'api'
+read_package_config() {
+  local field="$1" scope="${2:-.}"
+  if [ "$scope" != "." ] && is_monorepo; then
+    local val
+    val="$(jq -r ".packages[\"$scope\"]$field // $field // empty" "$CONFIG_FILE" 2>/dev/null)"
+    if [ -n "$val" ] && [ "$val" != "null" ]; then echo "$val"; return; fi
+  fi
+  read_config_field "$field" 2>/dev/null || echo ""
+}
+
+# Detect which packages are affected by current branch changes
+detect_affected_packages() {
+  is_monorepo || { echo "."; return; }
+  local changed_files
+  changed_files="$(git diff --name-only "$(git merge-base HEAD "$(git rev-parse --abbrev-ref HEAD@{upstream} 2>/dev/null || echo HEAD~1)" 2>/dev/null)" HEAD 2>/dev/null || git diff --name-only HEAD~1 2>/dev/null || echo "")"
+  [ -n "$changed_files" ] || { echo "."; return; }
+
+  local packages=""
+  while IFS= read -r key; do
+    local pkg_path
+    pkg_path="$(jq -r ".packages[\"$key\"].path" "$CONFIG_FILE")"
+    if echo "$changed_files" | grep -q "^$pkg_path/"; then
+      packages="${packages:+$packages }$key"
+    fi
+  done < <(jq -r '.packages | keys[]' "$CONFIG_FILE" 2>/dev/null)
+
+  echo "${packages:-.}"
+}
+
 is_fail_closed() {
   local val
   val="$(read_config_field '.workflow.fail_closed_when_no_state' 2>/dev/null || echo "false")"
@@ -141,17 +178,45 @@ DRIFT_DEBT_FILE="$REPO_ROOT/.claude/meta/drift-debt.json"
 # ---------------------------------------------------------------------------
 
 run_tests() {
-  local test_cmd
-  test_cmd="$(read_config_field '.commands.test')"
-  [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured in workflow-config.json"
-  eval "$test_cmd"
+  # In monorepo mode, run tests for all affected packages
+  if is_monorepo; then
+    local packages
+    packages="$(detect_affected_packages)"
+    local any_run=false
+    for pkg in $packages; do
+      [ "$pkg" = "." ] && continue
+      local cmd
+      cmd="$(read_package_config '.commands.test' "$pkg")"
+      if [ -n "$cmd" ] && [ "$cmd" != "null" ]; then
+        any_run=true
+        eval "$cmd"
+      fi
+    done
+    if [ "$any_run" = "false" ]; then
+      local test_cmd
+      test_cmd="$(read_config_field '.commands.test')"
+      [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
+      eval "$test_cmd"
+    fi
+  else
+    local test_cmd
+    test_cmd="$(read_config_field '.commands.test')"
+    [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured in workflow-config.json"
+    eval "$test_cmd"
+  fi
 }
 
 tests_fail_not_build_error() {
   local test_cmd fail_pattern build_pattern
-  test_cmd="$(read_config_field '.commands.test')"
-  fail_pattern="$(read_config_field '.patterns.test_fail_pattern')"
-  build_pattern="$(read_config_field '.patterns.build_error_pattern')"
+  # Use first affected package's config, or global fallback
+  local pkg="."
+  if is_monorepo; then
+    pkg="$(detect_affected_packages | awk '{print $1}')"
+    [ "$pkg" = "." ] || true
+  fi
+  test_cmd="$(read_package_config '.commands.test' "$pkg")"
+  fail_pattern="$(read_package_config '.patterns.test_fail_pattern' "$pkg")"
+  build_pattern="$(read_package_config '.patterns.build_error_pattern' "$pkg")"
 
   [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
 
@@ -180,6 +245,23 @@ tests_fail_not_build_error() {
 }
 
 tests_pass() {
+  # In monorepo mode, ALL affected packages must pass
+  if is_monorepo; then
+    local packages
+    packages="$(detect_affected_packages)"
+    for pkg in $packages; do
+      [ "$pkg" = "." ] && continue
+      local cmd output exit_code
+      cmd="$(read_package_config '.commands.test' "$pkg")"
+      [ -n "$cmd" ] && [ "$cmd" != "null" ] || continue
+      output="$(eval "$cmd" 2>&1)" && exit_code=0 || exit_code=$?
+      if [ "$exit_code" -ne 0 ]; then
+        die "Tests do not pass in package '$pkg'. Fix failures before advancing.\n\nOutput (last 30 lines):\n$(echo "$output" | tail -30)"
+      fi
+    done
+    return 0
+  fi
+
   local test_cmd output exit_code
   test_cmd="$(read_config_field '.commands.test')"
   [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
