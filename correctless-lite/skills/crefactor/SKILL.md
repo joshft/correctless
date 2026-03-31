@@ -212,7 +212,7 @@ If the verification agent detects a test file modification:
 
 ## Step 7: QA Review
 
-Before spawning the QA agent, check context usage. If above 70%, warn the user: "Context is getting full after the refactor phases. Consider running `/compact` before QA."
+**Context enforcement (mandatory):** Before spawning the QA agent, check context usage. The QA agent runs as a forked subagent (clean context), but the orchestrator must stay coherent to process findings and manage fix rounds. If above 70%: tell the human "Context is at {N}%. The QA agent will run in fresh context, but I need to be coherent to process findings. Run `/compact` before I spawn QA, or I may miss issues in the findings." If above 85%: "Context is critically full ({N}%). I must stop here. Run `/compact` and then re-run `/crefactor` — the checkpoint will resume from this phase."
 
 After all phases complete, spawn a **QA agent** (forked subagent):
 
@@ -315,5 +315,6 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 - **Characterization tests capture reality, not intent.** A characterization test that asserts a bug is still correct — it tells you the refactor changed behavior.
 - **Phase by phase.** Large refactors must be broken into phases that leave tests passing. No "I'll fix the tests after I'm done restructuring."
 - **Agent separation is mandatory.** The refactor agent does not verify. The verification agent did not refactor. Same principle as RED/GREEN in TDD.
+- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to manage remaining phases correctly.
 - **Evidence before claims.** Never say "tests pass" or "checks out" without running the command fresh in this message and showing the output. "Should pass" is not evidence.
 - **All files inside the project directory.** Never /tmp.

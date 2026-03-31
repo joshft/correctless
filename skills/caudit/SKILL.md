@@ -401,8 +401,8 @@ See "Progress Visibility" section above — task creation and round-by-round nar
 - When fix rounds involve TDD (write test then fix), run the test suite in the background while preparing the next fix
 - Run linter/formatter checks in the background during triage
 
-### /context
-Check context usage between rounds. If the lead orchestrator's context exceeds 70%, inform the user and suggest /compact or spawn the next round with a forked subagent to get clean context.
+### Context Enforcement
+**Context enforcement (mandatory):** Between rounds, check context usage. Each round's agents run forked (clean context), but the orchestrator must stay coherent to manage convergence. If above 70%: "Context at {N}%. Spawning round {N+1} agents in fresh context, but convergence tracking may degrade. Run `/compact` for reliable convergence." If above 85%: "Context critically full. Stopping audit. Run `/compact` and re-run `/caudit` — the checkpoint resumes from round {N}."
 
 ### Token Tracking
 
@@ -440,5 +440,6 @@ After each round, report: findings found, findings fixed, findings rejected, cum
 - **Every finding needs instance fix AND class fix.**
 - **Post-convergence regression tests are mandatory.**
 - **All files inside the project directory.** Never /tmp.
+- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to manage remaining rounds correctly.
 - **Cost visibility every round.** Human can stop the loop.
 - **Redact if sharing.** If this output will be shared externally, apply redaction rules from `templates/redaction-rules.md` first.

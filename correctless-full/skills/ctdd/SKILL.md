@@ -256,7 +256,7 @@ Trailers go after a blank line at the end of the commit message. They are querya
 
 Then advance:
 
-Before advancing to QA, check context usage. If above 70%, warn the user: "Context is getting full. Consider running `/compact` before QA — the QA agent gets clean context via `context: fork`, but the orchestrator needs to stay coherent to process findings and manage fix rounds."
+**Context enforcement (mandatory):** Before spawning the QA agent, check context usage. The QA agent ALWAYS runs as a forked subagent (`context: fork`) which gives it clean context. But if the orchestrator's context exceeds 70%, it may not correctly process the QA agent's findings or manage fix rounds. If above 70%: tell the human "Context is at {N}%. The QA agent will run in fresh context, but I need to be coherent to process findings. Run `/compact` before I spawn QA, or I may miss issues in the findings." If above 85%: "Context is critically full ({N}%). I must stop here. Run `/compact` and then re-run `/ctdd` — the checkpoint will resume from this phase."
 
 ```bash
 .claude/hooks/workflow-advance.sh qa
@@ -406,5 +406,6 @@ After workflow completes (done phase), suggest: "Consider exporting this convers
 - **If `workflow-advance.sh` fails**, read the error message and present it to the human. Common causes: wrong phase, missing precondition, not on a feature branch.
 - **All files created by any agent must be inside the project directory.** Never write to /tmp or external paths.
 - **Never skip workflow steps.** The full pipeline is: RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge. Every step runs, every time. No exceptions. "This feature is small" is not a reason to skip. Time is not the constraint — correctness is.
+- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to manage remaining phases correctly.
 - **Evidence before claims.** Never say "tests pass" or "checks out" without running the command fresh in this message and showing the output. "Should pass" is not evidence.
 - **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

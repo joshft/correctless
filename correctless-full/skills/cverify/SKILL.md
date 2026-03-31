@@ -204,8 +204,8 @@ Next step is mandatory:
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
-### Context Check
-Verification reads many files (spec, all changed files, tests, ARCHITECTURE.md, QA findings, git diff). Before starting mutation testing, check context usage. If above 70%: "Context is getting full. Consider running `/compact` before continuing — remaining checks may produce incomplete results if context is truncated."
+### Context Enforcement
+**Context enforcement (mandatory):** Before starting mutation testing, check context usage. Verification reads many files and the orchestrator must stay coherent to write an accurate report. If above 70%: "Context at {N}%. Run `/compact` before I continue — remaining checks may produce incomplete results." If above 85%: "Context is critically full ({N}%). I must stop here. Run `/compact` and then re-run `/cverify` — verification will restart but reads from existing artifacts."
 
 ### Token Tracking
 
@@ -243,6 +243,7 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 - **Do NOT skip the rule coverage check.** Every rule must be accounted for.
 - **Do NOT approve a feature with uncovered rules.** Uncovered rules are BLOCKING.
 - **Be specific about weak tests.** "Weak" means: the test would still pass if the rule were violated.
+- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to produce accurate verification results.
 - **Evidence before claims.** Never say "tests pass" or "checks out" without running the command fresh in this message and showing the output. "Should pass" is not evidence.
 - **All files written inside the project directory.** Never /tmp.
 - **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

@@ -176,8 +176,8 @@ After each subagent completes, capture `total_tokens` and `duration_ms` from the
 
 If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
-### /context
-Check context usage before spawning the agent team. If above 70%, inform the user. The `context: fork` frontmatter gives each agent clean context, but the lead orchestrator's context may be full from the spec conversation.
+### Context Enforcement
+**Context enforcement (mandatory):** Before spawning the agent team, check context usage. If above 70%: the agents run forked (clean context) but the orchestrator needs to synthesize findings. Warn: "Context at {N}%. Run `/compact` before I spawn the review team — synthesis quality degrades with full context." If above 85%: stop and require /compact.
 
 ### /export
 After review approval, suggest: "Consider exporting: `/export docs/decisions/{task-slug}-review.md`"
@@ -195,4 +195,5 @@ After review approval, suggest: "Consider exporting: `/export docs/decisions/{ta
 - Do NOT approve the spec uncritically. Your job is to find problems.
 - Preserve the spec author's intent — challenge weak invariants, don't redesign the feature.
 - Each team member receives: spec, ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, and the self-assessment.
+- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to synthesize findings correctly.
 - **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.
