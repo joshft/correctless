@@ -608,7 +608,12 @@ cmd_reset() {
   sf="$(state_file)"
   if [ -f "$sf" ]; then
     rm "$sf"
-    info "Workflow state removed for branch '$(current_branch)'"
+    # Also remove audit trail and checkpoint files for this branch
+    local slug_hash
+    slug_hash="$(branch_slug)"
+    rm -f "$ARTIFACTS_DIR/audit-trail-${slug_hash}.jsonl"
+    rm -f "$ARTIFACTS_DIR/checkpoint-*-${slug_hash}.json" 2>/dev/null
+    info "Workflow state and audit trail removed for branch '$(current_branch)'"
   else
     info "No workflow state for branch '$(current_branch)'"
   fi

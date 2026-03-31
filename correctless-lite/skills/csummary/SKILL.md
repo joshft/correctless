@@ -24,6 +24,7 @@ Read these files to build the summary. Skip any that don't exist.
 4. **Git log** on the current branch — count commits, measure duration
 5. **Workflow state file** — QA rounds, spec updates
 6. **Test edit log** (`.claude/artifacts/tdd-test-edits.log`) — tests modified during implementation
+7. **Audit trail** (`.claude/artifacts/audit-trail-{branch-slug}.jsonl`) — every file modification with workflow phase and timestamp. Shows exactly which files were touched in which phases, without manual instrumentation.
 
 ## How to Build the Summary
 
@@ -45,6 +46,7 @@ If a research brief exists (`.claude/artifacts/research/{task-slug}-research.md`
 The test audit runs between RED and GREEN. Its findings are verbal (returned to the orchestrator) and may not be persisted as a file. Check:
 - QA findings JSON for early-round entries that mention "test strengthened" or "integration test added"
 - The test edit log for tests modified during GREEN (may indicate test audit feedback)
+- The audit trail JSONL for file modifications during GREEN — this supplements the test edit log with precise timestamps and phase tags for detecting test changes during implementation
 
 ### Step 4: Gather QA Findings
 

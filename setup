@@ -285,7 +285,8 @@ install_hooks() {
   cp "$SCRIPT_DIR/hooks/workflow-gate.sh" "$hook_dest/workflow-gate.sh"
   cp "$SCRIPT_DIR/hooks/workflow-advance.sh" "$hook_dest/workflow-advance.sh"
   cp "$SCRIPT_DIR/hooks/statusline.sh" "$hook_dest/statusline.sh"
-  chmod +x "$hook_dest/workflow-gate.sh" "$hook_dest/workflow-advance.sh" "$hook_dest/statusline.sh"
+  cp "$SCRIPT_DIR/hooks/audit-trail.sh" "$hook_dest/audit-trail.sh"
+  chmod +x "$hook_dest/workflow-gate.sh" "$hook_dest/workflow-advance.sh" "$hook_dest/statusline.sh" "$hook_dest/audit-trail.sh"
   ok "Installed hooks to .claude/hooks/"
 }
 
@@ -301,6 +302,7 @@ register_hooks() {
   mkdir -p "$(dirname "$settings")"
 
   local statusline_path=".claude/hooks/statusline.sh"
+  local audit_path=".claude/hooks/audit-trail.sh"
 
   if [ ! -f "$settings" ]; then
     cat > "$settings" <<HEOF
@@ -311,6 +313,13 @@ register_hooks() {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
         "command": "$hook_path",
         "timeout_ms": 5000
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|CreateFile|Bash",
+        "command": "$audit_path",
+        "timeout_ms": 1000
       }
     ]
   },
@@ -338,11 +347,16 @@ HEOF
   # Append hook to existing settings using jq
   if command -v jq >/dev/null 2>&1; then
     local tmp="$settings.$$"
-    jq --arg cmd "$hook_path" --arg adv "$advance_path" --arg sl "$statusline_path" '
+    jq --arg cmd "$hook_path" --arg adv "$advance_path" --arg sl "$statusline_path" --arg audit "$audit_path" '
       .hooks.PreToolUse = (.hooks.PreToolUse // []) + [{
         matcher: "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
         command: $cmd,
         timeout_ms: 5000
+      }]
+      | .hooks.PostToolUse = (.hooks.PostToolUse // []) + [{
+        matcher: "Edit|Write|MultiEdit|CreateFile|Bash",
+        command: $audit,
+        timeout_ms: 1000
       }]
       | .permissions.allow = (.permissions.allow // []) + ["Bash(\($adv) *)"]
       | .statusLine = { type: "command", command: $sl }

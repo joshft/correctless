@@ -31,9 +31,10 @@ Read everything in the accumulation layer. Skip files that don't exist.
 9. **Decision records** — `glob docs/decisions/*.md` — for staleness checks (revisit-when/revisit-by markers)
 10. **Workflow state files** — `glob .claude/artifacts/workflow-state-*.json` — for spec_updates counts per feature
 11. **Token logs** — `glob .claude/artifacts/token-log-*.json` — per-feature token usage from subagent spawns
-12. **Git log** — commit history to measure feature velocity and branch durations
-13. **Session meta** — `glob ~/.claude/usage-data/session-meta/*.json` — filter by `project_path` matching the current project root. Contains exact token counts, tool usage, duration, error rates per session.
-14. **Session facets** — `glob ~/.claude/usage-data/facets/*.json` — match by `session_id` to session-meta entries for this project. Contains AI-analyzed session quality: outcome, friction, satisfaction.
+12. **Audit trails** — `glob .claude/artifacts/audit-trail-*.jsonl` — per-branch tool invocation logs from the PostToolUse hook. Contains: timestamp, phase, tool name, file path, branch.
+13. **Git log** — commit history to measure feature velocity and branch durations
+14. **Session meta** — `glob ~/.claude/usage-data/session-meta/*.json` — filter by `project_path` matching the current project root. Contains exact token counts, tool usage, duration, error rates per session.
+15. **Session facets** — `glob ~/.claude/usage-data/facets/*.json` — match by `session_id` to session-meta entries for this project. Contains AI-analyzed session quality: outcome, friction, satisfaction.
 
 ### Derived metrics:
 
@@ -226,6 +227,8 @@ This shows where the budget goes. If 65% goes to TDD and TDD catches 60% of bugs
 **6. Olympics efficiency** (Full only): Tokens per finding per round. "Round 1: {N} findings at {T} tokens. Round {M}: {N} findings at {T} tokens." Shows diminishing returns.
 
 **7. Token trend**: Compare with previous metrics. "Token cost per feature: {stable/growing/shrinking}. Cost per bug: {improving/degrading}."
+
+**8. Tool call distribution per phase**: From audit trail JSONL files, count tool invocations grouped by phase. Shows where tool activity concentrates — if 80% of Edit calls happen in tdd-impl (GREEN), the implementation phase is the most write-heavy.
 
 ### Output
 
