@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2254
 # Correctless — workflow state machine
 # The ONLY way to change the workflow state file.
 # Validates transitions with real gates.
 # Supports both Lite and Full modes (Full adds: model, review-spec, tdd-verify, audit phases).
+# SC2254 disabled: unquoted $pat in case is intentional — we need glob matching
 
 set -euo pipefail
-
-# shellcheck disable=SC2254  # Unquoted $pat in case is intentional — we need glob matching
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 CONFIG_FILE="$REPO_ROOT/.claude/workflow-config.json"

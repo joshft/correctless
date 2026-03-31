@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2254
 # Correctless — PreToolUse gate hook (supports both Lite and Full modes)
 # Blocks file operations that violate the current workflow phase.
 #
@@ -8,10 +9,9 @@
 # Exit codes:
 #   0 — allow the operation
 #   2 — block the operation (message printed to stderr)
+# SC2254 disabled: unquoted $pat in case is intentional — we need glob matching
 
 set -euo pipefail
-
-# shellcheck disable=SC2254  # Unquoted $pat in case is intentional — we need glob matching
 
 # Disable glob expansion — patterns like *.ts must not expand to filenames
 set -f
