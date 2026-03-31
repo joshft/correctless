@@ -138,7 +138,7 @@ Then restart Claude Code.
 
 ## Commands
 
-### Lite (15 skills)
+### Lite (16 skills)
 
 ```
 /csetup       Project health check + workflow setup
@@ -156,9 +156,10 @@ Then restart Claude Code.
 /cmetrics     Project-wide metrics dashboard + health analysis
 /cdebug       Structured bug investigation with TDD fix
 /chelp        Quick help — workflow pipeline and commands
+/cwtf         Audit the workflow — did agents follow instructions?
 ```
 
-### Full (22 skills — includes all Lite skills)
+### Full (23 skills — includes all Lite skills)
 
 ```
 /csetup       Health check + workflow setup + intensity selection
@@ -183,6 +184,7 @@ Then restart Claude Code.
 /cmetrics     Project-wide metrics dashboard, health analysis, and ROI
 /cdebug       Structured bug investigation with escalation
 /chelp        Quick help — workflow pipeline and commands
+/cwtf         Audit the workflow — did agents follow instructions?
 ```
 
 ### Built-in Claude Code Skills in the Workflow
@@ -231,7 +233,7 @@ Mutation testing, property-based testing, and PBT helpers are Full-only. Lite wo
 
 | | Lite | Full |
 |---|------|------|
-| Skills | 15 | 22 |
+| Skills | 16 | 23 |
 | Spec format | 5 sections, simple rules | 12+ sections, typed invariants |
 | Spec research | Current best practices, dependency health | Same |
 | Review | Single-pass + auto security checklist | 4-agent adversarial team |

@@ -53,6 +53,7 @@ Other:
   /cmetrics     Project-wide health dashboard
   /csetup       Re-run setup / health check
   /chelp        This help
+  /cwtf         Audit the workflow — did agents follow instructions?
 ```
 
 **Full mode — add these:**
@@ -86,6 +87,7 @@ Quick reference:
   Contribute to OSS  → /ccontribute
   Review as maintainer → /cmaintain
   Project health     → /cmetrics
+  Audit the workflow → /cwtf
 ```
 
 ## Constraints

@@ -1,0 +1,188 @@
+---
+name: cwtf
+description: Workflow accountability — verifies agents did what skill instructions required. Checks phase execution, rule coverage, agent thoroughness, and deviations.
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(jq*), Bash(find*), Write(.claude/artifacts/token-log-*)
+---
+
+# /cwtf — Workflow Accountability
+
+Every other skill watches the code. This skill watches the agents watching the code. It answers: **"Did the workflow actually do what the skill instructions said it should do?"**
+
+Invoke with: `/cwtf` (analyzes the most recent or current workflow) or `/cwtf {phase}` (analyzes a specific phase)
+
+## Important: Not Punitive
+
+This report identifies gaps, not blame. "QA checked 4 of 6 rules" is a fact, not an accusation. The QA agent may have had good reason — context overflow, rate limiting, or the 2 unchecked rules were trivially satisfied by the implementation. Present findings with context, not judgment. Let the user decide what matters.
+
+Frame gaps as: "R-003 was not checked during QA. This may indicate context overflow, rate limiting, or that the agent prioritized higher-risk rules." NOT: "The QA agent FAILED to check R-003."
+
+## Progress Visibility (MANDATORY)
+
+Accountability analysis takes 5-10 minutes. The user must see progress throughout.
+
+**Before starting**, create a task list:
+1. Load workflow state and spec
+2. Check phase execution
+3. Analyze rule coverage
+4. Check agent thoroughness (QA)
+5. Check agent thoroughness (review)
+6. Detect deviations
+7. Generate verdict
+
+**Between each step**, print a 1-line status: "Phase execution verified — all 7 phases ran. Checking rule coverage..." Mark each task complete as it finishes.
+
+## Step 1: Load Context
+
+Read these data sources (skip any that don't exist):
+
+1. **Workflow state** — `.claude/artifacts/workflow-state-{slug}.json` — derive branch slug from current branch the same way as other hooks (`sed + md5sum/md5`)
+2. **Spec file** — path from workflow state's `.spec_file` field
+3. **QA findings** — `.claude/artifacts/qa-findings-{task-slug}.json`
+4. **Test edit log** — `.claude/artifacts/tdd-test-edits.log`
+5. **Audit trail** — `.claude/artifacts/audit-trail-{slug}.jsonl`
+6. **Override log** — `.claude/artifacts/override-log.json`
+7. **Verification report** — `docs/verification/{task-slug}-verification.md`
+8. **Session-meta** — `find ~/.claude/usage-data/session-meta/ -name '*.json'` filtered by `project_path` matching `git rev-parse --show-toplevel`
+
+If no workflow state file exists: "No active or completed workflow on this branch. Nothing to analyze."
+
+Extract the spec rules: grep the spec file for `R-xxx` or `INV-xxx` identifiers. Count them — this is the baseline for coverage checks.
+
+## Step 2: Phase Execution Verification
+
+Check whether all mandatory phases executed:
+
+**For Lite**: spec → review → tdd-tests → tdd-impl → tdd-qa → done → verified → documented
+**For Full**: spec → review-spec (or model → review-spec) → tdd-tests → tdd-impl → tdd-qa → (tdd-verify →) done → verified → documented
+
+For each phase:
+- Did it execute? (workflow state's `phase_entered_at` should have progressed through each)
+- Were overrides used? (check override log for entries during this workflow)
+- How many spec updates happened? (from `spec_update_history` — many updates suggests the spec was undercooked)
+
+Report: "All {N} phases executed" or "Phase {X} was skipped via override: '{reason}'"
+
+## Step 3: Rule Coverage
+
+For each spec rule (R-xxx or INV-xxx):
+
+1. **Test exists?** Grep test files for the rule ID (e.g., `Tests R-001`, `R-001`). Use the `patterns.test_file` from `workflow-config.json` to find test files.
+2. **Integration tag?** If the rule is tagged `[integration]`, check whether the test uses real wiring or mocks.
+3. **QA checked?** Search the QA findings artifact for mentions of this rule ID.
+4. **Verification status?** If the verification report exists, check its rule coverage table.
+
+Output as a table:
+```
+| Rule | Test | QA Checked | Verify Status |
+|------|------|-----------|---------------|
+| R-001 | auth.test.ts:42 | Yes | covered |
+| R-002 | — | NO | UNCOVERED |
+```
+
+**Recommended action for gaps**: "R-002 has no test. Run `/ctdd` from the tests phase to add coverage, or run `/cverify` to confirm this is a known gap."
+
+## Step 4: Agent Thoroughness — QA
+
+The most valuable analysis. Check whether the QA agent actually did a thorough job:
+
+**Rule mention count**: Search the QA findings artifact AND the conversation JSONL for mentions of each rule ID. Count: "QA mentioned {N} of {M} spec rules." Missing rules are listed.
+
+**Token budget indicator**: Find the QA session in session-meta (match by project_path and timestamp). Compare its `output_tokens` against the project average for QA sessions. "QA used {N}k tokens ({X}% of project average for QA)." A QA session at 30% of average likely shortcut. At 150% of average, it was thorough.
+
+**File coverage** (if audit trail exists): From the audit trail, which files had Read operations during the tdd-qa phase? Compare against files modified during tdd-impl. "QA read {N} of {M} files modified during implementation." Missing files are listed.
+
+**Recommended action**: "QA did not check R-003 or R-005. Consider: re-run QA with `workflow-advance.sh fix` then `workflow-advance.sh qa`, or manually verify these rules are satisfied."
+
+## Step 5: Agent Thoroughness — Review
+
+Check whether the review agent was thorough:
+
+**Security checklist coverage**: If the spec touches auth, user input, data storage, or APIs, the security checklist should have fired. Search conversation JSONL for security-related terms (CSRF, XSS, injection, auth bypass, SSRF, RLS, CORS, HSTS). Count how many categories were checked vs how many were applicable.
+
+**Antipattern check**: Did the review mention any antipattern IDs (AP-xxx)? If the project has antipatterns.md with entries, the review should have checked against them.
+
+**Recommended action**: "Review did not check for CSRF despite the spec touching API endpoints. Run `/creview` again or verify CSRF protection manually."
+
+## Step 6: Deviation Detection
+
+Cross-reference what happened against what should have happened:
+
+**Source files modified during QA**: The audit trail should show no Edit/Write operations on source files during `tdd-qa` phase. If it does: "Source file {file} was modified during QA phase at {timestamp}. This is a gate bypass — the QA agent should be read-only."
+
+**Test files modified during GREEN without logging**: Compare audit trail (test file edits during `tdd-impl`) against the test-edit log. If the audit trail shows a test edit that the log doesn't mention: "Test file {file} was edited during GREEN at {timestamp} but not logged in tdd-test-edits.log."
+
+**Overrides**: List all overrides with their reasons and when they occurred relative to the workflow timeline.
+
+**Spec updates**: If `spec_updates > 0`, list each update with its reason. Multiple updates suggest the spec wasn't thorough enough.
+
+**Recommended action per deviation**: specific, not vague. "Source file edited during QA — check if this was a legitimate fix round (should have used `workflow-advance.sh fix` first) or a gate bypass."
+
+## Step 7: Generate Verdict
+
+Assess the overall workflow quality:
+
+- **THOROUGH** — all phases ran, all rules have coverage, QA checked all rules, review ran security checklist, no deviations
+- **ADEQUATE** — all phases ran, most rules covered, minor gaps in QA/review thoroughness that don't affect correctness
+- **INCOMPLETE** — phases ran but significant rule coverage gaps, QA missed multiple rules, or review skipped applicable security checks
+- **SHORTCUT** — phases skipped via override, QA used far below average tokens, multiple rules unchecked, or source files modified during QA
+
+The verdict is a judgment call. Explain the reasoning. Users can disagree.
+
+## Output Format
+
+```markdown
+## Workflow Accountability Report
+
+### Workflow: {task name}
+**Branch:** {branch}
+**Phases completed:** {list}
+**QA rounds:** {N}
+**Overrides used:** {N}
+
+### Phase Execution: {PASS | {N} issues}
+{details}
+
+### Rule Coverage: {N}/{M} rules covered
+| Rule | Test | QA Checked | Verify Status |
+|------|------|-----------|---------------|
+| R-001 | auth.test.ts:42 | Yes | covered |
+| R-002 | — | NO | UNCOVERED |
+
+### Agent Thoroughness
+**QA**: Checked {N}/{M} rules. Token usage: {N}k ({X}% of average).
+- {Missing rules with recommended actions}
+
+**Review**: {N}/{M} security checks applied.
+- {Skipped checks with recommended actions}
+
+### Deviations ({N} found)
+{Each deviation with timestamp, evidence, and recommended action}
+
+### Verdict: {THOROUGH | ADEQUATE | INCOMPLETE | SHORTCUT}
+{2-3 sentences explaining the assessment and what, if anything, should be done about it.}
+```
+
+## Claude Code Feature Integration
+
+### Task Lists
+See "Progress Visibility" section above — task creation and narration are mandatory.
+
+### Token Tracking
+After any subagent completes, capture `total_tokens` and `duration_ms`. Append to `.claude/artifacts/token-log-{slug}.json`. If `.claude/artifacts/` doesn't exist, skip.
+
+If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+
+## If Something Goes Wrong
+
+- This skill is read-only. Re-run anytime safely.
+- **Conversation JSONL too large**: Use targeted `grep` and `jq` queries on the JSONL file. Search for specific rule IDs, tool names, or phase-related keywords. Never read the entire file into memory.
+- **Audit trail missing**: The skill still works from qa-findings + verification report, but agent thoroughness analysis will be less detailed. Note: "Audit trail not available — thoroughness analysis based on artifacts only."
+- **No session-meta match**: Token budget comparison unavailable. Note it and skip that metric.
+
+## Constraints
+
+- **Read-only.** Never modify workflow state, findings, source code, or any artifact.
+- **Not punitive.** Frame gaps as observations with context, not accusations. Include possible reasons for each gap.
+- **Recommended actions.** Every gap should suggest a specific next step — not auto-fix, just point the user at the right command.
+- **Targeted JSONL queries.** The conversation JSONL can be megabytes. Use `grep` for rule IDs, `jq` for structured extraction. Never `cat` the entire file.
+- **Verdict is honest.** SHORTCUT is a valid assessment. Don't soften it to ADEQUATE if the evidence shows shortcuts. But explain why.

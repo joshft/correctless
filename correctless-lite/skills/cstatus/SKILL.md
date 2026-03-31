@@ -76,6 +76,7 @@ Available commands:
   /cdebug         Structured bug investigation
   /csetup         Re-run setup / validate configuration
   /chelp          Quick help — workflow pipeline and commands
+  /cwtf           Workflow accountability — did agents do their job?
 
 State management:
   .claude/hooks/workflow-advance.sh status      Current phase
