@@ -1,6 +1,6 @@
 # Correctless: Correctness-Oriented Development Workflow
 
-> **Note:** This is the original design specification. The implementation has evolved — 11 skills were added (/cdevadv, /credteam, /cstatus, /csummary, /cmetrics, /cdebug, /creview, /cpr-review, /crefactor, /ccontribute, /chelp), the bounty/penalty economics were refined, and several feedback loops were closed. Full now has 21 skills. See the [README](README.md) and the actual [skill files](skills/) for the current implementation.
+> **Note:** This is the original design specification. The implementation has evolved — 12 skills were added (/cdevadv, /credteam, /cstatus, /csummary, /cmetrics, /cdebug, /creview, /cpr-review, /crefactor, /ccontribute, /cmaintain, /chelp), the bounty/penalty economics were refined, and several feedback loops were closed. Full now has 22 skills. See the [README](README.md) and the actual [skill files](skills/) for the current implementation.
 
 
 

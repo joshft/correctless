@@ -46,6 +46,7 @@ Other:
   /crefactor    Structured refactoring (tests must pass before + after)
   /cpr-review   Review someone else's PR
   /ccontribute  Contribute to someone else's project
+  /cmaintain    Review contributions as a maintainer
   /cdebug       Structured bug investigation
   /cstatus      Where am I? What's next?
   /csummary     What did the workflow catch this feature?
@@ -83,6 +84,7 @@ Quick reference:
   Refactor safely    → /crefactor
   Check status       → /cstatus
   Contribute to OSS  → /ccontribute
+  Review as maintainer → /cmaintain
   Project health     → /cmetrics
 ```
 

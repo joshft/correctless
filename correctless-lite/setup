@@ -606,7 +606,7 @@ else
 
 This project uses Correctless for correctness-oriented development.
 Read AGENT_CONTEXT.md before starting any work.
-Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cstatus, /csummary, /cmetrics, /cdebug, /chelp
+Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp
 CMDEOF
   else
     cat >> "$CLAUDEMD" <<'CMDEOF'
@@ -615,7 +615,7 @@ CMDEOF
 
 This project uses Correctless Lite for structured development.
 Read AGENT_CONTEXT.md before starting any work.
-Available commands: /csetup, /cspec, /creview, /ctdd, /cverify, /cdocs, /crefactor, /cpr-review, /ccontribute, /cstatus, /csummary, /cmetrics, /cdebug, /chelp
+Available commands: /csetup, /cspec, /creview, /ctdd, /cverify, /cdocs, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp
 CMDEOF
   fi
   ok "Updated CLAUDE.md"

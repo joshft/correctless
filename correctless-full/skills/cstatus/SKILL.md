@@ -72,6 +72,7 @@ Available commands:
   /crefactor      Structured refactoring with behavioral equivalence
   /cpr-review     Multi-lens PR review
   /ccontribute    Contribute to an open source project
+  /cmaintain      Maintainer review for incoming contributions
   /cdebug         Structured bug investigation
   /csetup         Re-run setup / validate configuration
   /chelp          Quick help — workflow pipeline and commands

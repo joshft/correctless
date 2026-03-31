@@ -138,7 +138,7 @@ Then restart Claude Code.
 
 ## Commands
 
-### Lite (14 skills)
+### Lite (15 skills)
 
 ```
 /csetup       Project health check + workflow setup
@@ -150,6 +150,7 @@ Then restart Claude Code.
 /crefactor    Structured refactoring with behavioral equivalence enforcement
 /cpr-review   Multi-lens PR review (architecture, security, tests, dep bumps)
 /ccontribute  Contribute to an open source project
+/cmaintain    Maintainer review for incoming contributions
 /cstatus      Show current phase and next steps
 /csummary     Feature summary — what the workflow caught
 /cmetrics     Project-wide metrics dashboard + health analysis
@@ -157,7 +158,7 @@ Then restart Claude Code.
 /chelp        Quick help — workflow pipeline and commands
 ```
 
-### Full (21 skills — includes all Lite skills)
+### Full (22 skills — includes all Lite skills)
 
 ```
 /csetup       Health check + workflow setup + intensity selection
@@ -176,6 +177,7 @@ Then restart Claude Code.
 /crefactor    Structured refactoring + mutation testing, cross-spec impact
 /cpr-review   Multi-lens PR review + concurrency, trust boundaries, dep bumps
 /ccontribute  Contribute to an open source project
+/cmaintain    Maintainer review for incoming contributions
 /cstatus      Show current phase and next steps
 /csummary     Feature summary — what the workflow caught
 /cmetrics     Project-wide metrics dashboard, health analysis, and ROI
@@ -229,7 +231,7 @@ Mutation testing, property-based testing, and PBT helpers are Full-only. Lite wo
 
 | | Lite | Full |
 |---|------|------|
-| Skills | 14 | 21 |
+| Skills | 15 | 22 |
 | Spec format | 5 sections, simple rules | 12+ sections, typed invariants |
 | Spec research | Current best practices, dependency health | Same |
 | Review | Single-pass + auto security checklist | 4-agent adversarial team |
