@@ -208,7 +208,7 @@ After the verification agent completes, capture `total_tokens` and `duration_ms`
 }
 ```
 
-When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
 ### Background Tasks
 - Run mutation testing in the background while doing rule coverage analysis, prohibition checks, and antipattern matching

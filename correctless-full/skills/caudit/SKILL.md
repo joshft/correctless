@@ -405,7 +405,7 @@ After each subagent completes, capture `total_tokens` and `duration_ms` from the
 }
 ```
 
-When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
 After each round's agents complete and triage finishes, print: "Round {N} complete. {M} findings. Running token cost: ~{total}k tokens. Continue to round {N+1}?" This gives the user cost visibility to decide whether to continue.
 

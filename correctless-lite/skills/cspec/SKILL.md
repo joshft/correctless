@@ -355,7 +355,7 @@ After the research subagent completes (when triggered), capture `total_tokens` a
 }
 ```
 
-When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry. Only logged when the research subagent is triggered.
+If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed. Only logged when the research subagent is triggered.
 
 ### /btw
 When presenting the spec for review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."

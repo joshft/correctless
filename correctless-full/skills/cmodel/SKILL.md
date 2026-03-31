@@ -137,7 +137,7 @@ After the interpreter subagent completes, capture `total_tokens` and `duration_m
 }
 ```
 
-When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
 ### Background Tasks
 Run the Alloy Analyzer (`java -jar`) as a background task while preparing the counterexample interpretation context. The JAR can take 30+ seconds for complex state spaces.

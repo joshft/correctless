@@ -125,12 +125,12 @@ git checkout -b feature/my-feature
 
 ### Updating
 
-**Plugin:** Claude Code's `plugin update` doesn't always pull latest. To update reliably:
+**Plugin:** Claude Code's `plugin update` doesn't always pull latest. To update reliably (replace `correctless` with `correctless-lite` if you installed Lite):
 ```
-/plugin uninstall correctless
+/plugin uninstall correctless              # or: correctless-lite
 /plugin marketplace remove correctless
 /plugin marketplace add joshft/correctless
-/plugin install correctless
+/plugin install correctless                # or: correctless-lite
 ```
 Then restart Claude Code.
 

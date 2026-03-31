@@ -190,7 +190,7 @@ After each subagent completes, capture `total_tokens` and `duration_ms` from the
 }
 ```
 
-When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
 ### /btw
 When presenting the root cause analysis: "Use /btw if you need to check something about the codebase without interrupting this investigation."

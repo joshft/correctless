@@ -211,7 +211,7 @@ Read all `.claude/artifacts/token-log-*.json` files. Correlate token spend with 
 | Review (creview/creview-spec) | {N} | {%} | {N} | {N} |
 | Verification (cverify) | {N} | {%} | {N} | {N} |
 | Audit (caudit) | {N} | {%} | {N} | {N} |
-| Other (cspec research, cdebug, crefactor) | {N} | {%} | {N} | {N} |
+| Other (all remaining: cspec, cdebug, crefactor, cmodel, credteam, cdevadv, cpostmortem) | {N} | {%} | {N} | {N} |
 
 This shows where the budget goes. If 65% goes to TDD and TDD catches 60% of bugs, the allocation is efficient. If 40% goes to audit and it catches 5% of bugs, consider reducing audit intensity.
 
@@ -240,10 +240,11 @@ Add to the dashboard after the existing ROI Estimate section:
 ### Phase Distribution
 | Phase | Tokens | % of Total | Findings | Tokens/Finding |
 |-------|--------|-----------|----------|----------------|
-| TDD | {N} | {%} | {N} | {N} |
-| Review | {N} | {%} | {N} | {N} |
-| Verification | {N} | {%} | {N} | {N} |
-| Audit | {N} | {%} | {N} | {N} |
+| TDD (ctdd) | {N} | {%} | {N} | {N} |
+| Review (creview, creview-spec) | {N} | {%} | {N} | {N} |
+| Verification (cverify) | {N} | {%} | {N} | {N} |
+| Audit (caudit) | {N} | {%} | {N} | {N} |
+| Other (cspec, cdebug, crefactor, cmodel, credteam, cdevadv, cpostmortem) | {N} | {%} | {N} | {N} |
 
 ### Bug Escape Rate
 - **Pre-merge bugs caught:** {N}

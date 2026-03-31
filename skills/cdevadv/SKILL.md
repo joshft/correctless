@@ -247,7 +247,7 @@ After the explorer subagent completes (signals mode only), capture `total_tokens
 }
 ```
 
-When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
 ### /context
 Check context usage before starting. Layers mode is context-efficient (cheap passes first). Signals mode loads more data. If context is above 50% before starting, suggest compacting first.

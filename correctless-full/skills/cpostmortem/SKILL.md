@@ -128,7 +128,7 @@ After the analysis subagent completes, capture `total_tokens` and `duration_ms` 
 }
 ```
 
-When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
 ### /export
 After postmortem completes: "Export this postmortem conversation: `/export docs/decisions/{task-slug}-postmortem.md` — captures the full analysis of why the workflow missed this bug."
