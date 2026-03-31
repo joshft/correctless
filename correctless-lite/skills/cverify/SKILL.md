@@ -193,6 +193,23 @@ See "Progress Visibility" section above — task creation and narration are mand
 ### Context Check
 Verification reads many files (spec, all changed files, tests, ARCHITECTURE.md, QA findings, git diff). Before starting mutation testing, check context usage. If above 70%: "Context is getting full. Consider running `/compact` before continuing — remaining checks may produce incomplete results if context is truncated."
 
+### Token Tracking
+
+After the verification agent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
+
+```json
+{
+  "skill": "cverify",
+  "phase": "verification",
+  "agent_role": "verification-agent",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### Background Tasks
 - Run mutation testing in the background while doing rule coverage analysis, prohibition checks, and antipattern matching
 - Run coverage report in the background while doing drift detection

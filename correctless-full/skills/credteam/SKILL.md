@@ -298,6 +298,23 @@ Devil's Advocate (periodic)
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
+### Token Tracking
+
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the report date):
+
+```json
+{
+  "skill": "credteam",
+  "phase": "{attack-{path-number}|team-{agent-role}}",
+  "agent_role": "{attack-agent|primary-interface|control-plane|resilience}",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### Background Tasks
 Run crafted payloads and network probes as background tasks where possible — prepare the next attack path while waiting for the response from the current one.
 

@@ -232,6 +232,23 @@ The report goes to the human. It is NOT auto-actioned. For each finding:
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
+### Token Tracking
+
+After the explorer subagent completes (signals mode only), capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the report date):
+
+```json
+{
+  "skill": "cdevadv",
+  "phase": "explorer",
+  "agent_role": "explorer-agent",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### /context
 Check context usage before starting. Layers mode is context-efficient (cheap passes first). Signals mode loads more data. If context is above 50% before starting, suggest compacting first.
 

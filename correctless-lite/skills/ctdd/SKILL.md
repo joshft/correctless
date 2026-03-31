@@ -369,6 +369,23 @@ See "Progress Visibility" section above — task creation and narration are mand
 - Run race detector (`-race` flag) in the background while preparing for QA transition
 - Run coverage report generation in the background while composing the QA summary
 
+### Token Tracking
+
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the workflow state or spec file):
+
+```json
+{
+  "skill": "ctdd",
+  "phase": "{red|test-audit|green|qa|fix-round-N}",
+  "agent_role": "{test-writer|test-auditor|implementation|qa-agent|fix-agent}",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### /btw Reminder
 When presenting QA findings for the human to review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."
 

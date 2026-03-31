@@ -122,6 +122,23 @@ After advancing, tell the human: "Model complete. Run `/creview-spec` for multi-
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
+### Token Tracking
+
+After the interpreter subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the task slug):
+
+```json
+{
+  "skill": "cmodel",
+  "phase": "interpreter",
+  "agent_role": "interpreter-agent",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### Background Tasks
 Run the Alloy Analyzer (`java -jar`) as a background task while preparing the counterexample interpretation context. The JAR can take 30+ seconds for complex state spaces.
 

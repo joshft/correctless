@@ -30,7 +30,8 @@ Read everything in the accumulation layer. Skip files that don't exist.
 8. **Feature summaries** — `glob .claude/artifacts/summary-*.md` — per-feature summaries (from /csummary)
 9. **Decision records** — `glob docs/decisions/*.md` — for staleness checks (revisit-when/revisit-by markers)
 10. **Workflow state files** — `glob .claude/artifacts/workflow-state-*.json` — for spec_updates counts per feature
-11. **Git log** — commit history to measure feature velocity and branch durations
+11. **Token logs** — `glob .claude/artifacts/token-log-*.json` — per-feature token usage from subagent spawns
+12. **Git log** — commit history to measure feature velocity and branch durations
 
 ### Derived metrics:
 
@@ -194,6 +195,69 @@ After computing the raw metrics above, analyze them for actionable insights. Thi
 - "Drift debt is growing AND Olympics convergence is fast" → drift may be in areas Olympics don't cover
 - "Review phase catches fewer issues over time BUT antipattern count is growing" → review isn't reading antipatterns effectively
 
+## Token ROI Analysis
+
+Read all `.claude/artifacts/token-log-*.json` files. Correlate token spend with findings data from QA, verification, and audit artifacts.
+
+### Metrics to Compute
+
+**1. Cost per bug caught**: Total tokens across all features / total distinct findings. "Across {N} features, you spent {T} tokens and caught {B} bugs — {T/B} tokens per bug caught pre-merge."
+
+**2. Tokens per feature by phase**: Aggregate `by_skill` totals across all token logs. Show as a table:
+
+| Phase | Tokens | % of Total | Findings | Tokens/Finding |
+|-------|--------|-----------|----------|----------------|
+| TDD (ctdd) | {N} | {%} | {N} | {N} |
+| Review (creview/creview-spec) | {N} | {%} | {N} | {N} |
+| Verification (cverify) | {N} | {%} | {N} | {N} |
+| Audit (caudit) | {N} | {%} | {N} | {N} |
+| Other (cspec research, cdebug, crefactor) | {N} | {%} | {N} | {N} |
+
+This shows where the budget goes. If 65% goes to TDD and TDD catches 60% of bugs, the allocation is efficient. If 40% goes to audit and it catches 5% of bugs, consider reducing audit intensity.
+
+**3. Bug escape rate**: From `workflow-effectiveness.json`: `post_merge_bugs` count / (total caught + escaped). "Escape rate: {N}%. {M} caught pre-merge, {K} escaped."
+
+**4. Estimated production fix cost avoided**: Each caught bug saves an estimated 2-10 hours of production debugging, hotfixes, rollbacks, and incident response. "{N} bugs caught × 2-10 hours = {range} hours saved. At $150/hr developer cost, that's ${range} saved." This is a rough estimate — say so. But even the conservative end usually exceeds the token cost.
+
+**5. Tokens per LOC**: Total tokens / total lines added (from git diff --stat across features). Track over time — should be stable if overhead scales linearly.
+
+**6. Olympics efficiency** (Full only): Tokens per finding per round. "Round 1: {N} findings at {T} tokens. Round {M}: {N} findings at {T} tokens." Shows diminishing returns.
+
+**7. Token trend**: Compare with previous metrics. "Token cost per feature: {stable/growing/shrinking}. Cost per bug: {improving/degrading}."
+
+### Output
+
+Add to the dashboard after the existing ROI Estimate section:
+
+```markdown
+## Token ROI Analysis
+
+### Cost Summary
+- **Total tokens tracked:** {N} across {M} features
+- **Average tokens per feature:** {N}
+- **Cost per bug caught:** {N} tokens ({M} bugs caught)
+
+### Phase Distribution
+| Phase | Tokens | % of Total | Findings | Tokens/Finding |
+|-------|--------|-----------|----------|----------------|
+| TDD | {N} | {%} | {N} | {N} |
+| Review | {N} | {%} | {N} | {N} |
+| Verification | {N} | {%} | {N} | {N} |
+| Audit | {N} | {%} | {N} | {N} |
+
+### Bug Escape Rate
+- **Pre-merge bugs caught:** {N}
+- **Post-merge bugs escaped:** {M}
+- **Escape rate:** {%}
+- **Estimated production fix cost avoided:** {N bugs} × 2-10 hours = {range} hours
+
+### Token Trend
+- Token cost per feature: {stable/growing/shrinking}
+- Cost per bug caught: {improving/degrading}
+```
+
+If no token logs exist, skip this section with: "No token usage data yet. Token tracking starts automatically when skills run — data will appear after the next feature."
+
 ## Trend Tracking
 
 If previous metrics files exist (`.claude/artifacts/metrics-*.md`), compare:
@@ -218,6 +282,7 @@ Use TaskCreate/TaskUpdate:
 - Calculating metrics
 - Reading decision records
 - Analyzing health indicators
+- Reading token logs and computing ROI
 - Generating dashboard
 
 ## If Something Goes Wrong

@@ -390,6 +390,25 @@ See "Progress Visibility" section above — task creation and round-by-round nar
 ### /context
 Check context usage between rounds. If the lead orchestrator's context exceeds 70%, inform the user and suggest /compact or spawn the next round with a forked subagent to get clean context.
 
+### Token Tracking
+
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the preset and date):
+
+```json
+{
+  "skill": "caudit",
+  "phase": "{round-N-{agent-role}|round-N-triage}",
+  "agent_role": "{specialist-role|triage}",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
+After each round's agents complete and triage finishes, print: "Round {N} complete. {M} findings. Running token cost: ~{total}k tokens. Continue to round {N+1}?" This gives the user cost visibility to decide whether to continue.
+
 ### Cost Visibility
 After each round, report: findings found, findings fixed, findings rejected, cumulative rounds. The human can decide whether to continue or stop.
 

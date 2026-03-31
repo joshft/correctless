@@ -159,6 +159,23 @@ After advancing, tell the human: "Review complete. Run `/ctdd` to start the TDD 
 ### Task Lists
 See "Progress Visibility" section above — task creation and agent announcements are mandatory.
 
+### Token Tracking
+
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
+
+```json
+{
+  "skill": "creview-spec",
+  "phase": "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|external-{model}}",
+  "agent_role": "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|external-{model}}",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### /context
 Check context usage before spawning the agent team. If above 70%, inform the user. The `context: fork` frontmatter gives each agent clean context, but the lead orchestrator's context may be full from the spec conversation.
 

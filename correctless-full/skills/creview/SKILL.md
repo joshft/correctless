@@ -214,6 +214,23 @@ After advancing, tell the human to run `/ctdd`. The full pipeline continues: RED
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
+### Token Tracking
+
+After the review agent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
+
+```json
+{
+  "skill": "creview",
+  "phase": "review",
+  "agent_role": "review-agent",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### /btw
 When presenting findings, mention: "Use /btw if you need to check something about the codebase without interrupting this review."
 

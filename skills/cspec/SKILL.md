@@ -340,6 +340,23 @@ After advancing, tell the human to run `/creview` (Lite) or `/creview-spec` (Ful
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
+### Token Tracking
+
+After the research subagent completes (when triggered), capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the task slug):
+
+```json
+{
+  "skill": "cspec",
+  "phase": "research",
+  "agent_role": "research-agent",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry. Only logged when the research subagent is triggered.
+
 ### /btw
 When presenting the spec for review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."
 

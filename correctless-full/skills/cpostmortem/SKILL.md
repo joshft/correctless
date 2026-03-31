@@ -113,6 +113,23 @@ Increment counters in `phase_effectiveness` for the relevant phase. Note pattern
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
+### Token Tracking
+
+After the analysis subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the feature slug):
+
+```json
+{
+  "skill": "cpostmortem",
+  "phase": "analysis",
+  "agent_role": "analysis-agent",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### /export
 After postmortem completes: "Export this postmortem conversation: `/export docs/decisions/{task-slug}-postmortem.md` — captures the full analysis of why the workflow missed this bug."
 

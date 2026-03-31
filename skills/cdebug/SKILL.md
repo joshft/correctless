@@ -175,6 +175,23 @@ See "Progress Visibility" section above — task creation and narration are mand
 ### Background Tasks
 Run the test suite in the background while investigating the code path. Run git blame in the background while reading the code.
 
+### Token Tracking
+
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the debug investigation slug):
+
+```json
+{
+  "skill": "cdebug",
+  "phase": "{fix|escalation}",
+  "agent_role": "{fix-agent|escalation-agent}",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### /btw
 When presenting the root cause analysis: "Use /btw if you need to check something about the codebase without interrupting this investigation."
 

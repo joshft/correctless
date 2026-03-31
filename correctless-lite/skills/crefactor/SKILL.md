@@ -280,6 +280,23 @@ If the refactor was part of an active feature workflow (check `workflow-advance.
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
+### Token Tracking
+
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the refactor intent filename):
+
+```json
+{
+  "skill": "crefactor",
+  "phase": "{characterization-tests|phase-N-refactor|phase-N-verify|qa}",
+  "agent_role": "{test-agent|refactor-agent|verification-agent|qa-agent}",
+  "total_tokens": N,
+  "duration_ms": N,
+  "timestamp": "ISO"
+}
+```
+
+When the skill completes, update the `totals` field with aggregated token counts by skill. If the file doesn't exist, create it with the first entry.
+
 ### Background Tasks
 - Run coverage analysis in the background while the refactor agent works
 - Run mutation testing (Full mode) in the background during QA
