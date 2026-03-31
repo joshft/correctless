@@ -52,7 +52,7 @@ Read everything in the accumulation layer. Skip files that don't exist.
 - Audit: findings in Olympics history
 
 **Bug escape rate** — from `workflow-effectiveness.json`:
-- `post_merge_bugs` count / total issues caught
+- `post_merge_bugs` count / (total issues caught + post_merge_bugs)
 - List the escaped bugs with which phase should have caught them
 
 **Phase effectiveness** — from `workflow-effectiveness.json`:
@@ -203,7 +203,7 @@ Read all `.claude/artifacts/token-log-*.json` files. Correlate token spend with 
 
 **1. Cost per bug caught**: Total tokens across all features / total distinct findings. "Across {N} features, you spent {T} tokens and caught {B} bugs — {T/B} tokens per bug caught pre-merge."
 
-**2. Tokens per feature by phase**: Aggregate `by_skill` totals across all token logs. Show as a table:
+**2. Tokens per feature by phase**: Group all token log entries by the `skill` field and sum `total_tokens` per skill. Show as a table:
 
 | Phase | Tokens | % of Total | Findings | Tokens/Finding |
 |-------|--------|-----------|----------|----------------|
@@ -249,7 +249,11 @@ Add to the dashboard after the existing ROI Estimate section:
 - **Pre-merge bugs caught:** {N}
 - **Post-merge bugs escaped:** {M}
 - **Escape rate:** {%}
-- **Estimated production fix cost avoided:** {N bugs} × 2-10 hours = {range} hours
+- **Estimated production fix cost avoided:** {N bugs} × 2-10 hours = {range} hours (~${range} at $150/hr)
+
+### Efficiency
+- **Tokens per LOC:** {N} (total tokens / lines added across features)
+- **Olympics efficiency (Full only):** Round 1: {N} findings at {T}k tokens → Round {M}: {N} findings at {T}k tokens
 
 ### Token Trend
 - Token cost per feature: {stable/growing/shrinking}

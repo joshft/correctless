@@ -1,7 +1,7 @@
 ---
 name: cdebug
 description: Structured bug investigation workflow. Root cause analysis, hypothesis testing, TDD fix with agent separation, escalation after 3 failed attempts. Use when stuck on a bug.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/antipatterns.md), Write(.claude/artifacts/debug-*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/antipatterns.md), Write(.claude/artifacts/debug-*), Write(.claude/artifacts/token-log-*), Edit
 context: fork
 ---
 
