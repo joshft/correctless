@@ -28,27 +28,52 @@ Same model — but the framing determines what the agent finds.
 
 ### Correctless Lite
 
-For web apps, APIs, CLI tools, and everyday development.
+For web apps, APIs, CLI tools, and everyday development. **~10-15 minutes per feature.**
 
+```mermaid
+graph LR
+    A["/cspec<br/>Write spec"] --> B["/creview<br/>Security checklist"]
+    B --> C["/ctdd"]
+    C --> D["/cverify<br/>Rule coverage"]
+    D --> E["/cdocs<br/>Update docs"]
+    E --> F["Ready to merge"]
+
+    subgraph "/ctdd — Enforced TDD"
+        direction LR
+        C1["RED<br/>Write tests"] --> C2["Test Audit"]
+        C2 --> C3["GREEN<br/>Implement"]
+        C3 --> C4["/simplify"]
+        C4 --> C5["QA<br/>Hostile review"]
+    end
+
+    C --- C1
+
+    style C1 fill:#ff6b6b,color:#fff
+    style C3 fill:#51cf66,color:#fff
+    style C5 fill:#ffd43b,color:#000
 ```
-/cspec → /creview → /ctdd [RED → test audit → GREEN → /simplify → QA] → /cverify → /cdocs
-```
 
-**~10-15 minutes per feature** (after initial setup). You get: specs before code with current best practice research, a skeptical review with automatic OWASP security checklist, enforced TDD with test quality audit, verification, and living documentation. First run includes a 17-point project health check that catches hardcoded secrets, missing CI, and security gaps.
-
-[Full spec &rarr;](correctless-lite.md)
+Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. [Full spec &rarr;](correctless-lite.md)
 
 ### Correctless (Full)
 
-For security-critical infrastructure, financial systems, and anything where a bug is a vulnerability.
+For security-critical infrastructure and anything where a bug is a vulnerability. **~1-2 hours per feature — but the code ships tested, reviewed, and assumption-challenged.**
 
+```mermaid
+graph LR
+    A["/cspec<br/>Typed invariants"] --> B["/cmodel<br/>Alloy modeling"]
+    B --> C["/creview-spec<br/>4-agent review"]
+    C --> D["/ctdd<br/>+ mutation testing"]
+    D --> E["/cverify<br/>+ drift detection"]
+    E --> F["/cupdate-arch"]
+    F --> G["/cdocs"]
+    G --> H["/caudit<br/>Olympics"]
+
+    style C fill:#e599f7,color:#000
+    style H fill:#ff922b,color:#fff
 ```
-/cspec → /cmodel → /creview-spec → /ctdd [RED → test audit → GREEN → /simplify → QA] → /cverify → /cupdate-arch → /cdocs → /caudit
-```
 
-**~1-2 hours per feature — but the code that ships is tested, reviewed, and has had its assumptions challenged.** Everything in Lite plus: formal Alloy modeling, STRIDE threat analysis, 4-agent adversarial spec review, mutation testing, drift debt tracking, postmortem feedback loops, convergence-based audit system, live red team assessment, and devil's advocate analysis.
-
-[Full spec &rarr;](correctless.md)
+Everything in Lite plus: formal modeling, STRIDE threat analysis, adversarial spec review, mutation testing, convergence-based auditing, and more. [Full spec &rarr;](correctless.md)
 
 ### Which One?
 
@@ -129,27 +154,44 @@ A fresh agent ([`/creview`](docs/skills/creview.md)) that didn't write the spec 
 
 ### 6. The Compounding Effect
 
-After each feature, Correctless learns:
-- **Antipatterns** capture escaped bugs — every future spec and review checks against them
-- **QA findings** accumulate — specs get tailored to avoid recurrent bugs
-- **CLAUDE.md learnings** compound — postmortems, confirmed conventions, and audit patterns are appended to CLAUDE.md and loaded into every future session automatically
-- **Workflow effectiveness** tracks which phases catch what — weak phases get pushed harder
+```mermaid
+graph LR
+    A["Feature N bugs"] --> B["/cpostmortem"]
+    B --> C["antipatterns.md"]
+    B --> D["CLAUDE.md learnings"]
+    C --> E["/cspec reads<br/>antipatterns"]
+    D --> F["Every future<br/>session loads"]
+    E --> G["Feature N+1<br/>spec prevents<br/>same bug class"]
+    F --> G
 
-Six months in, the workflow knows your project's failure modes better than any individual developer.
+    style B fill:#ff922b,color:#fff
+    style G fill:#51cf66,color:#fff
+```
+
+Escaped bugs become antipatterns. Antipatterns become spec rules. Spec rules become tests. Six months in, the workflow knows your project's failure modes better than any individual developer.
 
 ### 7. Defense in Depth — Why Enforcement is Bash, Not Prompts
 
-Prompt-level instructions ("don't edit source files during QA") fade as context fills. Research shows LLM instruction adherence drops significantly past ~60% context usage. Enforcement that depends on the model following instructions is not enforcement — it's a suggestion.
+Prompt-level instructions fade as context fills — enforcement that depends on the model is a suggestion. Correctless uses three independent layers:
 
-Correctless uses three layers, each independent of the model's instruction-following:
+```mermaid
+graph TD
+    A["Agent wants to<br/>edit source file<br/>during QA phase"] --> B{"Layer 1: Gate<br/>(PreToolUse hook)"}
+    B -->|"BLOCK"| C["❌ Edit prevented<br/>Model can't bypass bash"]
+    B -->|"ALLOW<br/>(Bash slip-through)"| D["File modified"]
+    D --> E{"Layer 2: Audit Trail<br/>(PostToolUse hook)"}
+    E --> F["📝 Logged with phase context<br/>⚠ Alert shown to user"]
+    F --> G["/cwtf reads trail<br/>reports deviations"]
 
-**Layer 1 — Gate (bash, blocking).** A PreToolUse hook that runs before every file edit. Returns `block` or `allow`. The model cannot write to a source file during QA because the hook physically prevents the write. This is application-level enforcement — the model's compliance is irrelevant.
+    H["Layer 3: Skill Instructions<br/>(prompt-level, advisory)"] -.->|"Subject to<br/>context fade"| A
 
-**Layer 2 — Audit trail (bash, observing).** A PostToolUse hook that records every file modification with phase context. If a Bash command slips past the gate's pattern detection (e.g., `python3 -c "open('file','w')..."`), the audit trail catches it after the fact. [`/cwtf`](docs/skills/cwtf.md) reads the audit trail and reports deviations.
+    style B fill:#ff6b6b,color:#fff
+    style C fill:#ff6b6b,color:#fff
+    style E fill:#ffd43b,color:#000
+    style H fill:#dee2e6,color:#000
+```
 
-**Layer 3 — Skill instructions (prompt-level, advisory).** The skill prompt tells the QA agent not to modify source files. This is the weakest layer — subject to context fade. But it's backed by layers 1 and 2, so it doesn't need to be reliable on its own.
-
-**Fresh agents per phase** provide additional resilience. Each phase transition spawns a new agent with `context: fork` — starting at 0% context with fresh instructions. A QA agent at 0% context follows its hostile-lens instructions perfectly. A single agent at 70% context may have forgotten it was supposed to be hostile. Agent separation isn't just about confirmation bias — it's about instruction reliability under context pressure.
+**Fresh agents per phase** add resilience: each phase spawns a new agent at 0% context with fresh instructions via `context: fork`. A QA agent at 0% follows hostile-lens instructions perfectly. A single agent at 70% may have forgotten it was supposed to be hostile.
 
 ## Skills
 
@@ -204,6 +246,25 @@ Correctless uses three layers, each independent of the model's instruction-follo
 ## Platform Integration
 
 Correctless hooks into Claude Code's infrastructure for real-time feedback and long-term learning. All features below are **automatic** after `/csetup` unless marked opt-in.
+
+```mermaid
+graph TB
+    subgraph "Claude Code"
+        A["PreToolUse"] --> B["workflow-gate.sh<br/>Phase enforcement"]
+        C["PostToolUse"] --> D["audit-trail.sh<br/>Adherence feedback"]
+        E["Statusline"] --> F["statusline.sh<br/>Phase + cost + context"]
+        G["Session Data"] --> H["session-meta<br/>+ facets"]
+    end
+
+    B -->|"block/allow"| I["Every file edit"]
+    D -->|"⚠ alerts"| J["Real-time feedback"]
+    F -->|"RED QA:R2 $0.42"| K["Always visible"]
+    H -->|"read by"| L["/cmetrics"]
+
+    style B fill:#ff6b6b,color:#fff
+    style D fill:#ffd43b,color:#000
+    style F fill:#51cf66,color:#fff
+```
 
 ### Statusline (automatic)
 
