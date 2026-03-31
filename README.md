@@ -131,6 +131,20 @@ After each feature, Correctless learns:
 
 Six months in, the workflow knows your project's failure modes better than any individual developer.
 
+### 7. Defense in Depth — Why Enforcement is Bash, Not Prompts
+
+Prompt-level instructions ("don't edit source files during QA") fade as context fills. Research shows LLM instruction adherence drops significantly past ~60% context usage. Enforcement that depends on the model following instructions is not enforcement — it's a suggestion.
+
+Correctless uses three layers, each independent of the model's instruction-following:
+
+**Layer 1 — Gate (bash, blocking).** A PreToolUse hook that runs before every file edit. Returns `block` or `allow`. The model cannot write to a source file during QA because the hook physically prevents the write. This is application-level enforcement — the model's compliance is irrelevant.
+
+**Layer 2 — Audit trail (bash, observing).** A PostToolUse hook that records every file modification with phase context. If a Bash command slips past the gate's pattern detection (e.g., `python3 -c "open('file','w')..."`), the audit trail catches it after the fact. [`/cwtf`](docs/skills/cwtf.md) reads the audit trail and reports deviations.
+
+**Layer 3 — Skill instructions (prompt-level, advisory).** The skill prompt tells the QA agent not to modify source files. This is the weakest layer — subject to context fade. But it's backed by layers 1 and 2, so it doesn't need to be reliable on its own.
+
+**Fresh agents per phase** provide additional resilience. Each phase transition spawns a new agent with `context: fork` — starting at 0% context with fresh instructions. A QA agent at 0% context follows its hostile-lens instructions perfectly. A single agent at 70% context may have forgotten it was supposed to be hostile. Agent separation isn't just about confirmation bias — it's about instruction reliability under context pressure.
+
 ## Skills
 
 ### Core Workflow
