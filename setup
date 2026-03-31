@@ -338,13 +338,14 @@ HEOF
   # Append hook to existing settings using jq
   if command -v jq >/dev/null 2>&1; then
     local tmp="$settings.$$"
-    jq --arg cmd "$hook_path" --arg adv "$advance_path" '
+    jq --arg cmd "$hook_path" --arg adv "$advance_path" --arg sl "$statusline_path" '
       .hooks.PreToolUse = (.hooks.PreToolUse // []) + [{
         matcher: "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
         command: $cmd,
         timeout_ms: 5000
       }]
       | .permissions.allow = (.permissions.allow // []) + ["Bash(\($adv) *)"]
+      | .statusLine = { type: "command", command: $sl }
     ' "$settings" > "$tmp" && mv "$tmp" "$settings"
     ok "Registered hooks in existing settings.json"
   else

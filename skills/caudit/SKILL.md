@@ -388,7 +388,7 @@ If any finding category appeared in 2+ previous audit runs (check `.claude/artif
 - Source: /caudit {preset}
 ```
 
-Before appending, read the existing Correctless Learnings section. If this audit pattern is already recorded with the same category, skip.
+Before appending, read the existing Correctless Learnings section. If this audit pattern is already recorded with the same category, skip. If the `## Correctless Learnings` section doesn't exist in CLAUDE.md, create it with the header before appending.
 
 Feed to /cdevadv: if a learning category has appeared 3+ times, note it as a candidate for devil's advocate analysis — it may indicate an architectural issue, not just recurring bugs.
 

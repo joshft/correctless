@@ -267,7 +267,9 @@ If no token logs exist, skip this section with: "No token usage data yet. Token 
 
 ## Session Analytics (from Claude Code data)
 
-Read all session-meta files from `~/.claude/usage-data/session-meta/`. Filter to sessions where `project_path` matches the current project root. For each matching session, look up the corresponding facets file at `~/.claude/usage-data/facets/{session_id}.json`.
+Determine the current project root: `git rev-parse --show-toplevel`. Then use `find ~/.claude/usage-data/session-meta/ -name '*.json'` to list all session-meta files (do NOT use Glob with `~` — use find or Bash for tilde expansion). Filter to sessions where `project_path` matches the project root (exact string match on the absolute path). For each matching session, look up the corresponding facets file at `~/.claude/usage-data/facets/{session_id}.json` (the facets filename IS the session_id).
+
+Note: Not all sessions have facets files (~26% coverage is typical). When computing facets-based metrics, note the sample size: "Outcome data available for {N} of {M} sessions ({%})."
 
 ### Metrics to Compute
 
@@ -287,7 +289,14 @@ Read all session-meta files from `~/.claude/usage-data/session-meta/`. Filter to
 
 **Correctless vs Freeform comparison:**
 
-Identify Correctless sessions by checking if `first_prompt` contains any /c command (/cspec, /ctdd, /creview, etc.). All other sessions are "freeform."
+Identify Correctless sessions by checking whether Correctless artifacts were modified during the session's time window. A session is "Correctless" if:
+- Workflow state files (`.claude/artifacts/workflow-state-*.json`) have `phase_entered_at` timestamps within the session's `start_time` to `start_time + duration_minutes` range, OR
+- The session's `tool_counts` includes calls to tools that only Correctless uses (the `Task` tool with high counts suggests orchestrated workflow), OR
+- QA findings, verification reports, or spec files were modified during the session window (check git log timestamps)
+
+If none of these signals are present, the session is "freeform." Note: this heuristic is approximate — some Correctless sessions (e.g., `/cstatus` or `/chelp`) may look freeform. Err on the side of undercounting Correctless sessions rather than overcounting.
+
+**Important:** Slash commands like `/cspec` are intercepted by Claude Code before reaching the conversation — they do NOT appear in `first_prompt`. Do not use `first_prompt` to identify Correctless sessions.
 
 ### Output
 
@@ -308,7 +317,8 @@ Identify Correctless sessions by checking if `first_prompt` contains any /c comm
 - **Outcome rate:** {N}% fully achieved
 - **Helpfulness:** {distribution}
 - **Friction rate:** {N}% tool errors
-- **Top friction:** {category} ({N} occurrences)
+- **Top friction:** {category from facets friction_counts} ({N} occurrences)
+- **User engagement:** avg response time {N}s ({<15s: flowing | 15-60s: normal | >60s: confused})
 
 ### Correctless vs Freeform
 | Metric | Correctless Sessions | Freeform Sessions |

@@ -1,7 +1,7 @@
 ---
 name: cpostmortem
 description: Structured post-merge bug analysis. Walk through what broke, which phase should have caught it, and what corrective action to take. Strengthens the workflow over time.
-allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.claude/meta/*), Write(.claude/antipatterns.md), Write(.claude/templates/invariants/*), Write(.claude/artifacts/token-log-*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.claude/meta/*), Write(.claude/antipatterns.md), Write(.claude/templates/invariants/*), Write(.claude/artifacts/token-log-*), Write(CLAUDE.md)
 context: fork
 ---
 
@@ -118,7 +118,7 @@ After writing the PMB entry and antipattern, append a learning to the `## Correc
 - Source: PMB-{N}
 ```
 
-Before appending, read the existing Correctless Learnings section. If an entry with the same PMB-N already exists, skip (deduplication).
+Before appending, read the existing Correctless Learnings section. If an entry with the same PMB-N already exists, skip (deduplication). If the `## Correctless Learnings` section doesn't exist in CLAUDE.md, create it with the header before appending.
 
 This learning is loaded into every future session. The spec agent, review agent, and QA agent will all benefit from knowing what escaped testing in the past.
 

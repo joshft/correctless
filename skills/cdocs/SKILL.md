@@ -1,7 +1,7 @@
 ---
 name: cdocs
 description: Update project documentation after a feature lands. Updates README, AGENT_CONTEXT.md, ARCHITECTURE.md, and feature docs. Run before merging.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/*), Write(README.md), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/*), Write(README.md), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md), Write(CLAUDE.md)
 ---
 
 # /cdocs — Update Project Documentation
@@ -123,7 +123,7 @@ If this is the 3rd or more feature where the same architectural pattern has appe
 - Source: /cdocs after {feature slug}
 ```
 
-Before appending, read the existing Correctless Learnings section. If this convention is already recorded, skip.
+Before appending, read the existing Correctless Learnings section. Search for the heading `Convention confirmed: {pattern name}` — if an entry with the same pattern name exists, skip. If the `## Correctless Learnings` section doesn't exist in CLAUDE.md, create it with the header before appending.
 
 This ensures future spec and review agents know about established conventions without manually updating ARCHITECTURE.md.
 
