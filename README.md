@@ -1,6 +1,10 @@
 # Correctless
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
+[![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Skills: 23](https://img.shields.io/badge/skills-23-blue.svg)](docs/skills/)
+[![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
 
