@@ -45,6 +45,7 @@ Feature workflow:
 Other:
   /crefactor    Structured refactoring (tests must pass before + after)
   /cpr-review   Review someone else's PR
+  /ccontribute  Contribute to someone else's project
   /cdebug       Structured bug investigation
   /cpostmortem  Post-merge bug analysis (when bugs escape to production)
   /cstatus      Where am I? What's next?
@@ -81,6 +82,7 @@ Quick reference:
   Fix a bug          → /cdebug
   Refactor safely    → /crefactor
   Check status       → /cstatus
+  Contribute to OSS  → /ccontribute
   Project health     → /cmetrics
 ```
 
