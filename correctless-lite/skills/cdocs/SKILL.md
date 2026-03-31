@@ -113,6 +113,22 @@ Structure your output:
 
 ## After Documentation
 
+### Convention Learning
+
+If this is the 3rd or more feature where the same architectural pattern has appeared (check docs/specs/ for recurring patterns), append to the `## Correctless Learnings` section of `CLAUDE.md`:
+
+```markdown
+### {date} — Convention confirmed: {pattern name}
+- Observed in {N} features — treat as established project convention
+- Source: /cdocs after {feature slug}
+```
+
+Before appending, read the existing Correctless Learnings section. If this convention is already recorded, skip.
+
+This ensures future spec and review agents know about established conventions without manually updating ARCHITECTURE.md.
+
+### Advance Workflow
+
 Advance the state machine:
 ```bash
 .claude/hooks/workflow-advance.sh documented

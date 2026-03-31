@@ -32,6 +32,8 @@ Read everything in the accumulation layer. Skip files that don't exist.
 10. **Workflow state files** — `glob .claude/artifacts/workflow-state-*.json` — for spec_updates counts per feature
 11. **Token logs** — `glob .claude/artifacts/token-log-*.json` — per-feature token usage from subagent spawns
 12. **Git log** — commit history to measure feature velocity and branch durations
+13. **Session meta** — `glob ~/.claude/usage-data/session-meta/*.json` — filter by `project_path` matching the current project root. Contains exact token counts, tool usage, duration, error rates per session.
+14. **Session facets** — `glob ~/.claude/usage-data/facets/*.json` — match by `session_id` to session-meta entries for this project. Contains AI-analyzed session quality: outcome, friction, satisfaction.
 
 ### Derived metrics:
 
@@ -263,6 +265,62 @@ Add to the dashboard after the existing ROI Estimate section:
 
 If no token logs exist, skip this section with: "No token usage data yet. Token tracking starts automatically when skills run — data will appear after the next feature."
 
+## Session Analytics (from Claude Code data)
+
+Read all session-meta files from `~/.claude/usage-data/session-meta/`. Filter to sessions where `project_path` matches the current project root. For each matching session, look up the corresponding facets file at `~/.claude/usage-data/facets/{session_id}.json`.
+
+### Metrics to Compute
+
+**From session-meta:**
+
+- **Exact token cost**: Sum `input_tokens + output_tokens` across all project sessions. This is ground truth — cross-check against manual token logs. If they diverge significantly, note: "Session-meta shows {N} tokens total. Token logs show {M}. The difference ({D}) is orchestrator overhead not captured by subagent tracking."
+- **Average session duration**: `mean(duration_minutes)` across sessions.
+- **Tool distribution**: Aggregate `tool_counts` across sessions. Show top 6 tools by call count.
+- **Friction rate**: `sum(tool_errors) / sum(all tool calls)`. Break down by `tool_error_categories`.
+- **User engagement**: Average `user_response_times`. Long times (>60s) suggest confusion. Short times (<15s) suggest flow.
+
+**From facets:**
+
+- **Outcome rate**: % of sessions with `outcome: "fully_achieved"`.
+- **Satisfaction**: Distribution of `claude_helpfulness` values.
+- **Top friction categories**: Aggregate `friction_counts` across sessions. Flag growing categories.
+
+**Correctless vs Freeform comparison:**
+
+Identify Correctless sessions by checking if `first_prompt` contains any /c command (/cspec, /ctdd, /creview, etc.). All other sessions are "freeform."
+
+### Output
+
+```markdown
+## Session Analytics
+
+### Overview
+- **Sessions tracked:** {N} (from {date} to {date})
+- **Average session duration:** {N} minutes
+- **Total tokens (ground truth):** {N} input + {N} output
+
+### Tool Distribution
+| Tool | Calls | % of Total |
+|------|-------|-----------|
+| {tool} | {N} | {%} |
+
+### Quality Signals
+- **Outcome rate:** {N}% fully achieved
+- **Helpfulness:** {distribution}
+- **Friction rate:** {N}% tool errors
+- **Top friction:** {category} ({N} occurrences)
+
+### Correctless vs Freeform
+| Metric | Correctless Sessions | Freeform Sessions |
+|--------|---------------------|-------------------|
+| Outcome rate | {%} | {%} |
+| Friction rate | {%} | {%} |
+| Avg duration | {N} min | {N} min |
+| Avg tokens | {N} | {N} |
+```
+
+If no session-meta data exists for this project, skip with: "No Claude Code session data found for this project. Session analytics will appear after running a few sessions."
+
 ## Trend Tracking
 
 If previous metrics files exist (`.claude/artifacts/metrics-*.md`), compare:
@@ -286,6 +344,7 @@ Use TaskCreate/TaskUpdate:
 - Reading git log
 - Calculating metrics
 - Reading decision records
+- Reading session analytics data
 - Analyzing health indicators
 - Reading token logs and computing ROI
 - Generating dashboard

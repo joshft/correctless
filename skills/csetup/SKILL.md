@@ -630,6 +630,14 @@ After applying fixes, re-run the health card to show progress.
 
 ## Step 8: Source Control Configuration
 
+### Statusline
+
+If the Correctless statusline is installed at `.claude/hooks/statusline.sh`, offer to activate it: "Correctless includes a workflow-aware statusline that shows your current phase (RED/GREEN/QA), session cost, and context usage at a glance. It's registered in this project's `.claude/settings.json` — activate it?"
+
+If yes and the statusline isn't already registered in `.claude/settings.json`, the setup script has already installed it. Confirm: "Statusline active. You'll see workflow phase, cost, and context % in the status bar."
+
+### Source Control
+
 Detect and configure source control preferences. Check what's already configured before asking.
 
 **Auto-detect first:**

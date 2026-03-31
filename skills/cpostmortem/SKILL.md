@@ -108,6 +108,20 @@ Entry format:
 
 Increment counters in `phase_effectiveness` for the relevant phase. Note patterns (e.g., "tdd-qa has missed 5 goroutine lifecycle bugs").
 
+### Step 6: Append Learning to CLAUDE.md
+
+After writing the PMB entry and antipattern, append a learning to the `## Correctless Learnings` section of `CLAUDE.md`:
+
+```markdown
+### {date} — Postmortem: {1-line bug description}
+- {key learning — what future agents should do differently}
+- Source: PMB-{N}
+```
+
+Before appending, read the existing Correctless Learnings section. If an entry with the same PMB-N already exists, skip (deduplication).
+
+This learning is loaded into every future session. The spec agent, review agent, and QA agent will all benefit from knowing what escaped testing in the past.
+
 ## Claude Code Feature Integration
 
 ### Task Lists

@@ -284,7 +284,8 @@ install_hooks() {
 
   cp "$SCRIPT_DIR/hooks/workflow-gate.sh" "$hook_dest/workflow-gate.sh"
   cp "$SCRIPT_DIR/hooks/workflow-advance.sh" "$hook_dest/workflow-advance.sh"
-  chmod +x "$hook_dest/workflow-gate.sh" "$hook_dest/workflow-advance.sh"
+  cp "$SCRIPT_DIR/hooks/statusline.sh" "$hook_dest/statusline.sh"
+  chmod +x "$hook_dest/workflow-gate.sh" "$hook_dest/workflow-advance.sh" "$hook_dest/statusline.sh"
   ok "Installed hooks to .claude/hooks/"
 }
 
@@ -298,6 +299,8 @@ register_hooks() {
   local advance_path=".claude/hooks/workflow-advance.sh"
 
   mkdir -p "$(dirname "$settings")"
+
+  local statusline_path=".claude/hooks/statusline.sh"
 
   if [ ! -f "$settings" ]; then
     cat > "$settings" <<HEOF
@@ -315,6 +318,10 @@ register_hooks() {
     "allow": [
       "Bash($advance_path *)"
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "$statusline_path"
   }
 }
 HEOF
@@ -619,6 +626,16 @@ Available commands: /csetup, /cspec, /creview, /ctdd, /cverify, /cdocs, /crefact
 CMDEOF
   fi
   ok "Updated CLAUDE.md"
+fi
+
+# Add Correctless Learnings section if not present
+if [ -f "$CLAUDEMD" ] && ! grep -q 'Correctless Learnings' "$CLAUDEMD" 2>/dev/null; then
+  cat >> "$CLAUDEMD" <<'LEARNEOF'
+
+## Correctless Learnings
+<!-- Auto-updated by Correctless workflow. Do not edit above this line. -->
+LEARNEOF
+  ok "Added Correctless Learnings section to CLAUDE.md"
 fi
 
 echo ""

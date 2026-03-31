@@ -378,6 +378,20 @@ When a finding category recurs across runs, it's a systemic issue that belongs i
 6. Mark audit complete: `.claude/hooks/workflow-advance.sh audit-done`
 7. Merge audit branch to main.
 
+### Audit Learning
+
+If any finding category appeared in 2+ previous audit runs (check `.claude/artifacts/findings/audit-*-history.md`), append to the `## Correctless Learnings` section of `CLAUDE.md`:
+
+```markdown
+### {date} — Audit pattern: {finding category}
+- Recurs across {N} audit runs — always check {description of what to look for}
+- Source: /caudit {preset}
+```
+
+Before appending, read the existing Correctless Learnings section. If this audit pattern is already recorded with the same category, skip.
+
+Feed to /cdevadv: if a learning category has appeared 3+ times, note it as a candidate for devil's advocate analysis — it may indicate an architectural issue, not just recurring bugs.
+
 ## Claude Code Feature Integration
 
 ### Task Lists
