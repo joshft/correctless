@@ -6,7 +6,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC2254  # Unquoted $pat in case is intentional — we need glob matching
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 CONFIG_FILE="$REPO_ROOT/.claude/workflow-config.json"
 ARTIFACTS_DIR="$REPO_ROOT/.claude/artifacts"
@@ -144,6 +145,7 @@ read_package_config() {
 detect_affected_packages() {
   is_monorepo || { echo "."; return; }
   local changed_files
+  # shellcheck disable=SC1083  # Braces in HEAD@{upstream} are git refspec syntax, not shell
   changed_files="$(git diff --name-only "$(git merge-base HEAD "$(git rev-parse --abbrev-ref HEAD@{upstream} 2>/dev/null || echo HEAD~1)" 2>/dev/null)" HEAD 2>/dev/null || git diff --name-only HEAD~1 2>/dev/null || echo "")"
   [ -n "$changed_files" ] || { echo "."; return; }
 
@@ -297,6 +299,7 @@ test_files_exist() {
     local regex
     regex="$(printf '%s' "$pattern" | sed 's/\./\\./g; s/\*/.*/g')"
     local count
+    # shellcheck disable=SC1083  # Braces in HEAD@{upstream} are git refspec syntax, not shell
     count="$(git diff --name-only "$(git merge-base HEAD "$(git rev-parse --abbrev-ref HEAD@{upstream} 2>/dev/null || echo HEAD~1)" 2>/dev/null)" HEAD 2>/dev/null | grep -cE "$regex" || true)"
     if [ "$count" -gt 0 ]; then
       return 0
@@ -586,7 +589,8 @@ cmd_audit_start() {
   [ -z "$default_branch" ] && default_branch="main"
 
   # Audit can read from main but creates its own branch
-  local audit_branch="audit/${audit_type}-$(date +%Y-%m-%d)"
+  local audit_branch
+  audit_branch="audit/${audit_type}-$(date +%Y-%m-%d)"
   if [ "$branch" != "$audit_branch" ]; then
     info "Audit should run on branch '$audit_branch'"
     info "Create it with: git checkout -b $audit_branch"

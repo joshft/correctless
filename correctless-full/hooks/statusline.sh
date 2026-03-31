@@ -8,7 +8,6 @@ input=$(cat)
 # Colors
 ORANGE='\033[38;5;214m'
 GRAY='\033[2m'
-WHITE='\033[1m'
 RED='\033[31m'
 GREEN='\x1b[38;5;42m'
 YELLOW='\x1b[38;5;226m'
@@ -45,7 +44,7 @@ if [ "$USAGE" != "null" ]; then
 fi
 
 # Git branch
-cd "$DIR" 2>/dev/null
+cd "$DIR" 2>/dev/null || true
 branch=$(git --no-optional-locks rev-parse --abbrev-ref HEAD 2>/dev/null)
 
 # --- Workflow state (Correctless-specific) ---

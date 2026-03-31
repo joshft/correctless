@@ -11,6 +11,8 @@
 
 set -euo pipefail
 
+# shellcheck disable=SC2254  # Unquoted $pat in case is intentional — we need glob matching
+
 # Disable glob expansion — patterns like *.ts must not expand to filenames
 set -f
 command -v jq >/dev/null 2>&1 || { echo "BLOCKED: jq not found — required for workflow gate" >&2; exit 2; }
