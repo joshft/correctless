@@ -612,8 +612,9 @@ cmd_reset() {
     local slug_hash
     slug_hash="$(branch_slug)"
     rm -f "$ARTIFACTS_DIR/audit-trail-${slug_hash}.jsonl"
+    rm -f "$ARTIFACTS_DIR/adherence-state-${slug_hash}.json"
     rm -f "$ARTIFACTS_DIR/checkpoint-*-${slug_hash}.json" 2>/dev/null
-    info "Workflow state and audit trail removed for branch '$(current_branch)'"
+    info "Workflow state, audit trail, and adherence state removed for branch '$(current_branch)'"
   else
     info "No workflow state for branch '$(current_branch)'"
   fi
