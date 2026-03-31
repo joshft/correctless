@@ -1,7 +1,7 @@
 ---
 name: cwtf
 description: Workflow accountability — verifies agents did what skill instructions required. Checks phase execution, rule coverage, agent thoroughness, and deviations.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(jq*), Bash(find*), Write(.claude/artifacts/token-log-*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(jq*), Bash(find*), Bash(grep*)
 ---
 
 # /cwtf — Workflow Accountability
@@ -33,16 +33,21 @@ Accountability analysis takes 5-10 minutes. The user must see progress throughou
 
 ## Step 1: Load Context
 
+Derive the branch slug and hash using the same formula as other hooks (`sed + md5sum/md5`). Determine the repo root with `git rev-parse --show-toplevel` — prepend this to all relative paths for the Read tool.
+
+Derive the task-slug from the workflow state's `.task` field: lowercase, non-alphanumeric characters replaced with `-`, consecutive dashes collapsed, leading/trailing dashes removed. This differs from the branch slug.
+
 Read these data sources (skip any that don't exist):
 
-1. **Workflow state** — `.claude/artifacts/workflow-state-{slug}.json` — derive branch slug from current branch the same way as other hooks (`sed + md5sum/md5`)
-2. **Spec file** — path from workflow state's `.spec_file` field
+1. **Workflow state** — `.claude/artifacts/workflow-state-{slug}-{hash}.json`
+2. **Spec file** — path from `.spec_file` field (relative to repo root — prepend repo root for Read tool)
 3. **QA findings** — `.claude/artifacts/qa-findings-{task-slug}.json`
 4. **Test edit log** — `.claude/artifacts/tdd-test-edits.log`
-5. **Audit trail** — `.claude/artifacts/audit-trail-{slug}.jsonl`
+5. **Audit trail** — `.claude/artifacts/audit-trail-{slug}-{hash}.jsonl`
 6. **Override log** — `.claude/artifacts/override-log.json`
 7. **Verification report** — `docs/verification/{task-slug}-verification.md`
-8. **Session-meta** — `find ~/.claude/usage-data/session-meta/ -name '*.json'` filtered by `project_path` matching `git rev-parse --show-toplevel`
+8. **Session-meta** — `find ~/.claude/usage-data/session-meta/ -name '*.json'` filtered by `project_path` matching repo root
+9. **Conversation JSONL** (optional, for deep analysis) — find the session file at `~/.claude/projects/`. List directories with `find ~/.claude/projects/ -maxdepth 2 -name '*.jsonl'`, identify the correct file by matching the project path pattern in the directory name and selecting the most recent file. This file can be very large — use targeted `jq` queries, never read it entirely.
 
 If no workflow state file exists: "No active or completed workflow on this branch. Nothing to analyze."
 
@@ -55,8 +60,9 @@ Check whether all mandatory phases executed:
 **For Lite**: spec → review → tdd-tests → tdd-impl → tdd-qa → done → verified → documented
 **For Full**: spec → review-spec (or model → review-spec) → tdd-tests → tdd-impl → tdd-qa → (tdd-verify →) done → verified → documented
 
-For each phase:
-- Did it execute? (workflow state's `phase_entered_at` should have progressed through each)
+**Primary source for phase history: the audit trail.** The workflow state's `phase_entered_at` field only contains the MOST RECENT transition timestamp — it cannot prove earlier phases ran. Instead, extract distinct phase values from the audit trail: `jq -r '.phase' .claude/artifacts/audit-trail-{slug}-{hash}.jsonl | sort -u`. This shows every phase that had tool activity. If no audit trail exists, fall back to the current `phase` field as a minimum marker and note: "No audit trail — can only verify current phase, not history."
+
+Also check:
 - Were overrides used? (check override log for entries during this workflow)
 - How many spec updates happened? (from `spec_update_history` — many updates suggests the spec was undercooked)
 
@@ -83,11 +89,11 @@ Output as a table:
 
 ## Step 4: Agent Thoroughness — QA
 
-The most valuable analysis. Check whether the QA agent actually did a thorough job:
+The most valuable analysis. Assess QA coverage and depth:
 
 **Rule mention count**: Search the QA findings artifact AND the conversation JSONL for mentions of each rule ID. Count: "QA mentioned {N} of {M} spec rules." Missing rules are listed.
 
-**Token budget indicator**: Find the QA session in session-meta (match by project_path and timestamp). Compare its `output_tokens` against the project average for QA sessions. "QA used {N}k tokens ({X}% of project average for QA)." A QA session at 30% of average likely shortcut. At 150% of average, it was thorough.
+**Token budget indicator** (best-effort): Find the most recent session-meta entry matching this project's path. Report its total `output_tokens`. If multiple prior sessions exist for the project, compute a rough average and compare: "This session used {N}k tokens ({X}% of project average)." A session at 30% of average likely shortcut. Note: identifying which session corresponds to QA specifically is imprecise — this is a rough signal, not a measurement. If session-meta is unavailable, skip this metric.
 
 **File coverage** (if audit trail exists): From the audit trail, which files had Read operations during the tdd-qa phase? Compare against files modified during tdd-impl. "QA read {N} of {M} files modified during implementation." Missing files are listed.
 
@@ -126,7 +132,9 @@ Assess the overall workflow quality:
 - **INCOMPLETE** — phases ran but significant rule coverage gaps, QA missed multiple rules, or review skipped applicable security checks
 - **SHORTCUT** — phases skipped via override, QA used far below average tokens, multiple rules unchecked, or source files modified during QA
 
-The verdict is a judgment call. Explain the reasoning. Users can disagree.
+**Precedence rule**: If any SHORTCUT criterion is met (phase skip via override, source edit during QA, token usage far below average), the verdict cannot be higher than SHORTCUT regardless of other positive signals. A single gate bypass dominates all other indicators.
+
+The verdict is a judgment call within those constraints. Explain the reasoning. Users can disagree.
 
 ## Output Format
 
@@ -166,11 +174,6 @@ The verdict is a judgment call. Explain the reasoning. Users can disagree.
 
 ### Task Lists
 See "Progress Visibility" section above — task creation and narration are mandatory.
-
-### Token Tracking
-After any subagent completes, capture `total_tokens` and `duration_ms`. Append to `.claude/artifacts/token-log-{slug}.json`. If `.claude/artifacts/` doesn't exist, skip.
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
 ## If Something Goes Wrong
 
