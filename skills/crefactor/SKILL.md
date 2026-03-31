@@ -315,4 +315,5 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 - **Characterization tests capture reality, not intent.** A characterization test that asserts a bug is still correct — it tells you the refactor changed behavior.
 - **Phase by phase.** Large refactors must be broken into phases that leave tests passing. No "I'll fix the tests after I'm done restructuring."
 - **Agent separation is mandatory.** The refactor agent does not verify. The verification agent did not refactor. Same principle as RED/GREEN in TDD.
+- **Evidence before claims.** Never say "tests pass" or "checks out" without running the command fresh in this message and showing the output. "Should pass" is not evidence.
 - **All files inside the project directory.** Never /tmp.

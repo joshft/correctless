@@ -1,6 +1,6 @@
 ---
 name: cmetrics
-description: Project-wide workflow metrics dashboard. Shows total issues caught, bug escape rate, phase effectiveness, antipattern trends, Olympics history, and ROI estimate.
+description: Project health and ROI dashboard. Use monthly or when evaluating workflow effectiveness. Shows bugs caught, token cost, and trends.
 allowed-tools: Read, Grep, Glob, Bash(git*), Bash(wc*), Bash(find*), Bash(cat*), Bash(jq*), Write(.claude/artifacts/metrics-*)
 ---
 

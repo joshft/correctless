@@ -1,6 +1,6 @@
 ---
 name: cwtf
-description: Workflow accountability — verifies agents did what skill instructions required. Checks phase execution, rule coverage, agent thoroughness, and deviations.
+description: Audit the workflow itself. Use when you suspect agents shortcut or after a bug escapes despite the workflow running. Checks phase execution, rule coverage, and agent thoroughness.
 allowed-tools: Read, Grep, Glob, Bash(git*), Bash(jq*), Bash(find*), Bash(grep*)
 ---
 

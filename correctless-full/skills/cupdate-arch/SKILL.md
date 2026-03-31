@@ -1,6 +1,6 @@
 ---
 name: cupdate-arch
-description: Maintain ARCHITECTURE.md as a living document. Identify undocumented abstractions, trust boundaries, and patterns after features land.
+description: Update ARCHITECTURE.md after features land. Use after /cdocs or when the codebase structure has changed.
 allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(ARCHITECTURE.md), Write(docs/architecture/*)
 ---
 

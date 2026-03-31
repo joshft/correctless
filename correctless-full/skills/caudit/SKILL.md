@@ -1,6 +1,6 @@
 ---
 name: caudit
-description: Olympics audit system. Convergence-based auditing with parallel specialized agents, confidence tiers, bounty/penalty economics, and find/fix loops. Presets: QA, Hacker, Performance, Custom.
+description: Cross-codebase quality audit. Use after a major feature lands or periodically for systemic bug detection. Presets: QA, Hacker, Performance.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/*), Write(.claude/antipatterns.md), Write(*test*), Write(*spec*), Edit
 context: fork
 ---

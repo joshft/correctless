@@ -1,6 +1,6 @@
 ---
 name: csummary
-description: Generate a "what the workflow caught" report for the current feature. Shows every issue prevented from shipping, by phase. Run after /cdocs or at any point to see current progress.
+description: Feature summary. Use after /cdocs to see what the workflow caught, or mid-feature to check progress.
 allowed-tools: Read, Grep, Glob, Bash(git*), Write(.claude/artifacts/summary-*)
 ---
 

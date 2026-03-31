@@ -229,5 +229,6 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 - **Do NOT skip the rule coverage check.** Every rule must be accounted for.
 - **Do NOT approve a feature with uncovered rules.** Uncovered rules are BLOCKING.
 - **Be specific about weak tests.** "Weak" means: the test would still pass if the rule were violated.
+- **Evidence before claims.** Never say "tests pass" or "checks out" without running the command fresh in this message and showing the output. "Should pass" is not evidence.
 - **All files written inside the project directory.** Never /tmp.
 - **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

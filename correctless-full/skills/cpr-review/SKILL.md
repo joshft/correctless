@@ -1,6 +1,6 @@
 ---
 name: cpr-review
-description: Multi-lens PR review. Checks architecture compliance, security, test coverage, antipatterns, spec alignment, and (Full mode) concurrency, trust boundaries, dependency risk, cross-spec impact, drift, and performance.
+description: Review an incoming PR. Use when someone opens a PR against your project. Checks architecture, security, tests, and antipatterns.
 allowed-tools: Read, Grep, Glob, Bash(gh*), Bash(glab*), Bash(git*), Bash(*test*), Bash(*lint*), Bash(*audit*), Bash(govulncheck*)
 ---
 

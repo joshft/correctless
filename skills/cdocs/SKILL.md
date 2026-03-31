@@ -134,7 +134,11 @@ Advance the state machine:
 .claude/hooks/workflow-advance.sh documented
 ```
 
-Confirm: "Documentation complete. Branch is ready to merge.
+Confirm: "Documentation complete. Your options:
+1. Create a PR: `gh pr create` (or `/cpr-review` on your own branch first)
+2. Merge locally: `git checkout main && git merge {branch}`
+3. Keep the branch as-is for later review
+4. Discard: `git checkout main && git branch -D {branch}`
 
 After merging to main:
 - If bugs escape to production from this feature → run `/cpostmortem` to trace which phase missed it

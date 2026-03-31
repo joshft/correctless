@@ -52,7 +52,7 @@ If no active workflow, also run:
 | `tdd-verify` | "Final verification — edits blocked. If checks pass: `workflow-advance.sh done`." |
 | `done` | "TDD complete. MANDATORY: run `/cverify` next (it advances the state automatically)." |
 | `verified` | "Verification complete. MANDATORY: run `/cdocs` next (it advances the state automatically)." |
-| `documented` | "All steps complete. Branch is ready to merge. After merging: `/cpostmortem` if bugs escape, `/cmetrics` to track health, `/caudit` for a cross-codebase sweep (Full)." |
+| `documented` | "All steps complete. Options: create PR (`gh pr create`), merge locally, keep branch, or discard. After merging: `/cpostmortem` if bugs escape, `/cmetrics` for health, `/caudit` for sweep (Full)." |
 | `audit` | "Audit in progress. Run `/caudit` to continue the convergence loop." |
 
 ### 4. Show Available Commands

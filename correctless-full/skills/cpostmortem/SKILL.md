@@ -1,6 +1,6 @@
 ---
 name: cpostmortem
-description: Structured post-merge bug analysis. Walk through what broke, which phase should have caught it, and what corrective action to take. Strengthens the workflow over time.
+description: Post-merge bug analysis. Use when a bug escapes to production. Traces which phase missed it and strengthens the workflow.
 allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.claude/meta/*), Write(.claude/antipatterns.md), Write(.claude/templates/invariants/*), Write(.claude/artifacts/token-log-*), Write(CLAUDE.md)
 context: fork
 ---
