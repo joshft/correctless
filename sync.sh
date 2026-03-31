@@ -27,7 +27,7 @@ chmod +x correctless-lite/setup correctless-full/setup
 info "Setup script → both plugins"
 
 # --- Shared templates ---
-for tmpl in ARCHITECTURE.md AGENT_CONTEXT.md antipatterns.md workflow-config.json; do
+for tmpl in ARCHITECTURE.md AGENT_CONTEXT.md antipatterns.md workflow-config.json redaction-rules.md; do
   cp "templates/$tmpl" "correctless-lite/templates/$tmpl"
   cp "templates/$tmpl" "correctless-full/templates/$tmpl"
 done

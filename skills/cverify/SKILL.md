@@ -182,7 +182,7 @@ This checks that the verification report file exists. If it doesn't, the transit
 
 Next step is mandatory:
 - If BLOCKING findings exist: they MUST be fixed first. Return to the TDD cycle.
-- After fixing and re-verifying: run `/cdocs`. This is the final step before merge.
+- After fixing and re-verifying: tell the human to run `/cdocs`. This is the final step before merge.
 - Do NOT say "ready to merge" until /cdocs has run and `workflow-advance.sh documented` has been called.
 
 ## Claude Code Feature Integration

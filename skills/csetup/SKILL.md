@@ -714,7 +714,7 @@ Check workflow state anytime: `.claude/hooks/workflow-advance.sh status`
 
 Want to start a feature now?"
 
-If the human says yes, ask what they want to build and hand off to the spec flow.
+If the human says yes, ask what they want to build and suggest they run `/cspec`.
 
 ## Subsequent Runs
 
@@ -745,3 +745,4 @@ See "Progress Visibility" section above — task creation and narration are mand
 - **Don't be preachy about the health card.** Present facts, offer fixes, let the human decide. A project with 5/17 checks passing isn't "bad" — it might be an early prototype.
 - **One exception: hardcoded secrets are always urgent.** Flag them prominently regardless of project context.
 - **All generated files inside the project directory.** Never /tmp.
+- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. Suggest `/cspec` — don't start it.

@@ -337,19 +337,17 @@ This artifact is consumed by `/cverify` (to check class fixes were implemented),
   - **Lite mode**: `workflow-advance.sh done`
   - **Full mode**: `workflow-advance.sh verify-phase` (goes to tdd-verify for final verification, then `done`)
 
-## After TDD Completes: MANDATORY Next Steps
+## After TDD Completes: Next Steps
 
-**Do NOT skip these. Do NOT go straight to merge. The workflow is not complete until all steps run.**
+After `workflow-advance.sh done`, tell the human the mandatory remaining steps:
 
-After `workflow-advance.sh done`, you MUST run the following in order:
+"TDD complete. The workflow requires two more steps before merge:
+1. `/cverify` — verifies implementation matches spec, checks rule coverage and architecture compliance
+2. `/cdocs` — updates documentation
 
-1. **`/cverify`** — Post-implementation verification. Checks rule coverage, dependency audit, architecture compliance. This is NOT optional — it catches drift between spec and implementation that QA misses.
+Run `/cverify` when ready."
 
-2. **`/cdocs`** — Update documentation. Updates AGENT_CONTEXT.md, README, feature docs, ARCHITECTURE.md. This is NOT optional — stale docs cause bugs in future features.
-
-3. **Only then**: tell the human the branch is ready to merge.
-
-**Never say "ready to merge" before /cverify and /cdocs have run.** These steps are not optional. If the human asks to skip them, refuse. The whole point of this workflow is correctness — every step exists because skipping it has caused bugs.
+**Do NOT auto-invoke /cverify or /cdocs.** Tell the human what comes next and let them decide when to run it. Do NOT say "ready to merge" until the human confirms both have completed — the state machine enforces this (it won't advance to `documented` without both steps).
 
 ## Spec Updates
 
