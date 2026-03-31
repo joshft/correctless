@@ -1,0 +1,69 @@
+name: Prompt Injection Scan
+
+on:
+  push:
+    branches: [main]
+    paths: ['skills/**', 'templates/**']
+  pull_request:
+    branches: [main]
+    paths: ['skills/**', 'templates/**']
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan for injection patterns
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Check for prompt injection patterns
+        run: |
+          echo "Scanning skill files and templates for injection patterns..."
+          FAILED=0
+
+          # Known injection patterns (case-insensitive)
+          PATTERNS=(
+            "ignore previous instructions"
+            "ignore all prior"
+            "disregard all previous"
+            "disregard your instructions"
+            "you are now"
+            "system prompt override"
+            "new system prompt"
+            "forget your instructions"
+            "override your rules"
+            "pretend you are"
+            "act as if you have no restrictions"
+            "jailbreak"
+            "DAN mode"
+          )
+
+          for pattern in "${PATTERNS[@]}"; do
+            if grep -riEl "$pattern" skills/ templates/ 2>/dev/null; then
+              echo "::error::Injection pattern detected: '$pattern'"
+              FAILED=1
+            fi
+          done
+
+          # Check for hidden Unicode characters (zero-width spaces, RTL overrides)
+          if grep -rPl '[\x{200B}\x{200C}\x{200D}\x{FEFF}\x{202A}\x{202B}\x{202C}\x{202D}\x{202E}]' skills/ templates/ 2>/dev/null; then
+            echo "::error::Hidden Unicode characters detected in skill files"
+            FAILED=1
+          fi
+
+          # Check for base64-encoded blocks (>100 chars of base64 in a single line)
+          if grep -rPl '[A-Za-z0-9+/]{100,}={0,2}' skills/ templates/ 2>/dev/null; then
+            echo "::warning::Possible base64-encoded content detected — verify manually"
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo ""
+            echo "Prompt injection patterns detected. Review the flagged files."
+            echo "If these are false positives (e.g., security checklist mentioning injection),"
+            echo "add an inline comment: <!-- prompt-scan: false-positive -->"
+            exit 1
+          fi
+
+          echo "No injection patterns found."

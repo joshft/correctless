@@ -1,0 +1,6 @@
+# Skill prompts are the most sensitive files — they get loaded into Claude's context.
+# Any change requires maintainer review.
+skills/*/SKILL.md @joshft
+templates/ @joshft
+hooks/ @joshft
+setup @joshft
