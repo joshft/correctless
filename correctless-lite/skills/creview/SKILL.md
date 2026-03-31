@@ -183,7 +183,7 @@ If the developer says "I'll handle security later" — add the rules as accepted
 
 ### 7. Compliance Checks
 
-If `workflow.compliance_checks` in `workflow-config.json` has entries with `phase: "review"`, run them and report pass/fail results before presenting findings.
+If `workflow.compliance_checks` in `workflow-config.json` has entries with `phase: "review"`, run them and report pass/fail results before presenting findings. If `blocking: true` and a check fails, include it as a BLOCKING finding in the review: "Compliance check '{name}' failed — this must be addressed before proceeding to TDD."
 
 ### 8. Self-Assessment (That the Spec Author Couldn't Do)
 

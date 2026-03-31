@@ -66,6 +66,8 @@ detect_config() {
     "test_fail_pattern": "FAIL",
     "build_error_pattern": "cannot|undefined|syntax error"
   },
+  "is_monorepo": false,
+  "packages": {},
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
@@ -127,6 +129,8 @@ GOEOF
     "test_fail_pattern": "FAIL|failing",
     "build_error_pattern": "error TS|Cannot find|SyntaxError"
   },
+  "is_monorepo": false,
+  "packages": {},
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
@@ -172,6 +176,8 @@ TSEOF
     "test_fail_pattern": "FAILED|ERROR",
     "build_error_pattern": "SyntaxError|ImportError"
   },
+  "is_monorepo": false,
+  "packages": {},
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
@@ -212,6 +218,8 @@ PYEOF
     "test_fail_pattern": "FAILED|failures",
     "build_error_pattern": "error\\[E|cannot find"
   },
+  "is_monorepo": false,
+  "packages": {},
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
@@ -252,6 +260,8 @@ RSEOF
     "test_fail_pattern": "",
     "build_error_pattern": ""
   },
+  "is_monorepo": false,
+  "packages": {},
   "workflow": {
     "min_qa_rounds": 1,
     "require_review": true,
@@ -459,6 +469,7 @@ detect_monorepo_type() {
   elif [ -f "$REPO_ROOT/rush.json" ]; then echo "rush"
   elif [ -f "$REPO_ROOT/go.work" ]; then echo "go-workspace"
   elif [ -f "$REPO_ROOT/Cargo.toml" ] && grep -q '^\[workspace\]' "$REPO_ROOT/Cargo.toml" 2>/dev/null; then echo "cargo-workspace"
+  elif [ -f "$REPO_ROOT/package.json" ] && jq -e '.workspaces' "$REPO_ROOT/package.json" >/dev/null 2>&1; then echo "npm-workspaces"
   else echo "none"
   fi
 }

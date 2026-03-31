@@ -205,11 +205,15 @@ resolve_package() {
   jq -e '.is_monorepo' "$CONFIG_FILE" >/dev/null 2>&1 || { echo "."; return; }
 
   # Check cache (invalidated by config mtime)
-  local cache_file="$ARTIFACTS_DIR/.pkg-cache-$(stat -c %Y "$CONFIG_FILE" 2>/dev/null || stat -f %m "$CONFIG_FILE" 2>/dev/null).json"
-  if [ -f "$cache_file" ]; then
-    local cached
-    cached="$(jq -r --arg f "$file" '.[$f] // empty' "$cache_file" 2>/dev/null)"
-    if [ -n "$cached" ]; then echo "$cached"; return; fi
+  local mtime cache_file=""
+  mtime="$(stat -c %Y "$CONFIG_FILE" 2>/dev/null || stat -f %m "$CONFIG_FILE" 2>/dev/null)"
+  if [ -n "$mtime" ] && [ -d "$ARTIFACTS_DIR" ]; then
+    cache_file="$ARTIFACTS_DIR/.pkg-cache-${mtime}.json"
+    if [ -f "$cache_file" ]; then
+      local cached
+      cached="$(jq -r --arg f "$file" '.[$f] // empty' "$cache_file" 2>/dev/null)"
+      if [ -n "$cached" ]; then echo "$cached"; return; fi
+    fi
   fi
 
   # Longest-prefix match
@@ -225,8 +229,8 @@ resolve_package() {
     esac
   done < <(jq -r '.packages | keys[]' "$CONFIG_FILE" 2>/dev/null)
 
-  # Write to cache
-  if [ -d "$ARTIFACTS_DIR" ]; then
+  # Write to cache (only if mtime was available)
+  if [ -n "$cache_file" ]; then
     if [ -f "$cache_file" ]; then
       jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null
     else

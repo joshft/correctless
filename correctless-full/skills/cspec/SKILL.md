@@ -285,7 +285,7 @@ If `workflow-config.json` has `is_monorepo: true`, add a "Packages Affected" sec
 
 ### Compliance Checks
 
-If `workflow.compliance_checks` in `workflow-config.json` has entries with `phase: "spec"`, run them before presenting the spec. Report pass/fail results to the human.
+If `workflow.compliance_checks` in `workflow-config.json` has entries with `phase: "spec"`, run them before presenting the spec. Report pass/fail results. If `blocking: true` and a check fails, warn the human: "Compliance check '{name}' failed — the spec may need to address this before proceeding." Do not refuse to present the spec, but make the failure prominent.
 
 ### Step 4: Load Invariant Templates (Full Mode)
 

@@ -247,18 +247,29 @@ tests_fail_not_build_error() {
 tests_pass() {
   # In monorepo mode, ALL affected packages must pass
   if is_monorepo; then
-    local packages
+    local packages any_run=false
     packages="$(detect_affected_packages)"
     for pkg in $packages; do
       [ "$pkg" = "." ] && continue
       local cmd output exit_code
       cmd="$(read_package_config '.commands.test' "$pkg")"
       [ -n "$cmd" ] && [ "$cmd" != "null" ] || continue
+      any_run=true
       output="$(eval "$cmd" 2>&1)" && exit_code=0 || exit_code=$?
       if [ "$exit_code" -ne 0 ]; then
         die "Tests do not pass in package '$pkg'. Fix failures before advancing.\n\nOutput (last 30 lines):\n$(echo "$output" | tail -30)"
       fi
     done
+    # If no package tests ran, fall back to global test command
+    if [ "$any_run" = "false" ]; then
+      local test_cmd output exit_code
+      test_cmd="$(read_config_field '.commands.test')"
+      [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
+      output="$(eval "$test_cmd" 2>&1)" && exit_code=0 || exit_code=$?
+      if [ "$exit_code" -ne 0 ]; then
+        die "Tests do not pass. Fix failures before advancing.\n\nOutput (last 30 lines):\n$(echo "$output" | tail -30)"
+      fi
+    fi
     return 0
   fi
 
