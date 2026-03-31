@@ -11,7 +11,7 @@
 
 ## How It Fits in the Workflow
 
-This skill typically runs after `/cdocs` as the final step before merging. It aggregates findings from every earlier phase -- review, test audit, QA, and verification -- into a single report. The summary can be exported and included in a PR description to show reviewers what the workflow already caught.
+This skill typically runs after `/cdocs` as the final step before merging. It aggregates findings from every earlier phase — review, test audit, QA, and verification — into a single report. The summary can be exported and included in a PR description to show reviewers what the workflow already caught.
 
 ## What It Does
 

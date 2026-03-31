@@ -7,11 +7,11 @@
 - You are a project maintainer and someone submitted a PR you need to decide on.
 - You want to assess whether merging a contribution is worth the long-term cost.
 - A first-time contributor opened a PR and you want to give constructive, convention-aware feedback.
-- **Not for:** Code-level review (architecture, security, antipatterns) -- use `/cpr-review` for that. Not for contributing to someone else's project -- use `/ccontribute`.
+- **Not for:** Code-level review (architecture, security, antipatterns) — use `/cpr-review` for that. Not for contributing to someone else's project — use `/ccontribute`.
 
 ## How It Fits in the Workflow
 
-This skill is standalone and complements `/cpr-review`. While `/cpr-review` asks "is this code good?", `/cmaintain` asks "should I merge this?" -- a question about scope, conventions, and long-term ownership. Run both for a complete picture, or run `/cmaintain` alone when the code quality is not in question but the merge decision is.
+This skill is standalone and complements `/cpr-review`. While `/cpr-review` asks "is this code good?", `/cmaintain` asks "should I merge this?" — a question about scope, conventions, and long-term ownership. Run both for a complete picture, or run `/cmaintain` alone when the code quality is not in question but the merge decision is.
 
 ## What It Does
 

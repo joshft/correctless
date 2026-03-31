@@ -1,4 +1,4 @@
-# /creview-spec -- Multi-Agent Adversarial Spec Review
+# /creview-spec — Multi-Agent Adversarial Spec Review
 
 > Spawn 4 adversarial agents in parallel to tear apart a spec before any code is written.
 
@@ -6,7 +6,7 @@
 
 - After `/cspec` or `/cmodel` on any feature going through the Full pipeline
 - When a spec has security-relevant invariants, trust boundaries, or cross-cutting concerns
-- **Not for:** quick, low-risk features -- use `/creview` (single-pass, 3 min) instead
+- **Not for:** quick, low-risk features — use `/creview` (single-pass, 3 min) instead
 
 ## How It Fits in the Workflow
 
@@ -18,10 +18,10 @@ Sits between spec/model and TDD. This is the last gate before code gets written.
 
 - Spawns a self-assessment subagent that reads the spec cold (independent of the author)
 - Launches 4 adversarial agents in parallel, each with the self-assessment as input:
-  - **Red Team Agent** -- finds attack paths, bypass vectors, and failure modes the spec ignores
-  - **Assumptions Auditor** -- surfaces every unstated assumption (OS, network, clock, DNS)
-  - **Testability Auditor** -- flags vague invariants that cannot be turned into pass/fail tests
-  - **Design Contract Checker** -- verifies the spec composes correctly with ARCHITECTURE.md abstractions and patterns
+  - **Red Team Agent** — finds attack paths, bypass vectors, and failure modes the spec ignores
+  - **Assumptions Auditor** — surfaces every unstated assumption (OS, network, clock, DNS)
+  - **Testability Auditor** — flags vague invariants that cannot be turned into pass/fail tests
+  - **Design Contract Checker** — verifies the spec composes correctly with ARCHITECTURE.md abstractions and patterns
 - Synthesizes findings: unanimous agreement is auto-incorporated; disagreements go to the human
 - Optionally routes flagged invariants to external models for cross-validation
 
@@ -33,7 +33,7 @@ The self-assessment subagent flags INV-004 ("webhooks are delivered exactly once
 
 The Assumptions Auditor completes first, reporting 3 unstated assumptions: (1) the spec assumes webhook endpoints respond within 30 seconds but never states a timeout, (2) the retry policy assumes idempotent receivers but the spec does not require idempotency keys, (3) the spec assumes DNS resolution is stable during retry sequences.
 
-The Red Team Agent finds that the signature verification in the spec does not account for replay attacks -- an attacker who captures a signed payload can re-deliver it indefinitely.
+The Red Team Agent finds that the signature verification in the spec does not account for replay attacks — an attacker who captures a signed payload can re-deliver it indefinitely.
 
 The Testability Auditor flags INV-004 as untestable as written ("exactly once" across network partitions requires distributed consensus) and proposes a rewrite: "at-least-once delivery with idempotency key, deduplicated within a 24-hour window."
 

@@ -11,12 +11,12 @@
 
 ## How It Fits in the Workflow
 
-This skill can be invoked at any point. It reads the current workflow state and tells you exactly where you are in the pipeline and what command to run next. It is purely diagnostic -- it never modifies state.
+This skill can be invoked at any point. It reads the current workflow state and tells you exactly where you are in the pipeline and what command to run next. It is purely diagnostic — it never modifies state.
 
 ## What It Does
 
 - Verifies Correctless is configured in the project (checks for `workflow-config.json`, hooks, and `ARCHITECTURE.md`).
-- Reads the current workflow phase and shows phase-specific guidance (e.g., "RED phase -- writing tests. Source files are blocked.").
+- Reads the current workflow phase and shows phase-specific guidance (e.g., "RED phase — writing tests. Source files are blocked.").
 - Lists all available commands for the current mode (Lite or Full).
 - **Detects problems proactively**:
   - **Stale workflows**: If a phase has been active for more than 24 hours, warns and suggests re-running the phase skill or using an override.

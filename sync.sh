@@ -14,10 +14,10 @@ echo "========================"
 echo ""
 
 # --- Hooks (shared by both) ---
-cp hooks/workflow-gate.sh correctless-lite/hooks/workflow-gate.sh
-cp hooks/workflow-gate.sh correctless-full/hooks/workflow-gate.sh
-cp hooks/workflow-advance.sh correctless-lite/hooks/workflow-advance.sh
-cp hooks/workflow-advance.sh correctless-full/hooks/workflow-advance.sh
+for hook in workflow-gate.sh workflow-advance.sh statusline.sh audit-trail.sh; do
+  cp "hooks/$hook" "correctless-lite/hooks/$hook"
+  cp "hooks/$hook" "correctless-full/hooks/$hook"
+done
 info "Hooks → both plugins"
 
 # --- Setup script (shared) ---

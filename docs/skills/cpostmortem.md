@@ -1,4 +1,4 @@
-# /cpostmortem -- Post-Merge Bug Analysis
+# /cpostmortem — Post-Merge Bug Analysis
 
 > Analyze why a bug escaped the workflow and strengthen the process so the entire class of bug cannot recur.
 
@@ -7,7 +7,7 @@
 - A bug is found in merged/production code that the workflow should have caught
 - A previously fixed bug has reappeared in a different feature
 - You want to understand which workflow phase is underperforming
-- **Not for:** fixing the bug itself -- that is a separate `/ctdd` cycle
+- **Not for:** fixing the bug itself — that is a separate `/ctdd` cycle
 
 ## How It Fits in the Workflow
 
@@ -55,7 +55,7 @@ The PMB entry is written, phase effectiveness counters are updated (review-spec 
 | Action | What It Does | When to Use |
 |--------|-------------|-------------|
 | New antipattern (AP-xxx) | Adds a class-level bug pattern to `.claude/antipatterns.md` | The bug class is not yet tracked |
-| Structural test | Automated test that catches all current and future instances | Highest-value action -- turns a process gap into a CI check |
+| Structural test | Automated test that catches all current and future instances | Highest-value action — turns a process gap into a CI check |
 | Invariant template update | Adds a rule to spec templates so future specs include it | The spec domain template should have required this invariant |
 | Drift debt (DRIFT-xxx) | Tracks unresolved architectural drift | The bug reveals a gap between docs and reality |
 

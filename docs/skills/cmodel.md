@@ -1,4 +1,4 @@
-# /cmodel -- Formal Alloy Modeling
+# /cmodel — Formal Alloy Modeling
 
 > Translate spec invariants into a formal Alloy model and run the Alloy Analyzer to find design-level bugs before code is written.
 
@@ -7,7 +7,7 @@
 - Features with state machines or lifecycle transitions (e.g., token creation, refresh, revocation)
 - Protocol handling or trust boundary crossings
 - Access control logic or resource ownership
-- **Not for:** pure data transformations, config validation, or numeric calculations -- use property-based testing instead
+- **Not for:** pure data transformations, config validation, or numeric calculations — use property-based testing instead
 
 ## How It Fits in the Workflow
 
@@ -46,7 +46,7 @@ You revise the spec to require atomic check-and-consume, then advance to `/crevi
 - **"No counterexample" does not mean "proven."** Alloy provides bounded verification within a scope (typically 5 entities). It means no bug was found in that scope, not that none exists.
 - **Syntax errors on first run.** The agent auto-retries up to 3 times before surfacing to you.
 - **Temporal operators.** Claude's reliability with `always`, `after`, and `until` in Alloy is inconsistent for complex formulas. Review temporal assertions carefully.
-- **Wrong model, correct analysis.** A correct analysis of a wrong model creates false confidence. The human review step is load-bearing -- always verify the model represents the real system.
+- **Wrong model, correct analysis.** A correct analysis of a wrong model creates false confidence. The human review step is load-bearing — always verify the model represents the real system.
 
 ## Lite vs Full
 

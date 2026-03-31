@@ -1,4 +1,4 @@
-# /caudit -- Cross-Codebase Quality Audit (Olympics)
+# /caudit — Cross-Codebase Quality Audit (Olympics)
 
 > Run convergence-based audits using parallel specialist agents with hostile lenses. The loop runs until no critical or high findings remain.
 
@@ -8,7 +8,7 @@
 - End-of-week sweep (full project scope for systemic issues)
 - Pre-release gate (full scope, both QA and Hacker presets)
 - After an incident (targeted scope to affected subsystem)
-- **Not for:** feature-level bug detection during development -- that is `/ctdd`'s job
+- **Not for:** feature-level bug detection during development — that is `/ctdd`'s job
 
 ## How It Fits in the Workflow
 
@@ -55,15 +55,15 @@ Invoke with: `/caudit [preset] [scope]`
 | Preset | Purpose | Agents | Max Rounds |
 |--------|---------|--------|------------|
 | `qa` | Incorrect behavior, silent failures, data corruption | Concurrency, Error Handling, Input Boundary, Resource Lifecycle, API Contract, Regression Hunter | 5 |
-| `hacker` | Security vulnerabilities -- bypass, escalation, exfiltration, DoS | Encoding/Normalization, Protocol Abuse, Auth/AuthZ, Config Manipulation, Injection, Regression Hunter | 7 |
+| `hacker` | Security vulnerabilities — bypass, escalation, exfiltration, DoS | Encoding/Normalization, Protocol Abuse, Auth/AuthZ, Config Manipulation, Injection, Regression Hunter | 7 |
 | `perf` | Performance bottlenecks, memory waste, algorithmic inefficiency | Allocation Hunter, Algorithmic Complexity, I/O Bottleneck, Concurrency Efficiency, Regression Hunter | 5 |
 | `custom` | Project-specific lenses (rate limiting, data integrity, compliance) | User-defined | Configurable |
 
-Scope options: `all`, `changed` (default -- git diff against main), or a specific path.
+Scope options: `all`, `changed` (default — git diff against main), or a specific path.
 
 ## Common Issues
 
-- **"Why so many rounds?"** The convergence loop runs until no new critical/high findings appear. Each round spawns fresh agents with no memory, told to do better than the previous round. This is deliberate -- fixes can introduce new issues, and a single pass misses systemic problems.
+- **"Why so many rounds?"** The convergence loop runs until no new critical/high findings appear. Each round spawns fresh agents with no memory, told to do better than the previous round. This is deliberate — fixes can introduce new issues, and a single pass misses systemic problems.
 - **Oscillation.** If round N reintroduces a finding that round N-1 fixed, the issue is escalated to you for manual resolution rather than looping indefinitely.
 - **Cost visibility.** After every round, the skill reports findings, fixes, and cumulative token cost. You decide whether to continue or stop.
 - **Max rounds exceeded.** If convergence is not reached within the max (5 for QA, 7 for Hacker), remaining findings go to human triage.

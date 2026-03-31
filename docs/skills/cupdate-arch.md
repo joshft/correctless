@@ -1,4 +1,4 @@
-# /cupdate-arch -- Maintain Architecture Documentation
+# /cupdate-arch — Maintain Architecture Documentation
 
 > Scan the codebase for undocumented trust boundaries, abstractions, and patterns, then update ARCHITECTURE.md with human-approved entries.
 
@@ -7,7 +7,7 @@
 - After a feature lands via `/cdocs` and the codebase structure has changed
 - When new packages, modules, or trust boundaries have been introduced
 - When ARCHITECTURE.md feels stale relative to the actual code
-- **Not for:** writing architecture from scratch on a new project -- use `/csetup` for initial population
+- **Not for:** writing architecture from scratch on a new project — use `/csetup` for initial population
 
 ## How It Fits in the Workflow
 
@@ -29,11 +29,11 @@ After landing an OAuth2 integration, you run `/cupdate-arch`.
 
 The agent scans the codebase and finds three undocumented items:
 
-1. **TB-004: OAuth2 Token Exchange** -- a new trust boundary where the app exchanges authorization codes with the identity provider. The agent drafts an entry noting the identity assertion method (PKCE + state parameter) and the invariant that authorization codes must be single-use.
+1. **TB-004: OAuth2 Token Exchange** — a new trust boundary where the app exchanges authorization codes with the identity provider. The agent drafts an entry noting the identity assertion method (PKCE + state parameter) and the invariant that authorization codes must be single-use.
 
-2. **ABS-007: HTTP Client Wrapper** -- a wrapper module enforcing timeout and retry policies that 8 call sites use but ARCHITECTURE.md does not mention. The entry notes the invariant "all external HTTP calls go through this wrapper" and the violation condition "direct `http.Get` calls bypassing the wrapper."
+2. **ABS-007: HTTP Client Wrapper** — a wrapper module enforcing timeout and retry policies that 8 call sites use but ARCHITECTURE.md does not mention. The entry notes the invariant "all external HTTP calls go through this wrapper" and the violation condition "direct `http.Get` calls bypassing the wrapper."
 
-3. **PAT-005: Config-Then-Wire** -- a pattern repeated in 6 places where config structs are parsed and then wired to handlers. The entry notes the violation condition "config parsed but wiring call omitted."
+3. **PAT-005: Config-Then-Wire** — a pattern repeated in 6 places where config structs are parsed and then wired to handlers. The entry notes the violation condition "config parsed but wiring call omitted."
 
 You approve TB-004 and ABS-007, reject PAT-005 as too granular. ARCHITECTURE.md is updated with the two new entries.
 

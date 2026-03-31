@@ -7,12 +7,12 @@
 - Monthly, to track how the workflow is performing over time.
 - Before presenting to stakeholders, to justify the workflow investment with data.
 - When deciding whether to upgrade from Lite to Full mode.
-- When something feels off -- metrics reveal which phases are pulling weight and which are not.
+- When something feels off — metrics reveal which phases are pulling weight and which are not.
 - **Not for:** Single-feature summaries (use `/csummary`), or checking current workflow state (use `/cstatus`).
 
 ## How It Fits in the Workflow
 
-This skill is standalone and project-wide. It reads accumulated data from every feature that has gone through the Correctless workflow -- QA findings, verification reports, antipatterns, drift debt, audit history, token logs, and git history. It produces a comprehensive dashboard with actionable health analysis. Run it periodically to spot trends.
+This skill is standalone and project-wide. It reads accumulated data from every feature that has gone through the Correctless workflow — QA findings, verification reports, antipatterns, drift debt, audit history, token logs, and git history. It produces a comprehensive dashboard with actionable health analysis. Run it periodically to spot trends.
 
 ## What It Does
 

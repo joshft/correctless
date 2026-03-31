@@ -11,7 +11,7 @@
 
 ## How It Fits in the Workflow
 
-This skill is standalone -- it does not require an active Correctless workflow. Use it anytime a PR needs review. It pairs well with `/cmaintain` when you also need a maintainer-perspective assessment on merge readiness.
+This skill is standalone — it does not require an active Correctless workflow. Use it anytime a PR needs review. It pairs well with `/cmaintain` when you also need a maintainer-perspective assessment on merge readiness.
 
 ## What It Does
 

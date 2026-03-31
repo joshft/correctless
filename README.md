@@ -183,19 +183,19 @@ Six months in, the workflow knows your project's failure modes better than any i
 
 ## Platform Integration
 
-Correctless hooks into Claude Code's infrastructure for real-time feedback and long-term learning.
+Correctless hooks into Claude Code's infrastructure for real-time feedback and long-term learning. All features below are **automatic** after `/csetup` unless marked opt-in.
 
-### Statusline
+### Statusline (automatic)
 
 The Correctless statusline shows your workflow state at a glance — no commands needed:
 ```
 project/  feature/auth  Opus  34%  RED  QA:R0  $0.42  +87/-12
 ```
-Workflow phase (color-coded), QA round count, session cost, lines delta, context usage with red warning at 70%. Installed during `/csetup`.
+Workflow phase (color-coded), QA round count, session cost, lines delta, context usage with red warning at 70%. Installed during `/csetup`. Both Lite and Full.
 
-### Real-Time Adherence Feedback
+### Real-Time Adherence Feedback (automatic)
 
-A PostToolUse hook monitors every file modification and alerts you immediately:
+A PostToolUse hook monitors every file modification and alerts you immediately. Lite shows phase violations; Full adds coverage tracking:
 - `⚠ tdd-qa: Source file modified — middleware.ts (this phase should be read-only)`
 - `📝 GREEN: Test file edited — auth.test.ts (should be logged in test-edit-log)`
 - `🔍 QA: Read middleware.ts (3 of 7 modified files reviewed)` (Full mode)
@@ -299,7 +299,7 @@ Optional (Full only):
 
 ## Status
 
-**Early release.** 23 skills (16 Lite, 23 Full), 57 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
+**Correctless 2.0.0 — Early release.** 23 skills (16 Lite, 23 Full), 57 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
 
 ## License
 

@@ -1,4 +1,4 @@
-# /cdevadv -- Devil's Advocate (10th Man Rule)
+# /cdevadv — Devil's Advocate (10th Man Rule)
 
 > Challenge the assumptions, architecture, and strategies that every other agent accepts as true.
 
@@ -9,7 +9,7 @@
 - After a milestone when early assumptions become load-bearing at scale
 - After a production incident to determine if it reveals a deeper design flaw
 - When things feel too smooth: Olympics converging quickly, zero spec revisions, no reviewer pushback
-- **Not for:** finding code-level bugs -- that is `/caudit`'s job. This skill operates at the assumption/architecture/strategy level.
+- **Not for:** finding code-level bugs — that is `/caudit`'s job. This skill operates at the assumption/architecture/strategy level.
 
 ## How It Fits in the Workflow
 
@@ -33,7 +33,7 @@ You run `/cdevadv layers` after a quarter of development.
 
 **Pass 2 (Architecture):** ARCHITECTURE.md documents a caching abstraction (ABS-003) but says nothing about deployment topology. The agent notes that 4 specs reference ABS-003 and all implicitly assume cache coherence.
 
-**Pass 3 (Strategy):** Antipatterns show 3 cache-related entries in the last 2 months. Olympics findings history shows a cache invalidation bug was found and fixed twice -- different symptoms, same root cause.
+**Pass 3 (Strategy):** Antipatterns show 3 cache-related entries in the last 2 months. Olympics findings history shows a cache invalidation bug was found and fixed twice — different symptoms, same root cause.
 
 **Pass 4 (Deep Dive):** The agent reads the caching module source and confirms: the library uses in-process memory with no invalidation protocol. In a multi-server deployment, each server has its own cache state with no coordination.
 
@@ -68,4 +68,4 @@ Invoke with: `/cdevadv [mode] [argument]`
 
 - **"This is just an Olympics finding."** The devil's advocate operates at the assumption level. "This function has a race condition" is an Olympics finding. "This project's approach to concurrency is fundamentally inadequate" is a devil's advocate finding. The agent is penalized for surface observations disguised as deep insights.
 - **Evidence required.** Every claim must reference actual files, code paths, or patterns. Speculation without proof ("might not scale") is penalized.
-- **Findings require disposition.** Every finding must be accepted, deferred, or rejected with specific reasoning. Silence is not acceptable -- a future devil's advocate run will check whether deferred items still hold.
+- **Findings require disposition.** Every finding must be accepted, deferred, or rejected with specific reasoning. Silence is not acceptable — a future devil's advocate run will check whether deferred items still hold.
