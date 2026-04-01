@@ -144,6 +144,17 @@ Organize findings by category:
 5. Design contract conflicts
 6. External model findings (if any)
 
+For each finding, present the disposition options:
+
+```
+  1. Accept finding (recommended) — add rule or update spec
+  2. Reject — explain why this doesn't apply
+  3. Modify — accept the concern but change the proposed rule
+  4. Defer — log as accepted risk for future feature
+
+  Or type your own: ___
+```
+
 Incorporate approved changes into the spec.
 
 ## Advance State

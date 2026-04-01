@@ -204,7 +204,18 @@ If the verification agent detects a test file modification:
    - The refactor intentionally changes behavior — document why
    - The refactor accidentally broke something — fix it
 
-   Is this test change intentional? Provide a reason."
+   Is this test change intentional?"
+
+   Present the options:
+
+   ```
+     1. Approve behavioral change (recommended) — the test correctly reflects new behavior
+     2. Reject — revert this test change, find another approach
+     3. Split into separate PR — this behavioral change deserves its own review
+
+     Or type your own: ___
+   ```
+
 4. User must approve with a reason. Log the approval in the refactor intent artifact.
 5. Update the baseline with the new test checksums before proceeding.
 

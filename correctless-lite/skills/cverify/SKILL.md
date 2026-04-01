@@ -97,7 +97,17 @@ Compare the spec's rules against the implementation:
 - Are there code paths not covered by any spec rule?
 - For rules with `implemented_in` fields: do those files/functions still exist?
 
-**If drift is found**: Read `.claude/meta/drift-debt.json` first, then APPEND new entries to the existing `drift_debt` array. Use `Edit` to add entries — do NOT overwrite the file with `Write`. Use the next sequential DRIFT-NNN ID.
+**If drift is found**, present each drift item to the human with options:
+
+```
+  1. Fix (recommended) — update code or spec to resolve drift
+  2. Log as debt — create DRIFT-NNN entry for future resolution
+  3. Accept as intentional — document why the drift is correct
+
+  Or type your own: ___
+```
+
+For items where the user chooses "Log as debt": Read `.claude/meta/drift-debt.json` first, then APPEND new entries to the existing `drift_debt` array. Use `Edit` to add entries — do NOT overwrite the file with `Write`. Use the next sequential DRIFT-NNN ID.
 
 Drift debt entry format:
 ```json
