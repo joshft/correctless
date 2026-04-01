@@ -52,8 +52,8 @@ file_contains_i() {
 # R-022: 14 skills that receive Serena integration
 SERENA_SKILLS="cspec creview creview-spec ctdd cverify caudit crefactor credteam cwtf cmaintain ccontribute cdebug cpr-review cdocs"
 
-# R-023: 2 skills that receive Context7 integration
-CONTEXT7_SKILLS="cspec cdebug"
+# R-023: 5 skills that receive Context7 integration
+CONTEXT7_SKILLS="cspec cdebug creview ctdd crefactor"
 
 # R-024: Skills that do NOT receive MCP integration (except cwtf which is in R-022)
 NO_MCP_SKILLS="chelp cstatus csummary cmetrics cpostmortem cdevadv"
@@ -461,8 +461,8 @@ test_r020() {
   local lite_total full_total
   lite_total=$(find "$REPO_DIR/correctless-lite/skills" -name "SKILL.md" | wc -l)
   full_total=$(find "$REPO_DIR/correctless-full/skills" -name "SKILL.md" | wc -l)
-  assert_eq "R-020: Lite has 16 skills total" "16" "$lite_total"
-  assert_eq "R-020: Full has 23 skills total" "23" "$full_total"
+  assert_eq "R-020: Lite has 17 skills total" "17" "$lite_total"
+  assert_eq "R-020: Full has 24 skills total" "24" "$full_total"
 }
 
 # ---------------------------------------------------------------------------
@@ -527,12 +527,12 @@ test_r023() {
       c7_count=$((c7_count + 1))
     fi
   done
-  assert_eq "R-023: 2 skills have Context7 blocks" "2" "$c7_count"
+  assert_eq "R-023: 5 skills have Context7 blocks" "5" "$c7_count"
 
-  # Serena-only skills (all SERENA_SKILLS minus cspec and cdebug) must NOT contain mcp.context7
+  # Serena-only skills (all SERENA_SKILLS minus Context7 skills) must NOT contain mcp.context7
   for skill in $SERENA_SKILLS; do
-    # Skip cspec and cdebug — they legitimately have Context7
-    if [ "$skill" = "cspec" ] || [ "$skill" = "cdebug" ]; then
+    # Skip Context7 skills — they legitimately have mcp.context7
+    if [ "$skill" = "cspec" ] || [ "$skill" = "cdebug" ] || [ "$skill" = "creview" ] || [ "$skill" = "ctdd" ] || [ "$skill" = "crefactor" ]; then
       continue
     fi
     local skill_file="$REPO_DIR/skills/$skill/SKILL.md"

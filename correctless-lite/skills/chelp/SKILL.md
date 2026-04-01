@@ -57,6 +57,7 @@ Feature workflow:
   /cdocs        Update documentation
 
 Other:
+  /cquick       Quick fix with TDD — no spec/review for small changes
   /crefactor    Structured refactoring (tests must pass before + after)
   /cpr-review   Review someone else's PR
   /ccontribute  Contribute to someone else's project

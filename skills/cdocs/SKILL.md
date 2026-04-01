@@ -113,6 +113,19 @@ Structure your output:
 
 ## After Documentation
 
+### Workflow History
+
+Before advancing the state machine, append a workflow summary to `docs/workflow-history.md`. This file is append-only — never rewrite or delete existing entries. If the file doesn't exist, create it with a `# Workflow History` header.
+
+Each entry is one paragraph:
+
+```
+### {date} — {feature name}
+Branch: {branch}. Rules: {count}. QA rounds: {N}. Findings fixed: {N}. {one-line description}.
+```
+
+Read the workflow state file (`.claude/artifacts/workflow-state-{branch-slug}.json`): use `.branch` for the branch name, `.qa_rounds` for QA round count, `.spec_file` for the spec path. Count rules from the spec file (count lines matching `R-[0-9]` or `INV-[0-9]`). Count fixed findings from `.claude/artifacts/qa-findings-{task-slug}.json` if it exists (count entries where `.status == "fixed"`). Use today's date and the feature name from the spec's `# Spec: {title}` heading.
+
 ### Convention Learning
 
 If this is the 3rd or more feature where the same architectural pattern has appeared (check docs/specs/ for recurring patterns), append to the `## Correctless Learnings` section of `CLAUDE.md`:

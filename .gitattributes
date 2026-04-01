@@ -1,0 +1,2 @@
+# Workflow history is append-only — use union merge to avoid conflicts
+docs/workflow-history.md merge=union

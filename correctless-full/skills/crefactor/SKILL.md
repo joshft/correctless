@@ -323,6 +323,15 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 
 **Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
 
+### Context7 — Library Documentation
+
+If `mcp.context7` is `true` in `workflow-config.json`, use Context7 when checking whether a dependency migration path exists during refactoring:
+
+- Use `resolve-library-id` + `get-library-docs` to check if the target library version has a migration guide
+- Useful when refactoring involves upgrading a dependency (e.g., "does library-x v3 have a codemod for v2 → v3?")
+
+When Context7 is unavailable, fall back to web search. If Context7 was unavailable during this run, notify the user once at the end.
+
 ## If Something Goes Wrong
 
 - **Agent crashes mid-refactor**: Re-run `/crefactor`. The refactor intent document (`.claude/artifacts/refactor-intent-{slug}.md`) and baseline (`.claude/artifacts/refactor-baseline-{slug}.json`) persist — the skill can pick up context from these. However, partially completed refactor phases may need manual review.

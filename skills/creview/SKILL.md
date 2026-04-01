@@ -274,6 +274,15 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 
 **Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
 
+### Context7 — Library Documentation
+
+If `mcp.context7` is `true` in `workflow-config.json`, use Context7 to verify library-related claims in the spec (e.g., "bcrypt cost 12 is recommended", "use Zod for validation"):
+
+- Use `resolve-library-id` to find the library, then `get-library-docs` to fetch current docs
+- Compare the spec's claims against actual current documentation
+
+When Context7 is unavailable, fall back to web search. If Context7 was unavailable during this run, notify the user once at the end.
+
 ## If Something Goes Wrong
 
 - **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.

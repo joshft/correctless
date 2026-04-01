@@ -7,22 +7,29 @@ Thanks for your interest in contributing! Correctless is a set of Claude Code sk
 ```bash
 git clone https://github.com/joshft/correctless.git
 cd correctless
-bash test.sh          # Run the 57-test suite
-bash sync.sh          # Propagate source → both plugins
+bash test.sh              # 57 infrastructure tests
+bash test-mcp.sh          # 192 MCP integration tests
+bash test-bugfixes.sh     # 15 bug fix tests
+bash test-qol.sh          # 25 QoL improvement tests
+bash sync.sh              # Propagate source → both plugins
+bash sync.sh --check      # Verify distributions are in sync (exit 0 = clean)
 ```
 
 ## Project Structure
 
 ```
-skills/               # Source skills (23 SKILL.md files)
+skills/               # Source skills (24 SKILL.md files)
 hooks/                # Bash hooks (gate, state machine, statusline, audit trail)
-templates/            # Config and doc templates
+templates/            # Config, doc, and spec templates
 helpers/              # PBT helpers (Full mode only)
 setup                 # Install script
-test.sh               # Automated test suite
+test.sh               # Infrastructure tests (57)
+test-mcp.sh           # MCP integration tests (192)
+test-bugfixes.sh      # Bug fix tests (15)
+test-qol.sh           # QoL improvement tests (25)
 sync.sh               # Copies source → correctless-lite/ and correctless-full/
-correctless-lite/     # Lite plugin (16 skills)
-correctless-full/     # Full plugin (23 skills)
+correctless-lite/     # Lite plugin (17 skills)
+correctless-full/     # Full plugin (24 skills)
 docs/skills/          # Per-skill documentation pages
 ```
 
@@ -83,12 +90,30 @@ Run ShellCheck before submitting: `shellcheck hooks/*.sh`
 ## Testing
 
 ```bash
-bash test.sh          # 57 tests covering setup, state machine, gate, utilities, Full mode
-bash sync.sh          # Must produce no changes (git diff --exit-code)
-shellcheck hooks/*.sh # Must pass with -S warning
+bash test.sh              # 57 infrastructure tests
+bash test-mcp.sh          # 192 MCP integration tests
+bash test-bugfixes.sh     # 15 bug fix tests
+bash test-qol.sh          # 25 QoL improvement tests
+bash sync.sh --check      # Distributions must be in sync
+shellcheck hooks/*.sh     # Must pass with -S warning
 ```
 
-CI runs all three on every PR.
+CI runs tests + sync check + ShellCheck on every PR.
+
+## Pre-commit Hooks
+
+Install pre-commit hooks for local checks before commits:
+
+```bash
+pip install pre-commit   # or: pipx install pre-commit
+pre-commit install
+```
+
+Hooks: gitleaks (secret scanning), typos, shellcheck, trailing whitespace, sync check.
+
+## Quick Fixes
+
+For small changes (< 50 LOC, < 3 files), use `/cquick` instead of the full workflow. It enforces TDD but skips spec/review/verify/docs.
 
 ## QA Process
 

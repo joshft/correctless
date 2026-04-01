@@ -5,7 +5,7 @@
     "description": "Claude Code plugin framework: structured workflow skills for spec-driven development with TDD, auditing, and project health"
   },
   "commands": {
-    "test": "bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh",
+    "test": "bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh",
     "test_verbose": "bash test.sh && bash test-mcp.sh",
     "coverage": "",
     "lint": "shellcheck hooks/*.sh test.sh sync.sh setup",
