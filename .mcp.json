@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from", "git+https://github.com/oraios/serena@v0.1.4",
+        "serena-mcp-server",
+        "--transport", "stdio"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@context7/mcp@2.1.6"
+      ]
+    }
+  }
+}

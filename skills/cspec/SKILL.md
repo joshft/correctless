@@ -48,7 +48,8 @@ Check current workflow state:
 .claude/hooks/workflow-advance.sh status
 ```
 
-If no workflow is active, initialize one:
+If no workflow is active, initialize one. Before calling `workflow-advance.sh init`, ask the user: **"Short name for this feature? (used in filenames, e.g., `auth-middleware`)"**. If the user provides a name, use it as the task description for `init`. If they say "auto" or don't provide one, use the first 3-4 words of the feature description.
+
 ```bash
 .claude/hooks/workflow-advance.sh init "task description"
 ```

@@ -29,6 +29,16 @@ repos:
     hooks:
       - id: typos
 
+  # Correctless sync check — ensures source files match distribution copies
+  - repo: local
+    hooks:
+      - id: correctless-sync-check
+        name: correctless sync check
+        entry: bash sync.sh --check
+        language: system
+        pass_filenames: false
+        files: ^(skills/|hooks/|templates/|helpers/)
+
   # ShellCheck for shell scripts (severity matches CI config)
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1
