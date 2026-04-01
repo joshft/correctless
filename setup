@@ -348,9 +348,15 @@ HEOF
     return
   fi
 
-  # Check if hook already registered
-  if grep -q "workflow-gate" "$settings" 2>/dev/null; then
-    skip "Hook already registered in settings.json"
+  # Check if all components are registered — only skip if ALL are present
+  local has_gate has_audit has_statusline has_perms
+  has_gate=$(grep -q "workflow-gate" "$settings" 2>/dev/null && echo "y" || echo "n")
+  has_audit=$(grep -q "audit-trail" "$settings" 2>/dev/null && echo "y" || echo "n")
+  has_statusline=$(grep -q "statusLine" "$settings" 2>/dev/null && echo "y" || echo "n")
+  has_perms=$(grep -q "workflow-advance" "$settings" 2>/dev/null && echo "y" || echo "n")
+
+  if [ "$has_gate" = "y" ] && [ "$has_audit" = "y" ] && [ "$has_statusline" = "y" ] && [ "$has_perms" = "y" ]; then
+    skip "Hooks already registered in settings.json"
     return
   fi
 
