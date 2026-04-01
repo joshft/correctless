@@ -27,7 +27,19 @@ The TDD workflow can take 15-30+ minutes. The user must see what's happening at 
 5. QA: Independent review of tests + implementation
 6. (If QA finds issues: Fix round N → re-QA)
 
-**Between every phase**, print a 1-line status update:
+**Between every phase**, print a mini pipeline diagram showing progress. Mark completed phases with `✓` and the current phase with `▶`:
+
+```
+  ✓ RED → ✓ audit → ▶ GREEN → simplify → QA
+```
+
+Update the diagram each time a phase completes. After QA with fix rounds:
+
+```
+  ✓ RED → ✓ audit → ✓ GREEN → ✓ simplify → ✓ QA:R1 → ✓ fix → ▶ QA:R2
+```
+
+**Also print a 1-line status update:**
 - "Spawning test-writing agent — reading spec ({N} rules), ARCHITECTURE.md, antipatterns..."
 - "RED complete — {N} test files, {M} test cases, all failing as expected. Running test audit..."
 - "Test audit passed — {N} suggestions applied. Spawning implementation agent..."

@@ -39,7 +39,33 @@ If no active workflow, also run:
 - Start a new feature: `git checkout -b feature/my-feature` then `/cspec`
 - Check other branches: {show status-all output if there are active workflows elsewhere}"
 
-**If workflow is active, show phase-specific guidance:**
+**If workflow is active, show a pipeline diagram with the current phase marked.** Use `▶` to indicate the active phase. For Lite mode:
+
+```
+  spec → review → [ tdd ] → verify → docs → merge
+                     │
+               ┌─────┴─────┐
+              RED → GREEN → QA
+                     │       │
+               test audit    │
+                     └─ fix ◄┘
+```
+
+For Full mode, include the extra steps:
+
+```
+  spec → model → review → [ tdd ] → verify → arch → docs → audit → merge
+                             │
+                       ┌─────┴─────┐
+                      RED → GREEN → QA
+                             │       │
+                       test audit    │
+                             └─ fix ◄┘
+```
+
+Mark the current phase with `▶` and show it in the diagram. For TDD sub-phases (tdd-tests, tdd-impl, tdd-qa), mark the specific position inside the TDD box.
+
+**Then show phase-specific guidance:**
 
 | Phase | Show |
 |-------|------|

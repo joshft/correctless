@@ -21,14 +21,28 @@ Check if `.claude/workflow-config.json` exists. If not → not set up yet. If it
 
 **Lite mode:**
 ```
-Correctless Lite — Workflow Pipeline:
-  /cspec → /creview → /ctdd [RED → test audit → GREEN → /simplify → QA] → /cverify → /cdocs → merge
+Correctless Lite:
+
+  /cspec → /creview → [ /ctdd ] → /cverify → /cdocs → merge
+                          │
+                    ┌─────┴─────┐
+                   RED → GREEN → QA
+                          │       │
+                    test audit    │
+                          └─ fix ◄┘
 ```
 
 **Full mode:**
 ```
-Correctless Full — Workflow Pipeline:
-  /cspec → /cmodel → /creview-spec → /ctdd [RED → test audit → GREEN → /simplify → QA] → /cverify → /cupdate-arch → /cdocs → /caudit → merge
+Correctless Full:
+
+  /cspec → /cmodel → /creview-spec → [ /ctdd ] → /cverify → /cupdate-arch → /cdocs → /caudit → merge
+                                         │
+                                   ┌─────┴─────┐
+                                  RED → GREEN → QA
+                                         │       │
+                                   test audit    │
+                                         └─ fix ◄┘
 ```
 
 ### 3. Show Commands
