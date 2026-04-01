@@ -228,6 +228,28 @@ After any subagent completes, capture `total_tokens` and `duration_ms`. Append t
 
 If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
+## Code Analysis (MCP Integration)
+
+If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-level code analysis during contribution review:
+
+- Use `find_symbol` instead of grepping for function/type names
+- Use `find_referencing_symbols` to trace callers and dependencies to assess maintenance burden
+- Use `get_symbols_overview` for structural overview of a module
+- Use `replace_symbol_body` for precise edits (not used in this skill — maintainer review is read-only)
+- Use `search_for_pattern` for regex searches with symbol context
+
+**Fallback table** — if Serena is unavailable, fall back silently to text-based equivalents:
+
+| Serena Operation | Fallback |
+|-----------------|----------|
+| `find_symbol` | Grep for function/type name |
+| `find_referencing_symbols` | Grep for symbol name across source files |
+| `get_symbols_overview` | Read directory + read index files |
+| `replace_symbol_body` | Edit tool |
+| `search_for_pattern` | Grep tool |
+
+**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
+
 ## If Something Goes Wrong
 
 - **CLI not available**: The skill can still generate the review — it just can't fetch PR info or post comments automatically. Ask the user to provide the PR diff and info manually.

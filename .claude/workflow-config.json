@@ -1,0 +1,42 @@
+{
+  "project": {
+    "name": "correctless",
+    "language": "other",
+    "description": "Claude Code plugin framework: structured workflow skills for spec-driven development with TDD, auditing, and project health"
+  },
+  "commands": {
+    "test": "bash test.sh && bash test-mcp.sh",
+    "test_verbose": "bash test.sh",
+    "coverage": "",
+    "lint": "shellcheck hooks/*.sh test.sh sync.sh setup",
+    "build": ""
+  },
+  "patterns": {
+    "test_file": "test.sh",
+    "source_file": "*.sh,*.md",
+    "test_fail_pattern": "FAIL:",
+    "build_error_pattern": ""
+  },
+  "workflow": {
+    "min_qa_rounds": 1,
+    "require_review": true,
+    "auto_update_antipatterns": true,
+    "git_trailers": false,
+    "git_notes": false,
+    "branching_strategy": "feature-branches",
+    "merge_strategy": "squash"
+  },
+  "paths": {
+    "architecture_doc": "ARCHITECTURE.md",
+    "agent_context": "AGENT_CONTEXT.md",
+    "antipatterns": ".claude/antipatterns.md",
+    "docs": "docs/",
+    "specs": "docs/specs/",
+    "artifacts": ".claude/artifacts/",
+    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+  },
+  "setup": {
+    "architecture_state": "existing",
+    "agent_context_state": "existing"
+  }
+}

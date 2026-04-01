@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
+        "command": ".claude/hooks/workflow-gate.sh",
+        "timeout_ms": 5000
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(.claude/hooks/workflow-advance.sh *)"
+    ]
+  }
+}

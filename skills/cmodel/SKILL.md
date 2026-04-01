@@ -51,7 +51,7 @@ Skip: data transformations, config validation, numeric calculations.
 
 ### Step 2: Generate the Alloy Model
 
-Write to `docs/models/{task-slug}.als`. Use Alloy 6 syntax.
+Write to `docs/models/{task-slug}.also`. Use Alloy 6 syntax.
 
 - **Signatures** map to system entities
 - **Facts** encode system rules (always true)
@@ -69,7 +69,7 @@ java -jar {alloy_jar} {model_file}
 
 For each assertion, run `check assertionName for N` (start with scope 5).
 
-**Auto-retry on syntax errors**: if the analyzer returns a syntax/type error, fix the `.als` file and re-run. Up to 3 retries before surfacing to the human.
+**Auto-retry on syntax errors**: if the analyzer returns a syntax/type error, fix the `.also` file and re-run. Up to 3 retries before surfacing to the human.
 
 ### Step 4: Interpret Results (Separate Agent)
 
@@ -81,7 +81,7 @@ For each assertion, run `check assertionName for N` (start with scope 5).
 >
 > You receive:
 > - The feature spec (read from docs/specs/{task-slug}.md)
-> - The Alloy model (read from docs/models/{task-slug}.als)
+> - The Alloy model (read from docs/models/{task-slug}.also)
 > - The raw Alloy Analyzer output
 >
 > For each counterexample trace:

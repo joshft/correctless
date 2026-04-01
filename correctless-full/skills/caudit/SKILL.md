@@ -426,6 +426,32 @@ After each round's agents complete and triage finishes, print: "Round {N} comple
 ### Cost Visibility
 After each round, report: findings found, findings fixed, findings rejected, cumulative rounds. The human can decide whether to continue or stop.
 
+## Code Analysis (MCP Integration)
+
+If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-level code analysis. Each specialist agent uses Serena scoped to its domain:
+
+- **Concurrency specialist**: Use `find_symbol` to locate synchronization primitives (Mutex, RWMutex, chan, sync.WaitGroup, atomic). Use `find_referencing_symbols` on shared data structures to trace concurrent access.
+- **Error handling auditor**: Use `search_for_pattern` for error-returning functions and error suppression patterns (empty catch blocks, ignored error returns).
+- **Resource lifecycle tracker**: Use `find_symbol` for types implementing Close, Dispose, or cleanup interfaces. Use `find_referencing_symbols` to verify every allocation site has a corresponding cleanup.
+
+- Use `find_symbol` instead of grepping for function/type names
+- Use `find_referencing_symbols` to trace callers and dependencies
+- Use `get_symbols_overview` for structural overview of a module
+- Use `replace_symbol_body` for precise edits during fix phases
+- Use `search_for_pattern` for regex searches with symbol context
+
+**Fallback table** — if Serena is unavailable, fall back silently to text-based equivalents:
+
+| Serena Operation | Fallback |
+|-----------------|----------|
+| `find_symbol` | Grep for function/type name |
+| `find_referencing_symbols` | Grep for symbol name across source files |
+| `get_symbols_overview` | Read directory + read index files |
+| `replace_symbol_body` | Edit tool |
+| `search_for_pattern` | Grep tool |
+
+**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
+
 ## If Something Goes Wrong
 
 - **Agent crashes mid-round**: Re-run `/caudit`. Prior round findings are persisted in `.claude/artifacts/findings/` and provide context, but the skill restarts from Round 1. It will re-read prior findings and avoid re-reporting already-fixed issues, but there is no automatic round-level resume.

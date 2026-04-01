@@ -370,6 +370,39 @@ When presenting the spec for review, mention: "If you need to check something ab
 ### /export
 After spec approval, suggest: "Consider exporting this conversation as a decision record: `/export docs/decisions/{task-slug}-spec.md` — captures why these specific rules were chosen."
 
+## Code Analysis (MCP Integration)
+
+### Serena — Symbol-Level Code Analysis
+
+If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-level code analysis during codebase exploration and pattern mining:
+
+- Use `find_symbol` instead of grepping for function/type names
+- Use `find_referencing_symbols` to trace callers and dependencies
+- Use `get_symbols_overview` for structural overview of a module
+- Use `replace_symbol_body` for precise edits (not used in this skill — spec writing is read-only)
+- Use `search_for_pattern` for regex searches with symbol context
+
+**Fallback table** — if Serena is unavailable, fall back silently to text-based equivalents:
+
+| Serena Operation | Fallback |
+|-----------------|----------|
+| `find_symbol` | Grep for function/type name |
+| `find_referencing_symbols` | Grep for symbol name across source files |
+| `get_symbols_overview` | Read directory + read index files |
+| `replace_symbol_body` | Edit tool |
+| `search_for_pattern` | Grep tool |
+
+**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
+
+### Context7 — Library Documentation
+
+If `mcp.context7` is `true` in `workflow-config.json`, use Context7 for the research subagent's library documentation lookups:
+
+- Use `resolve-library-id` to find the canonical ID for a library before fetching docs
+- Use `get-library-docs` to retrieve current documentation and API references
+
+When Context7 is unavailable, fall back to web search for library documentation. If Context7 was unavailable during this run, notify the user once at the end: "Note: Context7 was unavailable — fell back to web search for library docs."
+
 ## If Something Goes Wrong
 
 - **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.

@@ -18,7 +18,7 @@ Runs after `/cspec` (spec phase) and before `/creview-spec`. The modeling phase 
 ## What It Does
 
 - Reads the spec artifact (invariants, prohibitions, trust boundaries, STRIDE analysis) and ARCHITECTURE.md
-- Generates an Alloy 6 model (`docs/models/{task-slug}.als`) with signatures, facts, predicates, and assertions mapped to INV-xxx IDs
+- Generates an Alloy 6 model (`docs/models/{task-slug}.also`) with signatures, facts, predicates, and assertions mapped to INV-xxx IDs
 - Runs the Alloy Analyzer (`java -jar`) to check each assertion within a bounded scope
 - Spawns a separate interpreter subagent to translate counterexamples into domain-specific scenarios (avoids blind spots from the model author)
 - Presents both raw Alloy traces and interpreted scenarios for human review
@@ -37,7 +37,7 @@ You revise the spec to require atomic check-and-consume, then advance to `/crevi
 
 | Reads | Writes |
 |-------|--------|
-| Spec artifact (`docs/specs/{slug}.md`) | Alloy model (`docs/models/{slug}.als`) |
+| Spec artifact (`docs/specs/{slug}.md`) | Alloy model (`docs/models/{slug}.also`) |
 | `ARCHITECTURE.md` | Analysis results (`docs/models/{slug}-results.md`) |
 | `.claude/workflow-config.json` | Token log (`.claude/artifacts/token-log-{slug}.json`) |
 

@@ -29,3 +29,6 @@ Thumbs.db
 # Implementation plans
 IMPLEMENTATION_PLAN.md
 ROADMAP.md
+
+# Correctless — transient workflow state
+.claude/artifacts/

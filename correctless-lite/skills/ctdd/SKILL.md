@@ -53,7 +53,7 @@ The RED phase (test writing) and GREEN phase (implementation) MUST be executed b
 
 ### Checkpoint Resume
 
-After reading the workflow state (step 5 below), check for `.claude/artifacts/checkpoint-ctdd-{slug}.json` (derive slug from the workflow state file's spec_file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
+After reading the workflow state (step 6 below), check for `.claude/artifacts/checkpoint-ctdd-{slug}.json` (derive slug from the workflow state file's spec_file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
 - **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify the current phase:
   - After `red`: test files exist and fail when run
@@ -81,8 +81,11 @@ Clean up the checkpoint file when the skill completes successfully.
 1. Read `AGENT_CONTEXT.md` for project context.
 2. Read the approved spec (path from workflow state).
 3. Read `.claude/workflow-config.json` for test commands and patterns.
-4. **Verify the test runner works**: Run `commands.test` from the config. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.claude/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
-5. Check current phase: `.claude/hooks/workflow-advance.sh status`
+4. **Verify required config fields exist**:
+   - If `commands.test` is null, absent, or empty: "No test command is configured in `.claude/workflow-config.json`. Add a `commands.test` field (e.g., `\"npm test\"`) or re-run `/csetup` to detect your test runner." Do not proceed.
+   - If `patterns.test_file` is null, absent, or empty: "No test file pattern is configured in `.claude/workflow-config.json`. Add a `patterns.test_file` field (e.g., `\"*.test.ts\"`) or re-run `/csetup` to detect your test patterns." Do not proceed. This pattern is used by the workflow gate to distinguish test files from source files during phase enforcement.
+5. **Verify the test runner works**: Run `commands.test` from the config. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.claude/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
+6. Check current phase: `.claude/hooks/workflow-advance.sh status`
 
 ## Pre-Execution: Task Graph (for features with 5+ rules)
 
@@ -389,6 +392,28 @@ When presenting QA findings for the human to review, mention: "If you need to ch
 
 ### /export
 After workflow completes (done phase), suggest: "Consider exporting this conversation as a decision record: `/export docs/decisions/{task-slug}-tdd.md`"
+
+## Code Analysis (MCP Integration)
+
+If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-level code analysis during test writing and implementation:
+
+- Use `find_symbol` instead of grepping for function/type names
+- Use `find_referencing_symbols` to trace callers and dependencies
+- Use `get_symbols_overview` for structural overview of a module
+- Use `replace_symbol_body` for precise symbol-level edits during implementation
+- Use `search_for_pattern` for regex searches with symbol context
+
+**Fallback table** — if Serena is unavailable, fall back silently to text-based equivalents:
+
+| Serena Operation | Fallback |
+|-----------------|----------|
+| `find_symbol` | Grep for function/type name |
+| `find_referencing_symbols` | Grep for symbol name across source files |
+| `get_symbols_overview` | Read directory + read index files |
+| `replace_symbol_body` | Edit tool |
+| `search_for_pattern` | Grep tool |
+
+**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
 
 ## If Something Goes Wrong
 

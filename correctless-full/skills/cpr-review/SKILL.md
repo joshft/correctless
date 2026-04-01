@@ -331,6 +331,28 @@ See "Progress Visibility" section above — task creation and narration are mand
 ### /btw
 When reviewing PRs with more than 10 changed files or 300+ lines of diff, remind after reading context (before starting checks): "Use /btw to check something about the codebase without interrupting this review."
 
+## Code Analysis (MCP Integration)
+
+If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-level code analysis during PR review:
+
+- Use `find_symbol` instead of grepping for function/type names
+- Use `find_referencing_symbols` to trace callers and dependencies affected by the PR
+- Use `get_symbols_overview` for structural overview of a module
+- Use `replace_symbol_body` for precise edits (not used in this skill — PR review is read-only)
+- Use `search_for_pattern` for regex searches with symbol context
+
+**Fallback table** — if Serena is unavailable, fall back silently to text-based equivalents:
+
+| Serena Operation | Fallback |
+|-----------------|----------|
+| `find_symbol` | Grep for function/type name |
+| `find_referencing_symbols` | Grep for symbol name across source files |
+| `get_symbols_overview` | Read directory + read index files |
+| `replace_symbol_body` | Edit tool |
+| `search_for_pattern` | Grep tool |
+
+**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
+
 ## If Something Goes Wrong
 
 - **CLI not available**: Paste the PR diff manually. The skill reviews the diff without needing `gh` or `glab` (but can't post comments or detect PR author for dep bump detection).

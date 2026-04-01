@@ -199,7 +199,7 @@ graph TD
 
 | Skill | When to Use | Description |
 |-------|------------|-------------|
-| [`/csetup`](docs/skills/csetup.md) | First run, or re-run for health check | Project detection, convention mining, 17-point health check |
+| [`/csetup`](docs/skills/csetup.md) | First run, or re-run for health check | Project detection, convention mining, 19-point health check |
 | [`/cspec`](docs/skills/cspec.md) | Starting a new feature | Write testable rules with research agent |
 | [`/creview`](docs/skills/creview.md) | After /cspec | Skeptical review + OWASP security checklist (~3 min) |
 | [`/ctdd`](docs/skills/ctdd.md) | After review approves spec | RED → test audit → GREEN → /simplify → QA |
@@ -294,6 +294,15 @@ After postmortems, feature completions, and audits, learnings are appended to CL
 - **Git trailers** in commit messages: `Spec:`, `Rules-covered:`, `Verified-by:` — queryable via `git log --format='%(trailers:key=Spec)'`
 - **Git notes** attaching verification summaries to commits
 - **Git bisect** in [`/cdebug`](docs/skills/cdebug.md) for automated regression finding
+
+### MCP Server Integration (opt-in)
+
+`/csetup` offers to configure two MCP servers that improve code analysis across all skills:
+
+- **Serena** — symbol-level code queries (call graphs, references, symbol lookup) instead of reading entire files. 14 skills use it for precise analysis with 40-60% token savings on larger projects.
+- **Context7** — current library documentation on demand. The `/cspec` research agent gets real docs for real versions instead of relying on training data.
+
+Both are free, open source, run locally, and fall back silently to grep/read when unavailable. Zero maintenance after setup.
 
 ### Output Redaction
 

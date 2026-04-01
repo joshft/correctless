@@ -17,7 +17,7 @@ FAIL=0
 setup_test_project() {
   rm -rf "$TEST_DIR"
   mkdir -p "$TEST_DIR"
-  cd "$TEST_DIR"
+  cd "$TEST_DIR" || exit
   git init -q
   git branch -M main
   echo '{"name": "test-app", "scripts": {"test": "echo FAIL && exit 1", "lint": "echo ok", "build": "echo ok"}}' > package.json
@@ -152,7 +152,7 @@ test_state_machine() {
   assert_eq "qa_rounds is 1" "1" "$(ADV status 2>&1 | grep 'QA rounds:' | awk '{print $3}')"
 
   # done
-  ADV done >/dev/null 2>&1
+  ADV "done" >/dev/null 2>&1
   assert_eq "done phase" "done" "$(ADV status 2>&1 | grep 'Phase:' | awk '{print $2}')"
 
   # verified requires report file
@@ -221,7 +221,7 @@ test_gate() {
   qa_out="$(ADV qa 2>&1)" || true
 
   # Verify we're actually in QA before testing the gate
-  cd "$TEST_DIR"
+  cd "$TEST_DIR" || exit
   local gate_phase
   gate_phase="$(cat .claude/artifacts/workflow-state-feature-test-gate-*.json 2>/dev/null | jq -r '.phase' 2>/dev/null)"
   assert_eq "gate test: in QA phase" "tdd-qa" "$gate_phase"
@@ -235,7 +235,7 @@ test_gate() {
   assert_eq "QA: blocks source" "2" "$exit_code"
 
   # QA phase: block test
-  cd "$TEST_DIR"
+  cd "$TEST_DIR" || exit
   local test_gate_exit
   echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/bar.test.ts"}}' | .claude/hooks/workflow-gate.sh >/dev/null 2>&1 && test_gate_exit=0 || test_gate_exit=$?
   assert_eq "QA: blocks test" "2" "$test_gate_exit"
@@ -349,7 +349,7 @@ test_full_mode() {
   ADV qa >/dev/null 2>&1
 
   # min_qa_rounds=2: can't go to done after 1 round
-  out="$(ADV done 2>&1)" && true
+  out="$(ADV "done" 2>&1)" && true
   assert_contains "enforces min_qa_rounds" "Only 1 QA round" "$out"
 
   # Fix round + second QA
@@ -365,7 +365,7 @@ test_full_mode() {
   assert_eq "tdd-verify blocks source" "2" "$exit_code"
 
   # Done from tdd-verify
-  ADV done >/dev/null 2>&1
+  ADV "done" >/dev/null 2>&1
   assert_eq "done from tdd-verify" "done" "$(ADV status 2>&1 | grep 'Phase:' | awk '{print $2}')"
 }
 
@@ -404,7 +404,7 @@ test_additional_coverage() {
   assert_eq "fix returns to impl" "tdd-impl" "$(ADV status 2>&1 | grep 'Phase:' | awk '{print $2}')"
 
   # N15: Test GREEN phase gate allows source edits
-  cd "$TEST_DIR"
+  cd "$TEST_DIR" || exit
   echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/index.ts"}}' | .claude/hooks/workflow-gate.sh >/dev/null 2>&1 && green_exit=0 || green_exit=$?
   assert_eq "GREEN allows source edits" "0" "$green_exit"
 
@@ -416,7 +416,7 @@ test_additional_coverage() {
   ADV qa >/dev/null 2>&1
   ADV override "expiry test" >/dev/null 2>&1
   # Burn through 10 calls
-  for i in $(seq 1 10); do
+  for _i in $(seq 1 10); do
     echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/index.ts"}}' | .claude/hooks/workflow-gate.sh >/dev/null 2>&1 || true
   done
   # 11th call should be blocked (override expired)

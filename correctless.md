@@ -137,7 +137,7 @@ project-root/
 │   │   ├── localhost-inspection.md
 │   │   └── sens052-rule.md
 │   ├── models/                        # committed — Alloy models (formal analysis record)
-│   │   ├── localhost-inspection.als
+│   │   ├── localhost-inspection.also
 │   │   └── localhost-inspection-results.md
 │   ├── diagrams/                      # committed — Mermaid architecture diagrams
 │   │   ├── system-overview.mermaid
@@ -617,7 +617,7 @@ Note: all skills use frontmatter for `allowed-tools`, `model`, and `context` set
 - `.claude/workflow-config.json`
 
 **Produces**:
-- `docs/models/{task-slug}.als` — the Alloy model source file
+- `docs/models/{task-slug}.also` — the Alloy model source file
 - `docs/models/{task-slug}-results.md` — analysis results (counterexamples or clean run)
 - Updated spec artifact if counterexamples found (new invariants, revised invariants, or design changes)
 
@@ -717,7 +717,7 @@ Note: all skills use frontmatter for `allowed-tools`, `model`, and `context` set
 
 3. **Run the Alloy Analyzer**. For each assertion in the model:
    - Run `check assertionName for N` where N is the scope (start with 5, increase if no counterexample found)
-   - **Auto-retry on syntax/type errors**: if the Alloy Analyzer returns a syntax error, type error, or other compilation failure, the skill feeds the exact error message back to the agent to fix the `.als` file and re-run. Up to 3 retry attempts before surfacing the error to the human. This is expected — Claude will occasionally get Alloy cardinality constraints (`some`/`all`/`lone`), signature hierarchies, or temporal operators wrong. The retry loop handles this without human involvement.
+   - **Auto-retry on syntax/type errors**: if the Alloy Analyzer returns a syntax error, type error, or other compilation failure, the skill feeds the exact error message back to the agent to fix the `.also` file and re-run. Up to 3 retry attempts before surfacing the error to the human. This is expected — Claude will occasionally get Alloy cardinality constraints (`some`/`all`/`lone`), signature hierarchies, or temporal operators wrong. The retry loop handles this without human involvement.
    - If a counterexample is found: the analyzer produces a concrete scenario where the invariant is violated
    - If no counterexample within scope: the invariant likely holds (bounded guarantee, not absolute proof)
 
@@ -833,7 +833,7 @@ If `require_external_review` is true, OR if any invariant is flagged `needs_exte
    - If a configured CLI is not found at runtime, skip it and log a warning
 
 3. Collect external responses. Where external models disagree with Claude's team, present the disagreement to the human.
-   - **Error handling**: if an external model CLI times out (>5 minutes), exits with a non-zero code, returns unparseable output, or returns an empty response, log the failure and continue without that model's input. Do not block the workflow on external model availability. Do not retry — external model failures are transient and retrying burns credits.
+   - **Error handling**: if an external model CLI times out (>5 minutes), exits with a non-zero code, returns unparsable output, or returns an empty response, log the failure and continue without that model's input. Do not block the workflow on external model availability. Do not retry — external model failures are transient and retrying burns credits.
    - **Credibility weighting**: external findings are not automatically higher-credibility than Claude's team findings. External models lack project context — they haven't read the full codebase or conversation history. Treat external findings as "worth investigating" not "definitely correct." Over time, the `external-review-history.json` builds a track record: if Gemini has historically been right about networking invariants but wrong about concurrency, weight its future feedback accordingly. The `/cspec` skill reads this history to decide which invariant categories benefit most from external review.
 4. Track disagreements in `.claude/meta/external-review-history.json` for future reference — which categories of invariants have needed external correction, and which external model was right vs wrong?
 5. **Report external model cost**: after external review completes, report the approximate token usage per model (based on input/output size). This makes external model costs visible — a user on `critical` intensity with `require_external_review: true` sending specs and source to Codex and Gemini on every feature should know what that costs outside their Claude subscription. The `/csetup` skill should mention this cost implication when configuring external models.
@@ -1710,7 +1710,7 @@ Human: "I want to add localhost traffic inspection"
   │   │   ├── Present to human, propose spec revision
   │   │   └── Loop until all counterexamples resolved
   │   ├── Human reviews model for faithfulness to system
-  │   └── Produces: docs/models/{slug}.als + results
+  │   └── Produces: docs/models/{slug}.also + results
   │
   ├── /creview-spec
   │   ├── Agent team: red team, assumptions auditor, testability auditor, design contract checker
@@ -2265,12 +2265,12 @@ The `setup` script does the following automatically:
    ✓ External models: codex (found), gemini (not found)
    ✓ Hooks registered in .claude/settings.json
    ✓ Commands registered: /cspec /cmodel /creview-spec /ctdd /cverify /caudit /cupdate-arch /cdocs /csetup
-   
+
    Created:
      .claude/workflow-config.json  ← review and adjust
      ARCHITECTURE.md               ← fill in your project's architecture
      AGENT_CONTEXT.md              ← fill in or run /cdocs to auto-generate
-   
+
    Next steps:
      1. Review .claude/workflow-config.json — adjust intensity, enable formal_model if desired
      2. Fill in ARCHITECTURE.md — at minimum, document your trust boundaries and core abstractions

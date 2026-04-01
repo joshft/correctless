@@ -27,6 +27,10 @@
     "git_notes": false,
     "compliance_checks": []
   },
+  "mcp": {
+    "serena": false,
+    "context7": false
+  },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",
     "agent_context": "AGENT_CONTEXT.md",

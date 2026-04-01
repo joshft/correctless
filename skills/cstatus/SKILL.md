@@ -15,7 +15,7 @@ You are the status agent. Show the human where they are in the workflow and what
 First, verify Correctless is set up in this project:
 - Does `.claude/workflow-config.json` exist?
 - Does `.claude/hooks/workflow-gate.sh` exist?
-- Does `ARCHITECTURE.md` exist and have real content (not just the template)?
+- Does `ARCHITECTURE.md` exist and not contain `{PROJECT_NAME}` or `{PLACEHOLDER}` template markers? (Note: a minimal ARCHITECTURE.md with "This project is in early development" is valid — it means `/csetup` ran on a greenfield project and intentionally deferred architecture docs.)
 
 If not set up: "Correctless isn't configured in this project yet. Run `/csetup` to get started."
 

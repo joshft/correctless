@@ -68,4 +68,4 @@ Intensity is set in `.claude/workflow-config.json`.
 
 - **Long runtime (10-20 min).** The skill announces each agent's completion as it happens. You do not need to wait silently.
 - **Checkpoint recovery.** If interrupted, re-running `/creview-spec` checks for a checkpoint less than 24 hours old. If agent outputs are not recoverable from the checkpoint, agents are re-spawned from scratch.
-- **External review failures.** If an external model times out or returns unparseable output, the skill logs a warning and continues. External failures never block the review.
+- **External review failures.** If an external model times out or returns unparsable output, the skill logs a warning and continues. External failures never block the review.
