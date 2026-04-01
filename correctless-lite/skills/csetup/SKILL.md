@@ -174,11 +174,17 @@ Check the following before presenting the offer:
 
 3. **Tooling detection**: Check for `uv` (or `uvx`) and `npx` binaries in PATH. Serena requires `uv`/`uvx`, Context7 requires `npx`.
 
+4. **Serena usefulness check**: Serena's value depends on both language support AND project size. Assess before offering:
+
+   **Strong recommendation** (offer Serena by default) — project language is Python, TypeScript/JavaScript, Go, Rust, Java, C#, C/C++, Ruby, PHP, Kotlin, Scala, or Swift, AND the project has 20+ source files. These languages have mature language servers and enough code to benefit from symbol-level navigation.
+
+   **Available but limited** (offer with caveat) — project language is Bash, Lua, Dart, Elixir, Haskell, Erlang, F#, Clojure, OCaml, Perl, R, Zig, or another language with Serena language server support, OR the project has fewer than 20 source files in a supported language. Show: "Serena supports {language} but symbol-level analysis is most valuable in larger codebases. Your project has {N} source files — it may not save much over grep/read at this size. Want to try it anyway?"
+
+   **Not useful** (skip Serena offer entirely) — `project.language` is `"other"` with no recognizable language, OR the project is primarily Markdown/config/prose with fewer than 10 source code files. Do not offer Serena — it won't provide value. Only offer Context7 (if applicable). Tell the user: "Serena provides symbol-level code analysis but isn't useful for this project type. Skipping. Context7 (library docs) is still available."
+
 ### Offer
 
-When **neither** server is configured, present MCP as a single decision with four options: **both**, **just Serena**, **just Context7**, or **skip**. When only one server is already configured, present a two-option offer for the missing one (as described in the Detection section above). The offer only appears when at least one server is not yet configured AND the required tooling is available.
-
-For `project.language: "other"` or unsupported languages, the Serena offer still appears with a caveat: "Serena works best with Python, TypeScript, Go, Rust, Java, PHP, Ruby, C#. Your project may have partial support."
+When **neither** server is configured and Serena passes the usefulness check, present MCP as a single decision with four options: **both**, **just Serena**, **just Context7**, or **skip**. When Serena does not pass the usefulness check, present only: **Context7** or **skip**. When only one server is already configured, present a two-option offer for the missing one (as described in the Detection section above). The offer only appears when at least one server is not yet configured AND the required tooling is available.
 
 ### Tooling Prerequisites
 
