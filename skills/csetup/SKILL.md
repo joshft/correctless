@@ -184,7 +184,19 @@ Check the following before presenting the offer:
 
 ### Offer
 
-When **neither** server is configured and Serena passes the usefulness check, present MCP as a single decision with four options: **both**, **just Serena**, **just Context7**, or **skip**. When Serena does not pass the usefulness check, present only: **Context7** or **skip**. When only one server is already configured, present a two-option offer for the missing one (as described in the Detection section above). The offer only appears when at least one server is not yet configured AND the required tooling is available.
+When **neither** server is configured and Serena passes the usefulness check, present MCP as a single decision with numbered options:
+
+```
+MCP server integration:
+  1. Both Serena + Context7 (recommended) — symbol analysis and library docs
+  2. Just Serena — symbol-level code analysis only
+  3. Just Context7 — up-to-date library documentation only
+  4. Skip — no MCP servers
+
+  Or type your own: ___
+```
+
+When Serena does not pass the usefulness check, present only: **Context7** or **skip**. When only one server is already configured, present a two-option offer for the missing one (as described in the Detection section above). The offer only appears when at least one server is not yet configured AND the required tooling is available.
 
 ### Tooling Prerequisites
 
@@ -979,8 +991,18 @@ Source Control — detected:
   ✗ PR template: none found → I can generate one
   ✗ Branch protection: not configured → recommend enabling
 
-Branching strategy: [feature branches / trunk-based]?
-Merge strategy: [squash / merge / rebase]?
+Branching strategy:
+  1. Feature branches (recommended) — branch per feature, merge via PR
+  2. Trunk-based — short-lived branches, commit to main frequently
+
+  Or type your own: ___
+
+Merge strategy:
+  1. Squash (recommended) — clean history, one commit per feature
+  2. Merge commit — preserves branch history
+  3. Rebase — linear history, no merge commits
+
+  Or type your own: ___
 ```
 
 **Where answers go:**

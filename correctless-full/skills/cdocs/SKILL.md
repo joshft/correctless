@@ -83,7 +83,16 @@ Reference the spec artifact for detailed rules — don't duplicate.
 
 If the feature introduced new patterns or conventions:
 - Suggest additions to ARCHITECTURE.md
-- Present each to the human for approval — one at a time
+- Present each to the human for approval — one at a time, with options:
+
+```
+  1. Add (recommended) — add this entry to ARCHITECTURE.md
+  2. Skip — not a pattern worth documenting
+  3. Modify — change the entry before adding
+
+  Or type your own: ___
+```
+
 - Don't auto-add without approval
 
 ### 6. Fact-Check
@@ -160,10 +169,12 @@ Full mode:
 ```
 
 Confirm: "Documentation complete. Your options:
-1. Create a PR: `gh pr create` (or `/cpr-review` on your own branch first)
+1. Create a PR (recommended): `gh pr create` (or `/cpr-review` on your own branch first)
 2. Merge locally: `git checkout main && git merge {branch}`
 3. Keep the branch as-is for later review
 4. Discard: `git checkout main && git branch -D {branch}`
+
+Or type your own: ___
 
 After merging to main:
 - If bugs escape to production from this feature → run `/cpostmortem` to trace which phase missed it

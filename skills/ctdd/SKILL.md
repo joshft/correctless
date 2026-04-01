@@ -203,7 +203,17 @@ After the test agent completes and tests exist, run the **test audit** before ad
 > Read: AGENT_CONTEXT.md, the spec, the test files, ARCHITECTURE.md, `.claude/antipatterns.md`.
 > Write: NOTHING. Return findings as your final text response.
 
-**If BLOCKING findings exist**: present to the human. The test agent must fix the tests (add integration tests, strengthen assertions, remove mock gaps) before advancing. Re-run the test auditor after fixes.
+**If BLOCKING findings exist**: present each finding to the human with disposition options:
+
+```
+  1. Fix now (recommended) — implement instance fix + class fix
+  2. Accept risk — document why this finding is acceptable
+  3. Dispute — explain why this is not actually an issue
+
+  Or type your own: ___
+```
+
+The test agent must fix the approved findings (add integration tests, strengthen assertions, remove mock gaps) before advancing. Re-run the test auditor after fixes.
 
 **If no BLOCKING findings**: advance to GREEN:
 
@@ -222,6 +232,14 @@ Spawn an **implementation agent** as a separate forked subagent:
 > Reference the failing test output and implement specifically to make tests pass. Each implementation decision should trace back to a spec rule.
 >
 > If you need to edit a test file (e.g., it has a bug — wrong assertion, incorrect setup), you may do so, but every test edit is logged with a reason. Acceptable: the test had a bug, needed an updated fixture. Unacceptable: weakening an assertion to make it pass, deleting a "too strict" test.
+>
+> When the implementation agent edits a test file, present the edit to the user:
+>
+>   1. Approve change (recommended) — the edit is a legitimate fix
+>   2. Reject — revert the test edit, find another implementation approach
+>   3. Modify — adjust the test edit before accepting
+>
+>   Or type your own: ___
 >
 > Before advancing, all tests must pass.
 >

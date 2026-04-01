@@ -86,7 +86,17 @@ Key questions:
 - What is the feature? (functional description — refined by brainstorm)
 - What does "correct" mean? (the answer becomes invariants/rules)
 - What must this feature NEVER do? (the answer becomes prohibitions/rules)
-- What happens when this fails? (failure mode — fail-open, fail-closed, passthrough, crash)
+- What happens when this fails? Present the failure mode options:
+
+```
+Failure mode:
+  1. Fail-closed (recommended) — reject the operation, return error
+  2. Fail-open — allow the operation, log the failure
+  3. Passthrough — forward to the next handler unchanged
+  4. Crash — terminate the process
+
+  Or type your own: ___
+```
 - **Full mode, if `require_stride` is true**: What is the adversary model? Who is trying to break this?
 - **Full mode**: What existing abstractions does this touch? (reference ARCHITECTURE.md ABS-xxx entries)
 
@@ -282,6 +292,14 @@ A unit test with hand-constructed mocks will not catch missing wiring.
 
 ## Risks
 - {risk} — {mitigation or "accepted"}
+
+For each identified risk, present the acceptance decision:
+
+  1. Mitigate (recommended) — add a rule or guard that addresses the risk
+  2. Accept — document why this risk is tolerable
+  3. Defer — log for a future feature to address
+
+  Or type your own: ___
 
 ## Open Questions
 - {question}

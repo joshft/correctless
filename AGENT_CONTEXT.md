@@ -17,7 +17,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Lite dist | `correctless-lite/` | 16-skill distribution target — never edit directly |
 | Full dist | `correctless-full/` | 23-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh` | 289 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL improvements |
+| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh` | 319 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX |
 | Sync | `sync.sh` | Propagates source edits to both distribution targets |
 
 ## Design Patterns

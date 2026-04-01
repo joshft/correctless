@@ -203,6 +203,17 @@ Present findings to the human organized by category:
 6. Security rules missing (from the checklist)
 7. Self-assessment of the spec
 
+For each finding, present the disposition options:
+
+```
+  1. Accept finding (recommended) — add rule or update spec
+  2. Reject — explain why this doesn't apply
+  3. Modify — accept the concern but change the proposed rule
+  4. Defer — log as accepted risk for future feature
+
+  Or type your own: ___
+```
+
 Incorporate approved changes directly into the spec file. Preserve existing rule numbering — add new rules at the end (R-004, R-005, etc.).
 
 ## Advance State

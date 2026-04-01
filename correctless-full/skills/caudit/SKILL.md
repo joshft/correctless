@@ -79,7 +79,17 @@ Clean up the checkpoint file when the audit converges and completes successfully
 2. Spawn parallel agents (4-6) with specialized hostile lenses
 3. Agents submit findings with confidence tiers (confirmed/probable/suspicious)
 4. Triage agent deduplicates, validates, rejects false positives
-5. Fix all confirmed findings on the audit branch
+5. Present validated findings to the human for triage:
+
+   ```
+     1. Fix now (recommended) — address in the current round
+     2. Defer — log for future resolution
+     3. Dispute — explain why this is not an issue
+
+     Or type your own: ___
+   ```
+
+   Fix all confirmed findings on the audit branch:
    - Non-trivial: TDD (tests first, separate impl agent)
    - Trivial one-liners: apply directly
 6. Commit fixes
@@ -103,6 +113,13 @@ Clean up the checkpoint file when the audit converges and completes successfully
 **Divergence**: if a round finds MORE issues than previous, check if fixes introduced regressions.
 
 **Cost visibility**: after each round, report: findings found, findings fixed, total rounds. Human decides whether to continue.
+
+After each round, present the convergence decision:
+
+  1. Continue to next round (recommended) — there are still actionable findings
+  2. Stop here — remaining findings are acceptable or diminishing returns
+
+  Or type your own: ___
 
 ## Confidence Tiers
 
