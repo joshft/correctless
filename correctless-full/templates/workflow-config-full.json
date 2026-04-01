@@ -6,6 +6,7 @@
   },
   "commands": {
     "test": "",
+    "test_new": "",
     "test_json": "",
     "test_race": "",
     "test_verbose": "",

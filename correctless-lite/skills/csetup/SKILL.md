@@ -192,7 +192,33 @@ If `uv` is not installed and the user wants Serena, print installation instructi
 
 ### Writing `.mcp.json`
 
-When writing `.mcp.json` in the project root: if the file already exists with other MCP server entries, merge the new entries into the existing `mcpServers` object. Existing entries in `mcpServers` are never overwritten or removed — only new keys are added. Use `jq` if available: `jq '.mcpServers = ({"serena": {...}, "context7": {...}} + .mcpServers)' .mcp.json > .mcp.json.tmp && mv .mcp.json.tmp .mcp.json` (note: in jq's `+` for objects, the right-hand side wins on key collision — so existing `.mcpServers` entries override the defaults, preserving custom configs). If `jq` is not available, use the Read tool to read the file, then Write to output the merged result.
+When writing `.mcp.json` in the project root, use this template with version-pinned dependencies:
+
+```json
+{
+  "mcpServers": {
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from", "git+https://github.com/oraios/serena@v0.1.4",
+        "serena-mcp-server",
+        "--transport", "stdio"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@context7/mcp@2.1.6"
+      ]
+    }
+  }
+}
+```
+
+**Version pins are mandatory.** Unpinned dependencies pull latest on every invocation, which can break without warning. When Serena or Context7 releases a new version, update the pins in this skill file after testing.
+
+If `.mcp.json` already exists with other MCP server entries, merge the new entries into the existing `mcpServers` object. Existing entries are never overwritten or removed — only new keys are added. Use `jq` if available: `jq '.mcpServers = ({"serena": {...}, "context7": {...}} + .mcpServers)' .mcp.json > .mcp.json.tmp && mv .mcp.json.tmp .mcp.json` (in jq's `+` for objects, the right-hand side wins on collision — existing entries are preserved). If `jq` is not available, use the Read tool to read the file, then Write to output the merged result.
 
 ### Creating `.serena.yml`
 

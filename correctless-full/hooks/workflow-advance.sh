@@ -216,7 +216,11 @@ tests_fail_not_build_error() {
     pkg="$(detect_affected_packages | awk '{print $1}')"
     [ "$pkg" = "." ] || true
   fi
-  test_cmd="$(read_package_config '.commands.test' "$pkg")"
+  # Prefer commands.test_new if present (allows separate new-test file for RED gate)
+  test_cmd="$(read_package_config '.commands.test_new' "$pkg")"
+  if [ -z "$test_cmd" ] || [ "$test_cmd" = "null" ]; then
+    test_cmd="$(read_package_config '.commands.test' "$pkg")"
+  fi
   fail_pattern="$(read_package_config '.patterns.test_fail_pattern' "$pkg")"
   build_pattern="$(read_package_config '.patterns.build_error_pattern' "$pkg")"
 
@@ -358,6 +362,34 @@ cmd_init() {
 
   local slug
   slug="$(echo "$task" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')"
+  # Truncate to first 4 hyphen-separated tokens, max 50 chars
+  slug="$(echo "$slug" | cut -d'-' -f1-4)"
+  slug="${slug:0:50}"
+  slug="${slug%-}"
+
+  # Guard: empty slug (all-punctuation or whitespace input)
+  [ -n "$slug" ] || die "Could not generate a valid slug from: '$task'. Provide a description containing at least one letter or digit."
+
+  # Check for collision against both spec files on disk AND state files claiming the same spec_file
+  spec_slug_in_use() {
+    local check_slug="$1"
+    [ -f "$REPO_ROOT/docs/specs/${check_slug}.md" ] && return 0
+    for state_f in "$ARTIFACTS_DIR"/workflow-state-*.json; do
+      [ -f "$state_f" ] || continue
+      local existing
+      existing="$(jq -r '.spec_file // empty' "$state_f" 2>/dev/null)"
+      [ "$existing" = "docs/specs/${check_slug}.md" ] && return 0
+    done
+    return 1
+  }
+
+  local base_slug="$slug"
+  local suffix=2
+  while spec_slug_in_use "$slug"; do
+    slug="${base_slug}-${suffix}"
+    suffix=$((suffix + 1))
+  done
+
   local spec_file="docs/specs/${slug}.md"
 
   mkdir -p "$ARTIFACTS_DIR"

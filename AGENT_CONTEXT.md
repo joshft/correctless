@@ -1,6 +1,6 @@
 # Agent Context — Correctless
 
-> Last updated: 2026-03-31
+> Last updated: 2026-04-01
 
 ## What This Project Does
 
@@ -17,7 +17,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Lite dist | `correctless-lite/` | 16-skill distribution target — never edit directly |
 | Full dist | `correctless-full/` | 23-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `test.sh` | 57 shell tests covering setup, state machine, gate hook, full mode |
+| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh` | 264 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes |
 | Sync | `sync.sh` | Propagates source edits to both distribution targets |
 
 ## Design Patterns
@@ -38,7 +38,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 
 | Need to... | Do this |
 |------------|---------|
-| Run tests | `bash test.sh` |
+| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh` |
 | Lint shell scripts | `shellcheck hooks/*.sh test.sh sync.sh setup` |
 | Sync to distributions | `bash sync.sh` |
 | Find a skill | `skills/{name}/SKILL.md` |
@@ -46,4 +46,5 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Check architecture | `ARCHITECTURE.md` |
 | See known bugs | `.claude/antipatterns.md` |
 | Find a spec | `docs/specs/{feature}.md` |
+| Verify sync is clean | `bash sync.sh --check` |
 | Check MCP status | `jq '.mcp' .claude/workflow-config.json` |
