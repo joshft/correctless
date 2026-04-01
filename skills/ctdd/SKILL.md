@@ -431,6 +431,15 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 
 **Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
 
+### Context7 — Library Documentation
+
+If `mcp.context7` is `true` in `workflow-config.json`, the test agent (RED phase) can use Context7 to understand a library's test utilities and assertion patterns:
+
+- Use `resolve-library-id` + `get-library-docs` to fetch testing docs for the libraries under test
+- Useful when the test agent needs to know how a library's test helpers work (e.g., testing hooks in React, test fixtures in pytest)
+
+When Context7 is unavailable, fall back to web search. If Context7 was unavailable during this run, notify the user once at the end.
+
 ## If Something Goes Wrong
 
 - **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.

@@ -39,6 +39,17 @@ If no active workflow, also run:
 - Start a new feature: `git checkout -b feature/my-feature` then `/cspec`
 - Check other branches: {show status-all output if there are active workflows elsewhere}"
 
+**When displaying the current phase, calculate and show the time spent in this phase.** Read `phase_entered_at` from the state file, compute the duration as `now - phase_entered_at`, and display in human-readable format:
+- Under 60 minutes: '{N} minutes' (e.g., '12 minutes')
+- 1-24 hours: '{N} hours' (e.g., '2 hours')
+- Over 24 hours: '{N} days' (e.g., '1 day')
+
+Format: 'Phase: {phase} ({duration})'
+
+Proactive warnings at thresholds:
+- After more than 1 hour in a phase: 'This phase has been active for {duration}. If you are stuck, try re-running the skill for this phase.'
+- After more than 24 hours: 'This workflow has been in {phase} for {duration}. The workflow may be stalled — re-run the skill or use `workflow-advance.sh override` if needed.'
+
 **If workflow is active, show a pipeline diagram with the current phase marked.** Use `▶` to indicate the active phase. For Lite mode:
 
 ```
@@ -117,10 +128,7 @@ Read `.claude/workflow-config.json`. If `workflow.intensity` is set, also show F
 
 After showing phase and commands, proactively check for issues:
 
-**Stale workflow**: Read `phase_entered_at` from the state file. Calculate how long the current phase has been active. If >24 hours: "This workflow has been in `{phase}` for {N} days. If you're stuck:
-- Re-run the skill for this phase (e.g., `/ctdd` for tdd-impl, `/cverify` for done)
-- If an agent crashed, the state machine is waiting for the next transition — re-running resumes
-- If truly stuck: `workflow-advance.sh override 'resuming after stall'`"
+**Stale workflow**: If >24 hours in a phase, this is already handled by the time-in-phase display in section 3 above — do not repeat the warning here. Only check for stale workflows if section 3 did not already display a >24h warning (e.g., if phase_entered_at was missing or unparsable).
 
 **Empty docs**: Check if ARCHITECTURE.md contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if AGENT_CONTEXT.md contains `{PROJECT_NAME}` or `{PLACEHOLDERS}`. If either is still the template: "ARCHITECTURE.md / AGENT_CONTEXT.md is still the default template. Run `/csetup` to populate it from your codebase — this significantly improves spec and review quality."
 

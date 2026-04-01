@@ -3,7 +3,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Skills: 23](https://img.shields.io/badge/skills-23-blue.svg)](docs/skills/)
+[![Skills: 24](https://img.shields.io/badge/skills-23-blue.svg)](docs/skills/)
 [![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
@@ -210,6 +210,7 @@ graph TD
 
 | Skill | When to Use | Description |
 |-------|------------|-------------|
+| [`/cquick`](docs/skills/cquick.md) | Small, well-understood changes | TDD without the ceremony — scope-guarded at 50 LOC / 3 files |
 | [`/crefactor`](docs/skills/crefactor.md) | Restructuring without changing behavior | Characterization tests, behavioral equivalence, agent separation |
 | [`/cdebug`](docs/skills/cdebug.md) | Stuck on a bug | Root cause → hypothesis → bisect → TDD fix → class fix |
 | [`/cpr-review`](docs/skills/cpr-review.md) | Someone opens a PR against your project | Architecture, security, tests, antipatterns, dep bumps |

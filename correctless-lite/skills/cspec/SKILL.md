@@ -179,6 +179,12 @@ After receiving the research subagent's output, **you** (the cspec agent) write 
 
 ### Step 3: Draft the Spec
 
+Before drafting, read the appropriate spec template file and use it as the skeleton:
+- Lite mode: read `templates/spec-lite.md` from the Correctless plugin directory
+- Full mode: read `templates/spec-full.md` from the Correctless plugin directory
+
+Use the template as the skeleton — fill in the placeholders with the feature-specific content rather than reconstructing the format from these instructions.
+
 Write the spec to `docs/specs/{task-slug}.md`.
 
 **Lite mode** — use 5 sections (What, Rules with R-xxx IDs, Won't Do, Risks, Open Questions). Keep it simple.
