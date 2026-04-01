@@ -6,13 +6,13 @@
   },
   "commands": {
     "test": "bash test.sh && bash test-mcp.sh",
-    "test_verbose": "bash test.sh",
+    "test_verbose": "bash test.sh && bash test-mcp.sh",
     "coverage": "",
     "lint": "shellcheck hooks/*.sh test.sh sync.sh setup",
     "build": ""
   },
   "patterns": {
-    "test_file": "test.sh",
+    "test_file": "test*.sh",
     "source_file": "*.sh,*.md",
     "test_fail_pattern": "FAIL:",
     "build_error_pattern": ""
@@ -25,6 +25,10 @@
     "git_notes": false,
     "branching_strategy": "feature-branches",
     "merge_strategy": "squash"
+  },
+  "mcp": {
+    "serena": false,
+    "context7": true
   },
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",

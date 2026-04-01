@@ -32,3 +32,6 @@ ROADMAP.md
 
 # Correctless — transient workflow state
 .claude/artifacts/
+
+# Serena local data
+.serena/
