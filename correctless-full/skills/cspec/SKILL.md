@@ -340,6 +340,23 @@ Once the human approves the spec, advance to review. **Review is MANDATORY — n
 .claude/hooks/workflow-advance.sh review-spec
 ```
 
+After advancing, print the pipeline diagram showing progress:
+
+Lite mode:
+```
+  ✓ spec → ▶ review → tdd → verify → docs → merge
+```
+
+Full mode (if advancing to model):
+```
+  ✓ spec → ▶ model → review → tdd → verify → arch → docs → audit → merge
+```
+
+Full mode (if advancing to review-spec, i.e. no formal model):
+```
+  ✓ spec → ▶ review → tdd → verify → arch → docs → audit → merge
+```
+
 After advancing, tell the human to run `/creview` (Lite) or `/creview-spec` (Full). Do NOT proceed to `/ctdd` yourself. The review must happen first.
 
 ## Claude Code Feature Integration

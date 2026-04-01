@@ -152,6 +152,15 @@ Incorporate approved changes into the spec.
 .claude/hooks/workflow-advance.sh tests
 ```
 
+After advancing, print the pipeline diagram:
+
+```
+  ✓ spec → ✓ review → ▶ tdd → verify → arch → docs → audit → merge
+                        │
+                  ┌─────┴─────┐
+                 ▶ RED  GREEN   QA
+```
+
 After advancing, tell the human: "Review complete. Run `/ctdd` to start the TDD cycle. The full pipeline continues: RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge. Every step runs."
 
 ## Claude Code Feature Integration

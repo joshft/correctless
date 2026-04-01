@@ -194,6 +194,18 @@ Advance the state machine:
 ```
 This checks that the verification report file exists. If it doesn't, the transition fails.
 
+After advancing, print the pipeline diagram:
+
+Lite mode:
+```
+  ✓ spec → ✓ review → ✓ tdd → ✓ verify → ▶ docs → merge
+```
+
+Full mode:
+```
+  ✓ spec → ✓ review → ✓ tdd → ✓ verify → ▶ arch → docs → audit → merge
+```
+
 Next step is mandatory:
 - If BLOCKING findings exist: they MUST be fixed first. Return to the TDD cycle.
 - After fixing and re-verifying: tell the human to run `/cdocs`. This is the final step before merge.

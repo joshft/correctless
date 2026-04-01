@@ -134,6 +134,18 @@ Advance the state machine:
 .claude/hooks/workflow-advance.sh documented
 ```
 
+After advancing, print the pipeline diagram:
+
+Lite mode:
+```
+  ✓ spec → ✓ review → ✓ tdd → ✓ verify → ✓ docs → ▶ merge
+```
+
+Full mode:
+```
+  ✓ spec → ✓ review → ✓ tdd → ✓ verify → ✓ arch → ✓ docs → ▶ audit → merge
+```
+
 Confirm: "Documentation complete. Your options:
 1. Create a PR: `gh pr create` (or `/cpr-review` on your own branch first)
 2. Merge locally: `git checkout main && git merge {branch}`

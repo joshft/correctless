@@ -212,6 +212,16 @@ Once the human approves the revised spec:
 .claude/hooks/workflow-advance.sh tests
 ```
 
+After advancing, print the pipeline diagram:
+
+Lite mode:
+```
+  ✓ spec → ✓ review → ▶ tdd → verify → docs → merge
+                        │
+                  ┌─────┴─────┐
+                 ▶ RED  GREEN   QA
+```
+
 After advancing, tell the human to run `/ctdd`. The full pipeline continues: RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge. Every step runs.
 
 ## Claude Code Feature Integration
