@@ -238,11 +238,14 @@ If Serena is selected, create `.serena.yml` in the project root with:
 
 ```yaml
 project_name: "{project name detected in Step 1 from the manifest file}"
+language: "{detected language from Step 1}"
 read_only: false
 enable_memories: true
 ```
 
 Set `project_name` to the project name detected in Step 1 (from the manifest file: `package.json` name, `go.mod` module, `Cargo.toml` package name, `pyproject.toml` project name, etc.), not from `workflow-config.json` which may not be confirmed yet.
+
+Set `language` to the language detected in Step 1. Must be one of Serena's supported language identifiers: `python`, `typescript`, `go`, `rust`, `java`, `c_sharp`, `c_cpp`, `ruby`, `php`, `kotlin`, `scala`, `swift`, `bash`, `lua`, `dart`, `elixir`, `haskell`, etc. **This field is required** — Serena crashes without it.
 
 ### `.gitignore` Update
 

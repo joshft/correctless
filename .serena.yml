@@ -1,3 +1,4 @@
 project_name: "correctless"
+language: "bash"
 read_only: false
 enable_memories: true

@@ -3,8 +3,13 @@
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
-        "command": ".claude/hooks/workflow-gate.sh",
-        "timeout_ms": 5000
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/workflow-gate.sh",
+            "timeout_ms": 5000
+          }
+        ]
       }
     ]
   },
@@ -12,5 +17,9 @@
     "allow": [
       "Bash(.claude/hooks/workflow-advance.sh *)"
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": ".claude/hooks/statusline.sh"
   }
 }
