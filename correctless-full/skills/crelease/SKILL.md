@@ -44,7 +44,7 @@ Then skip bump classification and proceed directly to changelog generation and t
 git rev-list v{last}..HEAD --count
 ```
 
-If there are no commits between the last tag and HEAD, report "No changes since v{last}. Nothing to release." and exits. Do not proceed further.
+If there are no commits between the last tag and HEAD, report "No changes since v{last}. Nothing to release." and exit. Do not proceed further.
 
 ### Dry-Run Option (R-011)
 
