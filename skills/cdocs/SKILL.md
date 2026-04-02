@@ -1,12 +1,12 @@
 ---
 name: cdocs
-description: Update project documentation after a feature lands. Updates README, AGENT_CONTEXT.md, ARCHITECTURE.md, and feature docs. Run before merging.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/*), Write(README.md), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md), Write(CLAUDE.md)
+description: Update project documentation after a feature lands. Updates README, .correctless/AGENT_CONTEXT.md, .correctless/ARCHITECTURE.md, and feature docs. Run before merging.
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md)
 ---
 
 # /cdocs — Update Project Documentation
 
-You are the documentation agent. Your job is to keep project documentation current after features land. You update README, AGENT_CONTEXT.md, feature docs, and suggest ARCHITECTURE.md additions.
+You are the documentation agent. Your job is to keep project documentation current after features land. You update README, .correctless/AGENT_CONTEXT.md, feature docs, and suggest .correctless/ARCHITECTURE.md additions.
 
 ## Progress Visibility (MANDATORY)
 
@@ -16,25 +16,25 @@ Documentation updates take about 5 minutes. The user must see progress throughou
 1. Check prerequisites (workflow state, verification report)
 2. Diff analysis
 3. README updates
-4. AGENT_CONTEXT.md updates
+4. .correctless/AGENT_CONTEXT.md updates
 5. Feature docs
-6. ARCHITECTURE.md suggestions
+6. .correctless/ARCHITECTURE.md suggestions
 7. Fact-check and staleness check
 
 **Between each step**, print a 1-line status: "Diff analysis complete — {N} new features, {M} changed behaviors. Checking README..." Mark each task complete as it finishes.
 
 ## Before You Start
 
-**First-run check**: If `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate ARCHITECTURE.md and AGENT_CONTEXT.md with the basics, or you can run `/csetup` for the full experience (health check, convention mining, security audit)." If they want the quick scan: glob for key directories, identify 3-5 components and patterns, populate ARCHITECTURE.md with real entries, then continue. This takes 30 seconds and dramatically improves output quality.
+**First-run check**: If `.correctless/ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate .correctless/ARCHITECTURE.md and .correctless/AGENT_CONTEXT.md with the basics, or you can run `/csetup` for the full experience (health check, convention mining, security audit)." If they want the quick scan: glob for key directories, identify 3-5 components and patterns, populate .correctless/ARCHITECTURE.md with real entries, then continue. This takes 30 seconds and dramatically improves output quality.
 
-**Step 0: Check prerequisites.** Read the workflow state file. If the current phase is not `verified`, stop immediately and tell the human: "Run `/cverify` first. The workflow order is: done → /cverify → verified → /cdocs → documented." Check that `docs/verification/{task-slug}-verification.md` exists. If it does not exist, stop and tell the human: "Verification report not found. Run /cverify before /cdocs." Do NOT proceed with documentation work until both checks pass.
+**Step 0: Check prerequisites.** Read the workflow state file. If the current phase is not `verified`, stop immediately and tell the human: "Run `/cverify` first. The workflow order is: done → /cverify → verified → /cdocs → documented." Check that `.correctless/verification/{task-slug}-verification.md` exists. If it does not exist, stop and tell the human: "Verification report not found. Run /cverify before /cdocs." Do NOT proceed with documentation work until both checks pass.
 
 1. Run `git log --oneline -20` to see recent changes.
 2. Run `git diff main...HEAD --stat` to see what changed on this branch.
-3. Read existing `README.md`, `ARCHITECTURE.md`, `AGENT_CONTEXT.md`.
-4. Read the spec artifact for the feature being merged (check `docs/specs/`).
-5. Read `.claude/workflow-config.json` for project commands.
-6. Read the verification report from `docs/verification/{task-slug}-verification.md` — use its findings to inform what to document (new dependencies, architecture changes, etc.).
+3. Read existing `README.md`, `.correctless/ARCHITECTURE.md`, `.correctless/AGENT_CONTEXT.md`.
+4. Read the spec artifact for the feature being merged (check `.correctless/specs/`).
+5. Read `.correctless/config/workflow-config.json` for project commands.
+6. Read the verification report from `.correctless/verification/{task-slug}-verification.md` — use its findings to inform what to document (new dependencies, architecture changes, etc.).
 
 ## What to Update
 
@@ -56,14 +56,14 @@ Check against the current state of the project:
 
 Update if needed. Present changes to the human for approval.
 
-### 3. AGENT_CONTEXT.md
+### 3. .correctless/AGENT_CONTEXT.md
 
 This is the most important output — every fresh agent reads this first.
 
 Update:
 - **Key Components table**: add new components, update locations
 - **Design Patterns**: add new patterns introduced by the feature
-- **Common Pitfalls**: add new pitfalls from `.claude/antipatterns.md`
+- **Common Pitfalls**: add new pitfalls from `.correctless/antipatterns.md`
 - **Quick Reference**: verify commands are still accurate
 
 Target: under 1500 words. Keep it concise and current.
@@ -79,14 +79,14 @@ For significant features, create or update a doc in `docs/features/`:
 
 Reference the spec artifact for detailed rules — don't duplicate.
 
-### 5. ARCHITECTURE.md
+### 5. .correctless/ARCHITECTURE.md
 
 If the feature introduced new patterns or conventions:
-- Suggest additions to ARCHITECTURE.md
+- Suggest additions to .correctless/ARCHITECTURE.md
 - Present each to the human for approval — one at a time, with options:
 
 ```
-  1. Add (recommended) — add this entry to ARCHITECTURE.md
+  1. Add (recommended) — add this entry to .correctless/ARCHITECTURE.md
   2. Skip — not a pattern worth documenting
   3. Modify — change the entry before adding
 
@@ -115,9 +115,9 @@ Present all proposed changes to the human for approval before writing.
 Structure your output:
 1. Summary of what changed
 2. Proposed README changes (if any)
-3. Proposed AGENT_CONTEXT.md updates
+3. Proposed .correctless/AGENT_CONTEXT.md updates
 4. New/updated feature docs
-5. Proposed ARCHITECTURE.md additions
+5. Proposed .correctless/ARCHITECTURE.md additions
 6. Stale docs flagged
 
 ## After Documentation
@@ -133,11 +133,11 @@ Each entry is one paragraph:
 Branch: {branch}. Rules: {count}. QA rounds: {N}. Findings fixed: {N}. {one-line description}.
 ```
 
-Read the workflow state file (`.claude/artifacts/workflow-state-{branch-slug}.json`): use `.branch` for the branch name, `.qa_rounds` for QA round count, `.spec_file` for the spec path. Count rules from the spec file (count lines matching `R-[0-9]` or `INV-[0-9]`). Count fixed findings from `.claude/artifacts/qa-findings-{task-slug}.json` if it exists (count entries where `.status == "fixed"`). Use today's date and the feature name from the spec's `# Spec: {title}` heading.
+Read the workflow state file (`.correctless/artifacts/workflow-state-{branch-slug}.json`): use `.branch` for the branch name, `.qa_rounds` for QA round count, `.spec_file` for the spec path. Count rules from the spec file (count lines matching `R-[0-9]` or `INV-[0-9]`). Count fixed findings from `.correctless/artifacts/qa-findings-{task-slug}.json` if it exists (count entries where `.status == "fixed"`). Use today's date and the feature name from the spec's `# Spec: {title}` heading.
 
 ### Convention Learning
 
-If this is the 3rd or more feature where the same architectural pattern has appeared (check docs/specs/ for recurring patterns), append to the `## Correctless Learnings` section of `CLAUDE.md`:
+If this is the 3rd or more feature where the same architectural pattern has appeared (check .correctless/specs/ for recurring patterns), append to the `## Correctless Learnings` section of `CLAUDE.md`:
 
 ```markdown
 ### {date} — Convention confirmed: {pattern name}
@@ -147,13 +147,13 @@ If this is the 3rd or more feature where the same architectural pattern has appe
 
 Before appending, read the existing Correctless Learnings section. Search for the heading `Convention confirmed: {pattern name}` — if an entry with the same pattern name exists, skip. If the `## Correctless Learnings` section doesn't exist in CLAUDE.md, create it with the header before appending.
 
-This ensures future spec and review agents know about established conventions without manually updating ARCHITECTURE.md.
+This ensures future spec and review agents know about established conventions without manually updating .correctless/ARCHITECTURE.md.
 
 ### Advance Workflow
 
 Advance the state machine:
 ```bash
-.claude/hooks/workflow-advance.sh documented
+.correctless/hooks/workflow-advance.sh documented
 ```
 
 After advancing, print the pipeline diagram:
@@ -187,7 +187,7 @@ After merging to main:
 See "Progress Visibility" section above — task creation and narration are mandatory.
 
 ### /export
-After documentation is approved: "Consider exporting: `/export docs/decisions/{task-slug}-docs.md`"
+After documentation is approved: "Consider exporting: `/export .correctless/decisions/{task-slug}-docs.md`"
 
 ## Code Analysis (MCP Integration)
 
@@ -220,8 +220,8 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 
 ## Constraints
 
-- **Don't duplicate information** that lives in ARCHITECTURE.md or spec artifacts. Reference them.
+- **Don't duplicate information** that lives in .correctless/ARCHITECTURE.md or spec artifacts. Reference them.
 - **Don't document internal implementation details** — document behavior, interfaces, configuration.
 - **Present changes for human approval** before writing. Documentation is the project's external face.
-- **Keep AGENT_CONTEXT.md under 1500 words.** It's a briefing, not a novel.
+- **Keep .correctless/AGENT_CONTEXT.md under 1500 words.** It's a briefing, not a novel.
 - **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

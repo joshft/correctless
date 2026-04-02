@@ -1,7 +1,7 @@
 ---
 name: cpostmortem
 description: Post-merge bug analysis. Use when a bug escapes to production. Traces which phase missed it and strengthens the workflow.
-allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.claude/meta/*), Write(.claude/antipatterns.md), Write(.claude/templates/invariants/*), Write(.claude/artifacts/token-log-*), Write(CLAUDE.md)
+allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.correctless/meta/*), Write(.correctless/antipatterns.md), Write(.claude/templates/invariants/*), Write(.correctless/artifacts/token-log-*), Write(CLAUDE.md)
 context: fork
 ---
 
@@ -29,11 +29,11 @@ Mark each task complete as it finishes.
 
 ## Before You Start
 
-1. Read `.claude/meta/workflow-effectiveness.json` for existing bug history.
-2. Read `.claude/antipatterns.md` to check if this bug class is already tracked.
+1. Read `.correctless/meta/workflow-effectiveness.json` for existing bug history.
+2. Read `.correctless/antipatterns.md` to check if this bug class is already tracked.
 3. Identify the spec artifact for the feature where the bug was introduced.
 4. Read the verification report for that feature if it exists.
-5. Read `.claude/artifacts/debug-investigation-*.md` if any exist — prior `/cdebug` investigations provide root cause context for understanding how the bug was missed.
+5. Read `.correctless/artifacts/debug-investigation-*.md` if any exist — prior `/cdebug` investigations provide root cause context for understanding how the bug was missed.
 
 ## Behavior
 
@@ -74,7 +74,7 @@ For each miss, propose one or more of:
 
 ### Step 4: Write the PMB Entry
 
-Read `.claude/meta/workflow-effectiveness.json` first. Append the new PMB entry to the `post_merge_bugs` array. Use `Edit` to add the entry — do NOT overwrite the file. Use the next sequential PMB-NNN ID.
+Read `.correctless/meta/workflow-effectiveness.json` first. Append the new PMB entry to the `post_merge_bugs` array. Use `Edit` to add the entry — do NOT overwrite the file. Use the next sequential PMB-NNN ID.
 
 Entry format:
 
@@ -129,7 +129,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the analysis subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the feature slug):
+After the analysis subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the feature slug):
 
 ```json
 {
@@ -145,7 +145,7 @@ After the analysis subagent completes, capture `total_tokens` and `duration_ms` 
 If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 
 ### /export
-After postmortem completes: "Export this postmortem conversation: `/export docs/decisions/{task-slug}-postmortem.md` — captures the full analysis of why the workflow missed this bug."
+After postmortem completes: "Export this postmortem conversation: `/export .correctless/decisions/{task-slug}-postmortem.md` — captures the full analysis of why the workflow missed this bug."
 
 ## If Something Goes Wrong
 

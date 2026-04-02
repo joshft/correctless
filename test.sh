@@ -63,9 +63,9 @@ assert_exit() {
   assert_eq "$desc" "$expected_exit" "$actual_exit"
 }
 
-ADV() { cd "$TEST_DIR" && .claude/hooks/workflow-advance.sh "$@"; }
-GATE_INPUT() { cd "$TEST_DIR" && echo "$1" | .claude/hooks/workflow-gate.sh 2>&1; }
-GATE_EXIT() { cd "$TEST_DIR" && echo "$1" | .claude/hooks/workflow-gate.sh >/dev/null 2>&1; echo $?; }
+ADV() { cd "$TEST_DIR" && .correctless/hooks/workflow-advance.sh "$@"; }
+GATE_INPUT() { cd "$TEST_DIR" && echo "$1" | .correctless/hooks/workflow-gate.sh 2>&1; }
+GATE_EXIT() { cd "$TEST_DIR" && echo "$1" | .correctless/hooks/workflow-gate.sh >/dev/null 2>&1; echo $?; }
 
 # ---------------------------------------------------------------------------
 # Test: Setup Script
@@ -80,17 +80,17 @@ test_setup() {
   output="$(.claude/skills/workflow/setup 2>&1)"
 
   assert_contains "detects TypeScript" "typescript" "$output"
-  assert_eq "creates workflow-config.json" "true" "$([ -f .claude/workflow-config.json ] && echo true || echo false)"
-  assert_eq "creates ARCHITECTURE.md" "true" "$([ -f ARCHITECTURE.md ] && echo true || echo false)"
-  assert_eq "creates AGENT_CONTEXT.md" "true" "$([ -f AGENT_CONTEXT.md ] && echo true || echo false)"
-  assert_eq "creates antipatterns.md" "true" "$([ -f .claude/antipatterns.md ] && echo true || echo false)"
+  assert_eq "creates workflow-config.json" "true" "$([ -f .correctless/config/workflow-config.json ] && echo true || echo false)"
+  assert_eq "creates ARCHITECTURE.md" "true" "$([ -f .correctless/ARCHITECTURE.md ] && echo true || echo false)"
+  assert_eq "creates AGENT_CONTEXT.md" "true" "$([ -f .correctless/AGENT_CONTEXT.md ] && echo true || echo false)"
+  assert_eq "creates antipatterns.md" "true" "$([ -f .correctless/antipatterns.md ] && echo true || echo false)"
   assert_eq "creates settings.json" "true" "$([ -f .claude/settings.json ] && echo true || echo false)"
-  assert_eq "creates hooks dir" "true" "$([ -f .claude/hooks/workflow-gate.sh ] && echo true || echo false)"
-  assert_contains "hooks reference .claude/hooks/" ".claude/hooks/workflow-gate.sh" "$(cat .claude/settings.json)"
+  assert_eq "creates hooks dir" "true" "$([ -f .correctless/hooks/workflow-gate.sh ] && echo true || echo false)"
+  assert_contains "hooks reference .correctless/hooks/" ".correctless/hooks/workflow-gate.sh" "$(cat .claude/settings.json)"
   assert_contains "settings has hooks array format" '"hooks"' "$(cat .claude/settings.json)"
   assert_contains "settings has audit-trail hook" "audit-trail" "$(cat .claude/settings.json)"
-  assert_eq "creates docs/specs" "true" "$([ -d docs/specs ] && echo true || echo false)"
-  assert_eq "creates .claude/artifacts" "true" "$([ -d .claude/artifacts ] && echo true || echo false)"
+  assert_eq "creates .correctless/specs" "true" "$([ -d .correctless/specs ] && echo true || echo false)"
+  assert_eq "creates .correctless/artifacts" "true" "$([ -d .correctless/artifacts ] && echo true || echo false)"
 
   # Idempotency
   local output2
@@ -98,7 +98,7 @@ test_setup() {
   assert_contains "idempotent — skips existing config" "already exists" "$output2"
 
   # Partial settings — gate exists but audit-trail missing (bug regression test)
-  local partial_settings='{"hooks":{"PreToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":".claude/hooks/workflow-gate.sh"}]}]}}'
+  local partial_settings='{"hooks":{"PreToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":".correctless/hooks/workflow-gate.sh"}]}]}}'
   echo "$partial_settings" > .claude/settings.json
   .claude/skills/workflow/setup >/dev/null 2>&1
   assert_contains "partial settings: adds audit-trail" "audit-trail" "$(cat .claude/settings.json)"
@@ -131,8 +131,8 @@ test_state_machine() {
   assert_contains "can't skip spec→impl" "Expected phase" "$out"
 
   # spec → review
-  mkdir -p docs/specs
-  echo "# Spec" > docs/specs/test-feature.md
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/test-feature.md
   ADV review >/dev/null 2>&1
   assert_eq "review phase" "review" "$(ADV status 2>&1 | grep 'Phase:' | awk '{print $2}')"
 
@@ -170,8 +170,8 @@ test_state_machine() {
   assert_contains "verified needs report" "Verification report not found" "$ver_out"
 
   # Create report and advance
-  mkdir -p docs/verification
-  echo "# Verification" > docs/verification/test-feature-verification.md
+  mkdir -p .correctless/verification
+  echo "# Verification" > .correctless/verification/test-feature-verification.md
   ADV verified >/dev/null 2>&1
   assert_eq "verified phase" "verified" "$(ADV status 2>&1 | grep 'Phase:' | awk '{print $2}')"
 
@@ -180,7 +180,7 @@ test_state_machine() {
   assert_eq "documented phase" "documented" "$(ADV status 2>&1 | grep 'Phase:' | awk '{print $2}')"
 
   # State file persists
-  assert_eq "state file persists" "true" "$(ls .claude/artifacts/workflow-state-feature-test-sm-*.json >/dev/null 2>&1 && echo true || echo false)"
+  assert_eq "state file persists" "true" "$(ls .correctless/artifacts/workflow-state-feature-test-sm-*.json >/dev/null 2>&1 && echo true || echo false)"
 }
 
 # ---------------------------------------------------------------------------
@@ -195,8 +195,8 @@ test_gate() {
   .claude/skills/workflow/setup >/dev/null 2>&1
   git checkout -q -b feature/test-gate
   ADV init "gate test" >/dev/null 2>&1
-  mkdir -p docs/specs
-  echo "# Spec" > docs/specs/gate-test.md
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/gate-test.md
   ADV review >/dev/null 2>&1
   ADV tests >/dev/null 2>&1
 
@@ -218,7 +218,7 @@ test_gate() {
   assert_eq "RED: allows markdown" "0" "$exit_code"
 
   # Block state file edits
-  exit_code="$(GATE_EXIT '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/.claude/artifacts/workflow-state-feature-test-gate.json"}}')"
+  exit_code="$(GATE_EXIT '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/.correctless/artifacts/workflow-state-feature-test-gate.json"}}')"
   assert_eq "blocks state file edits" "2" "$exit_code"
 
   # Advance to impl then qa
@@ -232,7 +232,7 @@ test_gate() {
   # Verify we're actually in QA before testing the gate
   cd "$TEST_DIR" || exit
   local gate_phase
-  gate_phase="$(cat .claude/artifacts/workflow-state-feature-test-gate-*.json 2>/dev/null | jq -r '.phase' 2>/dev/null)"
+  gate_phase="$(cat .correctless/artifacts/workflow-state-feature-test-gate-*.json 2>/dev/null | jq -r '.phase' 2>/dev/null)"
   assert_eq "gate test: in QA phase" "tdd-qa" "$gate_phase"
   if [ "$gate_phase" != "tdd-qa" ]; then
     echo "    IMPL output: $impl_out"
@@ -246,7 +246,7 @@ test_gate() {
   # QA phase: block test
   cd "$TEST_DIR" || exit
   local test_gate_exit
-  echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/bar.test.ts"}}' | .claude/hooks/workflow-gate.sh >/dev/null 2>&1 && test_gate_exit=0 || test_gate_exit=$?
+  echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/bar.test.ts"}}' | .correctless/hooks/workflow-gate.sh >/dev/null 2>&1 && test_gate_exit=0 || test_gate_exit=$?
   assert_eq "QA: blocks test" "2" "$test_gate_exit"
 
   # QA phase: allow markdown
@@ -272,8 +272,8 @@ test_utilities() {
   .claude/skills/workflow/setup >/dev/null 2>&1
   git checkout -q -b feature/test-util
   ADV init "util test" >/dev/null 2>&1
-  mkdir -p docs/specs
-  echo "# Spec" > docs/specs/util-test.md
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/util-test.md
   ADV review >/dev/null 2>&1
   ADV tests >/dev/null 2>&1
   echo '{"name": "test-app", "scripts": {"test": "echo FAIL && exit 1"}}' > package.json
@@ -289,7 +289,7 @@ test_utilities() {
   assert_eq "override allows blocked edit" "0" "$exit_code"
 
   # Override log exists
-  assert_eq "override log created" "true" "$([ -f .claude/artifacts/override-log.json ] && echo true || echo false)"
+  assert_eq "override log created" "true" "$([ -f .correctless/artifacts/override-log.json ] && echo true || echo false)"
 
   # Diagnose shows info
   local diag
@@ -302,8 +302,8 @@ test_utilities() {
   ADV reset >/dev/null 2>&1
   git checkout -q -b feature/test-specupdate
   ADV init "specupdate test" >/dev/null 2>&1
-  mkdir -p docs/specs
-  echo "# Spec" > docs/specs/specupdate-test.md
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/specupdate-test.md
   ADV review >/dev/null 2>&1
   ADV tests >/dev/null 2>&1
   ADV spec-update "rule was wrong" >/dev/null 2>&1
@@ -328,8 +328,8 @@ test_full_mode() {
   .claude/skills/workflow/setup >/dev/null 2>&1
 
   # Enable full mode
-  jq '.workflow += {"intensity": "high", "min_qa_rounds": 2, "fail_closed_when_no_state": true}' .claude/workflow-config.json > "$TEST_DIR/fc.$$.json"
-  mv "$TEST_DIR/fc.$$.json" .claude/workflow-config.json
+  jq '.workflow += {"intensity": "high", "min_qa_rounds": 2, "fail_closed_when_no_state": true}' .correctless/config/workflow-config.json > "$TEST_DIR/fc.$$.json"
+  mv "$TEST_DIR/fc.$$.json" .correctless/config/workflow-config.json
 
   # Fail-closed: no state file blocks source edits
   git checkout -q -b feature/test-full
@@ -339,8 +339,8 @@ test_full_mode() {
 
   # Init and test model/review-spec transitions
   ADV init "full test" >/dev/null 2>&1
-  mkdir -p docs/specs
-  echo "# Spec" > docs/specs/full-test.md
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/full-test.md
 
   # Model transition (should fail without formal_model)
   local out
@@ -392,8 +392,8 @@ test_additional_coverage() {
   # N11: Test spec→tests rejection when spec_updates=0
   git checkout -q -b feature/test-review-skip
   ADV init "review skip test" >/dev/null 2>&1
-  mkdir -p docs/specs
-  echo "# Spec" > docs/specs/review-skip-test.md
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/review-skip-test.md
   local out
   out="$(ADV tests 2>&1)" && true
   assert_contains "blocks spec→tests without review" "Cannot skip review" "$out"
@@ -414,11 +414,11 @@ test_additional_coverage() {
 
   # N15: Test GREEN phase gate allows source edits
   cd "$TEST_DIR" || exit
-  echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/index.ts"}}' | .claude/hooks/workflow-gate.sh >/dev/null 2>&1 && green_exit=0 || green_exit=$?
+  echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/index.ts"}}' | .correctless/hooks/workflow-gate.sh >/dev/null 2>&1 && green_exit=0 || green_exit=$?
   assert_eq "GREEN allows source edits" "0" "$green_exit"
 
   # N15: Test GREEN phase gate allows test edits (logged)
-  echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/z.test.ts"}}' | .claude/hooks/workflow-gate.sh >/dev/null 2>&1 && green_test_exit=0 || green_test_exit=$?
+  echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/z.test.ts"}}' | .correctless/hooks/workflow-gate.sh >/dev/null 2>&1 && green_test_exit=0 || green_test_exit=$?
   assert_eq "GREEN allows test edits" "0" "$green_test_exit"
 
   # B10: Test override expiry
@@ -426,10 +426,10 @@ test_additional_coverage() {
   ADV override "expiry test" >/dev/null 2>&1
   # Burn through 10 calls
   for _i in $(seq 1 10); do
-    echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/index.ts"}}' | .claude/hooks/workflow-gate.sh >/dev/null 2>&1 || true
+    echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/index.ts"}}' | .correctless/hooks/workflow-gate.sh >/dev/null 2>&1 || true
   done
   # 11th call should be blocked (override expired)
-  echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/index.ts"}}' | .claude/hooks/workflow-gate.sh >/dev/null 2>&1 && override_exit=0 || override_exit=$?
+  echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/index.ts"}}' | .correctless/hooks/workflow-gate.sh >/dev/null 2>&1 && override_exit=0 || override_exit=$?
   assert_eq "override expires after 10 calls" "2" "$override_exit"
 
   # N12: Test verify-phase rejected in Lite mode
@@ -437,7 +437,7 @@ test_additional_coverage() {
   .claude/skills/workflow/setup >/dev/null 2>&1
   git checkout -q -b feature/test-lite-verify
   ADV init "lite verify test" >/dev/null 2>&1
-  mkdir -p docs/specs && echo "# S" > docs/specs/lite-verify-test.md
+  mkdir -p .correctless/specs && echo "# S" > .correctless/specs/lite-verify-test.md
   ADV review >/dev/null 2>&1
   ADV tests >/dev/null 2>&1
   echo '// t' > a.test.ts && git add a.test.ts

@@ -20,7 +20,13 @@ jobs:
         run: sudo apt-get install -y jq
 
       - name: Run tests
-        run: bash test.sh
+        run: |
+          bash test.sh
+          bash test-mcp.sh
+          bash test-bugfixes.sh
+          bash test-qol.sh
+          bash test-decisions.sh
+          bash test-statusline.sh
 
       - name: Verify sync
         run: |
@@ -37,4 +43,5 @@ jobs:
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
         with:
           scandir: ./hooks
+          additional_files: sync.sh setup
           severity: warning

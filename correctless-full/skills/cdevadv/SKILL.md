@@ -1,7 +1,7 @@
 ---
 name: cdevadv
 description: "10th Man / Devil's Advocate. Challenges the assumptions, architecture, and strategies that every other agent accepts as true. Periodic deep analysis — not every feature."
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*test*), Bash(*coverage*), Write(.claude/artifacts/devadv/*), Write(.claude/artifacts/token-log-*), Write(.claude/meta/drift-debt.json)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*test*), Bash(*coverage*), Write(.correctless/artifacts/devadv/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/meta/drift-debt.json)
 context: fork
 ---
 
@@ -61,7 +61,7 @@ Challenge one specific area of consensus. The human provides a thesis to disprov
 - "The config lifecycle pattern covers all cases"
 - "The test suite provides real confidence"
 
-**Context to load**: ARCHITECTURE.md (always), antipatterns (always), the specs/source/findings relevant to the theme (not everything). Monthly, rotate which theme gets challenged. Over a quarter, every major assumption gets scrutinized.
+**Context to load**: .correctless/ARCHITECTURE.md (always), antipatterns (always), the specs/source/findings relevant to the theme (not everything). Monthly, rotate which theme gets challenged. Over a quarter, every major assumption gets scrutinized.
 
 ### Mode 2: Signals (`/cdevadv signals`)
 
@@ -72,11 +72,11 @@ An explorer subagent scans for "where things smell wrong" and produces a brief. 
 > You are a signal scanner for the devil's advocate analysis. Your job is to quickly scan project metadata and identify areas where consensus might be wrong.
 >
 > Read these files (skip any that don't exist — note the absence):
-> - `.claude/antipatterns.md` — group by category, flag any with 3+ entries
-> - `.claude/meta/drift-debt.json` — flag items older than 60 days
-> - `.claude/meta/workflow-effectiveness.json` — flag phases with 0 bugs caught
-> - `.claude/artifacts/findings/audit-*-history.md` — look for recurring patterns
-> - `.claude/artifacts/qa-findings-*.json` — look for repeated finding categories
+> - `.correctless/antipatterns.md` — group by category, flag any with 3+ entries
+> - `.correctless/meta/drift-debt.json` — flag items older than 60 days
+> - `.correctless/meta/workflow-effectiveness.json` — flag phases with 0 bugs caught
+> - `.correctless/artifacts/findings/audit-*-history.md` — look for recurring patterns
+> - `.correctless/artifacts/qa-findings-*.json` — look for repeated finding categories
 >
 > Also run: `git log --format='%H %s' --since='6 months ago' -- '*.go' '*.ts' '*.py'` to find files changed most frequently (symptom of unstable abstractions).
 >
@@ -88,15 +88,15 @@ An explorer subagent scans for "where things smell wrong" and produces a brief. 
 
 **Signals that warrant investigation:**
 
-1. **Antipattern categories with 3+ entries** — systematic issue, not isolated bugs. Read `.claude/antipatterns.md`, group by category, flag any category with 3+ entries.
+1. **Antipattern categories with 3+ entries** — systematic issue, not isolated bugs. Read `.correctless/antipatterns.md`, group by category, flag any category with 3+ entries.
 
-2. **Drift debt items older than 60 days** — the "fine for now" pile is rotting. Read `.claude/meta/drift-debt.json`, flag items where `status: open` and detected date > 60 days ago.
+2. **Drift debt items older than 60 days** — the "fine for now" pile is rotting. Read `.correctless/meta/drift-debt.json`, flag items where `status: open` and detected date > 60 days ago.
 
-3. **Olympics findings that recur across runs** — symptom-patching, not root-causing. Read `.claude/artifacts/findings/audit-*-history.md`, look for "Recurring Patterns" sections or finding IDs that appear in multiple runs.
+3. **Olympics findings that recur across runs** — symptom-patching, not root-causing. Read `.correctless/artifacts/findings/audit-*-history.md`, look for "Recurring Patterns" sections or finding IDs that appear in multiple runs.
 
 4. **Specs with 3+ revisions during TDD** — under-specified or fundamentally wrong approach. Read workflow state history or spec files for revision markers.
 
-5. **Workflow phases that haven't caught a bug in months** — compliance theater. Read `.claude/meta/workflow-effectiveness.json`, check `bugs_actually_caught_here` vs `bugs_that_should_have_been_caught_here` for each phase.
+5. **Workflow phases that haven't caught a bug in months** — compliance theater. Read `.correctless/meta/workflow-effectiveness.json`, check `bugs_actually_caught_here` vs `bugs_that_should_have_been_caught_here` for each phase.
 
 6. **Dependencies not updated in 6+ months** — unmaintained trust. Check lock file dates, check for known CVEs.
 
@@ -119,7 +119,7 @@ Challenge: trust assumptions. "You trust this library for X — is that trust wa
 - Dependencies that could be vendored to eliminate supply chain risk
 
 **Pass 2 — Architecture** (moderate context):
-Read only: ARCHITECTURE.md, AGENT_CONTEXT.md, spec metadata (titles, rule counts, impacts — not full specs).
+Read only: .correctless/ARCHITECTURE.md, .correctless/AGENT_CONTEXT.md, spec metadata (titles, rule counts, impacts — not full specs).
 Challenge: structural assumptions.
 - Trust boundaries that are assumed but not enforced
 - Abstractions that are documented but routinely violated (check antipatterns)
@@ -141,7 +141,7 @@ Only for findings from passes 1-3 that need code-level evidence. Load the specif
 ## What to Challenge
 
 ### Architecture assumptions
-"ARCHITECTURE.md says X. But the code does Y. Every agent has accepted this gap because it's in the design. I'm going to prove why the gap is dangerous."
+".correctless/ARCHITECTURE.md says X. But the code does Y. Every agent has accepted this gap because it's in the design. I'm going to prove why the gap is dangerous."
 
 ### Spec consensus
 "Every reviewer agreed INV-003 is sufficient. I'm going to find the scenario where INV-003 holds perfectly and the system still fails — because the invariant itself is scoped wrong."
@@ -166,7 +166,7 @@ Only for findings from passes 1-3 that need code-level evidence. Load the specif
 
 ## The Devil's Advocate Report
 
-Write to `.claude/artifacts/devadv/report-{date}.md`.
+Write to `.correctless/artifacts/devadv/report-{date}.md`.
 
 For each finding:
 
@@ -221,7 +221,7 @@ You are rewarded for depth, not volume. A single finding that reveals a fundamen
 
 The report goes to the human. It is NOT auto-actioned. For each finding:
 
-- **Accepted**: becomes a tracked action item. May trigger spec revisions, ARCHITECTURE.md updates, new invariants, or Olympics preset changes.
+- **Accepted**: becomes a tracked action item. May trigger spec revisions, .correctless/ARCHITECTURE.md updates, new invariants, or Olympics preset changes.
 - **Deferred**: logged in drift debt with rationale. The next devil's advocate run will see it and can escalate if the rationale has weakened.
 - **Rejected with reasoning**: logged so future runs don't repeat the same challenge. The reasoning must be specific enough that a future devil's advocate can evaluate whether it still holds.
 
@@ -234,7 +234,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the explorer subagent completes (signals mode only), capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the report date):
+After the explorer subagent completes (signals mode only), capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the report date):
 
 ```json
 {

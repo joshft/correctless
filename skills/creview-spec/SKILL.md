@@ -1,7 +1,7 @@
 ---
 name: creview-spec
 description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, and design contract checker. Use after /cspec or /cmodel.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.claude/artifacts/*), Write(docs/specs/*), Write(.claude/meta/external-review-history.json)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Write(.correctless/meta/external-review-history.json)
 context: fork
 ---
 
@@ -35,11 +35,11 @@ Mark each task complete as agents return results.
 
 ## Before You Start
 
-**First-run check**: If `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: "ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
+**First-run check**: If `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `.correctless/ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: ".correctless/ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
 
 ### Checkpoint Resume
 
-After reading the spec artifact (step 2 below), check for `.claude/artifacts/checkpoint-creview-spec-{slug}.json` (derive slug from the spec file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
+After reading the spec artifact (step 2 below), check for `.correctless/artifacts/checkpoint-creview-spec-{slug}.json` (derive slug from the spec file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
 - **If found and <24 hours old**: Read `completed_phases`. Phases: `self-assessment`, `red-team`, `assumptions`, `testability`, `design-contract`. For parallel agents, checkpoint only after ALL 4 complete, not individually — partial agent results are not useful without synthesis. Verification is weak here (agent output lives in conversation context, not artifacts), so if the checkpoint says agents completed but you cannot access their findings: "Checkpoint found but agent outputs are not recoverable. Restarting agent team." Re-spawning is safer than skipping.
   If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}."
@@ -59,14 +59,14 @@ After each major phase completes, write/update the checkpoint:
 ```
 Clean up the checkpoint file when the review completes and state advances.
 
-1. Read `AGENT_CONTEXT.md` for project context.
+1. Read `.correctless/AGENT_CONTEXT.md` for project context.
 2. Read the spec artifact.
-3. Read `ARCHITECTURE.md`.
-4. Read `.claude/antipatterns.md`.
-5. Read `.claude/workflow-config.json` for intensity level and external review settings.
-6. Read `.claude/meta/workflow-effectiveness.json` (if exists) — which phases historically miss bugs
-7. Read `.claude/meta/drift-debt.json` (if exists) — outstanding drift
-8. Read `.claude/artifacts/qa-findings-*.json` (if any exist) — QA patterns
+3. Read `.correctless/ARCHITECTURE.md`.
+4. Read `.correctless/antipatterns.md`.
+5. Read `.correctless/config/workflow-config.json` for intensity level and external review settings.
+6. Read `.correctless/meta/workflow-effectiveness.json` (if exists) — which phases historically miss bugs
+7. Read `.correctless/meta/drift-debt.json` (if exists) — outstanding drift
+8. Read `.correctless/artifacts/qa-findings-*.json` (if any exist) — QA patterns
 
 ## Step 0: Independent Self-Assessment
 
@@ -75,7 +75,7 @@ Before spawning the team, spawn a single **self-assessment subagent** (forked co
 > You are reading this spec for the first time. You did NOT write it. Assess:
 > - Which invariants are hardest to test and why?
 > - Which assumptions are most likely wrong?
-> - Where does ARCHITECTURE.md have gaps relative to this spec?
+> - Where does .correctless/ARCHITECTURE.md have gaps relative to this spec?
 > - Which invariants should be flagged for external review?
 > - What's the overall risk profile?
 
@@ -88,25 +88,25 @@ Spawn these agents in parallel each as a forked subagent:
 **Standard preamble for all team members** — prepend this to each agent's prompt when spawning:
 
 > Before starting your review, read these files in order:
-> 1. `AGENT_CONTEXT.md` — project overview
+> 1. `.correctless/AGENT_CONTEXT.md` — project overview
 > 2. The spec artifact at {spec_path}
-> 3. `ARCHITECTURE.md` — design patterns and trust boundaries
-> 4. `.claude/antipatterns.md` — known bug classes
+> 3. `.correctless/ARCHITECTURE.md` — design patterns and trust boundaries
+> 4. `.correctless/antipatterns.md` — known bug classes
 > 5. The self-assessment brief (provided by the lead)
 >
 > Use Read to examine files, Grep to search for patterns, Glob to find files. Return your findings as your final text response.
 
 ### 1. Red Team Agent
-> You are a security-focused adversary. Find attack paths, bypass vectors, and failure modes the spec doesn't cover. For every trust boundary, describe how you'd attack it. For every invariant, describe a scenario where it holds in tests but fails in production. Your attack paths must be credible for THIS system — read AGENT_CONTEXT.md.
+> You are a security-focused adversary. Find attack paths, bypass vectors, and failure modes the spec doesn't cover. For every trust boundary, describe how you'd attack it. For every invariant, describe a scenario where it holds in tests but fails in production. Your attack paths must be credible for THIS system — read .correctless/AGENT_CONTEXT.md.
 
 ### 2. Assumptions Auditor
-> You are an assumptions auditor. Find every unstated assumption. Does the spec assume a specific OS? Network connectivity? DNS resolution? Clock synchronization? For each, check if it's in ARCHITECTURE.md. Flag what's missing.
+> You are an assumptions auditor. Find every unstated assumption. Does the spec assume a specific OS? Network connectivity? DNS resolution? Clock synchronization? For each, check if it's in .correctless/ARCHITECTURE.md. Flag what's missing.
 
 ### 3. Testability Auditor
 > You are a test engineering auditor. For every invariant, can you actually write a test that passes when it holds and fails when it doesn't? Flag vague invariants. Propose concrete rewrites.
 
 ### 4. Design Contract Checker
-> You are a design contract auditor. Does this spec compose correctly with existing abstractions (ABS-xxx) and patterns (PAT-xxx) in ARCHITECTURE.md? Any conflicts? Any new abstractions that should be documented?
+> You are a design contract auditor. Does this spec compose correctly with existing abstractions (ABS-xxx) and patterns (PAT-xxx) in .correctless/ARCHITECTURE.md? Any conflicts? Any new abstractions that should be documented?
 
 At `low` intensity: spawn only assumptions + testability auditors.
 At `standard`: add red team.
@@ -116,7 +116,7 @@ At `high`/`critical`: spawn all four.
 
 - Findings all agents agree on → auto-incorporate into spec
 - Disagreements → present to human for resolution
-- New unstated assumptions → propose ARCHITECTURE.md additions
+- New unstated assumptions → propose .correctless/ARCHITECTURE.md additions
 
 ## Step 3: External Review (if configured)
 
@@ -130,7 +130,7 @@ If `require_external_review` is true, OR if any invariant is flagged `needs_exte
    - Skip if CLI not found, log warning
 3. Report approximate token usage per external model call
 4. Present external disagreements to human
-5. Track in `.claude/meta/external-review-history.json`
+5. Track in `.correctless/meta/external-review-history.json`
 
 **Error handling**: timeout, non-zero exit, unparsable output → log and continue. Don't block on external failures. Don't retry.
 
@@ -160,7 +160,7 @@ Incorporate approved changes into the spec.
 ## Advance State
 
 ```bash
-.claude/hooks/workflow-advance.sh tests
+.correctless/hooks/workflow-advance.sh tests
 ```
 
 After advancing, print the pipeline diagram:
@@ -181,7 +181,7 @@ See "Progress Visibility" section above — task creation and agent announcement
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
 
 ```json
 {
@@ -200,7 +200,7 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 **Context enforcement (mandatory):** Before spawning the agent team, check context usage. If above 70%: the agents run forked (clean context) but the orchestrator needs to synthesize findings. Warn: "Context at {N}%. Run `/compact` before I spawn the review team — synthesis quality degrades with full context." If above 85%: stop and require /compact.
 
 ### /export
-After review approval, suggest: "Consider exporting: `/export docs/decisions/{task-slug}-review.md`"
+After review approval, suggest: "Consider exporting: `/export .correctless/decisions/{task-slug}-review.md`"
 
 ## Code Analysis (MCP Integration)
 
@@ -236,6 +236,6 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 - Do NOT write code.
 - Do NOT approve the spec uncritically. Your job is to find problems.
 - Preserve the spec author's intent — challenge weak invariants, don't redesign the feature.
-- Each team member receives: spec, ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, and the self-assessment.
+- Each team member receives: spec, .correctless/ARCHITECTURE.md, .correctless/AGENT_CONTEXT.md, antipatterns, and the self-assessment.
 - **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to synthesize findings correctly.
 - **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

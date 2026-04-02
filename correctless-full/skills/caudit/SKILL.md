@@ -1,7 +1,7 @@
 ---
 name: caudit
 description: Cross-codebase quality audit. Use after a major feature lands or periodically for systemic bug detection. Presets: QA, Hacker, Performance.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/*), Write(.claude/antipatterns.md), Write(*test*), Write(*spec*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/antipatterns.md), Write(*test*), Write(*spec*), Edit
 context: fork
 ---
 
@@ -47,15 +47,15 @@ Invoke with: `/caudit [preset] [scope]`
 Create an audit branch and initialize audit state:
 ```bash
 git checkout -b audit/{preset}-{date}
-.claude/hooks/workflow-advance.sh audit-start {preset}
+.correctless/hooks/workflow-advance.sh audit-start {preset}
 ```
 All fixes commit here, never to main. Structured commit messages: `fix(qa-r2): resource leak in connection pool`. After convergence, call `workflow-advance.sh audit-done` before merging to main.
 
 ### Checkpoint Resume
 
-Check for `.claude/artifacts/checkpoint-caudit-{slug}.json` (derive slug from the preset and date, e.g., `qa-2026-03-29`).
+Check for `.correctless/artifacts/checkpoint-caudit-{slug}.json` (derive slug from the preset and date, e.g., `qa-2026-03-29`).
 
-- **If found and <24 hours old**: Read `completed_phases` (e.g., `["round-1", "round-2"]`). Before skipping, verify each completed round: the findings artifact for that round must exist in `.claude/artifacts/findings/` (e.g., `audit-{preset}-{date}-round-{N}.json`). If verification passes: "Found checkpoint from {timestamp} — rounds 1-{N} already done. Resuming from round {N+1}." Skip completed rounds. If a round's artifact is missing: restart from that round.
+- **If found and <24 hours old**: Read `completed_phases` (e.g., `["round-1", "round-2"]`). Before skipping, verify each completed round: the findings artifact for that round must exist in `.correctless/artifacts/findings/` (e.g., `audit-{preset}-{date}-round-{N}.json`). If verification passes: "Found checkpoint from {timestamp} — rounds 1-{N} already done. Resuming from round {N+1}." Skip completed rounds. If a round's artifact is missing: restart from that round.
 - **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
 - **If not found**: Start from Round 1 as normal.
 
@@ -274,11 +274,11 @@ Check whether the previous round's fixes introduced new issues."}
 
 Context you receive (skip any files that don't exist — this is normal on first runs):
 - Source code: {SCOPE}
-- ARCHITECTURE.md
-- AGENT_CONTEXT.md
-- .claude/antipatterns.md
-- Previous Olympics findings: .claude/artifacts/findings/audit-{preset}-history.md
-- QA findings from TDD: .claude/artifacts/qa-findings-*.json
+- .correctless/ARCHITECTURE.md
+- .correctless/AGENT_CONTEXT.md
+- .correctless/antipatterns.md
+- Previous Olympics findings: .correctless/artifacts/findings/audit-{preset}-history.md
+- QA findings from TDD: .correctless/artifacts/qa-findings-*.json
 
 For each finding, submit:
 - Tier: confirmed | probable | suspicious
@@ -307,9 +307,9 @@ You are the Regression Hunter. Your sole job is to check whether
 previously-fixed issues have reappeared.
 
 You receive:
-- .claude/antipatterns.md
-- Previous Olympics findings: .claude/artifacts/findings/audit-{preset}-history.md
-- QA findings from TDD: .claude/artifacts/qa-findings-*.json
+- .correctless/antipatterns.md
+- Previous Olympics findings: .correctless/artifacts/findings/audit-{preset}-history.md
+- QA findings from TDD: .correctless/artifacts/qa-findings-*.json
 
 DOUBLE bounty for confirmed regressions:
   Critical: $20,000  |  If false positive: -$20,000
@@ -322,9 +322,9 @@ You will be fired if a known pattern recurs and you don't find it.
 
 ## Findings Artifacts
 
-Write per-round findings to `.claude/artifacts/findings/audit-{preset}-{date}-round-{N}.json` (date format: ISO 8601 `YYYY-MM-DD`).
+Write per-round findings to `.correctless/artifacts/findings/audit-{preset}-{date}-round-{N}.json` (date format: ISO 8601 `YYYY-MM-DD`).
 
-**Note:** This schema differs from `/ctdd` QA findings (`.claude/artifacts/qa-findings-*.json`). Olympics findings have `tier`, `agent`, `bounty` fields. TDD QA findings have `severity` (BLOCKING/NON-BLOCKING) and `rule_ref`. Consuming agents must handle both schemas.
+**Note:** This schema differs from `/ctdd` QA findings (`.correctless/artifacts/qa-findings-*.json`). Olympics findings have `tier`, `agent`, `bounty` fields. TDD QA findings have `severity` (BLOCKING/NON-BLOCKING) and `rule_ref`. Consuming agents must handle both schemas.
 
 
 ```json
@@ -360,7 +360,7 @@ Write per-round findings to `.claude/artifacts/findings/audit-{preset}-{date}-ro
 }
 ```
 
-Also maintain persistent history at `.claude/artifacts/findings/audit-{preset}-history.md`. **Read the existing file first, then use Edit to append the new run** — do NOT use Write, which would overwrite all previous history:
+Also maintain persistent history at `.correctless/artifacts/findings/audit-{preset}-history.md`. **Read the existing file first, then use Edit to append the new run** — do NOT use Write, which would overwrite all previous history:
 
 ```markdown
 # {Preset} Olympics Findings — {Project}
@@ -383,21 +383,21 @@ Zero findings. Converged.
   → Consider architectural change, not just fixes
 ```
 
-When a finding category recurs across runs, it's a systemic issue that belongs in ARCHITECTURE.md as a design constraint.
+When a finding category recurs across runs, it's a systemic issue that belongs in .correctless/ARCHITECTURE.md as a design constraint.
 
 ## After Convergence
 
 1. Write regression tests (preset-specific, mandatory).
-2. Update `.claude/antipatterns.md` with new entries for each finding class.
+2. Update `.correctless/antipatterns.md` with new entries for each finding class.
 3. Update the persistent findings history.
-4. Check for recurring patterns across runs — flag for ARCHITECTURE.md.
+4. Check for recurring patterns across runs — flag for .correctless/ARCHITECTURE.md.
 5. Present summary: total rounds, findings, fixed, recurring patterns, cost.
-6. Mark audit complete: `.claude/hooks/workflow-advance.sh audit-done`
+6. Mark audit complete: `.correctless/hooks/workflow-advance.sh audit-done`
 7. Merge audit branch to main.
 
 ### Audit Learning
 
-If any finding category appeared in 2+ previous audit runs (check `.claude/artifacts/findings/audit-*-history.md`), append to the `## Correctless Learnings` section of `CLAUDE.md`:
+If any finding category appeared in 2+ previous audit runs (check `.correctless/artifacts/findings/audit-*-history.md`), append to the `## Correctless Learnings` section of `CLAUDE.md`:
 
 ```markdown
 ### {date} — Audit pattern: {finding category}
@@ -423,7 +423,7 @@ See "Progress Visibility" section above — task creation and round-by-round nar
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the preset and date):
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the preset and date):
 
 ```json
 {
@@ -471,7 +471,7 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 
 ## If Something Goes Wrong
 
-- **Agent crashes mid-round**: Re-run `/caudit`. Prior round findings are persisted in `.claude/artifacts/findings/` and provide context, but the skill restarts from Round 1. It will re-read prior findings and avoid re-reporting already-fixed issues, but there is no automatic round-level resume.
+- **Agent crashes mid-round**: Re-run `/caudit`. Prior round findings are persisted in `.correctless/artifacts/findings/` and provide context, but the skill restarts from Round 1. It will re-read prior findings and avoid re-reporting already-fixed issues, but there is no automatic round-level resume.
 - **Rate limit hit**: Wait 2-3 minutes and re-run. Convergence state persists in artifacts.
 - **Stuck in audit phase**: `workflow-advance.sh audit-done` to mark audit complete and move on.
 - **Want to start over**: Delete the audit branch and audit artifacts, then re-run.

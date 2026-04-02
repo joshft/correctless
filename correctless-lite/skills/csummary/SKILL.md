@@ -1,7 +1,7 @@
 ---
 name: csummary
 description: Feature summary. Use after /cdocs to see what the workflow caught, or mid-feature to check progress.
-allowed-tools: Read, Grep, Glob, Bash(git*), Write(.claude/artifacts/summary-*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Write(.correctless/artifacts/summary-*)
 ---
 
 # /csummary — Feature Workflow Summary
@@ -18,13 +18,13 @@ Generate a one-page summary of everything the Correctless workflow caught during
 
 Read these files to build the summary. Skip any that don't exist.
 
-1. **The spec** (`docs/specs/{task-slug}.md`) — check for rules added during review (rules not in the original draft)
-2. **QA findings** (`.claude/artifacts/qa-findings-{task-slug}.json`) — issues caught during TDD QA
-3. **Verification report** (`docs/verification/{task-slug}-verification.md`) — issues caught during verification
+1. **The spec** (`.correctless/specs/{task-slug}.md`) — check for rules added during review (rules not in the original draft)
+2. **QA findings** (`.correctless/artifacts/qa-findings-{task-slug}.json`) — issues caught during TDD QA
+3. **Verification report** (`.correctless/verification/{task-slug}-verification.md`) — issues caught during verification
 4. **Git log** on the current branch — count commits, measure duration
 5. **Workflow state file** — QA rounds, spec updates
-6. **Test edit log** (`.claude/artifacts/tdd-test-edits.log`) — tests modified during implementation
-7. **Audit trail** (`.claude/artifacts/audit-trail-{branch-slug}.jsonl`) — every file modification with workflow phase and timestamp. Shows exactly which files were touched in which phases, without manual instrumentation.
+6. **Test edit log** (`.correctless/artifacts/tdd-test-edits.log`) — tests modified during implementation
+7. **Audit trail** (`.correctless/artifacts/audit-trail-{branch-slug}.jsonl`) — every file modification with workflow phase and timestamp. Shows exactly which files were touched in which phases, without manual instrumentation.
 
 ## How to Build the Summary
 
@@ -39,7 +39,7 @@ Read the spec file. Look for rules that were added during the review phase — t
 - Rules referencing antipatterns (`guards_against: AP-xxx`)
 - Security-related rules (auth, validation, CSRF, etc.) — likely added by the security checklist
 
-If a research brief exists (`.claude/artifacts/research/{task-slug}-research.md`), note what the research agent found (stale APIs, CVEs, deprecated patterns).
+If a research brief exists (`.correctless/artifacts/research/{task-slug}-research.md`), note what the research agent found (stale APIs, CVEs, deprecated patterns).
 
 ### Step 3: Gather Test Audit Findings
 
@@ -50,7 +50,7 @@ The test audit runs between RED and GREEN. Its findings are verbal (returned to 
 
 ### Step 4: Gather QA Findings
 
-Read `.claude/artifacts/qa-findings-{task-slug}.json`. For each finding:
+Read `.correctless/artifacts/qa-findings-{task-slug}.json`. For each finding:
 - What was found (description)
 - Instance fix applied
 - Class fix applied (structural test added)
@@ -58,7 +58,7 @@ Read `.claude/artifacts/qa-findings-{task-slug}.json`. For each finding:
 
 ### Step 5: Gather Verification Findings
 
-Read `docs/verification/{task-slug}-verification.md`. Extract:
+Read `.correctless/verification/{task-slug}-verification.md`. Extract:
 - Uncovered rules
 - Weak tests
 - Undocumented dependencies
@@ -85,14 +85,14 @@ Count the "would have shipped" items. This is the headline number.
 
 ## Output Format
 
-Print the summary to the conversation AND write it to `.claude/artifacts/summary-{task-slug}.md`:
+Print the summary to the conversation AND write it to `.correctless/artifacts/summary-{task-slug}.md`:
 
 ```markdown
 # Workflow Summary: {Feature Name}
 
 **Branch:** {branch name}
 **Duration:** {time from first to last commit}
-**Spec:** {docs/specs/slug.md}
+**Spec:** {.correctless/specs/slug.md}
 
 ## What the Workflow Caught
 
@@ -136,7 +136,7 @@ Use TaskCreate/TaskUpdate to show progress:
 - Generating summary
 
 ### /export
-After generating: "Export this summary to include in your PR description: `/export .claude/artifacts/summary-{task-slug}.md`"
+After generating: "Export this summary to include in your PR description: `/export .correctless/artifacts/summary-{task-slug}.md`"
 
 ## If Something Goes Wrong
 

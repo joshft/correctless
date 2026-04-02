@@ -2,7 +2,7 @@
 ## Correctless Lite
 
 This project uses Correctless Lite for structured development.
-Read AGENT_CONTEXT.md before starting any work.
+Read .correctless/AGENT_CONTEXT.md before starting any work.
 Available commands: /csetup, /cspec, /creview, /ctdd, /cverify, /cdocs, /crefactor, /cpr-review, /cstatus, /csummary, /cmetrics, /cdebug, /chelp
 
 ## GitHub Operations

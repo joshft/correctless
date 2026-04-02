@@ -57,7 +57,7 @@ Fetch the diff:
 - GitHub: `gh pr diff {number}`
 - GitLab: `glab mr diff {number}`
 
-**Parse the PR body** for spec references: look for links to `docs/specs/*.md` or mentions of spec files.
+**Parse the PR body** for spec references: look for links to `.correctless/specs/*.md` or mentions of spec files.
 
 ### Detect Dependency Bump PRs
 
@@ -129,28 +129,28 @@ For package.json bumps, check if the lockfile changes affect other packages. For
 
 The recommendation should be primarily driven by test results, not changelog reading. If tests pass and no deprecated APIs are used, recommend merge. If tests fail, the failures ARE the review.
 
-**This replaces the standard code review checks (Steps 3-9) for dep bumps** — don't run architecture compliance, security checklist, etc. Those are for code changes, not version bumps. **Still run Step 2 (Read Project Context)** — the dep lens needs antipatterns.md and ARCHITECTURE.md for usage pattern context.
+**This replaces the standard code review checks (Steps 3-9) for dep bumps** — don't run architecture compliance, security checklist, etc. Those are for code changes, not version bumps. **Still run Step 2 (Read Project Context)** — the dep lens needs antipatterns.md and .correctless/ARCHITECTURE.md for usage pattern context.
 
 ## Step 2: Read Project Context
 
 Read these files to understand the project's standards:
-1. `ARCHITECTURE.md` — design patterns, conventions, trust boundaries, prohibitions
-2. `AGENT_CONTEXT.md` — project context, key components, common pitfalls
-3. `.claude/antipatterns.md` — known bug classes
-4. `.claude/workflow-config.json` — project settings, test patterns
+1. `.correctless/ARCHITECTURE.md` — design patterns, conventions, trust boundaries, prohibitions
+2. `.correctless/AGENT_CONTEXT.md` — project context, key components, common pitfalls
+3. `.correctless/antipatterns.md` — known bug classes
+4. `.correctless/config/workflow-config.json` — project settings, test patterns
 5. If a spec is referenced: read the spec for rule alignment
 
 ## Step 3: Architecture Compliance
 
-Check every changed file against ARCHITECTURE.md:
+Check every changed file against .correctless/ARCHITECTURE.md:
 
 - **Pattern violations**: Do changes follow documented design patterns (PAT-xxx)? If a new database query bypasses the repository layer, flag it.
 - **Convention violations**: Naming, file organization, import patterns — does the PR follow what's documented?
 - **Prohibition violations**: Does the PR do anything listed in the Prohibitions section? (e.g., "Never import database packages from HTTP handlers")
-- **New patterns**: Does the PR introduce a pattern not documented in ARCHITECTURE.md? If so, it's either a good addition that should be documented or drift that should be questioned.
+- **New patterns**: Does the PR introduce a pattern not documented in .correctless/ARCHITECTURE.md? If so, it's either a good addition that should be documented or drift that should be questioned.
 - **Component boundaries**: Do changes respect the component boundaries in the Key Components table? Cross-boundary imports that aren't documented are a smell.
 
-For each finding: cite the specific ARCHITECTURE.md entry (PAT-xxx, prohibition, convention) being violated.
+For each finding: cite the specific .correctless/ARCHITECTURE.md entry (PAT-xxx, prohibition, convention) being violated.
 
 ## Step 4: Security Checklist
 
@@ -210,7 +210,7 @@ Analyze the PR diff against test files:
 
 ## Step 6: Antipattern Check
 
-Read `.claude/antipatterns.md`. For each entry (AP-xxx):
+Read `.correctless/antipatterns.md`. For each entry (AP-xxx):
 - Does the PR introduce or repeat this known bug class?
 - If yes, cite the specific antipattern and the code location.
 
@@ -218,7 +218,7 @@ This is the compounding value of Correctless — bugs caught once get added to t
 
 ## Step 7: Convention Compliance
 
-Check the PR against documented conventions in ARCHITECTURE.md and CLAUDE.md:
+Check the PR against documented conventions in .correctless/ARCHITECTURE.md and CLAUDE.md:
 - Naming conventions (files, functions, variables)
 - Error handling patterns (consistent error shapes, proper propagation)
 - Import ordering and module boundaries
@@ -229,7 +229,7 @@ Only flag violations of **documented** conventions, not personal preferences.
 
 ## Step 8: Spec Alignment (if spec exists)
 
-If the PR references a spec in `docs/specs/`:
+If the PR references a spec in `.correctless/specs/`:
 - Read the spec rules
 - For each rule: does the PR implementation satisfy it?
 - For each rule: is there a test that would fail if the rule were violated?
@@ -239,7 +239,7 @@ If no spec is referenced, skip this step.
 
 ## Full Mode Additional Checks
 
-Read `.claude/workflow-config.json`. If `workflow.intensity` is set (any value: `"low"`, `"standard"`, `"high"`, or `"critical"`), you are in Full mode — run these additional checks.
+Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is set (any value: `"low"`, `"standard"`, `"high"`, or `"critical"`), you are in Full mode — run these additional checks.
 
 ### Concurrency Analysis
 - Does the PR introduce shared mutable state?
@@ -248,18 +248,18 @@ Read `.claude/workflow-config.json`. If `workflow.intensity` is set (any value: 
 - Channel usage: can channels deadlock? Is there proper cleanup?
 
 ### Trust Boundary Analysis
-- Does the PR modify trust boundaries documented in ARCHITECTURE.md?
+- Does the PR modify trust boundaries documented in .correctless/ARCHITECTURE.md?
 - Do changes cross trust boundaries without proper validation?
 - Is data from less-trusted sources sanitized before reaching more-trusted components?
 
 ### Cross-Spec Impact
-- Read all specs in `docs/specs/`. Do the PR's changes potentially violate invariants from OTHER specs?
+- Read all specs in `.correctless/specs/`. Do the PR's changes potentially violate invariants from OTHER specs?
 - Example: a PR that changes the auth middleware might break invariants from the payments spec that assumes authenticated users.
 
 ### Drift Detection
 - Do changes match the documented architecture, or are they introducing architectural drift?
 - If drift is detected: is it intentional evolution (document it) or accidental erosion (fix it)?
-- Check `.claude/meta/drift-debt.json` for existing drift in the same area.
+- Check `.correctless/meta/drift-debt.json` for existing drift in the same area.
 
 ### Performance Implications
 - N+1 query patterns in new database access
@@ -362,7 +362,7 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 ## Constraints
 
 - **Read-only for project files.** This skill reads code and posts comments — it does not modify source.
-- **Only flag documented violations.** Don't invent conventions the project doesn't have. Check ARCHITECTURE.md, CLAUDE.md, antipatterns.
+- **Only flag documented violations.** Don't invent conventions the project doesn't have. Check .correctless/ARCHITECTURE.md, CLAUDE.md, antipatterns.
 - **Be specific with findings.** "Security issue" is useless. "SQL injection in `src/routes/search.ts:42` — user input concatenated into query string" is actionable.
 - **Include "What Looks Good."** A review that only complains erodes trust. Note what the PR does well.
 - **Don't duplicate CI.** If CI already runs linting, don't re-report lint errors. Focus on what CI can't catch: architecture, security logic, spec alignment.

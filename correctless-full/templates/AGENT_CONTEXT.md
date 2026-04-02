@@ -28,6 +28,6 @@
 | Run tests | `npm test` |
 | Build | `npm run build` |
 | Lint | `npm run lint` |
-| Find a spec | `docs/specs/{feature}.md` |
-| Check architecture | `ARCHITECTURE.md` |
-| See known bugs | `.claude/antipatterns.md` |
+| Find a spec | `.correctless/specs/{feature}.md` |
+| Check architecture | `.correctless/ARCHITECTURE.md` |
+| See known bugs | `.correctless/antipatterns.md` |

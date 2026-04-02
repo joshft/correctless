@@ -23,7 +23,7 @@ If on `main` or `master`, stop immediately and tell the user: "You're on the mai
 
 Check if a workflow is already active on this branch:
 ```bash
-.claude/hooks/workflow-advance.sh status 2>/dev/null
+.correctless/hooks/workflow-advance.sh status 2>/dev/null
 ```
 
 If a workflow is active, stop and tell the user: "There's an active Correctless workflow on this branch. Use the workflow skills (`/ctdd`, `/cverify`, etc.) instead of `/cquick`. This skill is for standalone small fixes outside of an active workflow."

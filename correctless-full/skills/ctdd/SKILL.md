@@ -1,7 +1,7 @@
 ---
 name: ctdd
 description: Enforced TDD workflow. Write failing tests from spec rules, then implement. Use after /creview approves a spec.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/*), Write(docs/specs/*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Edit
 context: fork
 ---
 
@@ -40,7 +40,7 @@ Update the diagram each time a phase completes. After QA with fix rounds:
 ```
 
 **Also print a 1-line status update:**
-- "Spawning test-writing agent — reading spec ({N} rules), ARCHITECTURE.md, antipatterns..."
+- "Spawning test-writing agent — reading spec ({N} rules), .correctless/ARCHITECTURE.md, antipatterns..."
 - "RED complete — {N} test files, {M} test cases, all failing as expected. Running test audit..."
 - "Test audit passed — {N} suggestions applied. Spawning implementation agent..."
 - "GREEN complete — all {M} tests passing. Running /simplify..."
@@ -61,18 +61,18 @@ The RED phase (test writing) and GREEN phase (implementation) MUST be executed b
 
 ## Before You Start
 
-**First-run check**: If `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: "ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
+**First-run check**: If `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `.correctless/ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: ".correctless/ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
 
 ### Checkpoint Resume
 
-After reading the workflow state (step 6 below), check for `.claude/artifacts/checkpoint-ctdd-{slug}.json` (derive slug from the workflow state file's spec_file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
+After reading the workflow state (step 6 below), check for `.correctless/artifacts/checkpoint-ctdd-{slug}.json` (derive slug from the workflow state file's spec_file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
 - **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify the current phase:
   - After `red`: test files exist and fail when run
   - After `test-audit`: test files exist (audit feedback already applied)
   - After `green`: run test suite — tests must pass
   - After `simplify`: run test suite — tests must still pass
-  - After `qa`: `.claude/artifacts/qa-findings-{slug}.json` exists
+  - After `qa`: `.correctless/artifacts/qa-findings-{slug}.json` exists
   If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}." Skip completed phases. If verification fails: restart from the phase that failed verification.
 - **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
 - **If not found**: Start from the beginning as normal.
@@ -90,14 +90,14 @@ After each major phase (`red`, `test-audit`, `green`, `simplify`, `qa`) complete
 ```
 Clean up the checkpoint file when the skill completes successfully.
 
-1. Read `AGENT_CONTEXT.md` for project context.
+1. Read `.correctless/AGENT_CONTEXT.md` for project context.
 2. Read the approved spec (path from workflow state).
-3. Read `.claude/workflow-config.json` for test commands and patterns.
+3. Read `.correctless/config/workflow-config.json` for test commands and patterns.
 4. **Verify required config fields exist**:
-   - If `commands.test` is null, absent, or empty: "No test command is configured in `.claude/workflow-config.json`. Add a `commands.test` field (e.g., `\"npm test\"`) or re-run `/csetup` to detect your test runner." Do not proceed.
-   - If `patterns.test_file` is null, absent, or empty: "No test file pattern is configured in `.claude/workflow-config.json`. Add a `patterns.test_file` field (e.g., `\"*.test.ts\"`) or re-run `/csetup` to detect your test patterns." Do not proceed. This pattern is used by the workflow gate to distinguish test files from source files during phase enforcement.
-5. **Verify the test runner works**: Run `commands.test` from the config. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.claude/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
-6. Check current phase: `.claude/hooks/workflow-advance.sh status`
+   - If `commands.test` is null, absent, or empty: "No test command is configured in `.correctless/config/workflow-config.json`. Add a `commands.test` field (e.g., `\"npm test\"`) or re-run `/csetup` to detect your test runner." Do not proceed.
+   - If `patterns.test_file` is null, absent, or empty: "No test file pattern is configured in `.correctless/config/workflow-config.json`. Add a `patterns.test_file` field (e.g., `\"*.test.ts\"`) or re-run `/csetup` to detect your test patterns." Do not proceed. This pattern is used by the workflow gate to distinguish test files from source files during phase enforcement.
+5. **Verify the test runner works**: Run `commands.test` from the config. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.correctless/config/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
+6. Check current phase: `.correctless/hooks/workflow-advance.sh status`
 
 ## Pre-Execution: Task Graph (for features with 5+ rules)
 
@@ -166,7 +166,7 @@ Spawn a **test agent** as a forked subagent with these instructions:
 >
 > **All test files MUST be created inside the project directory** — never in /tmp, never in external paths. Use the project's standard test directory structure.
 >
-> Read: AGENT_CONTEXT.md, the spec, ARCHITECTURE.md, `.claude/antipatterns.md`.
+> Read: .correctless/AGENT_CONTEXT.md, the spec, .correctless/ARCHITECTURE.md, `.correctless/antipatterns.md`.
 > Write: test files (matching the test_file pattern from workflow-config.json) and stub source files. All files within the project root.
 > Run: the test command to verify tests exist and fail.
 
@@ -200,7 +200,7 @@ After the test agent completes and tests exist, run the **test audit** before ad
 > - Cross-component communication (events, callbacks, middleware chains)
 > - Any rule where the test constructs its own input rather than using the real system path
 >
-> Read: AGENT_CONTEXT.md, the spec, the test files, ARCHITECTURE.md, `.claude/antipatterns.md`.
+> Read: .correctless/AGENT_CONTEXT.md, the spec, the test files, .correctless/ARCHITECTURE.md, `.correctless/antipatterns.md`.
 > Write: NOTHING. Return findings as your final text response.
 
 **If BLOCKING findings exist**: present each finding to the human with disposition options:
@@ -218,7 +218,7 @@ The test agent must fix the approved findings (add integration tests, strengthen
 **If no BLOCKING findings**: advance to GREEN:
 
 ```bash
-.claude/hooks/workflow-advance.sh impl
+.correctless/hooks/workflow-advance.sh impl
 ```
 
 This gate checks that tests exist AND fail (not a build error).
@@ -245,23 +245,23 @@ Spawn an **implementation agent** as a separate forked subagent:
 >
 > **All files MUST be created inside the project directory** — never in /tmp, never in external paths.
 >
-> Read: AGENT_CONTEXT.md, the spec, ARCHITECTURE.md, the failing tests.
+> Read: .correctless/AGENT_CONTEXT.md, the spec, .correctless/ARCHITECTURE.md, the failing tests.
 > Write: source files, test files (logged). All files within the project root.
-> Log all test edits to `.claude/artifacts/tdd-test-edits.log` with timestamp and reason.
+> Log all test edits to `.correctless/artifacts/tdd-test-edits.log` with timestamp and reason.
 >
-> The implementation agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Edit, Write(source and test files inside project root), Write(.claude/artifacts/tdd-test-edits.log), Bash(test and build commands)`
+> The implementation agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Edit, Write(source and test files inside project root), Write(.correctless/artifacts/tdd-test-edits.log), Bash(test and build commands)`
 
 After the implementation agent completes and tests pass, run `/simplify` to clean up code quality issues before QA. If `/simplify` is not available (it is a built-in Claude Code skill, not part of Correctless), skip this step and proceed to QA.
 
 ### Commit Metadata (Git Trailers)
 
-Read `.claude/workflow-config.json`. If `workflow.git_trailers` is `true`, include structured trailers in all commits during TDD. If the field is absent or `false`, commit normally without trailers.
+Read `.correctless/config/workflow-config.json`. If `workflow.git_trailers` is `true`, include structured trailers in all commits during TDD. If the field is absent or `false`, commit normally without trailers.
 
 **Format for test commits (RED phase):**
 ```
 test(task-slug): write failing tests for R-001, R-002
 
-Spec: docs/specs/{task-slug}.md
+Spec: .correctless/specs/{task-slug}.md
 Rules-covered: R-001, R-002
 Phase: RED
 ```
@@ -270,7 +270,7 @@ Phase: RED
 ```
 feat(task-slug): implement rules R-001, R-002
 
-Spec: docs/specs/{task-slug}.md
+Spec: .correctless/specs/{task-slug}.md
 Rules-covered: R-001, R-002
 ```
 
@@ -278,7 +278,7 @@ Rules-covered: R-001, R-002
 ```
 fix(task-slug): address QA finding QA-001
 
-Spec: docs/specs/{task-slug}.md
+Spec: .correctless/specs/{task-slug}.md
 QA-rounds: {N}
 QA-finding: QA-001
 ```
@@ -292,7 +292,7 @@ Then advance:
 **Context enforcement (mandatory):** Before spawning the QA agent, check context usage. The QA agent ALWAYS runs as a forked subagent (`context: fork`) which gives it clean context. But if the orchestrator's context exceeds 70%, it may not correctly process the QA agent's findings or manage fix rounds. If above 70%: tell the human "Context is at {N}%. The QA agent will run in fresh context, but I need to be coherent to process findings. Run `/compact` before I spawn QA, or I may miss issues in the findings." If above 85%: "Context is critically full ({N}%). I must stop here. Run `/compact` and then re-run `/ctdd` — the checkpoint will resume from this phase."
 
 ```bash
-.claude/hooks/workflow-advance.sh qa
+.correctless/hooks/workflow-advance.sh qa
 ```
 
 ## Phase: QA (tdd-qa)
@@ -308,9 +308,9 @@ Spawn a **QA agent** as a third forked subagent:
 > 4. For rules tagged `[integration]`: is there an actual integration test that exercises the real system path? A unit test with hand-constructed inputs does NOT satisfy an `[integration]` rule.
 >
 > Also check:
-> - Review `.claude/artifacts/tdd-test-edits.log` — did the implementation agent weaken any tests?
+> - Review `.correctless/artifacts/tdd-test-edits.log` — did the implementation agent weaken any tests?
 > - Unclosed resources, missing error handling, hardcoded values
-> - Known antipatterns from `.claude/antipatterns.md`
+> - Known antipatterns from `.correctless/antipatterns.md`
 > - **Mock gap analysis**: for every test that uses mocks or hand-constructed inputs, ask: "If the wiring between components were broken, would this test still pass?" If yes, that's a BLOCKING finding.
 >
 > Report findings as a structured list:
@@ -323,7 +323,7 @@ Spawn a **QA agent** as a third forked subagent:
 >
 > **Every BLOCKING finding MUST have a class fix, not just an instance fix.** If you find a missing wiring call, the fix is not "add the wiring call" — it's "add a structural test that catches missing wiring automatically for all current and future sub-structs." The instance fix happens too, but the class fix is what prevents recurrence. If no class fix exists (one-off config error, third-party dependency bug, unique circumstance), set `class_fix: "N/A — [reason]"` in the finding. This is a valid option, not a failure. The human and /cpostmortem will review.
 >
-> Read: AGENT_CONTEXT.md, the spec, the source code, the test files, antipatterns.
+> Read: .correctless/AGENT_CONTEXT.md, the spec, the source code, the test files, antipatterns.
 > Write: NOTHING. Return your findings as your final text response. The orchestrator reads your response.
 >
 > **Output format** — use this exact structure so the orchestrator can persist findings:
@@ -341,7 +341,7 @@ Spawn a **QA agent** as a third forked subagent:
 
 The QA agent has `allowed-tools` restricted to: `Read, Grep, Glob, Bash(test commands)`
 
-**After the QA agent reports findings, YOU (the orchestrator) MUST persist them** by writing to `.claude/artifacts/qa-findings-{task-slug}.json`:
+**After the QA agent reports findings, YOU (the orchestrator) MUST persist them** by writing to `.correctless/artifacts/qa-findings-{task-slug}.json`:
 
 ```json
 {
@@ -367,7 +367,7 @@ This artifact is consumed by `/cverify` (to check class fixes were implemented),
 - **If a BLOCKING finding involves a bug that's hard to understand** (unclear root cause, multiple possible explanations): suggest the human run `/cdebug` for structured investigation before attempting the fix round.
 - **If BLOCKING findings exist**: present to human. Each finding must include both the instance fix AND the class fix. Then `workflow-advance.sh fix` to return to GREEN for a fix round. Spawn a **fix agent** with these additional instructions:
 
-  > After fixing each finding, the fix agent must update `.claude/artifacts/qa-findings-{task-slug}.json`: set `"status": "fixed"` on the findings you addressed. This ensures the findings artifact stays current as fixes land.
+  > After fixing each finding, the fix agent must update `.correctless/artifacts/qa-findings-{task-slug}.json`: set `"status": "fixed"` on the findings you addressed. This ensures the findings artifact stays current as fixes land.
 
   The fix round implements BOTH instance and class fixes. Then re-run QA. After each fix round, the orchestrator must verify the findings JSON: any finding whose instance_fix was applied but still shows `"status": "open"` should be updated to `"fixed"` by you (the orchestrator). This catches cases where the fix agent forgot to update the status.
 - **If no BLOCKING findings**:
@@ -390,7 +390,7 @@ Run `/cverify` when ready."
 
 If during any phase you discover a spec rule is wrong or impossible to implement:
 ```bash
-.claude/hooks/workflow-advance.sh spec-update "reason"
+.correctless/hooks/workflow-advance.sh spec-update "reason"
 ```
 Edit the spec, then `workflow-advance.sh tests` to resume from RED.
 
@@ -406,7 +406,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the workflow state or spec file):
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the workflow state or spec file):
 
 ```json
 {
@@ -425,7 +425,7 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 When presenting QA findings for the human to review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."
 
 ### /export
-After workflow completes (done phase), suggest: "Consider exporting this conversation as a decision record: `/export docs/decisions/{task-slug}-tdd.md`"
+After workflow completes (done phase), suggest: "Consider exporting this conversation as a decision record: `/export .correctless/decisions/{task-slug}-tdd.md`"
 
 ## Code Analysis (MCP Integration)
 
@@ -463,7 +463,7 @@ When Context7 is unavailable, fall back to web search. If Context7 was unavailab
 - **Agent crashes or context overflow**: The state machine remembers your phase. Re-run this skill — it will resume from the current phase.
 - **Rate limit hit**: Wait 2-3 minutes and re-run. The workflow state persists between sessions.
 - **Stuck in a phase**: Run `/cstatus` to see where you are and what to do next. If truly stuck: `workflow-advance.sh override "reason"` bypasses the gate for 10 tool calls.
-- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch. Also delete the checkpoint file: `rm -f .claude/artifacts/checkpoint-ctdd-*.json`
+- **Want to start over**: `workflow-advance.sh reset` clears all state on this branch. Also delete the checkpoint file: `rm -f .correctless/artifacts/checkpoint-ctdd-*.json`
 
 ## Constraints
 

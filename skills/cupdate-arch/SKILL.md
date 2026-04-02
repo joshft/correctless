@@ -1,12 +1,12 @@
 ---
 name: cupdate-arch
-description: Update ARCHITECTURE.md after features land. Use after /cdocs or when the codebase structure has changed.
-allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(ARCHITECTURE.md), Write(docs/architecture/*)
+description: Update .correctless/ARCHITECTURE.md after features land. Use after /cdocs or when the codebase structure has changed.
+allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.correctless/ARCHITECTURE.md), Write(docs/architecture/*)
 ---
 
 # /cupdate-arch — Maintain Architecture Documentation
 
-You are the architecture documentation agent. Your job is to keep ARCHITECTURE.md current after features land.
+You are the architecture documentation agent. Your job is to keep .correctless/ARCHITECTURE.md current after features land.
 
 ## Progress Visibility (MANDATORY)
 
@@ -24,16 +24,16 @@ Architecture updates take 5-10 minutes. The user must see progress throughout.
 
 ## Before You Start
 
-1. Read current `ARCHITECTURE.md`.
-2. Read recent specs in `docs/specs/`.
-3. Read verification reports in `docs/verification/`.
+1. Read current `.correctless/ARCHITECTURE.md`.
+2. Read recent specs in `.correctless/specs/`.
+3. Read verification reports in `.correctless/verification/`.
 4. Scan implementation source code for undocumented patterns.
 
 ## Behavior
 
 ### 1. Scan for Undocumented Entries
 
-Compare the codebase against ARCHITECTURE.md:
+Compare the codebase against .correctless/ARCHITECTURE.md:
 - **Trust Boundaries**: scan for network listeners, TLS configs, auth middleware not covered by existing TB-xxx entries.
 - **Abstractions**: scan for packages/modules with enforced usage patterns (e.g., "always use this wrapper, never call the underlying API directly") not covered by ABS-xxx.
 - **Patterns**: scan for patterns repeated in 5+ places but not documented as PAT-xxx.
@@ -78,15 +78,15 @@ Present each entry to the human one at a time. Don't batch — each entry deserv
 
 ### 4. Check Size
 
-If ARCHITECTURE.md exceeds ~5000 words after updates, suggest fragmentation:
+If .correctless/ARCHITECTURE.md exceeds ~5000 words after updates, suggest fragmentation:
 - Move sections to `docs/architecture/{section}.md`
-- Root ARCHITECTURE.md links to fragments
+- Root .correctless/ARCHITECTURE.md links to fragments
 
 ## If Something Goes Wrong
 
 - **Skill interrupted**: Re-run `/cupdate-arch`. It scans the codebase fresh each time. Partially written entries can be reviewed and corrected.
 - **Rate limit hit**: Wait 2-3 minutes and re-run.
-- **Wrong entries written**: Edit ARCHITECTURE.md directly to fix or remove incorrect entries.
+- **Wrong entries written**: Edit .correctless/ARCHITECTURE.md directly to fix or remove incorrect entries.
 
 ## Constraints
 

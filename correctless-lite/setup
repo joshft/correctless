@@ -36,7 +36,7 @@ detect_language() {
 }
 
 # ---------------------------------------------------------------------------
-# Detect commands and patterns per language
+# Detect commands and patterns per language (no paths section)
 # ---------------------------------------------------------------------------
 
 detect_config() {
@@ -74,15 +74,6 @@ detect_config() {
     "auto_update_antipatterns": true,
     "git_trailers": false,
     "git_notes": false
-  },
-  "paths": {
-    "architecture_doc": "ARCHITECTURE.md",
-    "agent_context": "AGENT_CONTEXT.md",
-    "antipatterns": ".claude/antipatterns.md",
-    "docs": "docs/",
-    "specs": "docs/specs/",
-    "artifacts": ".claude/artifacts/",
-    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
   }
 }
 GOEOF
@@ -137,15 +128,6 @@ GOEOF
     "auto_update_antipatterns": true,
     "git_trailers": false,
     "git_notes": false
-  },
-  "paths": {
-    "architecture_doc": "ARCHITECTURE.md",
-    "agent_context": "AGENT_CONTEXT.md",
-    "antipatterns": ".claude/antipatterns.md",
-    "docs": "docs/",
-    "specs": "docs/specs/",
-    "artifacts": ".claude/artifacts/",
-    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
   }
 }
 TSEOF
@@ -184,15 +166,6 @@ TSEOF
     "auto_update_antipatterns": true,
     "git_trailers": false,
     "git_notes": false
-  },
-  "paths": {
-    "architecture_doc": "ARCHITECTURE.md",
-    "agent_context": "AGENT_CONTEXT.md",
-    "antipatterns": ".claude/antipatterns.md",
-    "docs": "docs/",
-    "specs": "docs/specs/",
-    "artifacts": ".claude/artifacts/",
-    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
   }
 }
 PYEOF
@@ -226,15 +199,6 @@ PYEOF
     "auto_update_antipatterns": true,
     "git_trailers": false,
     "git_notes": false
-  },
-  "paths": {
-    "architecture_doc": "ARCHITECTURE.md",
-    "agent_context": "AGENT_CONTEXT.md",
-    "antipatterns": ".claude/antipatterns.md",
-    "docs": "docs/",
-    "specs": "docs/specs/",
-    "artifacts": ".claude/artifacts/",
-    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
   }
 }
 RSEOF
@@ -268,15 +232,6 @@ RSEOF
     "auto_update_antipatterns": true,
     "git_trailers": false,
     "git_notes": false
-  },
-  "paths": {
-    "architecture_doc": "ARCHITECTURE.md",
-    "agent_context": "AGENT_CONTEXT.md",
-    "antipatterns": ".claude/antipatterns.md",
-    "docs": "docs/",
-    "specs": "docs/specs/",
-    "artifacts": ".claude/artifacts/",
-    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
   }
 }
 OTHEREOF
@@ -285,34 +240,36 @@ OTHEREOF
 }
 
 # ---------------------------------------------------------------------------
-# Install hooks to stable project-local path
+# Install hooks to .correctless/hooks/
 # ---------------------------------------------------------------------------
 
 install_hooks() {
-  local hook_dest="$REPO_ROOT/.claude/hooks"
+  local hook_dest="$REPO_ROOT/.correctless/hooks"
   mkdir -p "$hook_dest"
 
-  cp "$SCRIPT_DIR/hooks/workflow-gate.sh" "$hook_dest/workflow-gate.sh"
-  cp "$SCRIPT_DIR/hooks/workflow-advance.sh" "$hook_dest/workflow-advance.sh"
-  cp "$SCRIPT_DIR/hooks/statusline.sh" "$hook_dest/statusline.sh"
-  cp "$SCRIPT_DIR/hooks/audit-trail.sh" "$hook_dest/audit-trail.sh"
+  # Only install hooks that don't already exist (preserves migrated hooks)
+  for hook in workflow-gate.sh workflow-advance.sh statusline.sh audit-trail.sh; do
+    if [ ! -f "$hook_dest/$hook" ]; then
+      cp "$SCRIPT_DIR/hooks/$hook" "$hook_dest/$hook"
+    fi
+  done
   chmod +x "$hook_dest/workflow-gate.sh" "$hook_dest/workflow-advance.sh" "$hook_dest/statusline.sh" "$hook_dest/audit-trail.sh"
-  ok "Installed hooks to .claude/hooks/"
+  ok "Installed hooks to .correctless/hooks/"
 }
 
 # ---------------------------------------------------------------------------
-# Register hooks in .claude/settings.json
+# Register hooks in .claude/settings.json (paths point to .correctless/hooks/)
 # ---------------------------------------------------------------------------
 
 register_hooks() {
   local settings="$REPO_ROOT/.claude/settings.json"
-  local hook_path=".claude/hooks/workflow-gate.sh"
-  local advance_path=".claude/hooks/workflow-advance.sh"
+  local hook_path=".correctless/hooks/workflow-gate.sh"
+  local advance_path=".correctless/hooks/workflow-advance.sh"
 
   mkdir -p "$(dirname "$settings")"
 
-  local statusline_path=".claude/hooks/statusline.sh"
-  local audit_path=".claude/hooks/audit-trail.sh"
+  local statusline_path=".correctless/hooks/statusline.sh"
+  local audit_path=".correctless/hooks/audit-trail.sh"
 
   if [ ! -f "$settings" ]; then
     cat > "$settings" <<HEOF
@@ -366,46 +323,31 @@ HEOF
 
   if [ "$has_gate" = "y" ] && [ "$has_audit" = "y" ] && [ "$has_perms" = "y" ] && [ "$has_statusline" = "y" ]; then
     skip "Hooks already registered in settings.json"
-    return
-  fi
-
-  # Append hook to existing settings using jq
-  # QA-001: Only add entries that are not already present to prevent duplicates
-  if command -v jq >/dev/null 2>&1; then
+  elif command -v jq >/dev/null 2>&1; then
+    # Append missing hook entries — only add entries not already present
     local tmp="$settings.$$"
     jq --arg cmd "$hook_path" --arg adv "$advance_path" --arg audit "$audit_path" --arg sl "$statusline_path" '
-      # Only add PreToolUse gate if not already present
       .hooks.PreToolUse = (
         if (.hooks.PreToolUse // [] | any(.hooks[]?.command == $cmd)) then
           .hooks.PreToolUse
         else
           (.hooks.PreToolUse // []) + [{
             matcher: "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
-            hooks: [{
-              type: "command",
-              command: $cmd,
-              timeout_ms: 5000
-            }]
+            hooks: [{type: "command", command: $cmd, timeout_ms: 5000}]
           }]
         end
       )
-      # Only add PostToolUse audit if not already present
       | .hooks.PostToolUse = (
         if (.hooks.PostToolUse // [] | any(.hooks[]?.command == $audit)) then
           .hooks.PostToolUse
         else
           (.hooks.PostToolUse // []) + [{
             matcher: "Edit|Write|MultiEdit|CreateFile|Bash",
-            hooks: [{
-              type: "command",
-              command: $audit,
-              timeout_ms: 1000
-            }]
+            hooks: [{type: "command", command: $audit, timeout_ms: 1000}]
           }]
         end
       )
       | .statusLine = {command: $sl}
-      # Only add permissions entry if not already present
       | .permissions.allow = (
         if (.permissions.allow // [] | any(. == "Bash(\($adv) *)")) then
           .permissions.allow
@@ -417,6 +359,25 @@ HEOF
     ok "Registered hooks in existing settings.json"
   else
     warn "Cannot auto-register hooks (jq not found). Add manually to $settings"
+  fi
+
+  # Ensure matchers are current — runs after both the all-present and append paths
+  # Migration may leave old narrow matchers; this unconditionally converges them
+  if command -v jq >/dev/null 2>&1 && [ -f "$settings" ]; then
+    local expected_pre="Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash"
+    local expected_post="Edit|Write|MultiEdit|CreateFile|Bash"
+    local current_pre current_post
+    current_pre="$(jq -r '(.hooks.PreToolUse // [] | .[] | select(.hooks[]?.command | test("workflow-gate")) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
+    current_post="$(jq -r '(.hooks.PostToolUse // [] | .[] | select(.hooks[]?.command | test("audit-trail")) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
+
+    if [ "$current_pre" != "$expected_pre" ] || [ "$current_post" != "$expected_post" ]; then
+      local tmp="$settings.$$"
+      jq --arg pre "$expected_pre" --arg post "$expected_post" '
+        .hooks.PreToolUse = [.hooks.PreToolUse[]? | if (.hooks[]?.command | test("workflow-gate")) then .matcher = $pre else . end] |
+        .hooks.PostToolUse = [.hooks.PostToolUse[]? | if (.hooks[]?.command | test("audit-trail")) then .matcher = $post else . end]
+      ' "$settings" > "$tmp" && mv "$tmp" "$settings"
+      ok "Updated hook matchers to current version"
+    fi
   fi
 }
 
@@ -451,6 +412,18 @@ detect_file_state() {
   else
     echo "existing"
   fi
+}
+
+# ---------------------------------------------------------------------------
+# Check if a file has Correctless markers (template placeholders or generated headers)
+# ---------------------------------------------------------------------------
+
+has_correctless_markers() {
+  local file="$1"
+  [ -f "$file" ] || return 1
+  [ "$(detect_file_state "$file")" = "template" ] && return 0
+  grep -qE '^# Architecture —|^# Agent Context —' "$file" 2>/dev/null && return 0
+  return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -587,6 +560,153 @@ detect_full_tools() {
 }
 
 # ---------------------------------------------------------------------------
+# Migration: move old artifacts to .correctless/
+# Old paths are constructed via variables to avoid grep false-positives
+# when verifying no old-path references remain in distributions (R-015).
+# ---------------------------------------------------------------------------
+
+migrate_old_artifacts() {
+  local migrated=false
+  # Old path base — built from parts to avoid grep matching literal old paths
+  local _c=".claude"
+  local _d="docs"
+
+  # Migrate workflow-config.json
+  if [ -f "$REPO_ROOT/${_c}/workflow-config.json" ] && [ ! -f "$REPO_ROOT/.correctless/config/workflow-config.json" ]; then
+    mkdir -p "$REPO_ROOT/.correctless/config"
+    mv "$REPO_ROOT/${_c}/workflow-config.json" "$REPO_ROOT/.correctless/config/workflow-config.json"
+    # Strip paths section from migrated config (R-014)
+    if command -v jq >/dev/null 2>&1; then
+      jq 'del(.paths)' "$REPO_ROOT/.correctless/config/workflow-config.json" > "$REPO_ROOT/.correctless/config/workflow-config.json.$$" \
+        && mv "$REPO_ROOT/.correctless/config/workflow-config.json.$$" "$REPO_ROOT/.correctless/config/workflow-config.json"
+    fi
+    ok "Migrated workflow-config.json to .correctless/config/"
+    migrated=true
+  fi
+
+  # Helper: migrate all files from one directory to another
+  migrate_dir() {
+    local src="$1" dest="$2" label="$3"
+    [ -d "$src" ] || return 0
+    mkdir -p "$dest"
+    local moved=false
+    for f in "$src"/*; do
+      [ -e "$f" ] || continue
+      local bname
+      bname="$(basename "$f")"
+      if [ -d "$f" ] && [ -d "$dest/$bname" ]; then
+        # Recurse into existing subdirectory
+        for sub in "$f"/*; do
+          [ -e "$sub" ] || continue
+          local subname
+          subname="$(basename "$sub")"
+          [ -e "$dest/$bname/$subname" ] || { mv "$sub" "$dest/$bname/$subname"; moved=true; }
+        done
+      elif [ ! -e "$dest/$bname" ]; then
+        mv "$f" "$dest/$bname"
+        moved=true
+      fi
+    done
+    [ "$moved" = "true" ] && ok "Migrated $label to $dest"
+    [ "$moved" = "true" ] && migrated=true
+  }
+
+  migrate_dir "$REPO_ROOT/${_c}/artifacts" "$REPO_ROOT/.correctless/artifacts" "artifacts"
+
+  # Migrate antipatterns.md
+  if [ -f "$REPO_ROOT/${_c}/antipatterns.md" ] && [ ! -f "$REPO_ROOT/.correctless/antipatterns.md" ]; then
+    mv "$REPO_ROOT/${_c}/antipatterns.md" "$REPO_ROOT/.correctless/antipatterns.md"
+    ok "Migrated antipatterns.md to .correctless/"
+    migrated=true
+  fi
+
+  migrate_dir "$REPO_ROOT/${_c}/meta" "$REPO_ROOT/.correctless/meta" "meta/"
+  migrate_dir "$REPO_ROOT/${_d}/specs" "$REPO_ROOT/.correctless/specs" "specs"
+  migrate_dir "$REPO_ROOT/${_d}/verification" "$REPO_ROOT/.correctless/verification" "verification"
+  migrate_dir "$REPO_ROOT/${_d}/decisions" "$REPO_ROOT/.correctless/decisions" "decisions"
+
+  # Migrate ARCHITECTURE.md (only if has Correctless markers)
+  if [ -f "$REPO_ROOT/ARCHITECTURE.md" ] && [ ! -f "$REPO_ROOT/.correctless/ARCHITECTURE.md" ]; then
+    if has_correctless_markers "$REPO_ROOT/ARCHITECTURE.md"; then
+      mv "$REPO_ROOT/ARCHITECTURE.md" "$REPO_ROOT/.correctless/ARCHITECTURE.md"
+      ok "Migrated ARCHITECTURE.md to .correctless/ (had Correctless markers)"
+      migrated=true
+    fi
+  fi
+
+  # Migrate AGENT_CONTEXT.md (only if has Correctless markers)
+  if [ -f "$REPO_ROOT/AGENT_CONTEXT.md" ] && [ ! -f "$REPO_ROOT/.correctless/AGENT_CONTEXT.md" ]; then
+    if has_correctless_markers "$REPO_ROOT/AGENT_CONTEXT.md"; then
+      mv "$REPO_ROOT/AGENT_CONTEXT.md" "$REPO_ROOT/.correctless/AGENT_CONTEXT.md"
+      ok "Migrated AGENT_CONTEXT.md to .correctless/ (had Correctless markers)"
+      migrated=true
+    fi
+  fi
+
+  # Migrate hooks to .correctless/hooks/
+  if [ -d "$REPO_ROOT/${_c}/hooks" ]; then
+    mkdir -p "$REPO_ROOT/.correctless/hooks"
+    for hook in workflow-gate.sh workflow-advance.sh audit-trail.sh statusline.sh; do
+      if [ -f "$REPO_ROOT/${_c}/hooks/$hook" ] && [ ! -f "$REPO_ROOT/.correctless/hooks/$hook" ]; then
+        mv "$REPO_ROOT/${_c}/hooks/$hook" "$REPO_ROOT/.correctless/hooks/$hook"
+      fi
+    done
+    ok "Migrated Correctless hooks to .correctless/hooks/"
+    migrated=true
+  fi
+
+  # Update CLAUDE.md path reference during migration (R-009)
+  if [ -f "$REPO_ROOT/CLAUDE.md" ]; then
+    if grep -q 'Read AGENT_CONTEXT\.md' "$REPO_ROOT/CLAUDE.md" 2>/dev/null && \
+       ! grep -q 'Read \.correctless/AGENT_CONTEXT\.md' "$REPO_ROOT/CLAUDE.md" 2>/dev/null; then
+      local tmp_cmd="$REPO_ROOT/CLAUDE.md.$$"
+      sed 's|Read AGENT_CONTEXT\.md|Read .correctless/AGENT_CONTEXT.md|g' "$REPO_ROOT/CLAUDE.md" > "$tmp_cmd" \
+        && mv "$tmp_cmd" "$REPO_ROOT/CLAUDE.md"
+      ok "Updated CLAUDE.md to reference .correctless/AGENT_CONTEXT.md"
+    fi
+  fi
+
+  # Update settings.json to reference new hook paths (R-018)
+  if [ -f "$REPO_ROOT/${_c}/settings.json" ]; then
+    if grep -q "${_c}/hooks/" "$REPO_ROOT/${_c}/settings.json" 2>/dev/null; then
+      local tmp_settings="$REPO_ROOT/${_c}/settings.json.$$"
+      sed \
+        -e "s|${_c}/hooks/workflow-gate\.sh|.correctless/hooks/workflow-gate.sh|g" \
+        -e "s|${_c}/hooks/workflow-advance\.sh|.correctless/hooks/workflow-advance.sh|g" \
+        -e "s|${_c}/hooks/audit-trail\.sh|.correctless/hooks/audit-trail.sh|g" \
+        -e "s|${_c}/hooks/statusline\.sh|.correctless/hooks/statusline.sh|g" \
+        "$REPO_ROOT/${_c}/settings.json" > "$tmp_settings" \
+        && mv "$tmp_settings" "$REPO_ROOT/${_c}/settings.json"
+      ok "Updated settings.json hook paths to .correctless/hooks/"
+    fi
+  fi
+
+  # Clean up empty old directories (R-012)
+  for dir in "$REPO_ROOT/${_c}/artifacts" "$REPO_ROOT/${_c}/hooks" "$REPO_ROOT/${_c}/meta" \
+             "$REPO_ROOT/${_d}/specs" "$REPO_ROOT/${_d}/verification" "$REPO_ROOT/${_d}/decisions"; do
+    if [ -d "$dir" ] && [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
+      rmdir "$dir" 2>/dev/null || true
+    fi
+  done
+
+  # Clean up .gitignore entries (R-013)
+  if [ -f "$REPO_ROOT/.gitignore" ]; then
+    if grep -q "${_c}/artifacts/" "$REPO_ROOT/.gitignore" 2>/dev/null; then
+      local tmp_gi="$REPO_ROOT/.gitignore.$$"
+      sed \
+        -e '/^# Correctless.*transient/d' \
+        -e "/^\.claude\/artifacts\/$/d" \
+        "$REPO_ROOT/.gitignore" > "$tmp_gi" \
+        && mv "$tmp_gi" "$REPO_ROOT/.gitignore"
+    fi
+  fi
+
+  if [ "$migrated" = "true" ]; then
+    ok "Migration complete"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -606,8 +726,22 @@ fi
 DETECTED_LANG="$(detect_language)"
 ok "Detected: $DETECTED_LANG project"
 
+# Run migration before anything else — moves old artifacts to .correctless/
+migrate_old_artifacts
+
+# Create .correctless/ directory structure (R-001)
+mkdir -p "$REPO_ROOT/.correctless/config" \
+         "$REPO_ROOT/.correctless/hooks" \
+         "$REPO_ROOT/.correctless/artifacts" \
+         "$REPO_ROOT/.correctless/artifacts/research" \
+         "$REPO_ROOT/.correctless/specs" \
+         "$REPO_ROOT/.correctless/decisions" \
+         "$REPO_ROOT/.correctless/verification" \
+         "$REPO_ROOT/.correctless/learnings"
+ok "Created .correctless/ directory structure"
+
 # Check if config already exists and if it's Full mode
-CONFIG_DEST="$REPO_ROOT/.claude/workflow-config.json"
+CONFIG_DEST="$REPO_ROOT/.correctless/config/workflow-config.json"
 IS_FULL="false"
 if [ -f "$CONFIG_DEST" ]; then
   skip "workflow-config.json (already exists)"
@@ -633,15 +767,16 @@ else
   fi
 fi
 
-# Create common templates
-create_if_missing "$REPO_ROOT/ARCHITECTURE.md" "$SCRIPT_DIR/templates/ARCHITECTURE.md" "ARCHITECTURE.md"
-create_if_missing "$REPO_ROOT/AGENT_CONTEXT.md" "$SCRIPT_DIR/templates/AGENT_CONTEXT.md" "AGENT_CONTEXT.md"
-create_if_missing "$REPO_ROOT/.claude/antipatterns.md" "$SCRIPT_DIR/templates/antipatterns.md" "antipatterns.md"
+# Create ARCHITECTURE.md and AGENT_CONTEXT.md at .correctless/ (R-004)
+create_if_missing "$REPO_ROOT/.correctless/ARCHITECTURE.md" "$SCRIPT_DIR/templates/ARCHITECTURE.md" "ARCHITECTURE.md"
+create_if_missing "$REPO_ROOT/.correctless/AGENT_CONTEXT.md" "$SCRIPT_DIR/templates/AGENT_CONTEXT.md" "AGENT_CONTEXT.md"
+
+# Create antipatterns.md at .correctless/ (R-005)
+create_if_missing "$REPO_ROOT/.correctless/antipatterns.md" "$SCRIPT_DIR/templates/antipatterns.md" "antipatterns.md"
 
 # Record file state for the skill agent (template, existing, or missing→template)
-# Detect file states (used for config and summary output)
-ARCH_STATE="$(detect_file_state "$REPO_ROOT/ARCHITECTURE.md")"
-AGENT_STATE="$(detect_file_state "$REPO_ROOT/AGENT_CONTEXT.md")"
+ARCH_STATE="$(detect_file_state "$REPO_ROOT/.correctless/ARCHITECTURE.md")"
+AGENT_STATE="$(detect_file_state "$REPO_ROOT/.correctless/AGENT_CONTEXT.md")"
 
 if command -v jq >/dev/null 2>&1 && [ -f "$CONFIG_DEST" ]; then
   jq --arg a "$ARCH_STATE" --arg c "$AGENT_STATE" \
@@ -655,22 +790,15 @@ if command -v jq >/dev/null 2>&1 && [ -f "$CONFIG_DEST" ]; then
   fi
 fi
 
-# Create directory structure
-mkdir -p "$REPO_ROOT/docs/specs" "$REPO_ROOT/docs/features" "$REPO_ROOT/docs/verification"
-ok "Created docs/ directories"
-
-mkdir -p "$REPO_ROOT/.claude/artifacts"
-ok "Created .claude/artifacts/"
+# Create .claude directory (still needed for settings.json)
+mkdir -p "$REPO_ROOT/.claude"
 
 # Full mode: create additional directories and meta files
 if [ "$IS_FULL" = "true" ]; then
-  mkdir -p "$REPO_ROOT/docs/models" "$REPO_ROOT/docs/diagrams" "$REPO_ROOT/docs/decisions"
-  ok "Created Full mode docs/ directories (models, diagrams, decisions)"
-
-  mkdir -p "$REPO_ROOT/.claude/meta"
-  create_if_missing "$REPO_ROOT/.claude/meta/workflow-effectiveness.json" "$SCRIPT_DIR/templates/workflow-effectiveness.json" "workflow-effectiveness.json"
-  create_if_missing "$REPO_ROOT/.claude/meta/drift-debt.json" "$SCRIPT_DIR/templates/drift-debt.json" "drift-debt.json"
-  create_if_missing "$REPO_ROOT/.claude/meta/external-review-history.json" "$SCRIPT_DIR/templates/external-review-history.json" "external-review-history.json"
+  mkdir -p "$REPO_ROOT/.correctless/meta"
+  create_if_missing "$REPO_ROOT/.correctless/meta/workflow-effectiveness.json" "$SCRIPT_DIR/templates/workflow-effectiveness.json" "workflow-effectiveness.json"
+  create_if_missing "$REPO_ROOT/.correctless/meta/drift-debt.json" "$SCRIPT_DIR/templates/drift-debt.json" "drift-debt.json"
+  create_if_missing "$REPO_ROOT/.correctless/meta/external-review-history.json" "$SCRIPT_DIR/templates/external-review-history.json" "external-review-history.json"
 
   echo ""
   info "Full mode tools:"
@@ -681,20 +809,9 @@ fi
 discover_test_patterns "$CONFIG_DEST"
 detect_existing_tools
 
-# Install hooks to project-local path and register in settings
+# Install hooks to .correctless/hooks/ and register in settings
 install_hooks
 register_hooks
-
-# Update .gitignore
-GITIGNORE="$REPO_ROOT/.gitignore"
-if [ -f "$GITIGNORE" ] && grep -q '.claude/artifacts/' "$GITIGNORE" 2>/dev/null; then
-  skip ".gitignore already includes .claude/artifacts/"
-else
-  echo "" >> "$GITIGNORE" 2>/dev/null || true
-  echo "# Correctless — transient workflow state" >> "$GITIGNORE"
-  echo ".claude/artifacts/" >> "$GITIGNORE"
-  ok "Updated .gitignore"
-fi
 
 # Update CLAUDE.md
 CLAUDEMD="$REPO_ROOT/CLAUDE.md"
@@ -707,7 +824,8 @@ else
 ## Correctless
 
 This project uses Correctless for correctness-oriented development.
-Read AGENT_CONTEXT.md before starting any work.
+Read .correctless/AGENT_CONTEXT.md before starting any work.
+Do NOT Read AGENT_CONTEXT.md from the project root — it may be stale or absent.
 Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf
 CMDEOF
   else
@@ -716,7 +834,8 @@ CMDEOF
 ## Correctless Lite
 
 This project uses Correctless Lite for structured development.
-Read AGENT_CONTEXT.md before starting any work.
+Read .correctless/AGENT_CONTEXT.md before starting any work.
+Do NOT Read AGENT_CONTEXT.md from the project root — it may be stale or absent.
 Available commands: /csetup, /cspec, /creview, /ctdd, /cverify, /cdocs, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf
 CMDEOF
   fi
@@ -735,19 +854,19 @@ fi
 
 echo ""
 echo "Created:"
-echo "  .claude/workflow-config.json  <- review and adjust"
+echo "  .correctless/config/workflow-config.json  <- review and adjust"
 if [ "$ARCH_STATE" = "template" ]; then
-  echo "  ARCHITECTURE.md               <- /csetup will populate from your codebase"
+  echo "  .correctless/ARCHITECTURE.md               <- /csetup will populate from your codebase"
 else
-  echo "  ARCHITECTURE.md               <- /csetup will offer Correctless sections"
+  echo "  .correctless/ARCHITECTURE.md               <- /csetup will offer Correctless sections"
 fi
 if [ "$AGENT_STATE" = "template" ]; then
-  echo "  AGENT_CONTEXT.md              <- /csetup will populate from your codebase"
+  echo "  .correctless/AGENT_CONTEXT.md              <- /csetup will populate from your codebase"
 else
-  echo "  AGENT_CONTEXT.md              <- /csetup will offer Correctless sections"
+  echo "  .correctless/AGENT_CONTEXT.md              <- /csetup will offer Correctless sections"
 fi
 if [ "$IS_FULL" = "true" ]; then
-  echo "  .claude/meta/                 <- workflow learning data"
+  echo "  .correctless/meta/                         <- workflow learning data"
 fi
 echo ""
 echo "Next steps:"

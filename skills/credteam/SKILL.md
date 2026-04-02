@@ -1,7 +1,7 @@
 ---
 name: credteam
 description: "Live adversarial red team assessment against a running system. Goal-directed penetration testing with source code access. Requires isolated environment."
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/redteam/*), Write(.claude/artifacts/token-log-*), Write(.claude/antipatterns.md), Write(*test*), Write(*spec*), Write(docker-compose*.yml)
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/redteam/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/antipatterns.md), Write(*test*), Write(*spec*), Write(docker-compose*.yml)
 context: fork
 ---
 
@@ -242,7 +242,7 @@ cat red-team-report.md
 
 ## Write Report
 
-Write the report to `.claude/artifacts/redteam/report-{date}.md`.
+Write the report to `.correctless/artifacts/redteam/report-{date}.md`.
 
 ## After the Assessment
 
@@ -250,7 +250,7 @@ Write the report to `.claude/artifacts/redteam/report-{date}.md`.
 
 1. **Fix the vulnerability chain** — break any link to prevent the attack
 2. **Write regression tests** — the report includes exact reproduction, turn it into a CI test
-3. **Update antipatterns** — add the vulnerability class to `.claude/antipatterns.md`
+3. **Update antipatterns** — add the vulnerability class to `.correctless/antipatterns.md`
 4. **Consider a Hacker Olympics run** — the red team found one path, there may be others
 
 ### If objective NOT achieved:
@@ -300,7 +300,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the report date):
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the report date):
 
 ```json
 {
@@ -342,7 +342,7 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 
 ## If Something Goes Wrong
 
-- **Agent crashes mid-assessment**: Re-run `/credteam`. The report artifact persists at `.claude/artifacts/redteam/`. Partial findings are preserved. The assessment resumes from the attack phase if boundary mapping is already in the report.
+- **Agent crashes mid-assessment**: Re-run `/credteam`. The report artifact persists at `.correctless/artifacts/redteam/`. Partial findings are preserved. The assessment resumes from the attack phase if boundary mapping is already in the report.
 - **Rate limit hit**: Wait 2-3 minutes and re-run. Red team assessments are long-running — rate limits are expected.
 - **Target environment goes down**: Stop the assessment. The report documents what was tested up to that point.
 - **Want to start over**: Delete the report artifact and re-run.

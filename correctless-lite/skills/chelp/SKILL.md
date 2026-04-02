@@ -12,7 +12,7 @@ Show the user the workflow pipeline, available commands, and current status. Kee
 
 ### 1. Detect Mode
 
-Check if `.claude/workflow-config.json` exists. If not → not set up yet. If it exists, read it: if `workflow.intensity` is set → Full mode. Otherwise → Lite mode.
+Check if `.correctless/config/workflow-config.json` exists. If not → not set up yet. If it exists, read it: if `workflow.intensity` is set → Full mode. Otherwise → Lite mode.
 
 ### 2. Show Pipeline
 
@@ -77,7 +77,7 @@ Full mode additions:
   /cmodel       Formal Alloy modeling
   /creview-spec Adversarial 4-agent review (~15 min, critical features)
   /caudit       Olympics audit (QA/Hacker/Performance)
-  /cupdate-arch Update ARCHITECTURE.md
+  /cupdate-arch Update .correctless/ARCHITECTURE.md
   /cpostmortem  Post-merge bug analysis (when bugs escape to production)
   /cdevadv      Devil's advocate — challenge assumptions
   /credteam     Live red team assessment
@@ -85,7 +85,7 @@ Full mode additions:
 
 ### 4. Show Current Status
 
-Run: `.claude/hooks/workflow-advance.sh status 2>/dev/null`
+Run: `.correctless/hooks/workflow-advance.sh status 2>/dev/null`
 
 If active workflow: show the phase and next action.
 If no active workflow: "No active workflow. Start one: `git checkout -b feature/my-feature` then `/cspec`."

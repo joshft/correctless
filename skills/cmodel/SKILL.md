@@ -1,7 +1,7 @@
 ---
 name: cmodel
 description: Generate an Alloy formal model of security-relevant behavior and run the Alloy Analyzer. Use after /cspec for features with state machines, protocol handling, or trust boundaries.
-allowed-tools: Read, Grep, Glob, Bash(java*), Bash(alloy*), Bash(git*), Bash(*workflow-advance.sh*), Write(docs/models/*), Write(.claude/artifacts/token-log-*)
+allowed-tools: Read, Grep, Glob, Bash(java*), Bash(alloy*), Bash(git*), Bash(*workflow-advance.sh*), Write(docs/models/*), Write(.correctless/artifacts/token-log-*)
 context: fork
 ---
 
@@ -30,11 +30,11 @@ Mark each task complete as it finishes.
 
 ## Before You Start
 
-Check current phase: `.claude/hooks/workflow-advance.sh status`. You should be in the `model` phase. If not, tell the human to run `/cspec` first to enter the correct phase. Do not advance state from the wrong phase.
+Check current phase: `.correctless/hooks/workflow-advance.sh status`. You should be in the `model` phase. If not, tell the human to run `/cspec` first to enter the correct phase. Do not advance state from the wrong phase.
 
 1. Read the spec artifact (invariants, prohibitions, trust boundaries, STRIDE analysis).
-2. Read `ARCHITECTURE.md` for existing trust boundaries and abstractions.
-3. Read `.claude/workflow-config.json` for the Alloy JAR path.
+2. Read `.correctless/ARCHITECTURE.md` for existing trust boundaries and abstractions.
+3. Read `.correctless/config/workflow-config.json` for the Alloy JAR path.
 
 ## Behavior
 
@@ -80,7 +80,7 @@ For each assertion, run `check assertionName for N` (start with scope 5).
 > You are the Alloy model interpreter. You did NOT write this model. Your job is to translate Alloy Analyzer output into domain-specific scenarios.
 >
 > You receive:
-> - The feature spec (read from docs/specs/{task-slug}.md)
+> - The feature spec (read from .correctless/specs/{task-slug}.md)
 > - The Alloy model (read from docs/models/{task-slug}.also)
 > - The raw Alloy Analyzer output
 >
@@ -112,7 +112,7 @@ Write analysis results to `docs/models/{task-slug}-results.md`.
 ## Advance State
 
 ```bash
-.claude/hooks/workflow-advance.sh review-spec
+.correctless/hooks/workflow-advance.sh review-spec
 ```
 
 After advancing, tell the human: "Model complete. Run `/creview-spec` for multi-agent adversarial review of the spec."
@@ -124,7 +124,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the interpreter subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the task slug):
+After the interpreter subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the task slug):
 
 ```json
 {

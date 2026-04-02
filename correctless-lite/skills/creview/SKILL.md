@@ -1,7 +1,7 @@
 ---
 name: creview
 description: Skeptically review a spec for unstated assumptions, untestable rules, missing edge cases, and security gaps. Run after /cspec.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/specs/*), Write(.claude/artifacts/reviews/*), Write(.claude/artifacts/token-log-*)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*)
 context: fork
 ---
 
@@ -18,7 +18,7 @@ You are a separate agent from the spec author. Do not assume the spec is correct
 This review takes 5-10 minutes. The user must see progress throughout.
 
 **Before starting**, create a task list:
-1. Read context (spec, ARCHITECTURE.md, antipatterns, flywheel data)
+1. Read context (spec, .correctless/ARCHITECTURE.md, antipatterns, flywheel data)
 2. Assumptions check
 3. Testability check
 4. Edge cases check
@@ -33,15 +33,15 @@ This review takes 5-10 minutes. The user must see progress throughout.
 
 ## Before You Start
 
-**First-run check**: If `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: "ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
+**First-run check**: If `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `.correctless/ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: ".correctless/ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
 
-1. Read `AGENT_CONTEXT.md` for project context.
+1. Read `.correctless/AGENT_CONTEXT.md` for project context.
 2. Read the spec artifact (path from workflow state).
-3. Read `ARCHITECTURE.md` for design patterns.
-4. Read `.claude/antipatterns.md` for known bug classes.
-5. Read `.claude/meta/workflow-effectiveness.json` (if it exists) — check which phases have historically missed bugs. If QA has missed concurrency bugs 3 times, push harder for concurrency rules in this spec.
-6. Read `.claude/meta/drift-debt.json` (if it exists) — check if this feature touches code with outstanding drift.
-7. Read `.claude/artifacts/qa-findings-*.json` (if any exist) — see what QA has historically found in similar code areas.
+3. Read `.correctless/ARCHITECTURE.md` for design patterns.
+4. Read `.correctless/antipatterns.md` for known bug classes.
+5. Read `.correctless/meta/workflow-effectiveness.json` (if it exists) — check which phases have historically missed bugs. If QA has missed concurrency bugs 3 times, push harder for concurrency rules in this spec.
+6. Read `.correctless/meta/drift-debt.json` (if it exists) — check if this feature touches code with outstanding drift.
+7. Read `.correctless/artifacts/qa-findings-*.json` (if any exist) — see what QA has historically found in similar code areas.
 8. Grep/glob relevant source code to understand the codebase area this spec touches.
 
 ## What to Check
@@ -78,7 +78,7 @@ Does the spec have rules that cover these? If not, propose additions.
 
 ### 4. Antipattern Check
 
-Does this feature match any pattern in `.claude/antipatterns.md`?
+Does this feature match any pattern in `.correctless/antipatterns.md`?
 
 If the project has historically had issues with (e.g.) forgetting to handle the loading state, or missing cleanup on error paths — check whether this spec has rules for those.
 
@@ -220,7 +220,7 @@ Incorporate approved changes directly into the spec file. Preserve existing rule
 
 Once the human approves the revised spec:
 ```bash
-.claude/hooks/workflow-advance.sh tests
+.correctless/hooks/workflow-advance.sh tests
 ```
 
 After advancing, print the pipeline diagram:
@@ -242,7 +242,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the review agent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
+After the review agent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
 
 ```json
 {

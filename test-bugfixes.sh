@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Correctless — workflow bug fix tests
-# Tests spec rules R-001 through R-011 from docs/specs/workflow-bug-fixes.md
+# Tests spec rules R-001 through R-011 from .correctless/specs/workflow-bug-fixes.md
 # Run from repo root: bash test-bugfixes.sh
 
 set -uo pipefail
@@ -65,7 +65,7 @@ assert_exit() {
 
 file_contains() { grep -q "$2" "$1" 2>/dev/null; }
 
-ADV() { cd "$TEST_DIR" && .claude/hooks/workflow-advance.sh "$@"; }
+ADV() { cd "$TEST_DIR" && .correctless/hooks/workflow-advance.sh "$@"; }
 
 # ---------------------------------------------------------------------------
 # Bug 1: Slug Truncation — R-001, R-002, R-011
@@ -85,11 +85,11 @@ test_slug_truncation() {
 
   # Read the spec_file from state
   local state_file spec_file slug token_count slug_len
-  state_file="$(ls .claude/artifacts/workflow-state-feature-slug-trunc-*.json 2>/dev/null | head -1)"
+  state_file="$(ls .correctless/artifacts/workflow-state-feature-slug-trunc-*.json 2>/dev/null | head -1)"
   spec_file="$(jq -r '.spec_file' "$state_file")"
 
-  # Extract the slug portion: strip "docs/specs/" prefix and ".md" suffix
-  slug="$(echo "$spec_file" | sed 's|^docs/specs/||' | sed 's|\.md$||')"
+  # Extract the slug portion: strip ".correctless/specs/" prefix and ".md" suffix
+  slug="$(echo "$spec_file" | sed 's|^.correctless/specs/||' | sed 's|\.md$||')"
 
   # Count hyphen-separated tokens
   token_count="$(echo "$slug" | tr '-' '\n' | wc -l | tr -d ' ')"
@@ -130,15 +130,15 @@ test_slug_truncation() {
   git checkout -q -b feature/slug-collision
 
   # Pre-create a spec file that would collide
-  mkdir -p docs/specs
-  echo "# Existing spec" > docs/specs/workflow-bug.md
+  mkdir -p .correctless/specs
+  echo "# Existing spec" > .correctless/specs/workflow-bug.md
 
   ADV init "workflow bug" >/dev/null 2>&1
 
-  state_file="$(ls .claude/artifacts/workflow-state-feature-slug-collision-*.json 2>/dev/null | head -1)"
+  state_file="$(ls .correctless/artifacts/workflow-state-feature-slug-collision-*.json 2>/dev/null | head -1)"
   spec_file="$(jq -r '.spec_file' "$state_file")"
 
-  assert_eq "R-011: collision appends -2 to spec_file" "docs/specs/workflow-bug-2.md" "$spec_file"
+  assert_eq "R-011: collision appends -2 to spec_file" ".correctless/specs/workflow-bug-2.md" "$spec_file"
 }
 
 # ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ test_red_gate_test_new() {
 
   # Configure: test (main suite) passes, test_new (new tests) fails
   # This mimics having existing passing tests + new failing tests
-  cat > .claude/workflow-config.json <<'WCONF'
+  cat > .correctless/config/workflow-config.json <<'WCONF'
 {
   "project": { "name": "test-app", "language": "typescript", "description": "" },
   "commands": {
@@ -179,8 +179,8 @@ test_red_gate_test_new() {
 WCONF
 
   ADV init "test new red gate" >/dev/null 2>&1
-  mkdir -p docs/specs
-  echo "# Spec" > docs/specs/test-new-red-gate.md
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/test-new-red-gate.md
   ADV review >/dev/null 2>&1
   ADV tests >/dev/null 2>&1
 
@@ -196,7 +196,7 @@ WCONF
   # --- R-004 [integration]: tests_pass (GREEN gate) uses commands.test ---
 
   # Now in tdd-impl phase. Configure test to fail (all tests including new must pass)
-  cat > .claude/workflow-config.json <<'WCONF'
+  cat > .correctless/config/workflow-config.json <<'WCONF'
 {
   "project": { "name": "test-app", "language": "typescript", "description": "" },
   "commands": {
@@ -228,7 +228,7 @@ WCONF
   git checkout -q -b feature/test-no-new
 
   # Config has NO test_new field
-  cat > .claude/workflow-config.json <<'WCONF'
+  cat > .correctless/config/workflow-config.json <<'WCONF'
 {
   "project": { "name": "test-app", "language": "typescript", "description": "" },
   "commands": {
@@ -249,8 +249,8 @@ WCONF
 WCONF
 
   ADV init "test fallback" >/dev/null 2>&1
-  mkdir -p docs/specs
-  echo "# Spec" > docs/specs/test-fallback.md
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/test-fallback.md
   ADV review >/dev/null 2>&1
   ADV tests >/dev/null 2>&1
 
