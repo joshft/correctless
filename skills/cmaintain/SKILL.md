@@ -38,8 +38,8 @@ Read the project's standards — this is the baseline every contribution is meas
 - Linter/formatter configs: `.eslintrc*`, `.prettierrc*`, `biome.json`, `.golangci-lint.yml`, `ruff.toml`, `rustfmt.toml`, `.editorconfig`
 - Test patterns: read 2-3 existing test files to understand framework, naming, structure
 - CI config: `.github/workflows/`, `.gitlab-ci.yml` — what checks run, what will fail
-- `ARCHITECTURE.md` if it exists — patterns, conventions, prohibitions
-- `AGENT_CONTEXT.md` if it exists — project context, common pitfalls
+- `.correctless/ARCHITECTURE.md` if it exists — patterns, conventions, prohibitions
+- `.correctless/AGENT_CONTEXT.md` if it exists — project context, common pitfalls
 
 ## Step 2: Load Contribution Context
 
@@ -224,7 +224,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After any subagent completes, capture `total_tokens` and `duration_ms`. Append to `.claude/artifacts/token-log-{slug}.json`. If `.claude/artifacts/` doesn't exist, create it with `mkdir -p .claude/artifacts/` first.
+After any subagent completes, capture `total_tokens` and `duration_ms`. Append to `.correctless/artifacts/token-log-{slug}.json`. If `.correctless/artifacts/` doesn't exist, create it with `mkdir -p .correctless/artifacts/` first.
 
 If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
 

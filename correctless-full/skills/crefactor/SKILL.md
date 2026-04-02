@@ -1,7 +1,7 @@
 ---
 name: crefactor
 description: Structured refactoring with behavioral equivalence enforcement. Tests must pass before AND after. Any test change requires explicit approval. Writes characterization tests for low-coverage code.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/artifacts/*), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md), Edit(ARCHITECTURE.md), Edit(AGENT_CONTEXT.md)
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Edit(.correctless/ARCHITECTURE.md), Edit(.correctless/AGENT_CONTEXT.md)
 context: fork
 ---
 
@@ -34,17 +34,17 @@ Mark each task complete as it finishes.
 
 ## Step 1: Capture Refactor Intent
 
-**First-run check**: If `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate ARCHITECTURE.md and AGENT_CONTEXT.md, or you can run `/csetup` for the full experience." If they want the quick scan: glob for key directories, populate ARCHITECTURE.md, then continue. This improves refactor planning and architecture update suggestions.
+**First-run check**: If `.correctless/ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate .correctless/ARCHITECTURE.md and .correctless/AGENT_CONTEXT.md, or you can run `/csetup` for the full experience." If they want the quick scan: glob for key directories, populate .correctless/ARCHITECTURE.md, then continue. This improves refactor planning and architecture update suggestions.
 
 ### Checkpoint Resume
 
-After capturing the refactor intent (below), check for `.claude/artifacts/checkpoint-crefactor-{slug}.json` (derive slug from the intent filename). If no intent file exists yet, no checkpoint can exist — proceed normally. Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
+After capturing the refactor intent (below), check for `.correctless/artifacts/checkpoint-crefactor-{slug}.json` (derive slug from the intent filename). If no intent file exists yet, no checkpoint can exist — proceed normally. Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
 - **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify each phase:
   - After `coverage-assessed`: refactor intent artifact exists
   - After `characterization-tests`: characterization test files exist and pass
   - After `phase-N` (refactor phases): run test suite — tests must pass
-  - After `qa`: `.claude/artifacts/qa-findings-refactor-{slug}.json` exists
+  - After `qa`: `.correctless/artifacts/qa-findings-refactor-{slug}.json` exists
   If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}." Skip completed phases. If verification fails (e.g., tests no longer pass after a refactor phase): restart from the phase that failed.
 - **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
 - **If not found**: Start from the beginning as normal.
@@ -62,14 +62,14 @@ After each major phase (`coverage-assessed`, `characterization-tests`, `phase-1`
 ```
 Clean up the checkpoint file when the refactor completes successfully.
 
-First, check for an active workflow: `.claude/hooks/workflow-advance.sh status 2>/dev/null`. If a TDD workflow is active on this branch, warn the user: "There's an active workflow on this branch. Running /crefactor here may conflict. Consider finishing the current feature or using a separate branch."
+First, check for an active workflow: `.correctless/hooks/workflow-advance.sh status 2>/dev/null`. If a TDD workflow is active on this branch, warn the user: "There's an active workflow on this branch. Running /crefactor here may conflict. Consider finishing the current feature or using a separate branch."
 
 Ask the user:
 - **What** are you refactoring? (specific files, modules, layers)
 - **Why?** (extract domain layer, reduce duplication, migrate library, improve testability)
 - **What should NOT change?** (external behavior, API contracts, database schema)
 
-Write the intent to `.claude/artifacts/refactor-intent-{slug}.md`:
+Write the intent to `.correctless/artifacts/refactor-intent-{slug}.md`:
 ```markdown
 # Refactor Intent: {Title}
 
@@ -136,7 +136,7 @@ Record:
 - All passing test names
 - Test file checksums (to detect modifications)
 
-Store in `.claude/artifacts/refactor-baseline-{slug}.json`:
+Store in `.correctless/artifacts/refactor-baseline-{slug}.json`:
 ```json
 {
   "test_count": N,
@@ -232,14 +232,14 @@ After all phases complete, spawn a **QA agent** (forked subagent):
 > 1. Read the refactor intent document
 > 2. Read the git diff of all changes
 > 3. Check: did the refactor stay within its stated scope? Are there changes outside the declared files?
-> 4. Check `.claude/antipatterns.md` — does the refactored code introduce any known bug patterns?
+> 4. Check `.correctless/antipatterns.md` — does the refactored code introduce any known bug patterns?
 > 5. Look for behavioral drift: API response shapes, error messages, log formats, config behavior — things that tests might not cover but downstream consumers depend on
 > 6. Check for deleted code that was reachable — dead code removal is fine, but removing code that's called from outside the refactored module is a behavioral change
 > 7. Present findings
 >
 > The QA agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Bash(git*, test commands)` — NO Edit or Write.
 
-QA findings follow the same format as `/ctdd` QA — each finding needs an instance fix AND class fix (or N/A with reason). Persist findings to `.claude/artifacts/qa-findings-refactor-{slug}.json` (the orchestrator writes this, not the QA agent).
+QA findings follow the same format as `/ctdd` QA — each finding needs an instance fix AND class fix (or N/A with reason). Persist findings to `.correctless/artifacts/qa-findings-refactor-{slug}.json` (the orchestrator writes this, not the QA agent).
 
 ## Step 8: Final Verification
 
@@ -253,21 +253,21 @@ Print: "Refactor complete — {N} tests passing (baseline was {M}). Behavioral e
 ## Step 9: Architecture Update
 
 If the refactor changed the project structure significantly:
-- Suggest ARCHITECTURE.md updates for moved/renamed components
-- Suggest AGENT_CONTEXT.md updates for changed paths
+- Suggest .correctless/ARCHITECTURE.md updates for moved/renamed components
+- Suggest .correctless/AGENT_CONTEXT.md updates for changed paths
 - If patterns changed (e.g., "repository layer" moved from `src/db/` to `internal/repo/`), update PAT-xxx entries
 
 ## Full Mode Additions
 
-Read `.claude/workflow-config.json`. If `workflow.intensity` is set:
+Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is set:
 
 - **Mutation testing**: Run mutation testing on the refactored code. Surviving mutants may reveal tests that no longer exercise the refactored paths effectively — the structure change may have moved behavior away from what tests cover.
-- **Cross-spec impact**: Read all specs in `docs/specs/`. Does the structural change affect how other features' invariants are satisfied?
-- **Drift detection**: Did the refactor resolve or introduce architectural drift? Update `.claude/meta/drift-debt.json` accordingly.
+- **Cross-spec impact**: Read all specs in `.correctless/specs/`. Does the structural change affect how other features' invariants are satisfied?
+- **Drift detection**: Did the refactor resolve or introduce architectural drift? Update `.correctless/meta/drift-debt.json` accordingly.
 
 ## After Refactoring
 
-Write the refactor summary to `.claude/artifacts/refactor-summary-{slug}.md`:
+Write the refactor summary to `.correctless/artifacts/refactor-summary-{slug}.md`:
 ```markdown
 # Refactor Summary: {Title}
 
@@ -280,9 +280,9 @@ Write the refactor summary to `.claude/artifacts/refactor-summary-{slug}.md`:
 ## Coverage: {before}% → {after}% on refactored files
 ```
 
-Tell the user: "Refactor complete — {N} tests passing, behavioral equivalence verified. Summary written to `.claude/artifacts/refactor-summary-{slug}.md`."
+Tell the user: "Refactor complete — {N} tests passing, behavioral equivalence verified. Summary written to `.correctless/artifacts/refactor-summary-{slug}.md`."
 
-If the refactor was part of an active feature workflow (check `workflow-advance.sh status`), the user should continue that workflow. If standalone, the refactor is done — suggest updating ARCHITECTURE.md and committing.
+If the refactor was part of an active feature workflow (check `workflow-advance.sh status`), the user should continue that workflow. If standalone, the refactor is done — suggest updating .correctless/ARCHITECTURE.md and committing.
 
 **Note:** `/crefactor` does NOT use the TDD state machine. It is a standalone workflow. Do not call `workflow-advance.sh done/verified/documented`. The refactor intent document and summary artifact serve as the audit trail instead of a spec + verification report.
 
@@ -293,7 +293,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the refactor intent filename):
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the refactor intent filename):
 
 ```json
 {
@@ -345,7 +345,7 @@ When Context7 is unavailable, fall back to web search. If Context7 was unavailab
 
 ## If Something Goes Wrong
 
-- **Agent crashes mid-refactor**: Re-run `/crefactor`. The refactor intent document (`.claude/artifacts/refactor-intent-{slug}.md`) and baseline (`.claude/artifacts/refactor-baseline-{slug}.json`) persist — the skill can pick up context from these. However, partially completed refactor phases may need manual review.
+- **Agent crashes mid-refactor**: Re-run `/crefactor`. The refactor intent document (`.correctless/artifacts/refactor-intent-{slug}.md`) and baseline (`.correctless/artifacts/refactor-baseline-{slug}.json`) persist — the skill can pick up context from these. However, partially completed refactor phases may need manual review.
 - **Rate limit hit**: Wait 2-3 minutes and re-run.
 - **Tests fail after a refactor phase**: This is working as designed — the verification agent caught a behavioral change. Fix the issue or revert the phase.
 - **Want to start over**: Revert uncommitted changes with `git checkout .` and re-run from Step 1.

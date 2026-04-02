@@ -1,7 +1,7 @@
 ---
 name: cverify
 description: Verify implementation matches spec. Check rule coverage, undocumented dependencies, architecture compliance. Writes verification report and drift debt. Run after /ctdd completes.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(docs/verification/*), Write(.claude/meta/drift-debt.json), Write(.claude/artifacts/*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/artifacts/*)
 context: fork
 ---
 
@@ -14,7 +14,7 @@ You are the verification agent. You did NOT participate in the implementation. Y
 Verification takes 10-15 minutes with mutation testing running in the background. The user must see progress throughout.
 
 **Before starting**, create a task list:
-1. Read context (spec, implementation, tests, ARCHITECTURE.md)
+1. Read context (spec, implementation, tests, .correctless/ARCHITECTURE.md)
 2. Rule coverage matrix
 3. Mutation testing (background)
 4. Dependency check
@@ -29,15 +29,15 @@ Mark each task complete as it finishes.
 
 ## Before You Start
 
-**First-run check**: If `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: "ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
+**First-run check**: If `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `.correctless/ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: ".correctless/ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
 
-1. Read `AGENT_CONTEXT.md` for project context.
-2. Read the spec artifact (from workflow state or `docs/specs/`).
+1. Read `.correctless/AGENT_CONTEXT.md` for project context.
+2. Read the spec artifact (from workflow state or `.correctless/specs/`).
 3. Read the implementation — changed files on the branch.
 4. Read the test files.
-5. Read `ARCHITECTURE.md`.
-6. Read `.claude/meta/workflow-effectiveness.json` — check which phases have historically missed bugs in this area.
-7. Read `.claude/artifacts/qa-findings-*.json` — see what QA found and fixed during TDD.
+5. Read `.correctless/ARCHITECTURE.md`.
+6. Read `.correctless/meta/workflow-effectiveness.json` — check which phases have historically missed bugs in this area.
+7. Read `.correctless/artifacts/qa-findings-*.json` — see what QA found and fixed during TDD.
 8. Determine the default branch (check `workflow-config.json` for `workflow.default_branch`, fall back to `main`). Run `git diff {default_branch}...HEAD --stat` to see what changed.
 
 ## What to Check
@@ -69,10 +69,10 @@ If `workflow-config.json` has `is_monorepo: true` and the spec lists "Packages A
 
 ### 3. Architecture Compliance and Prohibitions
 
-Does the implementation follow the patterns in `ARCHITECTURE.md`?
+Does the implementation follow the patterns in `.correctless/ARCHITECTURE.md`?
 - Error handling, validation, state management, naming conventions?
-- New patterns introduced? Flag for ARCHITECTURE.md update.
-- **Prohibition check**: For each prohibition in ARCHITECTURE.md, grep the changed files for prohibited imports, patterns, or constructs. Flag any violations.
+- New patterns introduced? Flag for .correctless/ARCHITECTURE.md update.
+- **Prohibition check**: For each prohibition in .correctless/ARCHITECTURE.md, grep the changed files for prohibited imports, patterns, or constructs. Flag any violations.
 
 ### Compliance Checks (if configured)
 Read `workflow.compliance_checks` from `workflow-config.json`. For each check where `phase` is `"verify"`:
@@ -107,7 +107,7 @@ Compare the spec's rules against the implementation:
   Or type your own: ___
 ```
 
-For items where the user chooses "Log as debt": Read `.claude/meta/drift-debt.json` first, then APPEND new entries to the existing `drift_debt` array. Use `Edit` to add entries — do NOT overwrite the file with `Write`. Use the next sequential DRIFT-NNN ID.
+For items where the user chooses "Log as debt": Read `.correctless/meta/drift-debt.json` first, then APPEND new entries to the existing `drift_debt` array. Use `Edit` to add entries — do NOT overwrite the file with `Write`. Use the next sequential DRIFT-NNN ID.
 
 Drift debt entry format:
 ```json
@@ -127,7 +127,7 @@ Drift debt entry format:
 
 ### 6. Cross-Reference QA Findings
 
-Read `.claude/artifacts/qa-findings-{task-slug}.json` (if it exists). For each class fix that QA identified:
+Read `.correctless/artifacts/qa-findings-{task-slug}.json` (if it exists). For each class fix that QA identified:
 - Was the structural test actually added?
 - Does it cover the class of bug, not just the instance?
 
@@ -137,7 +137,7 @@ If the spec was updated during TDD, note what changed and why.
 
 ## Output: Write Verification Report
 
-**Write the report to `docs/verification/{task-slug}-verification.md`.** This is not optional — downstream skills depend on this file.
+**Write the report to `.correctless/verification/{task-slug}-verification.md`.** This is not optional — downstream skills depend on this file.
 
 ```markdown
 # Verification: {Task Title}
@@ -155,7 +155,7 @@ If the spec was updated during TDD, note what changed and why.
 
 ## Architecture Compliance
 - ✓ Error handling follows middleware pattern
-- ! New pattern: rate limiting — needs ARCHITECTURE.md entry
+- ! New pattern: rate limiting — needs .correctless/ARCHITECTURE.md entry
 
 ## QA Class Fixes Verified
 - QA-001: structural config wiring test added ✓
@@ -180,7 +180,7 @@ If `workflow.git_trailers` is `true` in `workflow-config.json`, stage the verifi
 ```
 verify(task-slug): verification complete
 
-Spec: docs/specs/{task-slug}.md
+Spec: .correctless/specs/{task-slug}.md
 Rules-covered: R-001, R-002, R-003, ...
 QA-rounds: {N}
 Verified-by: /cverify
@@ -200,7 +200,7 @@ Reviewers can see this with `git notes show HEAD` or `git log --notes`.
 
 Advance the state machine:
 ```bash
-.claude/hooks/workflow-advance.sh verified
+.correctless/hooks/workflow-advance.sh verified
 ```
 This checks that the verification report file exists. If it doesn't, the transition fails.
 
@@ -231,7 +231,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the verification agent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
+After the verification agent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
 
 ```json
 {

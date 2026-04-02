@@ -13,9 +13,9 @@ You are the status agent. Show the human where they are in the workflow and what
 ### 1. Check Setup
 
 First, verify Correctless is set up in this project:
-- Does `.claude/workflow-config.json` exist?
-- Does `.claude/hooks/workflow-gate.sh` exist?
-- Does `ARCHITECTURE.md` exist and not contain `{PROJECT_NAME}` or `{PLACEHOLDER}` template markers? (Note: a minimal ARCHITECTURE.md with "This project is in early development" is valid — it means `/csetup` ran on a greenfield project and intentionally deferred architecture docs.)
+- Does `.correctless/config/workflow-config.json` exist?
+- Does `.correctless/hooks/workflow-gate.sh` exist?
+- Does `.correctless/ARCHITECTURE.md` exist and not contain `{PROJECT_NAME}` or `{PLACEHOLDER}` template markers? (Note: a minimal .correctless/ARCHITECTURE.md with "This project is in early development" is valid — it means `/csetup` ran on a greenfield project and intentionally deferred architecture docs.)
 
 If not set up: "Correctless isn't configured in this project yet. Run `/csetup` to get started."
 
@@ -23,12 +23,12 @@ If not set up: "Correctless isn't configured in this project yet. Run `/csetup` 
 
 Run:
 ```bash
-.claude/hooks/workflow-advance.sh status 2>/dev/null
+.correctless/hooks/workflow-advance.sh status 2>/dev/null
 ```
 
 If no active workflow, also run:
 ```bash
-.claude/hooks/workflow-advance.sh status-all 2>/dev/null
+.correctless/hooks/workflow-advance.sh status-all 2>/dev/null
 ```
 
 ### 3. Present Status
@@ -116,13 +116,13 @@ Available commands:
   /cwtf           Workflow accountability — did agents do their job?
 
 State management:
-  .claude/hooks/workflow-advance.sh status      Current phase
-  .claude/hooks/workflow-advance.sh status-all   All active workflows
-  .claude/hooks/workflow-advance.sh diagnose "file"   Why a file is blocked
-  .claude/hooks/workflow-advance.sh override "reason"  Temporarily bypass gate
+  .correctless/hooks/workflow-advance.sh status      Current phase
+  .correctless/hooks/workflow-advance.sh status-all   All active workflows
+  .correctless/hooks/workflow-advance.sh diagnose "file"   Why a file is blocked
+  .correctless/hooks/workflow-advance.sh override "reason"  Temporarily bypass gate
 ```
 
-Read `.claude/workflow-config.json`. If `workflow.intensity` is set, also show Full mode commands: `/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`
+Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is set, also show Full mode commands: `/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`
 
 ### 5. Detect Problems
 
@@ -130,7 +130,7 @@ After showing phase and commands, proactively check for issues:
 
 **Stale workflow**: If >24 hours in a phase, this is already handled by the time-in-phase display in section 3 above — do not repeat the warning here. Only check for stale workflows if section 3 did not already display a >24h warning (e.g., if phase_entered_at was missing or unparsable).
 
-**Empty docs**: Check if ARCHITECTURE.md contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if AGENT_CONTEXT.md contains `{PROJECT_NAME}` or `{PLACEHOLDERS}`. If either is still the template: "ARCHITECTURE.md / AGENT_CONTEXT.md is still the default template. Run `/csetup` to populate it from your codebase — this significantly improves spec and review quality."
+**Empty docs**: Check if .correctless/ARCHITECTURE.md contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if .correctless/AGENT_CONTEXT.md contains `{PROJECT_NAME}` or `{PLACEHOLDERS}`. If either is still the template: ".correctless/ARCHITECTURE.md / .correctless/AGENT_CONTEXT.md is still the default template. Run `/csetup` to populate it from your codebase — this significantly improves spec and review quality."
 
 **Override usage**: Read `override_count` from the state file. If ≥2: "You've used {N} overrides on this workflow. If the gate keeps blocking legitimate edits, the workflow config or file patterns may need adjustment. Run `workflow-advance.sh diagnose 'yourfile.ts'` to understand why."
 
@@ -141,16 +141,16 @@ After showing phase and commands, proactively check for issues:
 If the human asks "is everything set up correctly?" or similar, validate:
 - Hooks registered in `.claude/settings.json`
 - Config file valid JSON with required fields
-- Hook scripts exist and are executable at `.claude/hooks/`
-- ARCHITECTURE.md has content (not template)
-- AGENT_CONTEXT.md has content (not template)
+- Hook scripts exist and are executable at `.correctless/hooks/`
+- .correctless/ARCHITECTURE.md has content (not template)
+- .correctless/AGENT_CONTEXT.md has content (not template)
 
 Report any issues with fix instructions.
 
 ## If Something Goes Wrong
 
 - `/cstatus` is read-only — it reads workflow state and project files but modifies nothing. Re-run anytime safely.
-- If status looks wrong, check that `.claude/workflow-config.json` exists and the hook scripts are installed at `.claude/hooks/`.
+- If status looks wrong, check that `.correctless/config/workflow-config.json` exists and the hook scripts are installed at `.correctless/hooks/`.
 
 ## Constraints
 

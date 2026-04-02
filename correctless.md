@@ -59,7 +59,7 @@ For teams where only one developer uses the full workflow: the artifacts (specs 
 
 ## Project Configuration
 
-### `.claude/workflow-config.json`
+### `.correctless/config/workflow-config.json`
 
 Every project declares its language-specific commands and workflow preferences. Skills read this file and refuse to run if it's missing or incomplete.
 
@@ -104,18 +104,6 @@ Every project declares its language-specific commands and workflow preferences. 
     "auto_update_antipatterns": true,
     "fail_closed_when_no_state": false,
     "merge_strategy": "squash"
-  },
-  "paths": {
-    "architecture_doc": "ARCHITECTURE.md",
-    "agent_context": "AGENT_CONTEXT.md",
-    "antipatterns": ".claude/antipatterns.md",
-    "docs": "docs/",
-    "diagrams": "docs/diagrams/",
-    "specs": "docs/specs/",
-    "models": "docs/models/",
-    "meta": ".claude/meta/",
-    "artifacts": ".claude/artifacts/",
-    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
   }
 }
 ```
@@ -208,7 +196,7 @@ project-root/
 
 ```gitignore
 # Workflow artifacts (transient working state)
-.claude/artifacts/
+.correctless/artifacts/
 ```
 
 ### Why specs and models are committed
@@ -280,7 +268,7 @@ What the project assumes about its runtime environment. Each assumption document
 ### ENV-002: ...
 ```
 
-### `.claude/antipatterns.md`
+### `.correctless/antipatterns.md`
 
 Living checklist. Starts empty for new projects. Grows with every bug found post-verification.
 
@@ -315,7 +303,7 @@ Invariants can reference antipattern IDs directly (e.g., "guards against AP-003"
 
 ## Artifact Formats
 
-### Spec Artifact (`docs/specs/{task-slug}.md`)
+### Spec Artifact (`.correctless/specs/{task-slug}.md`)
 
 Produced by `/cspec`. Consumed by `/creview-spec`, `/ctdd`, `/cverify`, `/caudit`.
 
@@ -437,7 +425,7 @@ Produced by the `/cspec` skill. Identifies which parts of this spec are least co
 - **Recommended for external review**: [INV-xxx, PRH-xxx] — because {reason}
 ```
 
-### Findings Artifact (`.claude/artifacts/findings/{task-slug}-round-{N}.json`)
+### Findings Artifact (`.correctless/artifacts/findings/{task-slug}-round-{N}.json`)
 
 Produced by `/caudit` QA agents. Consumed by `/caudit` orchestrator, `/cverify`.
 
@@ -467,7 +455,7 @@ Produced by `/caudit` QA agents. Consumed by `/caudit` orchestrator, `/cverify`.
 }
 ```
 
-### Resolution Artifact (`.claude/artifacts/findings/{task-slug}-fixes-round-{N}.json`)
+### Resolution Artifact (`.correctless/artifacts/findings/{task-slug}-fixes-round-{N}.json`)
 
 Produced by fix agent during `/caudit` fix rounds.
 
@@ -487,7 +475,7 @@ Produced by fix agent during `/caudit` fix rounds.
 }
 ```
 
-### Workflow State (`.claude/artifacts/workflow-state-{branch-slug}.json`)
+### Workflow State (`.correctless/artifacts/workflow-state-{branch-slug}.json`)
 
 Managed exclusively by the state transition script. No skill writes to this directly.
 
@@ -495,7 +483,7 @@ Managed exclusively by the state transition script. No skill writes to this dire
 {
   "phase": "spec | model | review-spec | tdd-tests | tdd-impl | tdd-qa | tdd-verify | audit | done",
   "task": "human-readable task description",
-  "spec_file": "docs/specs/task-slug.md",
+  "spec_file": ".correctless/specs/task-slug.md",
   "started_at": "ISO timestamp",
   "phase_entered_at": "ISO timestamp",
   "branch": "feature/branch-name",
@@ -560,15 +548,15 @@ Note: all skills use frontmatter for `allowed-tools`, `model`, and `context` set
 - `ARCHITECTURE.md` — existing trust boundaries, abstractions, patterns, env assumptions
 - `CLAUDE.md` — project conventions
 - `AGENT_CONTEXT.md` — project overview for context
-- `.claude/antipatterns.md` — known bug classes to spec against (AP-xxx entries)
-- `.claude/meta/drift-debt.json` — outstanding drift debt (flag if new feature touches drifted code)
-- `.claude/workflow-config.json` — project settings
+- `.correctless/antipatterns.md` — known bug classes to spec against (AP-xxx entries)
+- `.correctless/meta/drift-debt.json` — outstanding drift debt (flag if new feature touches drifted code)
+- `.correctless/config/workflow-config.json` — project settings
 - Relevant source code (via grep/glob based on feature description)
 - Recent git history for the area being changed
 
 **Produces**:
-- `docs/specs/{task-slug}.md` — the spec artifact
-- Updates `.claude/artifacts/workflow-state-{branch-slug}.json` to phase: `spec`
+- `.correctless/specs/{task-slug}.md` — the spec artifact
+- Updates `.correctless/artifacts/workflow-state-{branch-slug}.json` to phase: `spec`
 
 **Behavior**:
 
@@ -584,9 +572,9 @@ Note: all skills use frontmatter for `allowed-tools`, `model`, and `context` set
 
 3. **Draft the spec**. Write the full spec artifact with all sections. For each invariant, assess risk and flag whether it needs external review. Cross-reference every invariant against ARCHITECTURE.md — does it compose with existing abstractions or introduce a new one?
 
-4. **Check against antipatterns**. For every AP-xxx entry in `.claude/antipatterns.md`, ask: does this feature introduce a new instance of this bug class? If yes, add a specific invariant or prohibition that prevents it, with `guards_against: AP-xxx` referencing the antipattern ID.
+4. **Check against antipatterns**. For every AP-xxx entry in `.correctless/antipatterns.md`, ask: does this feature introduce a new instance of this bug class? If yes, add a specific invariant or prohibition that prevents it, with `guards_against: AP-xxx` referencing the antipattern ID.
 
-5. **Check drift debt**. Read `.claude/meta/drift-debt.json`. If any open drift debt items involve files or abstractions this feature touches, surface them: "This feature touches code with outstanding drift debt: DRIFT-001 — {description}. Consider resolving the drift as part of this feature, or add an invariant that accounts for the drifted state."
+5. **Check drift debt**. Read `.correctless/meta/drift-debt.json`. If any open drift debt items involve files or abstractions this feature touches, surface them: "This feature touches code with outstanding drift debt: DRIFT-001 — {description}. Consider resolving the drift as part of this feature, or add an invariant that accounts for the drifted state."
 
 6. **No self-assessment**. The spec author does NOT assess the quality of their own spec. Self-assessment is biased — the agent that wrote an invariant won't flag it as weak. Instead, the self-assessment is produced by the first step of `/creview-spec`, where a fresh agent reads the spec cold and identifies weak points. This separation prevents the spec author from marking everything as low-risk and "doesn't need external review."
 
@@ -614,7 +602,7 @@ Note: all skills use frontmatter for `allowed-tools`, `model`, and `context` set
 - The spec artifact from `/cspec` (invariants, prohibitions, trust boundaries, STRIDE analysis)
 - `ARCHITECTURE.md` (trust boundaries, abstractions — for modeling existing system context)
 - `AGENT_CONTEXT.md` (for understanding system structure)
-- `.claude/workflow-config.json`
+- `.correctless/config/workflow-config.json`
 
 **Produces**:
 - `docs/models/{task-slug}.also` — the Alloy model source file
@@ -771,13 +759,13 @@ Note: all skills use frontmatter for `allowed-tools`, `model`, and `context` set
 - The spec artifact from `/cspec`
 - `ARCHITECTURE.md`
 - `AGENT_CONTEXT.md` (provided to each review agent for project context)
-- `.claude/antipatterns.md`
-- `.claude/workflow-config.json`
+- `.correctless/antipatterns.md`
+- `.correctless/config/workflow-config.json`
 - Relevant source code
 
 **Produces**:
 - Revised spec artifact (updated in place with review findings incorporated)
-- `.claude/artifacts/reviews/{task-slug}-review.json` — structured review record
+- `.correctless/artifacts/reviews/{task-slug}-review.json` — structured review record
 - Updates workflow state
 
 **Behavior — Internal Review (Claude agent team)**:
@@ -822,7 +810,7 @@ The lead agent collects all teammate findings, deduplicates, and presents to the
 
 If `require_external_review` is true, OR if any invariant is flagged `needs_external_review`:
 
-1. Extract the flagged invariants + their surrounding context (trust boundary, abstraction, env assumptions) + the project's `.claude/antipatterns.md` (so the external model knows what the project has historically gotten wrong). Write this to a temporary review brief file.
+1. Extract the flagged invariants + their surrounding context (trust boundary, abstraction, env assumptions) + the project's `.correctless/antipatterns.md` (so the external model knows what the project has historically gotten wrong). Write this to a temporary review brief file.
 2. Invoke external model CLIs using the generic interface from `workflow-config.json`:
 
    **Generic interface**: each entry in `external_models` defines a `command` template (with `{prompt}` placeholder), `stdin_file` (whether to pipe the review brief via stdin), and `timeout_seconds`. This keeps specific CLI invocation patterns in config, not baked into the skill prompt — when CLIs change their syntax, update the config, not the skill.
@@ -835,7 +823,7 @@ If `require_external_review` is true, OR if any invariant is flagged `needs_exte
 3. Collect external responses. Where external models disagree with Claude's team, present the disagreement to the human.
    - **Error handling**: if an external model CLI times out (>5 minutes), exits with a non-zero code, returns unparsable output, or returns an empty response, log the failure and continue without that model's input. Do not block the workflow on external model availability. Do not retry — external model failures are transient and retrying burns credits.
    - **Credibility weighting**: external findings are not automatically higher-credibility than Claude's team findings. External models lack project context — they haven't read the full codebase or conversation history. Treat external findings as "worth investigating" not "definitely correct." Over time, the `external-review-history.json` builds a track record: if Gemini has historically been right about networking invariants but wrong about concurrency, weight its future feedback accordingly. The `/cspec` skill reads this history to decide which invariant categories benefit most from external review.
-4. Track disagreements in `.claude/meta/external-review-history.json` for future reference — which categories of invariants have needed external correction, and which external model was right vs wrong?
+4. Track disagreements in `.correctless/meta/external-review-history.json` for future reference — which categories of invariants have needed external correction, and which external model was right vs wrong?
 5. **Report external model cost**: after external review completes, report the approximate token usage per model (based on input/output size). This makes external model costs visible — a user on `critical` intensity with `require_external_review: true` sending specs and source to Codex and Gemini on every feature should know what that costs outside their Claude subscription. The `/csetup` skill should mention this cost implication when configuring external models.
 
 **Phase transition**: Human approves revised spec → state moves to `tdd-tests`.
@@ -850,16 +838,16 @@ If `require_external_review` is true, OR if any invariant is flagged `needs_exte
 
 **Reads**:
 - Approved spec artifact
-- `.claude/workflow-config.json`
+- `.correctless/config/workflow-config.json`
 - `ARCHITECTURE.md`
 - `AGENT_CONTEXT.md` (for subagents and agent team members)
-- `.claude/antipatterns.md`
+- `.correctless/antipatterns.md`
 
 **Produces**:
 - Test files (mapping to spec invariant IDs)
 - Implementation files
-- `.claude/artifacts/workflow-state-{branch-slug}.json` updates
-- `.claude/artifacts/tdd-test-edits.log` (if tests modified during impl phase)
+- `.correctless/artifacts/workflow-state-{branch-slug}.json` updates
+- `.correctless/artifacts/tdd-test-edits.log` (if tests modified during impl phase)
 
 **Sub-skills / Phases**:
 
@@ -897,7 +885,7 @@ Write implementation to make tests pass.
 
 **Allowed file operations**:
 - Create/edit any source file
-- Edit test files: ALLOWED but LOGGED to `.claude/artifacts/tdd-test-edits.log` with timestamp, file path, and justification. **Acceptable reasons to edit tests during GREEN**: the test had a bug (wrong assertion target, incorrect setup), the test was testing an implementation detail that changed during design (not the invariant itself), or the test needs an updated fixture/mock. **Unacceptable and flagged during QA review**: weakening an assertion to make it pass (changing expected value to match actual output), deleting a test because it's "too strict," removing an error case test because the implementation doesn't handle it. The QA phase reviews this log and flags any edit where the test became less strict as a finding (severity: high).
+- Edit test files: ALLOWED but LOGGED to `.correctless/artifacts/tdd-test-edits.log` with timestamp, file path, and justification. **Acceptable reasons to edit tests during GREEN**: the test had a bug (wrong assertion target, incorrect setup), the test was testing an implementation detail that changed during design (not the invariant itself), or the test needs an updated fixture/mock. **Unacceptable and flagged during QA review**: weakening an assertion to make it pass (changing expected value to match actual output), deleting a test because it's "too strict," removing an error case test because the implementation doesn't handle it. The QA phase reviews this log and flags any edit where the test became less strict as a finding (severity: high).
 - Create/edit non-source files
 
 **Behavior**:
@@ -940,7 +928,7 @@ Final verification before done.
 - Run full test suite with race detection
 - Check coverage delta: for **existing** packages touched by this feature, coverage must not decrease vs baseline captured at impl→qa transition. For **new** packages (no baseline exists), a minimum coverage threshold applies: all new packages must have at least 60% line coverage (configurable via `workflow.min_new_package_coverage` — defaults to 60%). This prevents the trivially-satisfied case where new code has 0% baseline and any test at all "doesn't decrease."
 - Verify all findings from QA rounds are resolved (diff findings JSON against resolution JSON)
-- Review `.claude/artifacts/tdd-test-edits.log` — were any tests weakened during impl? (assertion removed, expected value changed to match actual, test deleted)
+- Review `.correctless/artifacts/tdd-test-edits.log` — were any tests weakened during impl? (assertion removed, expected value changed to match actual, test deleted)
 - Verify spec invariant coverage: for each INV-xxx in the spec, confirm at least one test references it
 
 **Gate to done**: all checks pass → state moves to `done`, state file removed.
@@ -949,12 +937,12 @@ Final verification before done.
 
 **Implementation note**: this spec describes the gate's *behavior*, not its implementation language. The gate performs JSON parsing, file pattern classification, stub tag enforcement, bash write-pattern detection, package manager blocking, and polyglot scope resolution — all within a 5-second timeout. A small Go or Python binary is recommended over raw bash for testability and maintainability. The spec uses `.sh` naming for consistency with Claude Code hook conventions, but the hook can invoke any executable.
 
-Reads the branch-scoped `.claude/artifacts/workflow-state-{branch-slug}.json`. Blocks file operations that violate the current phase.
+Reads the branch-scoped `.correctless/artifacts/workflow-state-{branch-slug}.json`. Blocks file operations that violate the current phase.
 
-- Blocks direct edits to any `.claude/artifacts/workflow-state-*.json` file (only the advance script can modify them)
+- Blocks direct edits to any `.correctless/artifacts/workflow-state-*.json` file (only the advance script can modify them)
 - Classifies files based on `patterns.test_file` and `patterns.source_file` from workflow-config.json
 - Returns exit code 2 to block, exit code 0 to allow
-- Logs test-file edits during impl phase to `.claude/artifacts/tdd-test-edits.log`
+- Logs test-file edits during impl phase to `.correctless/artifacts/tdd-test-edits.log`
 - **Bash write detection** (accidental violation catcher, NOT a security boundary): the hook matcher includes `Bash` in addition to `Edit|Write|MultiEdit|CreateFile`. When the tool is `Bash`, the gate inspects the command for common shell write patterns (`>`, `>>`, `tee`, `sed -i`) targeting files that match source file patterns. This catches the common case where Claude reflexively uses shell commands instead of the Edit tool to modify source files. It is NOT bulletproof — the agent could bypass this via `python -c "open(...).write(...)"`, `cp` from a temp file, `git checkout` of a stash, or countless other indirection methods. The hook prevents accidental violations by a well-intentioned agent, not adversarial evasion. If Claude is compliant with the workflow (which it is — the skill prompts instruct compliance), the hook is a safety net. If it were truly adversarial, no PreToolUse hook would save you.
 - **Package manager blocking during TDD**: during `tdd-tests` and `tdd-impl` phases, the gate blocks bash commands that install unmanifested dependencies: `apt-get install`, `brew install`, `curl | bash`, `curl | sh`, `wget ... | bash`, `pip install` (outside of requirements.txt), `go get` (outside of go.mod), `npm install <package>` (as opposed to `npm install` with no args which installs from package.json). This prevents the agent from silently pulling in dependencies to make tests pass without going through the dependency manifest. Legitimate dependency additions must be done via the manifest file (go.mod, package.json, etc.) which gets caught by the ghost dependency check in `/cverify`.
 - **Stub tag enforcement**: during the `tdd-tests` phase, source file edits are allowed only if the file contains the literal string `STUB:TDD` AND does not contain implementation indicators. The gate checks: (1) `STUB:TDD` is present somewhere in the file — this is the language-agnostic part. (2) The file does not contain a blocklist of implementation patterns — this is the imperfect part. The blocklist is configurable per language scope and typically includes: `if ` followed by non-trivial conditions, `for `/`range `/`while `, function calls to external packages, channel operations, mutex operations, etc. This is a heuristic, not a parser — it will occasionally false-positive on complex type definitions or false-negative on clever inline implementations. It catches the 90% case of "agent wrote real logic during RED phase." The 10% that slips through gets caught by the QA phase's test-edit review. Do NOT rely on this as the sole enforcement of TDD discipline — the skill prompt's instructions are the primary control, the gate is the safety net.
@@ -976,10 +964,10 @@ Commands:
 - `done` — tdd-verify → done (requires all checks pass. Sets phase to `done` but does NOT remove the state file yet — state persists until the branch is merged. If the merge fails or needs rework, the state file allows the workflow to resume from `done` or transition back via `fix`. State file is cleaned up by `reset` or by the `/cdocs` skill as part of post-merge documentation.)
 - `spec-update "reason"` — tdd-tests|tdd-impl|tdd-qa → spec (logs reason, preserves TDD state, increments update count)
 - `reset` — any → none (user escape hatch, removes all state files for current branch)
-- `override "reason"` — temporarily disables the gate hook for the next 10 tool calls or 5 minutes (whichever comes first). The reason is logged to `.claude/artifacts/override-log.json` with timestamp, phase, and reason. This is the targeted escape valve for when the gate is blocking a legitimate edit due to a pattern matching bug or edge case — use it instead of `reset` when you don't want to lose all workflow state. The log is reviewed during `/cverify` — frequent overrides indicate a gate configuration problem.
+- `override "reason"` — temporarily disables the gate hook for the next 10 tool calls or 5 minutes (whichever comes first). The reason is logged to `.correctless/artifacts/override-log.json` with timestamp, phase, and reason. This is the targeted escape valve for when the gate is blocking a legitimate edit due to a pattern matching bug or edge case — use it instead of `reset` when you don't want to lose all workflow state. The log is reviewed during `/cverify` — frequent overrides indicate a gate configuration problem.
 - `diagnose "filepath"` — shows why a specific file would be allowed or blocked in the current phase, without actually blocking anything. Prints: current phase, file classification (test/source/other), which patterns matched, whether STUB:TDD would be required, and the gate's decision. Useful for debugging gate behavior.
 - `status` — prints current state, findings summary, spec update history
-- `status-all` — scans all `.claude/artifacts/workflow-state-*.json` and prints a summary of all active branches
+- `status-all` — scans all `.correctless/artifacts/workflow-state-*.json` and prints a summary of all active branches
 
 Branch awareness: state file is branch-scoped (derived from `git branch --show-current`). On every invocation, the script computes the current branch slug and reads the corresponding state file. If no state file exists for the current branch, the script behaves according to `fail_closed_when_no_state`. This supports parallel feature development — each branch has independent workflow state.
 
@@ -1001,9 +989,9 @@ Branch awareness: state file is branch-scoped (derived from `git branch --show-c
 - Coverage data
 
 **Produces**:
-- `docs/verification/{task-slug}-verification.md` — verification report
+- `.correctless/verification/{task-slug}-verification.md` — verification report
 - Proposed updates to `ARCHITECTURE.md` if the feature introduced new abstractions
-- Proposed updates to `.claude/antipatterns.md` if the verification found patterns that should be watched
+- Proposed updates to `.correctless/antipatterns.md` if the verification found patterns that should be watched
 
 **Behavior**:
 
@@ -1061,7 +1049,7 @@ Branch awareness: state file is branch-scoped (derived from `git branch --show-c
    - Workflow health summary (from meta-verification tracking)
    - Proposed doc updates
 
-   For any drift findings the human accepts without fixing (e.g., "this drift is intentional" or "will fix later"), log them as structured drift debt in `.claude/meta/drift-debt.json`:
+   For any drift findings the human accepts without fixing (e.g., "this drift is intentional" or "will fix later"), log them as structured drift debt in `.correctless/meta/drift-debt.json`:
 
    ```json
    {
@@ -1101,14 +1089,14 @@ Branch awareness: state file is branch-scoped (derived from `git branch --show-c
 - All source code (or scoped to specific packages/directories)
 - Spec artifacts for relevant features
 - `ARCHITECTURE.md`
-- `.claude/antipatterns.md`
+- `.correctless/antipatterns.md`
 - Previous findings docs (for regression hunting)
 - `AGENT_CONTEXT.md` (provided to each agent team member)
-- `.claude/workflow-config.json`
+- `.correctless/config/workflow-config.json`
 
 **Produces**:
-- `.claude/artifacts/findings/caudit-{type}-{date}-round-{N}.json` per round
-- Updated `.claude/antipatterns.md`
+- `.correctless/artifacts/findings/caudit-{type}-{date}-round-{N}.json` per round
+- Updated `.correctless/antipatterns.md`
 - Regression tests for security-critical findings
 - Audit summary report
 
@@ -1141,7 +1129,7 @@ Branch awareness: state file is branch-scoped (derived from `git branch --show-c
    - Instruction to execute verification (run tests, run tools) — not just read code
 
    The Regression Hunter receives:
-   - The full previous findings doc (`.claude/artifacts/findings/` for this audit type)
+   - The full previous findings doc (`.correctless/artifacts/findings/` for this audit type)
    - The antipatterns checklist
    - Instruction: check whether any previously fixed issues have regressed or reappeared
    - Must reference specific finding IDs from previous rounds
@@ -1161,7 +1149,7 @@ Branch awareness: state file is branch-scoped (derived from `git branch --show-c
    - Trivial fixes (one-liner guards, missing nil checks): apply directly
    - Update findings JSON with resolution
 
-5. **Update antipatterns**. For any new validated finding, add an entry to `.claude/antipatterns.md` with: what went wrong, which phase should have caught it, the check that would catch it in future.
+5. **Update antipatterns**. For any new validated finding, add an entry to `.correctless/antipatterns.md` with: what went wrong, which phase should have caught it, the check that would catch it in future.
 
 6. **Commit fixes**. Commit to the audit branch with structured message: `fix(audit-{type}-r{round}): {finding-id} — {one-line description}`. NEVER commit directly to main.
 
@@ -1181,7 +1169,7 @@ Branch awareness: state file is branch-scoped (derived from `git branch --show-c
 - Run verification against spec invariants for any spec that was in scope.
 
 **External model pass (optional)**:
-After Claude convergence, send the final implementation to an external model for a single "fresh eyes" pass. The external model receives: the changed source files, the spec invariants, the ARCHITECTURE.md trust boundaries, and `.claude/antipatterns.md` (so it knows what this project has historically missed). This catches systematic blind spots that Claude-on-Claude convergence can't find. External findings go into antipatterns and the external review history for future reference.
+After Claude convergence, send the final implementation to an external model for a single "fresh eyes" pass. The external model receives: the changed source files, the spec invariants, the ARCHITECTURE.md trust boundaries, and `.correctless/antipatterns.md` (so it knows what this project has historically missed). This catches systematic blind spots that Claude-on-Claude convergence can't find. External findings go into antipatterns and the external review history for future reference.
 
 ---
 
@@ -1222,7 +1210,7 @@ After Claude convergence, send the final implementation to an external model for
 - Existing documentation (README.md, docs/, ARCHITECTURE.md)
 - Existing agent context file (`AGENT_CONTEXT.md`)
 - Spec artifacts for recently completed features
-- `.claude/workflow-config.json`
+- `.correctless/config/workflow-config.json`
 
 **Produces**:
 - Updated `README.md` — project description, setup instructions, feature list
@@ -1343,7 +1331,7 @@ Reference ARCHITECTURE.md entries by ID.}
 ## Common Pitfalls
 
 {Things agents frequently get wrong in this codebase. Sourced from the antipatterns checklist
-and post-merge bug history. Top 5-10 items only — the full list is in .claude/antipatterns.md.}
+and post-merge bug history. Top 5-10 items only — the full list is in .correctless/antipatterns.md.}
 
 - **Pitfall**: {description} — **Instead**: {correct approach} — refs {AP-xxx}
 - ...
@@ -1373,10 +1361,10 @@ and post-merge bug history. Top 5-10 items only — the full list is in .claude/
 | Build the project | `{build command}` |
 | Run tests | `{test command}` |
 | Lint | `{lint command}` |
-| Find the spec for a feature | `docs/specs/{feature-slug}.md` |
+| Find the spec for a feature | `.correctless/specs/{feature-slug}.md` |
 | Find architecture docs | `ARCHITECTURE.md` |
-| Find known bug patterns | `.claude/antipatterns.md` |
-| Find workflow state | `.claude/artifacts/workflow-state-{branch}.json` |
+| Find known bug patterns | `.correctless/antipatterns.md` |
+| Find workflow state | `.correctless/artifacts/workflow-state-{branch}.json` |
 ```
 
 **How it's maintained**:
@@ -1385,7 +1373,7 @@ The `/cdocs` skill updates AGENT_CONTEXT.md as part of every documentation run. 
 - **Key Components table**: regenerated from the codebase (scan for packages/modules, their main exports)
 - **Design Paradigms**: updated when ARCHITECTURE.md patterns (PAT-xxx) change
 - **Critical Invariants**: updated when new high/critical invariants are added to specs
-- **Common Pitfalls**: updated from `.claude/antipatterns.md` (top items by frequency)
+- **Common Pitfalls**: updated from `.correctless/antipatterns.md` (top items by frequency)
 - **Current State**: updated from git history and active branches
 - **Quick Reference**: updated from `workflow-config.json` commands
 
@@ -1406,13 +1394,13 @@ The `/cdocs` skill updates AGENT_CONTEXT.md as part of every documentation run. 
 
 **Reads**:
 - Project root (scans for manifest files, source directories, existing config)
-- `.claude/workflow-config.json` (if exists — to show current config)
+- `.correctless/config/workflow-config.json` (if exists — to show current config)
 - `ARCHITECTURE.md` (if exists — to check if still template)
 - `AGENT_CONTEXT.md` (if exists — to check if still template)
 - Codebase structure (packages, modules, imports, test files)
 
 **Produces**:
-- Updated `.claude/workflow-config.json`
+- Updated `.correctless/config/workflow-config.json`
 - Bootstrapped `ARCHITECTURE.md` (if template or missing)
 - Bootstrapped `AGENT_CONTEXT.md` (if template or missing)
 - Validation report (if run on existing setup)
@@ -1481,17 +1469,17 @@ The `/cdocs` skill updates AGENT_CONTEXT.md as part of every documentation run. 
 **Trigger**: A bug is found in merged code — via user report, monitoring, manual testing, or a subsequent `/caudit` run. The human invokes `/cpostmortem` to analyze it.
 
 **Reads**:
-- `.claude/meta/workflow-effectiveness.json` (existing post-merge bug history)
-- `.claude/antipatterns.md` (to check if this bug class is already tracked)
+- `.correctless/meta/workflow-effectiveness.json` (existing post-merge bug history)
+- `.correctless/antipatterns.md` (to check if this bug class is already tracked)
 - The spec artifact for the feature where the bug was introduced (if one exists)
 - The verification report for that feature (if one exists)
 - Relevant source code and test files
 
 **Produces**:
-- New entry in `.claude/meta/workflow-effectiveness.json`
-- Optionally: new AP-xxx entry in `.claude/antipatterns.md`
+- New entry in `.correctless/meta/workflow-effectiveness.json`
+- Optionally: new AP-xxx entry in `.correctless/antipatterns.md`
 - Optionally: update to an invariant template in `.claude/templates/invariants/`
-- Optionally: new DRIFT-xxx entry in `.claude/meta/drift-debt.json`
+- Optionally: new DRIFT-xxx entry in `.correctless/meta/drift-debt.json`
 
 **Behavior**:
 
@@ -1553,7 +1541,7 @@ The `/cdocs` skill updates AGENT_CONTEXT.md as part of every documentation run. 
 
 Beyond the phase transition commands defined in Skill 4, the advance script supports:
 
-- `status-all` — scans `.claude/artifacts/workflow-state-*.json` and prints a summary of all active branches:
+- `status-all` — scans `.correctless/artifacts/workflow-state-*.json` and prints a summary of all active branches:
   ```
   Active workflows:
     feature/localhost-inspection  phase: tdd-impl   started: 2026-03-24  qa_rounds: 0
@@ -1562,7 +1550,7 @@ Beyond the phase transition commands defined in Skill 4, the advance script supp
   ```
   Essential for parallel development — see where everything is at a glance.
 
-- `resolve-drift DRIFT-xxx "reason"` — marks a drift debt item as resolved in `.claude/meta/drift-debt.json`. Sets `status: resolved`, `resolved_date`, and logs the reason.
+- `resolve-drift DRIFT-xxx "reason"` — marks a drift debt item as resolved in `.correctless/meta/drift-debt.json`. Sets `status: resolved`, `resolved_date`, and logs the reason.
 
 ---
 
@@ -1578,13 +1566,13 @@ Every skill restricts its tool access via frontmatter. This is a **second enforc
 |-------|-----------------|-----------|
 | `/cspec` | `Read, Grep, Glob, Bash(git log*), Bash(git diff*), Bash(git branch*)` | Read-only. Spec authoring must never touch source code. |
 | `/cmodel` | `Read, Grep, Bash(java -jar*), Write(docs/models/*)` | Can only write Alloy model files. Can run the Alloy Analyzer JAR. |
-| `/creview-spec` | `Read, Grep, Glob, Bash(git*), Write(.claude/artifacts/reviews/*), Write(docs/specs/*)` | Can read everything, write review artifacts and update the spec. Cannot touch source code. |
-| `/ctdd` | (varies by phase — orchestrator manages tool restrictions for spawned agents) | RED phase agents: `Read, Grep, Write(files matching patterns.test_file), Bash(commands.test*)`. GREEN phase agents: full tool access. QA phase agents: `Read, Grep, Glob, Bash(commands.test*), Write(.claude/artifacts/findings/*)`. |
-| `/cverify` | `Read, Grep, Glob, Bash(go test*), Bash(npm test*), Write(docs/verification/*)` | Can read and run tests. Can only write verification reports. Cannot modify source. |
+| `/creview-spec` | `Read, Grep, Glob, Bash(git*), Write(.correctless/artifacts/reviews/*), Write(.correctless/specs/*)` | Can read everything, write review artifacts and update the spec. Cannot touch source code. |
+| `/ctdd` | (varies by phase — orchestrator manages tool restrictions for spawned agents) | RED phase agents: `Read, Grep, Write(files matching patterns.test_file), Bash(commands.test*)`. GREEN phase agents: full tool access. QA phase agents: `Read, Grep, Glob, Bash(commands.test*), Write(.correctless/artifacts/findings/*)`. |
+| `/cverify` | `Read, Grep, Glob, Bash(go test*), Bash(npm test*), Write(.correctless/verification/*)` | Can read and run tests. Can only write verification reports. Cannot modify source. |
 | `/caudit` | (orchestrator manages per-agent — QA agents get read + test execution, fix agents get full access) | Agent-specific restrictions set when spawning teammates. |
 | `/cdocs` | `Read, Grep, Glob, Write(docs/*), Write(README.md), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md)` | Can write documentation files only. Cannot touch source code. |
-| `/cpostmortem` | `Read, Grep, Glob, Write(.claude/meta/*), Write(.claude/antipatterns.md)` | Can read everything, write meta-verification data and antipatterns. Cannot touch source. |
-| `/csetup` | `Read, Grep, Glob, Bash(*), Write(.claude/workflow-config.json), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md), Write(.claude/antipatterns.md), Write(.claude/meta/*), Write(.claude/templates/*), Write(.claude/skills/workflow/hooks/*), Write(.claude/settings.json)` | Needs broad write access to scaffold project files and register hooks. Cannot write source code or test files. |
+| `/cpostmortem` | `Read, Grep, Glob, Write(.correctless/meta/*), Write(.correctless/antipatterns.md)` | Can read everything, write meta-verification data and antipatterns. Cannot touch source. |
+| `/csetup` | `Read, Grep, Glob, Bash(*), Write(.correctless/config/workflow-config.json), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md), Write(.correctless/antipatterns.md), Write(.correctless/meta/*), Write(.claude/templates/*), Write(.claude/skills/workflow/hooks/*), Write(.claude/settings.json)` | Needs broad write access to scaffold project files and register hooks. Cannot write source code or test files. |
 
 ### Skill Frontmatter: `model`
 
@@ -1699,7 +1687,7 @@ Human: "I want to add localhost traffic inspection"
   ├── /cspec
   │   ├── Conversation: what, why, adversary model, failure modes
   │   ├── Reads: ARCHITECTURE.md, antipatterns, drift debt, relevant source
-  │   ├── Produces: docs/specs/localhost-inspection.md
+  │   ├── Produces: .correctless/specs/localhost-inspection.md
   │   └── Human approves spec
   │
   ├── /cmodel (if formal_model enabled)
@@ -1787,7 +1775,7 @@ The human decides which skills to invoke. The enforcement only kicks in once a s
 
 ## Project-Specific Customization
 
-### Go security proxy example: `.claude/workflow-config.json`
+### Go security proxy example: `.correctless/config/workflow-config.json`
 
 ```json
 {
@@ -1851,7 +1839,7 @@ The human decides which skills to invoke. The enforcement only kicks in once a s
 }
 ```
 
-### TypeScript web app example: `.claude/workflow-config.json`
+### TypeScript web app example: `.correctless/config/workflow-config.json`
 
 ```json
 {
@@ -2081,7 +2069,7 @@ The `/cspec` skill doesn't blindly apply every template. During the conversation
 
 Track whether the workflow is actually catching bugs, and which phases are doing the catching. This creates a feedback loop on the workflow itself.
 
-### Tracking file: `.claude/meta/workflow-effectiveness.json`
+### Tracking file: `.correctless/meta/workflow-effectiveness.json`
 
 ```json
 {
@@ -2191,10 +2179,10 @@ The `/cverify` skill includes a section in its report: "Workflow health: {N} pos
 | `setup` | Install script (executable, runs detection + scaffolding) |
 | `ARCHITECTURE.md` | Template — project fills in (or `/csetup` bootstraps) |
 | `AGENT_CONTEXT.md` | Template — agent onboarding brief |
-| `.claude/workflow-config.json` | Template — project fills in |
-| `.claude/antipatterns.md` | Empty template |
-| `.claude/meta/workflow-effectiveness.json` | Meta-verification tracking (starts empty) |
-| `.claude/meta/drift-debt.json` | Drift debt tracking (starts empty) |
+| `.correctless/config/workflow-config.json` | Template — project fills in |
+| `.correctless/antipatterns.md` | Empty template |
+| `.correctless/meta/workflow-effectiveness.json` | Meta-verification tracking (starts empty) |
+| `.correctless/meta/drift-debt.json` | Drift debt tracking (starts empty) |
 | `.claude/templates/invariants/concurrency.md` | Invariant template: goroutines, mutexes, channels |
 | `.claude/templates/invariants/resource-lifecycle.md` | Invariant template: allocation, cleanup, crash paths |
 | `.claude/templates/invariants/config-lifecycle.md` | Invariant template: config field completeness |
@@ -2235,15 +2223,15 @@ The `setup` script does the following automatically:
 6. **Scaffolds project files** — creates the directory structure and empty templates:
    - `ARCHITECTURE.md` — template with section headers, instructions, and one example entry per section
    - `AGENT_CONTEXT.md` — template with section headers and placeholder text
-   - `.claude/workflow-config.json` — pre-filled with detected values, ready for human review
-   - `.claude/antipatterns.md` — empty template with format instructions
-   - `.claude/meta/workflow-effectiveness.json` — empty `{}`
-   - `.claude/meta/drift-debt.json` — empty `{}`
-   - `.claude/meta/external-review-history.json` — empty `{}`
-   - `.claude/artifacts/` — created with `.gitignore` inside it
-   - `docs/specs/`, `docs/models/`, `docs/diagrams/`, `docs/features/`, `docs/verification/` — created empty
+   - `.correctless/config/workflow-config.json` — pre-filled with detected values, ready for human review
+   - `.correctless/antipatterns.md` — empty template with format instructions
+   - `.correctless/meta/workflow-effectiveness.json` — empty `{}`
+   - `.correctless/meta/drift-debt.json` — empty `{}`
+   - `.correctless/meta/external-review-history.json` — empty `{}`
+   - `.correctless/artifacts/` — created with `.gitignore` inside it
+   - `.correctless/specs/`, `docs/models/`, `docs/diagrams/`, `docs/features/`, `.correctless/verification/` — created empty
 
-7. **Updates `.gitignore`** — adds `.claude/artifacts/` if not already present.
+7. **Updates `.gitignore`** — adds `.correctless/artifacts/` if not already present.
 
 8. **Updates `CLAUDE.md`** — appends a section pointing to Correctless:
    ```markdown
@@ -2267,12 +2255,12 @@ The `setup` script does the following automatically:
    ✓ Commands registered: /cspec /cmodel /creview-spec /ctdd /cverify /caudit /cupdate-arch /cdocs /csetup
 
    Created:
-     .claude/workflow-config.json  ← review and adjust
+     .correctless/config/workflow-config.json  ← review and adjust
      ARCHITECTURE.md               ← fill in your project's architecture
      AGENT_CONTEXT.md              ← fill in or run /cdocs to auto-generate
 
    Next steps:
-     1. Review .claude/workflow-config.json — adjust intensity, enable formal_model if desired
+     1. Review .correctless/config/workflow-config.json — adjust intensity, enable formal_model if desired
      2. Fill in ARCHITECTURE.md — at minimum, document your trust boundaries and core abstractions
      3. Try it: create a feature branch and run /cspec
    ```

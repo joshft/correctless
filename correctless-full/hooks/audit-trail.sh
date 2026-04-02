@@ -6,8 +6,8 @@
 # Full mode: + adherence tracking with coverage progress
 # MUST be fast. Audit logging <100ms. Adherence feedback <200ms.
 
-# Fast-path bail: if no .claude/artifacts/ directory, exit immediately.
-[ -d ".claude/artifacts" ] || exit 0
+# Fast-path bail: if no .correctless/artifacts/ directory, exit immediately.
+[ -d ".correctless/artifacts" ] || exit 0
 
 # Read input
 INPUT="$(cat)"
@@ -36,18 +36,18 @@ branch="$(git --no-optional-locks branch --show-current 2>/dev/null)" || exit 0
 
 slug="$(echo "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
 hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
-STATE_FILE=".claude/artifacts/workflow-state-${slug}-${hash}.json"
+STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${hash}.json"
 
 # Fast-path bail: no state file = no active workflow = nothing to audit
 [ -f "$STATE_FILE" ] || exit 0
 
 # Read phase and config
 PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)"
-CONFIG_FILE=".claude/workflow-config.json"
+CONFIG_FILE=".correctless/config/workflow-config.json"
 
 # --- Audit trail logging (always, both modes) ---
 
-TRAIL=".claude/artifacts/audit-trail-${slug}-${hash}.jsonl"
+TRAIL=".correctless/artifacts/audit-trail-${slug}-${hash}.jsonl"
 TS="$(date -u +%FT%TZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 echo "$FILES" | while IFS= read -r f; do
@@ -135,7 +135,7 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 
 if [ "$IS_FULL" = "true" ]; then
-  ADHERENCE=".claude/artifacts/adherence-state-${slug}-${hash}.json"
+  ADHERENCE=".correctless/artifacts/adherence-state-${slug}-${hash}.json"
 
   # Initialize adherence state if missing
   if [ ! -f "$ADHERENCE" ]; then

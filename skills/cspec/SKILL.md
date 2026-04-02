@@ -1,7 +1,7 @@
 ---
 name: cspec
 description: Create a structured specification with testable invariants for a new feature. Researches current best practices before writing invariants. Adapts format to workflow intensity.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git log*), Bash(git diff*), Bash(git branch*), Bash(*workflow-advance.sh*), Write(docs/specs/*), Write(.claude/artifacts/research/*), Write(.claude/artifacts/token-log-*), Write(ARCHITECTURE.md), Write(AGENT_CONTEXT.md), WebSearch, WebFetch
+allowed-tools: Read, Grep, Glob, Edit, Bash(git log*), Bash(git diff*), Bash(git branch*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/research/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), WebSearch, WebFetch
 ---
 
 # /cspec — Write a Feature Specification
@@ -10,7 +10,7 @@ You are the spec agent. Your job is to turn a feature idea into a structured spe
 
 ## Detect Mode
 
-Read `.claude/workflow-config.json`. If it has `workflow.intensity` set (low/standard/high/critical), you're in **Full mode** — use the full invariant format. If it only has `workflow.min_qa_rounds` (no intensity field), you're in **Lite mode** — use the simple rules format.
+Read `.correctless/config/workflow-config.json`. If it has `workflow.intensity` set (low/standard/high/critical), you're in **Full mode** — use the full invariant format. If it only has `workflow.min_qa_rounds` (no intensity field), you're in **Lite mode** — use the simple rules format.
 
 ## Progress Visibility (MANDATORY)
 
@@ -18,7 +18,7 @@ Spec writing takes 5-10 minutes of active work plus conversation time. The user 
 
 **Before starting**, create a task list:
 1. Socratic brainstorm
-2. Read context (ARCHITECTURE.md, antipatterns, drift debt, QA findings)
+2. Read context (.correctless/ARCHITECTURE.md, antipatterns, drift debt, QA findings)
 3. Research phase (if triggered — announce when research subagent completes)
 4. Draft spec
 5. Load templates and check antipatterns
@@ -30,14 +30,14 @@ Mark each task complete as it finishes.
 
 ## Before You Start
 
-**First-run check**: If `ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.claude/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate ARCHITECTURE.md and AGENT_CONTEXT.md with the basics, or you can run `/csetup` for the full experience (health check, convention mining, security audit)." If they want the quick scan: glob for key directories, identify 3-5 components and patterns, populate ARCHITECTURE.md with real entries, then continue with the spec. This takes 30 seconds and dramatically improves spec quality.
+**First-run check**: If `.correctless/ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate .correctless/ARCHITECTURE.md and .correctless/AGENT_CONTEXT.md with the basics, or you can run `/csetup` for the full experience (health check, convention mining, security audit)." If they want the quick scan: glob for key directories, identify 3-5 components and patterns, populate .correctless/ARCHITECTURE.md with real entries, then continue with the spec. This takes 30 seconds and dramatically improves spec quality.
 
-1. Read `AGENT_CONTEXT.md` for project context.
-2. Read `ARCHITECTURE.md` for design patterns and conventions.
-3. Read `.claude/antipatterns.md` for known bug classes.
-4. **Full mode**: Read `.claude/meta/drift-debt.json` for outstanding drift debt.
-5. **Full mode**: Read `.claude/meta/workflow-effectiveness.json` for phase effectiveness history.
-6. Read `.claude/artifacts/qa-findings-*.json` (if any exist) — patterns QA historically finds in this project.
+1. Read `.correctless/AGENT_CONTEXT.md` for project context.
+2. Read `.correctless/ARCHITECTURE.md` for design patterns and conventions.
+3. Read `.correctless/antipatterns.md` for known bug classes.
+4. **Full mode**: Read `.correctless/meta/drift-debt.json` for outstanding drift debt.
+5. **Full mode**: Read `.correctless/meta/workflow-effectiveness.json` for phase effectiveness history.
+6. Read `.correctless/artifacts/qa-findings-*.json` (if any exist) — patterns QA historically finds in this project.
 7. Run `git log --oneline -20` to understand recent context.
 8. Grep/glob relevant source code areas based on the feature description.
 
@@ -45,13 +45,13 @@ Mark each task complete as it finishes.
 
 Check current workflow state:
 ```bash
-.claude/hooks/workflow-advance.sh status
+.correctless/hooks/workflow-advance.sh status
 ```
 
 If no workflow is active, initialize one. Before calling `workflow-advance.sh init`, ask the user: **"Short name for this feature? (used in filenames, e.g., `auth-middleware`)"**. If the user provides a name, use it as the task description for `init`. If they say "auto" or don't provide one, use the first 3-4 words of the feature description.
 
 ```bash
-.claude/hooks/workflow-advance.sh init "task description"
+.correctless/hooks/workflow-advance.sh init "task description"
 ```
 
 This creates the state file and sets the phase to `spec`. If you're on `main` or `master`, tell the user to create a feature branch first.
@@ -72,7 +72,7 @@ Ask these questions, adapting to the developer's confidence level:
 
 4. **"What would make this feature actively harmful if it went wrong?"** Surfaces failure modes at a high level to inform scope. Step 1 will pin down the exact failure mode classification (fail-open/fail-closed/etc.) for each specific behavior — this question identifies WHICH failure modes exist, Step 1 classifies them. "If the payment double-charges" or "if the auth check fails open" — these become prohibitions in the spec.
 
-5. **"Is there an existing pattern in the codebase that does something similar?"** Check ARCHITECTURE.md and the codebase. If a similar pattern exists, the new feature should compose with it, not reinvent it.
+5. **"Is there an existing pattern in the codebase that does something similar?"** Check .correctless/ARCHITECTURE.md and the codebase. If a similar pattern exists, the new feature should compose with it, not reinvent it.
 
 **Proportionality:** If the developer clearly understands the domain and has a well-formed idea, this step takes 2-3 exchanges. If the idea is vague ("I want to add payments"), this step takes longer and does more work. Read the developer's confidence from their responses — a product security engineer describing a network proxy doesn't need five Socratic questions. A junior developer adding their first auth system does.
 
@@ -98,7 +98,7 @@ Failure mode:
   Or type your own: ___
 ```
 - **Full mode, if `require_stride` is true**: What is the adversary model? Who is trying to break this?
-- **Full mode**: What existing abstractions does this touch? (reference ARCHITECTURE.md ABS-xxx entries)
+- **Full mode**: What existing abstractions does this touch? (reference .correctless/ARCHITECTURE.md ABS-xxx entries)
 
 ### Step 2: Research Current State (when needed)
 
@@ -126,7 +126,7 @@ After understanding what the human wants to build, assess whether your training 
 >
 > RESEARCH TOPIC: {topic from the feature description}
 > CONTEXT: {feature description}
-> PROJECT: {project type from AGENT_CONTEXT.md}
+> PROJECT: {project type from .correctless/AGENT_CONTEXT.md}
 >
 > Search for:
 > 1. Current official documentation for the libraries/protocols involved
@@ -183,7 +183,7 @@ After understanding what the human wants to build, assess whether your training 
 
 The research subagent should have `allowed-tools: WebSearch, WebFetch, Read, Grep`. It returns the brief as text to you (the cspec orchestrator).
 
-After receiving the research subagent's output, **you** (the cspec agent) write the brief to `.claude/artifacts/research/{task-slug}-research.md`. Then read the brief before drafting the spec. Reference findings in the spec's invariants where relevant.
+After receiving the research subagent's output, **you** (the cspec agent) write the brief to `.correctless/artifacts/research/{task-slug}-research.md`. Then read the brief before drafting the spec. Reference findings in the spec's invariants where relevant.
 
 **If no research signals are present** (straightforward feature using well-understood patterns), skip this step. Don't research for the sake of researching.
 
@@ -195,7 +195,7 @@ Before drafting, read the appropriate spec template file and use it as the skele
 
 Use the template as the skeleton — fill in the placeholders with the feature-specific content rather than reconstructing the format from these instructions.
 
-Write the spec to `docs/specs/{task-slug}.md`.
+Write the spec to `.correctless/specs/{task-slug}.md`.
 
 **Lite mode** — use 5 sections (What, Rules with R-xxx IDs, Won't Do, Risks, Open Questions). Keep it simple.
 
@@ -330,11 +330,11 @@ Walk through applicable template items with the human. Relevant items become dra
 
 ### Step 5: Check Antipatterns
 
-For each AP-xxx entry in `.claude/antipatterns.md`, ask: does this feature risk repeating this bug class? If yes, add a rule/invariant that prevents it (with `guards_against: AP-xxx` in Full mode).
+For each AP-xxx entry in `.correctless/antipatterns.md`, ask: does this feature risk repeating this bug class? If yes, add a rule/invariant that prevents it (with `guards_against: AP-xxx` in Full mode).
 
 ### Step 6: Check Drift Debt (Full Mode)
 
-Read `.claude/meta/drift-debt.json`. If any open drift items involve files or abstractions this feature touches, surface them to the human.
+Read `.correctless/meta/drift-debt.json`. If any open drift items involve files or abstractions this feature touches, surface them to the human.
 
 ### Step 7: Recommend Intensity (Full Mode)
 
@@ -356,13 +356,13 @@ Once the human approves the spec, advance to review. **Review is MANDATORY — n
 
 ```bash
 # Lite mode:
-.claude/hooks/workflow-advance.sh review
+.correctless/hooks/workflow-advance.sh review
 
 # Full mode (with formal modeling):
-.claude/hooks/workflow-advance.sh model
+.correctless/hooks/workflow-advance.sh model
 
 # Full mode (without formal modeling):
-.claude/hooks/workflow-advance.sh review-spec
+.correctless/hooks/workflow-advance.sh review-spec
 ```
 
 After advancing, print the pipeline diagram showing progress:
@@ -391,7 +391,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the research subagent completes (when triggered), capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the task slug):
+After the research subagent completes (when triggered), capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the task slug):
 
 ```json
 {
@@ -410,7 +410,7 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 When presenting the spec for review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."
 
 ### /export
-After spec approval, suggest: "Consider exporting this conversation as a decision record: `/export docs/decisions/{task-slug}-spec.md` — captures why these specific rules were chosen."
+After spec approval, suggest: "Consider exporting this conversation as a decision record: `/export .correctless/decisions/{task-slug}-spec.md` — captures why these specific rules were chosen."
 
 ## Code Analysis (MCP Integration)
 

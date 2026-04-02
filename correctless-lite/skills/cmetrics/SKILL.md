@@ -1,7 +1,7 @@
 ---
 name: cmetrics
 description: Project health and ROI dashboard. Use monthly or when evaluating workflow effectiveness. Shows bugs caught, token cost, and trends.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(wc*), Bash(find*), Bash(cat*), Bash(jq*), Write(.claude/artifacts/metrics-*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(wc*), Bash(find*), Bash(cat*), Bash(jq*), Write(.correctless/artifacts/metrics-*)
 ---
 
 # /cmetrics — Workflow Metrics Dashboard
@@ -20,25 +20,25 @@ Aggregate all accumulated workflow data into a project health dashboard. Shows t
 Read everything in the accumulation layer. Skip files that don't exist.
 
 ### Primary sources:
-1. **QA findings** — `glob .claude/artifacts/qa-findings-*.json` — every QA round from every feature
-2. **Verification reports** — `glob docs/verification/*-verification.md` — every verification
-3. **Workflow effectiveness** — `.claude/meta/workflow-effectiveness.json` — post-merge bug history
-4. **Antipatterns** — `.claude/antipatterns.md` — accumulated bug classes
-5. **Drift debt** — `.claude/meta/drift-debt.json` — architectural erosion
-6. **Olympics findings** — `glob .claude/artifacts/findings/audit-*-history.md` — all audit runs
-7. **Specs** — `glob docs/specs/*.md` — count of features that went through the workflow
-8. **Feature summaries** — `glob .claude/artifacts/summary-*.md` — per-feature summaries (from /csummary)
-9. **Decision records** — `glob docs/decisions/*.md` — for staleness checks (revisit-when/revisit-by markers)
-10. **Workflow state files** — `glob .claude/artifacts/workflow-state-*.json` — for spec_updates counts per feature
-11. **Token logs** — `glob .claude/artifacts/token-log-*.json` — per-feature token usage from subagent spawns
-12. **Audit trails** — `glob .claude/artifacts/audit-trail-*.jsonl` — per-branch tool invocation logs from the PostToolUse hook. Contains: timestamp, phase, tool name, file path, branch.
+1. **QA findings** — `glob .correctless/artifacts/qa-findings-*.json` — every QA round from every feature
+2. **Verification reports** — `glob .correctless/verification/*-verification.md` — every verification
+3. **Workflow effectiveness** — `.correctless/meta/workflow-effectiveness.json` — post-merge bug history
+4. **Antipatterns** — `.correctless/antipatterns.md` — accumulated bug classes
+5. **Drift debt** — `.correctless/meta/drift-debt.json` — architectural erosion
+6. **Olympics findings** — `glob .correctless/artifacts/findings/audit-*-history.md` — all audit runs
+7. **Specs** — `glob .correctless/specs/*.md` — count of features that went through the workflow
+8. **Feature summaries** — `glob .correctless/artifacts/summary-*.md` — per-feature summaries (from /csummary)
+9. **Decision records** — `glob .correctless/decisions/*.md` — for staleness checks (revisit-when/revisit-by markers)
+10. **Workflow state files** — `glob .correctless/artifacts/workflow-state-*.json` — for spec_updates counts per feature
+11. **Token logs** — `glob .correctless/artifacts/token-log-*.json` — per-feature token usage from subagent spawns
+12. **Audit trails** — `glob .correctless/artifacts/audit-trail-*.jsonl` — per-branch tool invocation logs from the PostToolUse hook. Contains: timestamp, phase, tool name, file path, branch.
 13. **Git log** — commit history to measure feature velocity and branch durations
 14. **Session meta** — `glob ~/.claude/usage-data/session-meta/*.json` — filter by `project_path` matching the current project root. Contains exact token counts, tool usage, duration, error rates per session.
 15. **Session facets** — `glob ~/.claude/usage-data/facets/*.json` — match by `session_id` to session-meta entries for this project. Contains AI-analyzed session quality: outcome, friction, satisfaction.
 
 ### Derived metrics:
 
-**Features completed** — count of spec files in `docs/specs/`
+**Features completed** — count of spec files in `.correctless/specs/`
 
 **Total issues caught** — sum of:
 - Rules added during review (count rules in final spec minus rules in initial draft — approximate by counting total rules per spec)
@@ -62,12 +62,12 @@ Read everything in the accumulation layer. Skip files that don't exist.
 - For each phase: bugs that should have been caught vs bugs actually caught
 - Identify weak phases (low catch rate relative to responsibility)
 
-**Antipattern trends** — from `.claude/antipatterns.md`:
+**Antipattern trends** — from `.correctless/antipatterns.md`:
 - Total entries
 - Group by category — which categories keep growing?
 - Most frequent (highest `Frequency` field)
 
-**Drift debt health** — from `.claude/meta/drift-debt.json`:
+**Drift debt health** — from `.correctless/meta/drift-debt.json`:
 - Open items count
 - Oldest open item age
 - Items resolved vs items accumulating
@@ -84,7 +84,7 @@ Read everything in the accumulation layer. Skip files that don't exist.
 
 ## Output Format
 
-Print to conversation AND write to `.claude/artifacts/metrics-{date}.md`:
+Print to conversation AND write to `.correctless/artifacts/metrics-{date}.md`:
 
 ```markdown
 # Correctless Metrics — {Project Name}
@@ -176,7 +176,7 @@ After computing the raw metrics above, analyze them for actionable insights. Thi
 
 **Antipattern Growth:**
 - Group antipatterns by category. Flag the fastest-growing: "Error handling antipatterns are growing fastest (4 new in last 3 months). This may indicate an architectural gap, not just individual bugs."
-- If any category has 5+ entries: "Consider whether '{category}' is a systemic issue that needs an ARCHITECTURE.md pattern, not just more antipattern entries."
+- If any category has 5+ entries: "Consider whether '{category}' is a systemic issue that needs an .correctless/ARCHITECTURE.md pattern, not just more antipattern entries."
 
 **Drift Debt Staleness:**
 - Flag items older than 90 days: "{N} drift items are older than 90 days. Stale drift becomes invisible — schedule a `/cdevadv layers` analysis."
@@ -187,7 +187,7 @@ After computing the raw metrics above, analyze them for actionable insights. Thi
 - If convergence is getting slower: "Olympics are taking more rounds — new code may be introducing complexity the current lenses don't cover well."
 
 **Decision Record Staleness:**
-- Scan `docs/decisions/` for files with `revisit-when` or `revisit-by` markers. Flag expired conditions.
+- Scan `.correctless/decisions/` for files with `revisit-when` or `revisit-by` markers. Flag expired conditions.
 
 **Spec Revision Rate:**
 - If specs are frequently revised during TDD (high spec_updates counts across features): "Specs are being revised mid-TDD frequently. The spec phase may not be thorough enough — consider more Socratic brainstorm time or research steps."
@@ -200,7 +200,7 @@ After computing the raw metrics above, analyze them for actionable insights. Thi
 
 ## Token ROI Analysis
 
-Read all `.claude/artifacts/token-log-*.json` files. Correlate token spend with findings data from QA, verification, and audit artifacts.
+Read all `.correctless/artifacts/token-log-*.json` files. Correlate token spend with findings data from QA, verification, and audit artifacts.
 
 ### Metrics to Compute
 
@@ -293,7 +293,7 @@ Note: Not all sessions have facets files (~26% coverage is typical). When comput
 **Correctless vs Freeform comparison:**
 
 Identify Correctless sessions by checking whether Correctless artifacts were modified during the session's time window. A session is "Correctless" if:
-- Workflow state files (`.claude/artifacts/workflow-state-*.json`) have `phase_entered_at` timestamps within the session's `start_time` to `start_time + duration_minutes` range, OR
+- Workflow state files (`.correctless/artifacts/workflow-state-*.json`) have `phase_entered_at` timestamps within the session's `start_time` to `start_time + duration_minutes` range, OR
 - The session's `tool_counts` includes calls to tools that only Correctless uses (the `Task` tool with high counts suggests orchestrated workflow), OR
 - QA findings, verification reports, or spec files were modified during the session window (check git log timestamps)
 
@@ -336,7 +336,7 @@ If no session-meta data exists for this project, skip with: "No Claude Code sess
 
 ## Trend Tracking
 
-If previous metrics files exist (`.claude/artifacts/metrics-*.md`), compare:
+If previous metrics files exist (`.correctless/artifacts/metrics-*.md`), compare:
 - Is the bug escape rate improving? (should decrease over time)
 - Are more issues being caught earlier? (review should catch more as templates improve)
 - Is drift debt accumulating or resolving?

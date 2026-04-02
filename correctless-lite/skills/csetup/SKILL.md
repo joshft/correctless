@@ -14,7 +14,7 @@ You are the onboarding agent. Your job is to get a project from zero to ready-to
 
 If `/csetup` is interrupted (context compaction, user stops, error), save a checkpoint so re-running picks up where it left off.
 
-**Checkpoint file:** `.claude/artifacts/checkpoint-csetup.json`
+**Checkpoint file:** `.correctless/artifacts/checkpoint-csetup.json`
 
 ```json
 {
@@ -52,7 +52,7 @@ Count and classify silently:
 1. **Source files**: Glob for language-specific patterns (`*.ts`, `*.go`, `*.py`, `*.rs`, `*.java`, `*.rb`, `*.swift`, etc.). Exclude `node_modules/`, `vendor/`, `dist/`, `build/`, `.next/`, `__pycache__/`, `target/`.
 2. **Test suite**: Do test files exist? Is there a test config (jest.config, vitest.config, pytest.ini, etc.)?
 3. **CI**: Do CI config files exist (`.github/workflows/`, `.gitlab-ci.yml`, etc.)?
-4. **Documentation**: Does `README.md` have real content (not just framework boilerplate)? Does `ARCHITECTURE.md` or similar exist?
+4. **Documentation**: Does `README.md` have real content (not just framework boilerplate)? Does `.correctless/ARCHITECTURE.md` or similar exist?
 5. **Git history**: How many commits? How old is the repo? Use `git rev-list --count HEAD 2>/dev/null || echo 0` and `git log --reverse --format=%ci 2>/dev/null | head -1`. If either command fails (zero-commit repo, not a git repo), treat commit count as 0 and age as "new".
 
 Classify as:
@@ -88,7 +88,7 @@ Setup on existing projects takes several minutes. The user must see progress thr
 2. Run setup script
 3. Configure MCP servers (if available)
 4. Confirm configuration
-5. Bootstrap docs (ARCHITECTURE.md + AGENT_CONTEXT.md)
+5. Bootstrap docs (.correctless/ARCHITECTURE.md + .correctless/AGENT_CONTEXT.md)
 6. Security quick-check (secrets scan)
 7. Source control defaults
 8. First feature guidance
@@ -100,7 +100,7 @@ Setup on existing projects takes several minutes. The user must see progress thr
 4. Confirm configuration
 5. Discover architecture
 6. Mine conventions
-7. Bootstrap AGENT_CONTEXT.md
+7. Bootstrap .correctless/AGENT_CONTEXT.md
 8. Health check
 9. Source control configuration
 10. First feature guidance
@@ -112,7 +112,7 @@ Setup on existing projects takes several minutes. The user must see progress thr
 4. Confirm configuration
 5. Discover architecture (merge mode)
 6. Mine conventions (comprehensive)
-7. Bootstrap AGENT_CONTEXT.md
+7. Bootstrap .correctless/AGENT_CONTEXT.md
 8. Health check (full)
 9. Source control configuration
 10. First feature guidance
@@ -128,7 +128,7 @@ Scan the project root silently. Then present findings conversationally:
 - Language (from manifest files: go.mod, package.json, Cargo.toml, pyproject.toml)
 - Test runner and commands
 - Package manager (npm, pnpm, yarn, pip, cargo)
-- Existing config (if `.claude/workflow-config.json` already exists)
+- Existing config (if `.correctless/config/workflow-config.json` already exists)
 
 **Monorepo detection:**
 - Check for: `pnpm-workspace.yaml`, `lerna.json`, `nx.json`, `turbo.json`, `rush.json`, `go.work`, `Cargo.toml` with `[workspace]`, `package.json` with `"workspaces"`
@@ -141,7 +141,7 @@ If something looks wrong, let the human correct it before proceeding.
 
 ## Step 2: Run the Setup Script
 
-Tell the user what this step does before running: "I'll run the setup script now — it creates the `.claude/artifacts/` directory, registers workflow hooks, and generates a config template. It doesn't modify your source code."
+Tell the user what this step does before running: "I'll run the setup script now — it creates the `.correctless/artifacts/` directory, registers workflow hooks, and generates a config template. It doesn't modify your source code."
 
 Then run the setup script to do the mechanical work:
 
@@ -247,6 +247,15 @@ Set `project_name` to the project name detected in Step 1 (from the manifest fil
 
 Set `language` to the language detected in Step 1. Must be one of Serena's supported language identifiers: `python`, `typescript`, `go`, `rust`, `java`, `c_sharp`, `c_cpp`, `ruby`, `php`, `kotlin`, `scala`, `swift`, `bash`, `lua`, `dart`, `elixir`, `haskell`, etc. **This field is required** — Serena crashes without it.
 
+### `.correctless/` Gitignore Decision
+
+Ask the user whether to gitignore `.correctless/` using structured decision format:
+
+1. **No** (recommended) — keep `.correctless/` tracked in git for team visibility
+2. **Yes** — add `.correctless/` to `.gitignore` (specs, decisions, and config will not be committed)
+
+If the user chooses yes, add `.correctless/` to `.gitignore`.
+
 ### `.gitignore` Update
 
 Add `.serena/` to `.gitignore` if not already present (Serena stores working data in this directory).
@@ -266,7 +275,7 @@ Set each flag to `true` only for the servers the user chose to install. Skills r
 
 ## Step 3: Confirm Configuration
 
-Read the generated `.claude/workflow-config.json`. Present the detected config as a single summary — not field-by-field:
+Read the generated `.correctless/config/workflow-config.json`. Present the detected config as a single summary — not field-by-field:
 
 ```
 Here's what I detected:
@@ -287,20 +296,20 @@ If the user says "looks good" — move on immediately. Don't ask about each fiel
 
 **Full mode only**: if the config has `workflow.intensity`, include it in the summary: "Intensity: standard (low skips STRIDE, high adds fail-closed, critical requires formal modeling)." Let the user change it if they want — don't force a question about it.
 
-## Step 4: Discover and Bootstrap ARCHITECTURE.md
+## Step 4: Discover and Bootstrap .correctless/ARCHITECTURE.md
 
 This step adapts to project maturity.
 
 ### Greenfield Projects
 
-Don't try to populate ARCHITECTURE.md from a handful of files. A 3-file project doesn't have architecture yet.
+Don't try to populate .correctless/ARCHITECTURE.md from a handful of files. A 3-file project doesn't have architecture yet.
 
 **However:** Even with < 10 files, check if there's enough structure to describe. A project with 5 files might have `src/server.ts`, `src/routes/`, `src/db/` — that's a clear layered structure worth capturing. Use judgment: if you can describe the architecture in 2+ meaningful sentences, do it. If all you can say is "there's one file," don't.
 
 If there isn't enough structure:
 "Your project is just getting started — I won't try to document architecture from {N} files. As you build features with `/cspec`, patterns will emerge and I'll capture them."
 
-**Important:** Do not leave ARCHITECTURE.md with `{PLACEHOLDER}` or `{PROJECT_NAME}` template markers — downstream skills (`/cspec`, `/ctdd`, `/cverify`) treat these markers as a signal that setup was never run and will push the user into an unwanted remediation detour. Instead, write a minimal but real ARCHITECTURE.md:
+**Important:** Do not leave .correctless/ARCHITECTURE.md with `{PLACEHOLDER}` or `{PROJECT_NAME}` template markers — downstream skills (`/cspec`, `/ctdd`, `/cverify`) treat these markers as a signal that setup was never run and will push the user into an unwanted remediation detour. Instead, write a minimal but real .correctless/ARCHITECTURE.md:
 
 ```markdown
 # Architecture — {actual project name}
@@ -318,7 +327,7 @@ If there isn't enough structure:
 
 Update `setup.architecture_state` to `"deferred"` in `workflow-config.json` so subsequent `/csetup` runs know this was intentional, not an error.
 
-If there IS meaningful structure even in a small project, present what you see and ask: "Even though this is a new project, I can already see a {pattern}. Want me to document this in ARCHITECTURE.md, or wait until more code exists?" If the user approves and you write content beyond the minimal stub, update `setup.architecture_state` to `"existing"` instead of `"deferred"`.
+If there IS meaningful structure even in a small project, present what you see and ask: "Even though this is a new project, I can already see a {pattern}. Want me to document this in .correctless/ARCHITECTURE.md, or wait until more code exists?" If the user approves and you write content beyond the minimal stub, update `setup.architecture_state` to `"existing"` instead of `"deferred"`.
 
 ### Early-stage Projects
 
@@ -328,19 +337,19 @@ Scan the codebase, present findings, but frame as observations — not prescript
 
 Run the scanning protocol (below) but present results with humility. Early-stage projects are still finding their shape — the agent shouldn't lock in patterns prematurely.
 
-After writing ARCHITECTURE.md for an early-stage project, update `setup.architecture_state` to `"existing"` in `workflow-config.json` so subsequent runs use merge mode.
+After writing .correctless/ARCHITECTURE.md for an early-stage project, update `setup.architecture_state` to `"existing"` in `workflow-config.json` so subsequent runs use merge mode.
 
 ### Mature Projects
 
 Full scan + merge mode. This is the existing behavior and it's correct.
 
-Read `.claude/workflow-config.json` field `setup.architecture_state` to determine mode:
+Read `.correctless/config/workflow-config.json` field `setup.architecture_state` to determine mode:
 - `template` or `missing` → **full bootstrap**: scan the codebase and populate from scratch
 - `existing` → **merge mode**: scan, compare with existing content, propose only additions
-- `deferred` → **merge mode**: the project was greenfield when last set up and ARCHITECTURE.md has minimal content. Scan the codebase and propose additions alongside the existing minimal content. Update the field to `existing` after writing.
-- `null` or field absent (older config, or jq was missing at setup time) → **detect manually**: check if ARCHITECTURE.md exists and contains real content (no `{PLACEHOLDER}` or `{PROJECT_NAME}` markers). If real content, use merge mode. If template/missing, use full bootstrap.
+- `deferred` → **merge mode**: the project was greenfield when last set up and .correctless/ARCHITECTURE.md has minimal content. Scan the codebase and propose additions alongside the existing minimal content. Update the field to `existing` after writing.
+- `null` or field absent (older config, or jq was missing at setup time) → **detect manually**: check if .correctless/ARCHITECTURE.md exists and contains real content (no `{PLACEHOLDER}` or `{PROJECT_NAME}` markers). If real content, use merge mode. If template/missing, use full bootstrap.
 
-**For existing projects, tell the user:** "Your project already has an ARCHITECTURE.md. I'll scan the codebase and suggest Correctless-specific sections to add alongside your existing content. This may take a moment — I'm learning your project."
+**For existing projects, tell the user:** "Your project already has an .correctless/ARCHITECTURE.md. I'll scan the codebase and suggest Correctless-specific sections to add alongside your existing content. This may take a moment — I'm learning your project."
 
 ### Scanning Protocol
 
@@ -369,7 +378,7 @@ Run these scans in parallel where possible:
 
 ### Full Bootstrap Mode (template/missing)
 
-Populate the entire ARCHITECTURE.md from scan results:
+Populate the entire .correctless/ARCHITECTURE.md from scan results:
 1. **Key Components table**: one row per significant directory/module discovered
 2. **Design Patterns** (PAT-xxx format): one entry per detected pattern
 3. **Conventions**: naming, file organization, import patterns discovered
@@ -378,7 +387,7 @@ Populate the entire ARCHITECTURE.md from scan results:
 
 ### Merge Mode (existing)
 
-Read the existing ARCHITECTURE.md fully. Then:
+Read the existing .correctless/ARCHITECTURE.md fully. Then:
 1. **Compare scan results against what's already documented.** If the existing doc already describes the repository pattern in prose and you find Prisma repos in `src/db/repos/`, don't add a second section — instead note: "Your existing docs already cover database access patterns. I'd add a Correctless-structured ID (PAT-001) to your existing section for reference by other skills. Here's how that would look."
 2. **Identify missing Correctless sections**: Design Patterns with PAT-xxx numbering, Conventions, Trust Boundaries (Full mode). Propose each as an addition that respects the user's existing structure — don't impose the template's format on top of it.
 3. **Never delete or rewrite existing content.** Only append new sections or annotate existing ones.
@@ -446,7 +455,7 @@ Before asking the user anything, scan the codebase for implicit conventions:
 
 Present findings as a categorized summary filtered by goal relevance: "I scanned your codebase and found these conventions:" with the most relevant findings first. For each finding, ask: "Is this intentional? Should I document it?"
 
-**Anti-conventions are valuable too.** If you find inconsistent patterns (two error formats, mixed naming styles, different test approaches in different directories), surface them explicitly: "I see two different patterns for X. Want to pick one as the convention? I'll add it to ARCHITECTURE.md and future specs will enforce it." This turns convention capture into a mini-audit for free.
+**Anti-conventions are valuable too.** If you find inconsistent patterns (two error formats, mixed naming styles, different test approaches in different directories), surface them explicitly: "I see two different patterns for X. Want to pick one as the convention? I'll add it to .correctless/ARCHITECTURE.md and future specs will enforce it." This turns convention capture into a mini-audit for free.
 
 ### Then Ask for Undocumented Conventions
 
@@ -471,13 +480,13 @@ Different conventions go to different files because different agents read them a
 
 | Convention type | Goes in | Why there |
 |----------------|---------|-----------|
-| Architecture patterns (service layer, repository, middleware, data flow) | `ARCHITECTURE.md` — Design Patterns section | Spec agents write specs that compose with these. Verify/audit agents check compliance. |
+| Architecture patterns (service layer, repository, middleware, data flow) | `.correctless/ARCHITECTURE.md` — Design Patterns section | Spec agents write specs that compose with these. Verify/audit agents check compliance. |
 | Coding style (naming, formatting, import ordering, comments) | `CLAUDE.md` | Read at start of every session. Always in context. |
-| Error handling (propagation, logging, response format, retry policy) | `ARCHITECTURE.md` — Design Patterns section | These are architectural decisions. Spec agents need them to write correct invariants. |
+| Error handling (propagation, logging, response format, retry policy) | `.correctless/ARCHITECTURE.md` — Design Patterns section | These are architectural decisions. Spec agents need them to write correct invariants. |
 | Testing conventions (what to mock, naming, fixtures, frameworks) | `CLAUDE.md` | Test agents read CLAUDE.md before writing tests. |
-| API conventions (versioning, pagination, error shapes, auth) | `ARCHITECTURE.md` — Design Patterns, with summary in `AGENT_CONTEXT.md` | Spec agents need these to write rules matching existing API behavior. |
+| API conventions (versioning, pagination, error shapes, auth) | `.correctless/ARCHITECTURE.md` — Design Patterns, with summary in `.correctless/AGENT_CONTEXT.md` | Spec agents need these to write rules matching existing API behavior. |
 | Git/workflow conventions (branch naming, commit messages, PR templates) | `CLAUDE.md` | Affects how the agent interacts with git throughout the workflow. |
-| Project prohibitions (never use X, never call Y directly, never store Z) | `ARCHITECTURE.md` — Prohibitions section AND `CLAUDE.md` | ARCHITECTURE.md is where `/cverify` checks enforcement. CLAUDE.md ensures agents see it in every session. Write to both. |
+| Project prohibitions (never use X, never call Y directly, never store Z) | `.correctless/ARCHITECTURE.md` — Prohibitions section AND `CLAUDE.md` | .correctless/ARCHITECTURE.md is where `/cverify` checks enforcement. CLAUDE.md ensures agents see it in every session. Write to both. |
 
 ### How to process conventions
 
@@ -485,7 +494,7 @@ Different conventions go to different files because different agents read them a
 1. Read the source material
 2. Classify each convention by type
 3. Draft entries for each destination file
-4. Present each entry one at a time: "I'd put this in ARCHITECTURE.md under Design Patterns. Look right?"
+4. Present each entry one at a time: "I'd put this in .correctless/ARCHITECTURE.md under Design Patterns. Look right?"
 5. Write approved entries
 
 **If the user describes them conversationally:**
@@ -494,13 +503,13 @@ Different conventions go to different files because different agents read them a
 3. Classify, draft, present, write
 
 **If the user skips:**
-Fine. After the first 2-3 features, suggest formalizing patterns that have appeared consistently across specs: "I've seen the service → repository → database pattern in 3 specs. Want me to add it to ARCHITECTURE.md?"
+Fine. After the first 2-3 features, suggest formalizing patterns that have appeared consistently across specs: "I've seen the service → repository → database pattern in 3 specs. Want me to add it to .correctless/ARCHITECTURE.md?"
 
 ### Examples
 
 **User says:** "All database queries go through repo structs in `internal/repo/`. Never raw SQL in handlers."
 
-**ARCHITECTURE.md** gets:
+**.correctless/ARCHITECTURE.md** gets:
 ```markdown
 ### PAT-001: Repository Pattern
 - All database access through repository structs in `internal/repo/`
@@ -520,36 +529,36 @@ Never use raw SQL or import database packages outside the repo layer.
 
 **User says:** "Error responses always look like `{"error": {"code": "INVALID_INPUT", "message": "...", "details": [...]}}`"
 
-**ARCHITECTURE.md** gets a PAT-xxx entry. **AGENT_CONTEXT.md** Quick Reference gets the format.
+**.correctless/ARCHITECTURE.md** gets a PAT-xxx entry. **.correctless/AGENT_CONTEXT.md** Quick Reference gets the format.
 
 ---
 
 **User says:** "Never use console.log. Use the logger from src/lib/logger.ts."
 
-**CLAUDE.md** gets a summary: "Use the logger from `src/lib/logger.ts` — never use `console.log` directly." **ARCHITECTURE.md** gets a Prohibitions section entry: "PROHIBIT: Direct `console.log` usage. Use `src/lib/logger.ts` instead." Both writes are needed — CLAUDE.md ensures agents see it in every session, and ARCHITECTURE.md's Prohibitions section is where `/cverify` checks enforcement.
+**CLAUDE.md** gets a summary: "Use the logger from `src/lib/logger.ts` — never use `console.log` directly." **.correctless/ARCHITECTURE.md** gets a Prohibitions section entry: "PROHIBIT: Direct `console.log` usage. Use `src/lib/logger.ts` instead." Both writes are needed — CLAUDE.md ensures agents see it in every session, and .correctless/ARCHITECTURE.md's Prohibitions section is where `/cverify` checks enforcement.
 
-## Step 6: Bootstrap AGENT_CONTEXT.md
+## Step 6: Bootstrap .correctless/AGENT_CONTEXT.md
 
-**Greenfield projects:** Create a minimal AGENT_CONTEXT.md. Skip the deep codebase sections — there's nothing to summarize. The minimal version MUST contain at least:
+**Greenfield projects:** Create a minimal .correctless/AGENT_CONTEXT.md. Skip the deep codebase sections — there's nothing to summarize. The minimal version MUST contain at least:
 
 1. **Project description** — from Step 0's question (e.g., "REST API for recipe sharing"). If the user didn't provide a goal, write "New {language} project — goal not yet specified."
 2. **Detected tooling** — language, package manager, test runner (if any)
 3. **Quick Reference command table** — test command, lint command, build command from `workflow-config.json`. For commands not yet configured, write `(not configured)` rather than omitting the row — this tells downstream skills the command is absent, not that the table is incomplete.
 
-This minimum schema ensures downstream skills (`/cspec`, `/ctdd`) that unconditionally read AGENT_CONTEXT.md get usable context rather than an empty file.
+This minimum schema ensures downstream skills (`/cspec`, `/ctdd`) that unconditionally read .correctless/AGENT_CONTEXT.md get usable context rather than an empty file.
 
-After writing the greenfield AGENT_CONTEXT.md, update `setup.agent_context_state` to `"existing"` in `workflow-config.json` so subsequent runs use merge mode.
+After writing the greenfield .correctless/AGENT_CONTEXT.md, update `setup.agent_context_state` to `"existing"` in `workflow-config.json` so subsequent runs use merge mode.
 
 **Early-stage and Mature projects:**
 
-Read `.claude/workflow-config.json` field `setup.agent_context_state` to determine mode:
+Read `.correctless/config/workflow-config.json` field `setup.agent_context_state` to determine mode:
 - `template` or `missing` → draft a populated version from scratch
 - `existing` → read existing content, propose only missing Correctless sections (Quick Reference table with commands, Common Pitfalls if absent)
-- `null` or field absent → detect manually: check if AGENT_CONTEXT.md exists and contains real content (no `{PLACEHOLDER}` markers). If real content, use merge mode. If template/missing, use full bootstrap.
+- `null` or field absent → detect manually: check if .correctless/AGENT_CONTEXT.md exists and contains real content (no `{PLACEHOLDER}` markers). If real content, use merge mode. If template/missing, use full bootstrap.
 
 For template/missing, populate based on:
 - Codebase scan results from Step 4
-- ARCHITECTURE.md entries just created
+- .correctless/ARCHITECTURE.md entries just created
 - Conventions captured in Step 5
 - Config file (test/lint/build commands)
 - Recent git history (`git log --oneline -20` — skip if no commits exist yet)
@@ -558,7 +567,7 @@ For existing files: read fully, identify what's already covered, propose only ad
 
 Present the draft (or proposed additions) for approval. Write after approval.
 
-After writing AGENT_CONTEXT.md, update `setup.agent_context_state` to `"existing"` in `workflow-config.json` — this mirrors the pattern used for `setup.architecture_state` and ensures subsequent runs use merge mode instead of re-detecting.
+After writing .correctless/AGENT_CONTEXT.md, update `setup.agent_context_state` to `"existing"` in `workflow-config.json` — this mirrors the pattern used for `setup.architecture_state` and ensures subsequent runs use merge mode instead of re-detecting.
 
 ## Step 7: Project Health Check
 
@@ -966,7 +975,7 @@ After applying fixes, re-run the health card to show progress.
 
 ### Statusline
 
-If the Correctless statusline hook exists at `.claude/hooks/statusline.sh`, check whether it's already registered in `.claude/settings.json`:
+If the Correctless statusline hook exists at `.correctless/hooks/statusline.sh`, check whether it's already registered in `.claude/settings.json`:
 
 - **Already registered** (setup script did this in Step 2): Confirm: "Statusline is active. You'll see workflow phase, cost, and context % in the status bar."
 - **Not yet registered** (e.g., hooks were copied but registration was skipped): Offer to activate it: "Correctless includes a workflow-aware statusline that shows your current phase (RED/GREEN/QA), session cost, and context usage. Want me to register it?" If yes, add the statusLine hook entry to `.claude/settings.json`.
@@ -1024,7 +1033,7 @@ Merge strategy:
 <!-- What does this change do? -->
 
 ## Spec
-<!-- Link: docs/specs/xxx.md -->
+<!-- Link: .correctless/specs/xxx.md -->
 
 ## Testing
 <!-- Coverage? All rules covered? -->
@@ -1066,7 +1075,7 @@ Start a feature:
 1. `git checkout -b feature/my-feature`
 2. Run `/cspec`
 
-Check workflow state anytime: `.claude/hooks/workflow-advance.sh status`"
+Check workflow state anytime: `.correctless/hooks/workflow-advance.sh status`"
 
 **Mature:**
 "You're set up. I've learned your project's conventions and they'll inform every spec, review, and verification.
@@ -1075,7 +1084,7 @@ Start a feature: `git checkout -b feature/my-feature` then `/cspec`.
 Or review a PR: `/cpr-review {number}`.
 
 Current commands: `/csetup`, `/cspec`, `/creview`, `/ctdd`, `/cverify`, `/cdocs`, `/crefactor`, `/cpr-review`, `/ccontribute`, `/cmaintain`, `/cstatus`, `/csummary`, `/cmetrics`, `/cdebug`, `/chelp`, `/cwtf`
-Check workflow state: `.claude/hooks/workflow-advance.sh status`"
+Check workflow state: `.correctless/hooks/workflow-advance.sh status`"
 
 If the human says they want to start a feature, ask what they want to build and suggest they run `/cspec`. **Do not auto-invoke `/cspec`.**
 
@@ -1111,7 +1120,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 ## Constraints
 
 - **Be conversational, not transactional.** Don't dump a wall of config at the human.
-- **Ask permission before writing content decisions.** "Can I update ARCHITECTURE.md with these entries?" (Exception: Step 2's setup script creates mechanical scaffolding — directories, hooks, config templates — after announcing what it will do. This doesn't require per-file approval.)
+- **Ask permission before writing content decisions.** "Can I update .correctless/ARCHITECTURE.md with these entries?" (Exception: Step 2's setup script creates mechanical scaffolding — directories, hooks, config templates — after announcing what it will do. This doesn't require per-file approval.)
 - **One topic at a time.** Don't ask 10 unrelated questions in one message. Related items (e.g., a batch of Design Pattern entries for merge-mode approval) can be presented together as a single decision.
 - **Accept defaults gracefully.** If the human says "looks fine" to the config review, move on — don't force them to confirm every field.
 - **Respect maturity.** Greenfield projects get a fast, minimal setup. Mature projects get thorough discovery. Don't run the mature flow on a greenfield project — it wastes time and produces empty results. Don't run the greenfield flow on a mature project — it misses conventions that matter.

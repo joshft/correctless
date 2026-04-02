@@ -17,7 +17,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Lite dist | `correctless-lite/` | 16-skill distribution target — never edit directly |
 | Full dist | `correctless-full/` | 23-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh`, `test-statusline.sh` | 429 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline |
+| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh`, `test-statusline.sh`, `test-consolidation.sh` | 598 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, .correctless/ consolidation |
 | Sync | `sync.sh` | Propagates source edits to both distribution targets |
 
 ## Design Patterns
@@ -25,7 +25,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 - **Source-to-dist sync** (PAT-001): edit in `skills/`, `hooks/`, `templates/`, `helpers/` only — run `sync.sh` to propagate to `correctless-lite/` and `correctless-full/`
 - **Agent separation** (PAT-002): each TDD phase (RED/GREEN/QA) is a different agent — enforced via `context: fork` and sub-agent spawning
 - **Phase-gated writes** (PAT-003): `workflow-gate.sh` blocks file operations that violate the current phase (RED blocks source, QA blocks everything)
-- **Branch-scoped state** (PAT-004): state lives in `.claude/artifacts/workflow-state-{branch-slug}.json` — `workflow-advance.sh` is the only writer
+- **Branch-scoped state** (PAT-004): state lives in `.correctless/artifacts/workflow-state-{branch-slug}.json` — `workflow-advance.sh` is the only writer
 - **MCP integration** (optional): Serena for symbol-level code analysis, Context7 for library docs — check `mcp.serena` and `mcp.context7` in workflow-config.json. Falls back to grep/read silently when unavailable
 
 ## Common Pitfalls
@@ -38,13 +38,13 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 
 | Need to... | Do this |
 |------------|---------|
-| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh && bash test-statusline.sh` |
+| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh && bash test-statusline.sh && bash test-consolidation.sh` |
 | Lint shell scripts | `shellcheck hooks/*.sh test.sh sync.sh setup` |
 | Sync to distributions | `bash sync.sh` |
 | Find a skill | `skills/{name}/SKILL.md` |
 | Find skill docs | `docs/skills/{name}.md` |
-| Check architecture | `ARCHITECTURE.md` |
-| See known bugs | `.claude/antipatterns.md` |
-| Find a spec | `docs/specs/{feature}.md` |
+| Check architecture | `.correctless/ARCHITECTURE.md` |
+| See known bugs | `.correctless/antipatterns.md` |
+| Find a spec | `.correctless/specs/{feature}.md` |
 | Verify sync is clean | `bash sync.sh --check` |
-| Check MCP status | `jq '.mcp' .claude/workflow-config.json` |
+| Check MCP status | `jq '.mcp' .correctless/config/workflow-config.json` |

@@ -1,7 +1,7 @@
 ---
 name: cdebug
 description: Structured bug investigation workflow. Root cause analysis, hypothesis testing, TDD fix with agent separation, escalation after 3 failed attempts. Use when stuck on a bug.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.claude/antipatterns.md), Write(.claude/artifacts/debug-*), Write(.claude/artifacts/token-log-*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/antipatterns.md), Write(.correctless/artifacts/debug-*), Write(.correctless/artifacts/token-log-*), Edit
 context: fork
 ---
 
@@ -31,7 +31,7 @@ Add hypothesis tasks dynamically as needed. Mark each task complete as it finish
 
 ## Artifact Output
 
-Write the investigation results to `.claude/artifacts/debug-investigation-{slug}.md`:
+Write the investigation results to `.correctless/artifacts/debug-investigation-{slug}.md`:
 
 ```markdown
 # Debug Investigation: {bug description}
@@ -74,7 +74,7 @@ If the bug has a reliable failing test from Phase 1, offer:
 
 **If yes:**
 1. Find the known-good commit: `git merge-base HEAD main`. If debugging on main (merge-base equals HEAD), ask the user: "You're on main — when did this last work? Provide a commit hash or tag." If no good commit can be identified, skip bisect.
-2. Write the bisect test script to `.claude/artifacts/debug-bisect-test.sh`.
+2. Write the bisect test script to `.correctless/artifacts/debug-bisect-test.sh`.
 3. Run the entire bisect as a **single bash call** (variables must survive across steps):
    ```bash
    # Stash if dirty
@@ -83,12 +83,12 @@ If the bug has a reliable failing test from Phase 1, offer:
      git stash && STASHED=true
    fi
    # Run bisect
-   git bisect start HEAD {good-commit} && git bisect run bash .claude/artifacts/debug-bisect-test.sh
+   git bisect start HEAD {good-commit} && git bisect run bash .correctless/artifacts/debug-bisect-test.sh
    RESULT=$?
    # Clean up (all steps run regardless)
    git bisect reset
    [ "$STASHED" = "true" ] && git stash pop
-   rm -f .claude/artifacts/debug-bisect-test.sh
+   rm -f .correctless/artifacts/debug-bisect-test.sh
    exit $RESULT
    ```
 4. Capture the first bad commit from the output. If bisect is inconclusive (exit non-zero, all bad/good/skipped), report: "Bisect could not isolate the commit — proceeding with manual investigation."
@@ -97,9 +97,9 @@ If the bug has a reliable failing test from Phase 1, offer:
 Feed the bisect result into Phase 3 — the identified commit narrows the hypothesis dramatically.
 
 3. **Read the tests**: what IS tested for this code path? What's NOT tested? The gap between "tested" and "failing" is often where the bug lives.
-4. **Check antipatterns** (`.claude/antipatterns.md`): is this a known bug class? If AP-003 is "config wiring missing" and this looks like a config wiring issue, you may already know the pattern.
-5. **Check QA findings** (`.claude/artifacts/qa-findings-*.json`): has this code area had issues before? What were they? Is this a recurrence?
-6. **Check drift debt** (`.claude/meta/drift-debt.json`): is this code area architecturally eroded? A bug in drifted code may be a symptom of the drift, not an independent issue.
+4. **Check antipatterns** (`.correctless/antipatterns.md`): is this a known bug class? If AP-003 is "config wiring missing" and this looks like a config wiring issue, you may already know the pattern.
+5. **Check QA findings** (`.correctless/artifacts/qa-findings-*.json`): has this code area had issues before? What were they? Is this a recurrence?
+6. **Check drift debt** (`.correctless/meta/drift-debt.json`): is this code area architecturally eroded? A bug in drifted code may be a symptom of the drift, not an independent issue.
 
 ## Phase 3: Hypothesis
 
@@ -135,7 +135,7 @@ This maintains the same agent separation principle as `/ctdd` — the agent that
 
 Ask: does this bug represent a class?
 
-- **If yes** (the same pattern could occur elsewhere): add a structural test that catches all instances, and add an antipattern entry to `.claude/antipatterns.md`. The structural test should fail if anyone introduces the same bug in a new location.
+- **If yes** (the same pattern could occur elsewhere): add a structural test that catches all instances, and add an antipattern entry to `.correctless/antipatterns.md`. The structural test should fail if anyone introduces the same bug in a new location.
 - **If no** (genuinely one-off — typo, unique edge case): the instance fix is sufficient. Set `class_fix: "N/A — one-off [reason]"`.
 
 ## Phase 6: Escalation (After 3 Failed Hypotheses)
@@ -161,11 +161,11 @@ Present the escalation analysis to the human. The fix may require a spec revisio
 
 ## Before You Start
 
-1. Read `AGENT_CONTEXT.md` for project context.
-2. Read `ARCHITECTURE.md` for design patterns in this area.
-3. Read `.claude/antipatterns.md` for known bug classes.
-4. Read `.claude/artifacts/qa-findings-*.json` for previous issues in this code area.
-5. Read `.claude/meta/drift-debt.json` for architectural erosion in this area.
+1. Read `.correctless/AGENT_CONTEXT.md` for project context.
+2. Read `.correctless/ARCHITECTURE.md` for design patterns in this area.
+3. Read `.correctless/antipatterns.md` for known bug classes.
+4. Read `.correctless/artifacts/qa-findings-*.json` for previous issues in this code area.
+5. Read `.correctless/meta/drift-debt.json` for architectural erosion in this area.
 
 ## Claude Code Feature Integration
 
@@ -177,7 +177,7 @@ Run the test suite in the background while investigating the code path. Run git 
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.claude/artifacts/token-log-{slug}.json` (derive slug from the debug investigation slug):
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the debug investigation slug):
 
 ```json
 {
@@ -230,7 +230,7 @@ When Context7 is unavailable, fall back to web search for library documentation.
 
 ## If Something Goes Wrong
 
-- **Skill interrupted**: Re-run `/cdebug`. The investigation artifact (`.claude/artifacts/debug-investigation-{slug}.md`) persists — the skill can resume from your last hypothesis.
+- **Skill interrupted**: Re-run `/cdebug`. The investigation artifact (`.correctless/artifacts/debug-investigation-{slug}.md`) persists — the skill can resume from your last hypothesis.
 - **Rate limit hit**: Wait 2-3 minutes and re-run.
 - **3 failed hypotheses**: This is expected — escalation to architectural review is the designed recovery path, not a failure.
 - **Bisect fails**: Bisect cleans up after itself. Proceed with manual investigation.

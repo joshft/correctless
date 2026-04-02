@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Correctless — statusline redesign tests
 # Tests R-001 through R-018 from:
-#   docs/specs/redesign-statusline-with-grouped-sections-token-counts-dirty-file-count-session-duration-and-richer-workflow-status.md
+#   .correctless/specs/redesign-statusline-with-grouped-sections-token-counts-dirty-file-count-session-duration-and-richer-workflow-status.md
 # Run from repo root: bash test-statusline.sh
 
 set -uo pipefail
@@ -127,7 +127,7 @@ patch_json() {
 # Exports TEST_REPO pointing at the temp dir.
 setup_test_repo() {
   rm -rf "$TEST_DIR"
-  mkdir -p "$TEST_DIR/.claude/artifacts"
+  mkdir -p "$TEST_DIR/.correctless/artifacts"
   cd "$TEST_DIR" || exit 1
   git init -q
   git -c user.email="t@t.com" -c user.name="T" commit -q --allow-empty -m "init"
@@ -144,7 +144,7 @@ state_filename() {
   local slug hash
   slug="$(printf '%s' "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
   hash="$(printf '%s' "$branch" | md5sum | cut -c1-6)"
-  echo ".claude/artifacts/workflow-state-${slug}-${hash}.json"
+  echo ".correctless/artifacts/workflow-state-${slug}-${hash}.json"
 }
 
 # JSON for integration tests pointing at TEST_DIR
@@ -807,7 +807,7 @@ setup_install_project
 .claude/skills/workflow/setup >/dev/null 2>&1 || true
 settings_content="$(cat "$SETUP_TEST_DIR/.claude/settings.json" 2>/dev/null || echo '{}')"
 assert_contains_str "R-015a: fresh settings.json has statusLine key" 'statusLine' "$settings_content"
-assert_contains_str "R-015a: statusLine.command points to .claude/hooks/statusline.sh" '.claude/hooks/statusline.sh' "$settings_content"
+assert_contains_str "R-015a: statusLine.command points to .correctless/hooks/statusline.sh" '.correctless/hooks/statusline.sh' "$settings_content"
 cleanup_setup
 
 echo "--- R-015b: settings.json exists without statusLine → jq merge adds it ---"
@@ -816,7 +816,7 @@ mkdir -p .claude
 cat > .claude/settings.json <<'EXISTING'
 {
   "hooks": {
-    "PreToolUse": [{"matcher": "Edit", "hooks": [{"type": "command", "command": ".claude/hooks/workflow-gate.sh"}]}]
+    "PreToolUse": [{"matcher": "Edit", "hooks": [{"type": "command", "command": ".correctless/hooks/workflow-gate.sh"}]}]
   }
 }
 EXISTING
@@ -836,7 +836,7 @@ mkdir -p .claude
 cat > .claude/settings.json <<'EXISTING'
 {
   "hooks": {
-    "PreToolUse": [{"matcher": "Edit", "hooks": [{"type": "command", "command": ".claude/hooks/workflow-gate.sh"}]}]
+    "PreToolUse": [{"matcher": "Edit", "hooks": [{"type": "command", "command": ".correctless/hooks/workflow-gate.sh"}]}]
   },
   "statusLine": {
     "command": "/usr/local/bin/some-other-statusline"
@@ -846,7 +846,7 @@ EXISTING
 .claude/skills/workflow/setup >/dev/null 2>&1 || true
 settings_file="$SETUP_TEST_DIR/.claude/settings.json"
 settings_content="$(cat "$settings_file" 2>/dev/null || echo '{}')"
-assert_contains_str "R-015c: statusLine command is now Correctless statusline" '.claude/hooks/statusline.sh' "$settings_content"
+assert_contains_str "R-015c: statusLine command is now Correctless statusline" '.correctless/hooks/statusline.sh' "$settings_content"
 assert_not_contains_str "R-015c: old statusLine command gone" '/usr/local/bin/some-other-statusline' "$settings_content"
 # QA-004: Verify no duplicate hook entries after overwrite
 gate_count=$(grep -c 'workflow-gate' "$settings_file")
@@ -872,7 +872,7 @@ mkdir -p .claude
 cat > .claude/settings.json <<'PARTIAL'
 {
   "hooks": {
-    "PreToolUse": [{"matcher": "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash", "hooks": [{"type": "command", "command": ".claude/hooks/workflow-gate.sh", "timeout_ms": 5000}]}]
+    "PreToolUse": [{"matcher": "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash", "hooks": [{"type": "command", "command": ".correctless/hooks/workflow-gate.sh", "timeout_ms": 5000}]}]
   }
 }
 PARTIAL

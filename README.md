@@ -3,7 +3,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Skills: 24](https://img.shields.io/badge/skills-23-blue.svg)](docs/skills/)
+[![Skills: 24](https://img.shields.io/badge/skills-24-blue.svg)](docs/skills/)
 [![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
@@ -108,7 +108,7 @@ git clone https://github.com/joshft/correctless.git .claude/skills/workflow
 /csetup
 ```
 
-Lite mode by default. To enable Full: add `"intensity": "standard"` (or `"high"` / `"critical"`) to `.claude/workflow-config.json` and re-run setup.
+Lite mode by default. To enable Full: add `"intensity": "standard"` (or `"high"` / `"critical"`) to `.correctless/config/workflow-config.json` and re-run setup.
 
 ### After Install
 
@@ -314,10 +314,10 @@ External-facing skills ([`/cpr-review`](docs/skills/cpr-review.md), [`/ccontribu
 Check your workflow status with [`/cstatus`](docs/skills/cstatus.md) or the statusline. For advanced debugging:
 
 ```bash
-.claude/hooks/workflow-advance.sh diagnose "file" # Why a file is blocked
-.claude/hooks/workflow-advance.sh override "why"  # Temporary gate bypass (10 tool calls)
-.claude/hooks/workflow-advance.sh spec-update "why"  # Spec was wrong mid-TDD
-.claude/hooks/workflow-advance.sh reset           # Nuclear — remove all state
+.correctless/hooks/workflow-advance.sh diagnose "file" # Why a file is blocked
+.correctless/hooks/workflow-advance.sh override "why"  # Temporary gate bypass (10 tool calls)
+.correctless/hooks/workflow-advance.sh spec-update "why"  # Spec was wrong mid-TDD
+.correctless/hooks/workflow-advance.sh reset           # Nuclear — remove all state
 ```
 
 ### Quick Fixes During an Active Workflow
@@ -325,7 +325,7 @@ Check your workflow status with [`/cstatus`](docs/skills/cstatus.md) or the stat
 If you need to fix a typo while a workflow is active and the gate is blocking you:
 
 ```bash
-.claude/hooks/workflow-advance.sh override "quick bugfix: fixing typo in error message"
+.correctless/hooks/workflow-advance.sh override "quick bugfix: fixing typo in error message"
 ```
 
 This bypasses the gate for 10 tool calls. Use for: typos, config tweaks, one-line fixes. When no workflow is active, the gate allows all edits freely.
@@ -381,7 +381,7 @@ Optional (Full only):
 | **Class fix** | Fix the entire category of this bug — add a structural test that prevents recurrence. |
 | **Convergence** | Run multiple audit rounds until findings stabilize (no new critical/high issues). |
 | **Drift** | Code that no longer matches documented architecture. Detected by `/cverify`, tracked in drift-debt.json. |
-| **Antipattern** | A known bug class from your project's history. Stored in `.claude/antipatterns.md`, checked by every future spec and review. |
+| **Antipattern** | A known bug class from your project's history. Stored in `.correctless/antipatterns.md`, checked by every future spec and review. |
 | **Spec** | A document defining what "correct" means for a feature: testable rules, edge cases, security assumptions. A spec that can't be tested is incomplete. |
 | **Invariant** | A rule that must always be true: "auth tokens expire after 24 hours." Specs are lists of invariants. |
 | **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Full mode only. |
@@ -390,7 +390,7 @@ Optional (Full only):
 
 ## Status
 
-**Correctless 2.0.0 — Early release.** 23 skills (16 Lite, 23 Full), 57 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
+**Correctless 2.0.0 — Early release.** 24 skills (16 Lite, 24 Full), 598 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
 
 ## License
 

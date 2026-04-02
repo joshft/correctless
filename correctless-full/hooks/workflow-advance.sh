@@ -9,8 +9,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-CONFIG_FILE="$REPO_ROOT/.claude/workflow-config.json"
-ARTIFACTS_DIR="$REPO_ROOT/.claude/artifacts"
+CONFIG_FILE="$REPO_ROOT/.correctless/config/workflow-config.json"
+ARTIFACTS_DIR="$REPO_ROOT/.correctless/artifacts"
 OVERRIDE_LOG="$ARTIFACTS_DIR/override-log.json"
 
 # ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ has_formal_model() {
   [ "$val" = "true" ]
 }
 
-DRIFT_DEBT_FILE="$REPO_ROOT/.claude/meta/drift-debt.json"
+DRIFT_DEBT_FILE="$REPO_ROOT/.correctless/meta/drift-debt.json"
 
 # ---------------------------------------------------------------------------
 # Test execution helpers
@@ -373,12 +373,12 @@ cmd_init() {
   # Check for collision against both spec files on disk AND state files claiming the same spec_file
   spec_slug_in_use() {
     local check_slug="$1"
-    [ -f "$REPO_ROOT/docs/specs/${check_slug}.md" ] && return 0
+    [ -f "$REPO_ROOT/.correctless/specs/${check_slug}.md" ] && return 0
     for state_f in "$ARTIFACTS_DIR"/workflow-state-*.json; do
       [ -f "$state_f" ] || continue
       local existing
       existing="$(jq -r '.spec_file // empty' "$state_f" 2>/dev/null)"
-      [ "$existing" = "docs/specs/${check_slug}.md" ] && return 0
+      [ "$existing" = ".correctless/specs/${check_slug}.md" ] && return 0
     done
     return 1
   }
@@ -390,9 +390,14 @@ cmd_init() {
     suffix=$((suffix + 1))
   done
 
-  local spec_file="docs/specs/${slug}.md"
+  local spec_file=".correctless/specs/${slug}.md"
 
   mkdir -p "$ARTIFACTS_DIR"
+  # Create the spec file stub so the path exists for downstream tools
+  mkdir -p "$REPO_ROOT/.correctless/specs"
+  if [ ! -f "$REPO_ROOT/$spec_file" ]; then
+    printf "# Spec: %s\n\n## Rules\n\n_(to be written)_\n" "$task" > "$REPO_ROOT/$spec_file"
+  fi
   write_state "$(jq -n \
     --arg phase "spec" \
     --arg task "$task" \
@@ -576,7 +581,7 @@ cmd_verified() {
   state="$(read_state)"
   spec_file="$(echo "$state" | jq -r '.spec_file')"
   slug="$(basename "$spec_file" .md)"
-  local report="$REPO_ROOT/docs/verification/${slug}-verification.md"
+  local report="$REPO_ROOT/.correctless/verification/${slug}-verification.md"
 
   if [ ! -f "$report" ]; then
     die "Verification report not found at $report. Run /cverify first — it must write the report file."
@@ -591,7 +596,7 @@ cmd_documented() {
   require_phase "verified"
 
   # Check that AGENT_CONTEXT.md has been updated (proxy for docs being written)
-  local agent_ctx="$REPO_ROOT/AGENT_CONTEXT.md"
+  local agent_ctx="$REPO_ROOT/.correctless/AGENT_CONTEXT.md"
   if [ -f "$agent_ctx" ]; then
     local last_mod
     last_mod="$(stat -c %Y "$agent_ctx" 2>/dev/null || stat -f %m "$agent_ctx" 2>/dev/null || echo 0)"
@@ -965,7 +970,7 @@ cmd="${1:-}"
 shift || true
 
 case "$cmd" in
-  init)           cmd_init "$@" ;;
+  init|start)     cmd_init "$@" ;;
   review)         cmd_review ;;
   model)          cmd_model ;;
   review-spec)    cmd_review_spec ;;

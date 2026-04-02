@@ -18,8 +18,8 @@ set -f
 command -v jq >/dev/null 2>&1 || { echo "BLOCKED: jq not found — required for workflow gate" >&2; exit 2; }
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-CONFIG_FILE="$REPO_ROOT/.claude/workflow-config.json"
-ARTIFACTS_DIR="$REPO_ROOT/.claude/artifacts"
+CONFIG_FILE="$REPO_ROOT/.correctless/config/workflow-config.json"
+ARTIFACTS_DIR="$REPO_ROOT/.correctless/artifacts"
 TEST_EDIT_LOG="$ARTIFACTS_DIR/tdd-test-edits.log"
 
 # ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ if [ ! -f "$STATE_FILE" ]; then
           case "$BASENAME_CHECK" in
             $p)
               echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
-  Start a workflow: .claude/hooks/workflow-advance.sh init \"task description\"
+  Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
   (You must be on a feature branch, not main.)
   Or run /cstatus to see what's going on." >&2
               exit 2
@@ -347,8 +347,8 @@ case "$PHASE" in
     if [ "$FILE_CLASS" = "source" ] || [ "$FILE_CLASS" = "test" ]; then
       block "You're in the $PHASE phase — source and test files are locked until the spec is reviewed and approved.
   What to do: finish the spec conversation, then advance the workflow.
-  Run: .claude/hooks/workflow-advance.sh status  (to see current state)
-  Bypass: .claude/hooks/workflow-advance.sh override \"reason\"  (emergency only)"
+  Run: .correctless/hooks/workflow-advance.sh status  (to see current state)
+  Bypass: .correctless/hooks/workflow-advance.sh override \"reason\"  (emergency only)"
     fi
     ;;
 
@@ -371,7 +371,7 @@ case "$PHASE" in
   Source file '$_src_rel' is blocked — no STUB:TDD marker found.
   What to do: write your test files first. For type signatures that tests need to compile,
   create stub functions with '// STUB:TDD' in the body and zero-value returns.
-  When tests exist and fail: .claude/hooks/workflow-advance.sh impl  (unlocks source files)"
+  When tests exist and fail: .correctless/hooks/workflow-advance.sh impl  (unlocks source files)"
           fi
         else
           # New file — check if content contains STUB:TDD
@@ -404,12 +404,12 @@ case "$PHASE" in
       if [ "$PHASE" = "tdd-qa" ]; then
         block "QA phase — code is frozen while the QA agent reviews.
   Source and test files are locked. Report findings as text, don't edit code.
-  If issues found: .claude/hooks/workflow-advance.sh fix  (returns to implementation)
-  If clean: .claude/hooks/workflow-advance.sh done  (completes the workflow)"
+  If issues found: .correctless/hooks/workflow-advance.sh fix  (returns to implementation)
+  If clean: .correctless/hooks/workflow-advance.sh done  (completes the workflow)"
       else
         block "Verification phase — code is frozen for final checks.
-  If all checks pass: .claude/hooks/workflow-advance.sh done
-  Bypass: .claude/hooks/workflow-advance.sh override \"reason\"  (emergency only)"
+  If all checks pass: .correctless/hooks/workflow-advance.sh done
+  Bypass: .correctless/hooks/workflow-advance.sh override \"reason\"  (emergency only)"
       fi
     fi
     ;;

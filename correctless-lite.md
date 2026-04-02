@@ -51,7 +51,7 @@ If you're building security-critical infrastructure, network proxies, financial 
 
 ## Project Configuration
 
-### `.claude/workflow-config.json`
+### `.correctless/config/workflow-config.json`
 
 ```json
 {
@@ -81,11 +81,11 @@ If you're building security-critical infrastructure, network proxies, financial 
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",
     "agent_context": "AGENT_CONTEXT.md",
-    "antipatterns": ".claude/antipatterns.md",
+    "antipatterns": ".correctless/antipatterns.md",
     "docs": "docs/",
-    "specs": "docs/specs/",
-    "artifacts": ".claude/artifacts/",
-    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+    "specs": ".correctless/specs/",
+    "artifacts": ".correctless/artifacts/",
+    "state": ".correctless/artifacts/workflow-state-{branch-slug}.json"
   }
 }
 ```
@@ -131,7 +131,7 @@ Lighter than Correctless. No formal trust boundary IDs or invariant enforcement 
 
 ---
 
-### `.claude/antipatterns.md`
+### `.correctless/antipatterns.md`
 
 Starts empty. Grows when bugs are found post-merge.
 
@@ -165,7 +165,7 @@ Correctless (full), the /cpostmortem skill automates this process.
 
 ## Artifact Formats
 
-### Spec Artifact (`docs/specs/{task-slug}.md`)
+### Spec Artifact (`.correctless/specs/{task-slug}.md`)
 
 Deliberately simple. Five sections, not twelve.
 
@@ -208,13 +208,13 @@ Things to resolve before or during implementation. If any remain when /ctdd star
 - {question}
 ```
 
-### Workflow State (`.claude/artifacts/workflow-state-{branch-slug}.json`)
+### Workflow State (`.correctless/artifacts/workflow-state-{branch-slug}.json`)
 
 ```json
 {
   "phase": "spec | review | tdd-tests | tdd-impl | tdd-qa | done",
   "task": "human-readable task description",
-  "spec_file": "docs/specs/task-slug.md",
+  "spec_file": ".correctless/specs/task-slug.md",
   "started_at": "ISO timestamp",
   "phase_entered_at": "ISO timestamp",
   "branch": "feature/branch-name",
@@ -243,11 +243,11 @@ model: claude-opus-4-6
 **Reads**:
 - `ARCHITECTURE.md`
 - `AGENT_CONTEXT.md`
-- `.claude/antipatterns.md`
+- `.correctless/antipatterns.md`
 - Relevant source code (grep/glob based on feature description)
 
 **Produces**:
-- `docs/specs/{task-slug}.md`
+- `.correctless/specs/{task-slug}.md`
 - Updates workflow state to phase: `spec`
 
 **Behavior**:
@@ -291,7 +291,7 @@ context: fork
 **Reads**:
 - The spec artifact
 - `ARCHITECTURE.md`
-- `.claude/antipatterns.md`
+- `.correctless/antipatterns.md`
 - Relevant source code
 
 **Produces**:
@@ -334,7 +334,7 @@ Note: the `/ctdd` skill itself runs on Sonnet as the orchestrator. It spawns the
 
 **Reads**:
 - Approved spec artifact
-- `.claude/workflow-config.json`
+- `.correctless/config/workflow-config.json`
 - `ARCHITECTURE.md`
 
 **Produces**:
@@ -543,7 +543,7 @@ Same concept as Correctless, shorter. Target: under 1500 words.
 | Run tests | `{command}` |
 | Build | `{command}` |
 | Lint | `{command}` |
-| Find a spec | `docs/specs/{feature}.md` |
+| Find a spec | `.correctless/specs/{feature}.md` |
 ```
 
 ---
@@ -580,7 +580,7 @@ project-root/
 
 `.gitignore` addition:
 ```
-.claude/artifacts/
+.correctless/artifacts/
 ```
 
 ---
@@ -594,7 +594,7 @@ git checkout -b feature/my-feature
   │
   ├── /cspec
   │   ├── Conversation about what you're building
-  │   ├── Produces: docs/specs/my-feature.md
+  │   ├── Produces: .correctless/specs/my-feature.md
   │   └── Human approves spec
   │
   ├── /creview
@@ -644,13 +644,13 @@ cd .claude/skills/workflow && ./setup
 
 The `setup` script:
 1. Detects language and test runner
-2. Generates `.claude/workflow-config.json` with detected values
+2. Generates `.correctless/config/workflow-config.json` with detected values
 3. Registers the PreToolUse hook in `.claude/settings.json`
 4. Registers slash commands
 5. Creates ARCHITECTURE.md template (if missing)
 6. Creates AGENT_CONTEXT.md template (if missing)
-7. Creates `.claude/antipatterns.md` template (if missing)
-8. Creates directory structure (`docs/specs/`, `.claude/artifacts/`)
+7. Creates `.correctless/antipatterns.md` template (if missing)
+8. Creates directory structure (`.correctless/specs/`, `.correctless/artifacts/`)
 9. Updates `.gitignore`
 10. Appends Correctless Lite section to `CLAUDE.md`
 
@@ -713,8 +713,8 @@ When your project grows into something that needs higher assurance — handling 
 | `.claude/skills/workflow/hooks/workflow-advance.sh` | State transition script |
 | `ARCHITECTURE.md` | Template |
 | `AGENT_CONTEXT.md` | Template |
-| `.claude/workflow-config.json` | Template |
-| `.claude/antipatterns.md` | Empty template |
+| `.correctless/config/workflow-config.json` | Template |
+| `.correctless/antipatterns.md` | Empty template |
 
 ## Implementation Order
 

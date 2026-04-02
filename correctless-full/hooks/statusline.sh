@@ -163,10 +163,10 @@ fi
 # --- Section 4: Workflow ---
 
 sec4=""
-if [ -n "$branch" ] && [ -d ".claude/artifacts" ]; then
+if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
   slug="$(echo "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
   hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
-  STATE_FILE=".claude/artifacts/workflow-state-${slug}-${hash}.json"
+  STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${hash}.json"
 
   if [ -f "$STATE_FILE" ]; then
     eval "$(jq -r '

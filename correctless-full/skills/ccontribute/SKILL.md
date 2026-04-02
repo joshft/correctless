@@ -177,7 +177,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After any subagent completes (research for unfamiliar patterns), capture `total_tokens` and `duration_ms`. Since this skill runs against external projects that may not have `.claude/artifacts/`, skip token logging if the directory doesn't exist. Token data is still visible in the conversation for manual tracking via `/cmetrics`.
+After any subagent completes (research for unfamiliar patterns), capture `total_tokens` and `duration_ms`. Since this skill runs against external projects that may not have `.correctless/artifacts/`, skip token logging if the directory doesn't exist. Token data is still visible in the conversation for manual tracking via `/cmetrics`.
 
 ## Code Analysis (MCP Integration)
 

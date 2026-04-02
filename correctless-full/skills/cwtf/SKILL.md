@@ -39,13 +39,13 @@ Derive the task-slug from the workflow state's `.task` field: lowercase, non-alp
 
 Read these data sources (skip any that don't exist):
 
-1. **Workflow state** — `.claude/artifacts/workflow-state-{slug}-{hash}.json`
+1. **Workflow state** — `.correctless/artifacts/workflow-state-{slug}-{hash}.json`
 2. **Spec file** — path from `.spec_file` field (relative to repo root — prepend repo root for Read tool)
-3. **QA findings** — `.claude/artifacts/qa-findings-{task-slug}.json`
-4. **Test edit log** — `.claude/artifacts/tdd-test-edits.log`
-5. **Audit trail** — `.claude/artifacts/audit-trail-{slug}-{hash}.jsonl`
-6. **Override log** — `.claude/artifacts/override-log.json`
-7. **Verification report** — `docs/verification/{task-slug}-verification.md`
+3. **QA findings** — `.correctless/artifacts/qa-findings-{task-slug}.json`
+4. **Test edit log** — `.correctless/artifacts/tdd-test-edits.log`
+5. **Audit trail** — `.correctless/artifacts/audit-trail-{slug}-{hash}.jsonl`
+6. **Override log** — `.correctless/artifacts/override-log.json`
+7. **Verification report** — `.correctless/verification/{task-slug}-verification.md`
 8. **Session-meta** — `find ~/.claude/usage-data/session-meta/ -name '*.json'` filtered by `project_path` matching repo root
 9. **Conversation JSONL** (optional, for deep analysis) — find the session file at `~/.claude/projects/`. List directories with `find ~/.claude/projects/ -maxdepth 2 -name '*.jsonl'`, identify the correct file by matching the project path pattern in the directory name and selecting the most recent file. This file can be very large — use targeted `jq` queries, never read it entirely.
 
@@ -60,7 +60,7 @@ Check whether all mandatory phases executed:
 **For Lite**: spec → review → tdd-tests → tdd-impl → tdd-qa → done → verified → documented
 **For Full**: spec → review-spec (or model → review-spec) → tdd-tests → tdd-impl → tdd-qa → (tdd-verify →) done → verified → documented
 
-**Primary source for phase history: the audit trail.** The workflow state's `phase_entered_at` field only contains the MOST RECENT transition timestamp — it cannot prove earlier phases ran. Instead, extract distinct phase values from the audit trail: `jq -r '.phase' .claude/artifacts/audit-trail-{slug}-{hash}.jsonl | sort -u`. This shows every phase that had tool activity. If no audit trail exists, fall back to the current `phase` field as a minimum marker and note: "No audit trail — can only verify current phase, not history."
+**Primary source for phase history: the audit trail.** The workflow state's `phase_entered_at` field only contains the MOST RECENT transition timestamp — it cannot prove earlier phases ran. Instead, extract distinct phase values from the audit trail: `jq -r '.phase' .correctless/artifacts/audit-trail-{slug}-{hash}.jsonl | sort -u`. This shows every phase that had tool activity. If no audit trail exists, fall back to the current `phase` field as a minimum marker and note: "No audit trail — can only verify current phase, not history."
 
 Also check:
 - Were overrides used? (check override log for entries during this workflow)
