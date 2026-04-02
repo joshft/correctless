@@ -48,3 +48,10 @@ cd packages/api && npx prisma migrate deploy
 ```
 
 Banner comments for scripts reviewed as files. Echo prefixes for scripts watched in real time. Inline `#` comments stay normal — only section headers get the visual treatment.
+
+## Correctless Learnings
+
+### 2026-04-02 — Convention confirmed: Serena MCP silent fallback
+- Observed in 5+ features — treat as established project convention
+- Every skill with Serena integration must: (1) check `mcp.serena` config flag, (2) include the standard 6-tool fallback table, (3) state "optimizer, not a dependency", (4) fall back silently (no abort, no retry, no mid-operation warnings), (5) notify once at session end if unavailable
+- Source: /cdocs after add-cexplain-skill-for-guided-codebase-exploration

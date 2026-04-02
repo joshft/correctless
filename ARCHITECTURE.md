@@ -4,16 +4,16 @@
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Skills | `skills/*/SKILL.md` | 25 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
+| Skills | `skills/*/SKILL.md` | 26 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
 | Hooks | `hooks/` | 4 bash scripts: workflow gate (PreToolUse), state machine (workflow-advance), statusline, audit trail. These enforce the workflow. |
 | Templates | `templates/` | Scaffolding templates for ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, invariant templates (Full-only), workflow configs. |
 | Helpers | `helpers/` | Property-based testing guides per language (Go, Python, TypeScript, Rust). Full-only. |
-| Distribution: Lite | `correctless-lite/` | 16-skill subset. No Alloy, STRIDE, convergence, red team, or PBT. |
-| Distribution: Full | `correctless-full/` | 23-skill suite with formal modeling, adversarial review, and convergence auditing. |
+| Distribution: Lite | `correctless-lite/` | 19-skill subset. No Alloy, STRIDE, convergence, red team, or PBT. |
+| Distribution: Full | `correctless-full/` | 26-skill suite with formal modeling, adversarial review, and convergence auditing. |
 | Docs | `docs/` | Per-skill user-facing documentation and feature docs. |
 | Design Specs | `correctless.md`, `correctless-lite.md` | Original design specifications for Full and Lite modes. |
 | Setup | `setup` | Bash script: detects stack, scaffolds config/hooks/templates, registers Claude Code hooks. Idempotent. |
-| Tests | `test*.sh` | 8 shell test suites: setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline, consolidation, crelease. |
+| Tests | `test*.sh` | 9 shell test suites: setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain. |
 | Sync | `sync.sh` | Copies source files into both distribution targets (`correctless-lite/`, `correctless-full/`). |
 
 ## Design Patterns
@@ -21,7 +21,7 @@
 ### PAT-001: Source → Distribution Sync
 - All development happens in root-level `skills/`, `hooks/`, `templates/`, `helpers/`
 - `sync.sh` copies to `correctless-lite/` and `correctless-full/` — these are never edited directly
-- Lite gets 16 skills; Full gets all 23 plus helpers and extra templates
+- Lite gets 19 skills; Full gets all 26 plus helpers and extra templates
 
 ### PAT-002: Agent Separation (The Lens Principle)
 - Never let an agent grade its own work
@@ -37,7 +37,7 @@
 - State files are always blocked from direct edits
 
 ### PAT-004: Branch-Scoped State Machine
-- Workflow state lives in `.claude/artifacts/workflow-state-{branch-slug}.json`
+- Workflow state lives in `.correctless/artifacts/workflow-state-{branch-slug}.json`
 - `workflow-advance.sh` is the only writer — validates transitions, enforces gates
 - State includes phase, task, spec_file, qa_rounds, timestamps
 - `override` allows temporary bypass (10 tool calls, logged)

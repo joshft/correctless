@@ -1,23 +1,23 @@
 # Agent Context — Correctless
 
-> Last updated: 2026-04-01
+> Last updated: 2026-04-02
 
 ## What This Project Does
 
-Claude Code plugin framework that enforces a correctness-oriented development workflow. Ships as two distributions: Correctless Lite (16 skills, ~10-15 min/feature) and Correctless Full (23 skills, ~1-2 hr/feature with formal modeling and convergence auditing). The core principle: never let an agent grade its own work — each workflow phase uses a separate agent with a different lens.
+Claude Code plugin framework that enforces a correctness-oriented development workflow. Ships as two distributions: Correctless Lite (19 skills, ~10-15 min/feature) and Correctless Full (26 skills, ~1-2 hr/feature with formal modeling and convergence auditing). The core principle: never let an agent grade its own work — each workflow phase uses a separate agent with a different lens.
 
 ## Key Components
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Skills | `skills/*/SKILL.md` | 25 skill definitions. Each is a slash command with frontmatter contract. |
+| Skills | `skills/*/SKILL.md` | 26 skill definitions. Each is a slash command with frontmatter contract. |
 | Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh |
 | Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs |
 | Helpers | `helpers/` | PBT guides per language (Full-only) |
-| Lite dist | `correctless-lite/` | 16-skill distribution target — never edit directly |
-| Full dist | `correctless-full/` | 23-skill distribution target — never edit directly |
+| Lite dist | `correctless-lite/` | 19-skill distribution target — never edit directly |
+| Full dist | `correctless-full/` | 26-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh`, `test-statusline.sh`, `test-consolidation.sh`, `test-crelease.sh` | 696 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease |
+| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh`, `test-statusline.sh`, `test-consolidation.sh`, `test-crelease.sh`, `test-cexplain.sh` | 841 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain |
 | Sync | `sync.sh` | Propagates source edits to both distribution targets |
 
 ## Design Patterns
@@ -38,7 +38,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 
 | Need to... | Do this |
 |------------|---------|
-| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh && bash test-statusline.sh && bash test-consolidation.sh && bash test-crelease.sh` |
+| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh && bash test-statusline.sh && bash test-consolidation.sh && bash test-crelease.sh && bash test-cexplain.sh` |
 | Lint shell scripts | `shellcheck hooks/*.sh test.sh sync.sh setup` |
 | Sync to distributions | `bash sync.sh` |
 | Find a skill | `skills/{name}/SKILL.md` |
