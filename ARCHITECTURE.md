@@ -13,7 +13,7 @@
 | Docs | `docs/` | Per-skill user-facing documentation and feature docs. |
 | Design Specs | `correctless.md`, `correctless-lite.md` | Original design specifications for Full and Lite modes. |
 | Setup | `setup` | Bash script: detects stack, scaffolds config/hooks/templates, registers Claude Code hooks. Idempotent. |
-| Tests | `test.sh` | Shell-based test suite: setup script, state machine transitions, gate hook, full mode features, override/diagnose utilities. 57 tests. |
+| Tests | `test*.sh` | 6 shell test suites (429 tests): setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline. |
 | Sync | `sync.sh` | Copies source files into both distribution targets (`correctless-lite/`, `correctless-full/`). |
 
 ## Design Patterns

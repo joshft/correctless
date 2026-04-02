@@ -321,26 +321,35 @@ register_hooks() {
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
-        "command": "$hook_path",
-        "timeout_ms": 5000
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$hook_path",
+            "timeout_ms": 5000
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit|CreateFile|Bash",
-        "command": "$audit_path",
-        "timeout_ms": 1000
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$audit_path",
+            "timeout_ms": 1000
+          }
+        ]
       }
     ]
+  },
+  "statusLine": {
+    "command": "$statusline_path"
   },
   "permissions": {
     "allow": [
       "Bash($advance_path *)"
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "$statusline_path"
   }
 }
 HEOF
@@ -349,33 +358,61 @@ HEOF
   fi
 
   # Check if all components are registered — only skip if ALL are present
-  local has_gate has_audit has_statusline has_perms
+  local has_gate has_audit has_perms has_statusline
   has_gate=$(grep -q "workflow-gate" "$settings" 2>/dev/null && echo "y" || echo "n")
   has_audit=$(grep -q "audit-trail" "$settings" 2>/dev/null && echo "y" || echo "n")
-  has_statusline=$(grep -q "statusLine" "$settings" 2>/dev/null && echo "y" || echo "n")
   has_perms=$(grep -q "workflow-advance" "$settings" 2>/dev/null && echo "y" || echo "n")
+  has_statusline=$(grep -q "statusLine" "$settings" 2>/dev/null && echo "y" || echo "n")
 
-  if [ "$has_gate" = "y" ] && [ "$has_audit" = "y" ] && [ "$has_statusline" = "y" ] && [ "$has_perms" = "y" ]; then
+  if [ "$has_gate" = "y" ] && [ "$has_audit" = "y" ] && [ "$has_perms" = "y" ] && [ "$has_statusline" = "y" ]; then
     skip "Hooks already registered in settings.json"
     return
   fi
 
   # Append hook to existing settings using jq
+  # QA-001: Only add entries that are not already present to prevent duplicates
   if command -v jq >/dev/null 2>&1; then
     local tmp="$settings.$$"
-    jq --arg cmd "$hook_path" --arg adv "$advance_path" --arg sl "$statusline_path" --arg audit "$audit_path" '
-      .hooks.PreToolUse = (.hooks.PreToolUse // []) + [{
-        matcher: "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
-        command: $cmd,
-        timeout_ms: 5000
-      }]
-      | .hooks.PostToolUse = (.hooks.PostToolUse // []) + [{
-        matcher: "Edit|Write|MultiEdit|CreateFile|Bash",
-        command: $audit,
-        timeout_ms: 1000
-      }]
-      | .permissions.allow = (.permissions.allow // []) + ["Bash(\($adv) *)"]
-      | .statusLine = { type: "command", command: $sl }
+    jq --arg cmd "$hook_path" --arg adv "$advance_path" --arg audit "$audit_path" --arg sl "$statusline_path" '
+      # Only add PreToolUse gate if not already present
+      .hooks.PreToolUse = (
+        if (.hooks.PreToolUse // [] | any(.hooks[]?.command == $cmd)) then
+          .hooks.PreToolUse
+        else
+          (.hooks.PreToolUse // []) + [{
+            matcher: "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
+            hooks: [{
+              type: "command",
+              command: $cmd,
+              timeout_ms: 5000
+            }]
+          }]
+        end
+      )
+      # Only add PostToolUse audit if not already present
+      | .hooks.PostToolUse = (
+        if (.hooks.PostToolUse // [] | any(.hooks[]?.command == $audit)) then
+          .hooks.PostToolUse
+        else
+          (.hooks.PostToolUse // []) + [{
+            matcher: "Edit|Write|MultiEdit|CreateFile|Bash",
+            hooks: [{
+              type: "command",
+              command: $audit,
+              timeout_ms: 1000
+            }]
+          }]
+        end
+      )
+      | .statusLine = {command: $sl}
+      # Only add permissions entry if not already present
+      | .permissions.allow = (
+        if (.permissions.allow // [] | any(. == "Bash(\($adv) *)")) then
+          .permissions.allow
+        else
+          (.permissions.allow // []) + ["Bash(\($adv) *)"]
+        end
+      )
     ' "$settings" > "$tmp" && mv "$tmp" "$settings"
     ok "Registered hooks in existing settings.json"
   else
