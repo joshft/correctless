@@ -87,7 +87,7 @@ test_setup() {
   assert_eq "creates settings.json" "true" "$([ -f .claude/settings.json ] && echo true || echo false)"
   assert_eq "creates hooks dir" "true" "$([ -f .claude/hooks/workflow-gate.sh ] && echo true || echo false)"
   assert_contains "hooks reference .claude/hooks/" ".claude/hooks/workflow-gate.sh" "$(cat .claude/settings.json)"
-  assert_contains "settings has statusLine" "statusLine" "$(cat .claude/settings.json)"
+  assert_contains "settings has hooks array format" '"hooks"' "$(cat .claude/settings.json)"
   assert_contains "settings has audit-trail hook" "audit-trail" "$(cat .claude/settings.json)"
   assert_eq "creates docs/specs" "true" "$([ -d docs/specs ] && echo true || echo false)"
   assert_eq "creates .claude/artifacts" "true" "$([ -d .claude/artifacts ] && echo true || echo false)"
@@ -97,12 +97,12 @@ test_setup() {
   output2="$(.claude/skills/workflow/setup 2>&1)"
   assert_contains "idempotent — skips existing config" "already exists" "$output2"
 
-  # Partial settings — gate exists but statusLine missing (bug regression test)
-  local partial_settings='{"hooks":{"PreToolUse":[{"matcher":"Edit","command":".claude/hooks/workflow-gate.sh"}]}}'
+  # Partial settings — gate exists but audit-trail missing (bug regression test)
+  local partial_settings='{"hooks":{"PreToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":".claude/hooks/workflow-gate.sh"}]}]}}'
   echo "$partial_settings" > .claude/settings.json
   .claude/skills/workflow/setup >/dev/null 2>&1
-  assert_contains "partial settings: adds statusLine" "statusLine" "$(cat .claude/settings.json)"
   assert_contains "partial settings: adds audit-trail" "audit-trail" "$(cat .claude/settings.json)"
+  assert_contains "partial settings: adds permissions" "workflow-advance" "$(cat .claude/settings.json)"
 }
 
 # ---------------------------------------------------------------------------
