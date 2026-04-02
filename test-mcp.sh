@@ -49,8 +49,8 @@ file_contains_i() {
 # Skill lists from the spec
 # ---------------------------------------------------------------------------
 
-# R-022: 14 skills that receive Serena integration
-SERENA_SKILLS="cspec creview creview-spec ctdd cverify caudit crefactor credteam cwtf cmaintain ccontribute cdebug cpr-review cdocs"
+# R-022: 15 skills that receive Serena integration
+SERENA_SKILLS="cspec creview creview-spec ctdd cverify caudit crefactor credteam cwtf cmaintain ccontribute cdebug cpr-review cdocs cexplain"
 
 # R-023: 5 skills that receive Context7 integration
 CONTEXT7_SKILLS="cspec cdebug creview ctdd crefactor"
@@ -433,7 +433,7 @@ test_r020() {
   local lite_serena_expected=0
   for skill in $SERENA_SKILLS; do
     local lite_skill="$REPO_DIR/correctless-lite/skills/$skill/SKILL.md"
-    # Only count skills that exist in Lite (not all 14 are in Lite)
+    # Only count skills that exist in Lite (not all 15 are in Lite)
     if [ -f "$lite_skill" ]; then
       lite_serena_expected=$((lite_serena_expected + 1))
       if file_contains "$lite_skill" "mcp.serena"; then
@@ -455,14 +455,14 @@ test_r020() {
       fi
     fi
   done
-  assert_eq "R-020: Full has Serena blocks in all 14 skills" "$full_serena_expected" "$full_serena_count"
+  assert_eq "R-020: Full has Serena blocks in all 15 skills" "$full_serena_expected" "$full_serena_count"
 
   # Assert absolute skill counts in each distribution
   local lite_total full_total
   lite_total=$(find "$REPO_DIR/correctless-lite/skills" -name "SKILL.md" | wc -l)
   full_total=$(find "$REPO_DIR/correctless-full/skills" -name "SKILL.md" | wc -l)
-  assert_eq "R-020: Lite has 18 skills total" "18" "$lite_total"
-  assert_eq "R-020: Full has 25 skills total" "25" "$full_total"
+  assert_eq "R-020: Lite has 19 skills total" "19" "$lite_total"
+  assert_eq "R-020: Full has 26 skills total" "26" "$full_total"
 }
 
 # ---------------------------------------------------------------------------
@@ -495,12 +495,12 @@ test_r021() {
 }
 
 # ---------------------------------------------------------------------------
-# Test: R-022 — Exactly 14 skills have Serena blocks
+# Test: R-022 — Exactly 15 skills have Serena blocks
 # ---------------------------------------------------------------------------
 
 test_r022() {
   echo ""
-  echo "=== R-022: Exactly 14 skills have Serena blocks ==="
+  echo "=== R-022: Exactly 15 skills have Serena blocks ==="
 
   local serena_count=0
   for skill in $SERENA_SKILLS; do
@@ -509,7 +509,16 @@ test_r022() {
       serena_count=$((serena_count + 1))
     fi
   done
-  assert_eq "R-022: 14 skills have Serena blocks" "14" "$serena_count"
+  assert_eq "R-022: 15 skills have Serena blocks" "15" "$serena_count"
+
+  # Class fix (QA-001): verify SERENA_SKILLS list matches actual Serena consumer skills on disk
+  # Use find_symbol as the marker for Serena consumers (csetup mentions mcp.serena but only writes config, not consumes)
+  local actual_serena
+  actual_serena="$(grep -rl 'find_symbol' "$REPO_DIR/skills/"*/SKILL.md 2>/dev/null | wc -l | tr -d '[:space:]')"
+  local listed_serena
+  # shellcheck disable=SC2086
+  listed_serena="$(echo $SERENA_SKILLS | wc -w | tr -d '[:space:]')"
+  assert_eq "R-022: SERENA_SKILLS count matches actual Serena consumer skills on disk" "$listed_serena" "$actual_serena"
 }
 
 # ---------------------------------------------------------------------------
