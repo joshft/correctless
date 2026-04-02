@@ -1,0 +1,5 @@
+[default.extend-words]
+# Regex character classes in grep patterns are not typos
+ommit = "ommit"
+anual = "anual"
+elease = "elease"

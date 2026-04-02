@@ -189,7 +189,7 @@ PYEOF
     "test_file": "*_test.rs|tests/*.rs",
     "source_file": "*.rs",
     "test_fail_pattern": "FAILED|failures",
-    "build_error_pattern": "error\\[E|cannot find"
+    "build_error_pattern": "error\\\\[E|cannot find"
   },
   "is_monorepo": false,
   "packages": {},
@@ -560,6 +560,62 @@ detect_full_tools() {
 }
 
 # ---------------------------------------------------------------------------
+# Detect version file for /crelease (R-004, R-013)
+# ---------------------------------------------------------------------------
+
+detect_version_file() {
+  local config="$1"
+  command -v jq >/dev/null 2>&1 || return 0
+
+  local version_file=""
+  local version_pattern=""
+
+  # Check package.json
+  if [ -f "$REPO_ROOT/package.json" ] && jq -e '.version' "$REPO_ROOT/package.json" >/dev/null 2>&1; then
+    version_file="package.json"
+    version_pattern=".version"
+  # Check Cargo.toml — section-aware: version must be under [package], not [workspace]
+  elif [ -f "$REPO_ROOT/Cargo.toml" ] && sed -n '/^\[package\]/,/^\[/p' "$REPO_ROOT/Cargo.toml" 2>/dev/null | grep -q '^version\s*='; then
+    version_file="Cargo.toml"
+    version_pattern='version\s*=\s*"[^"]*"'
+  # Check pyproject.toml — section-aware: version must be under [project]
+  elif [ -f "$REPO_ROOT/pyproject.toml" ] && sed -n '/^\[project\]/,/^\[/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | grep -q '^version\s*='; then
+    version_file="pyproject.toml"
+    version_pattern='version\s*=\s*"[^"]*"'
+  # Check setup.cfg
+  elif [ -f "$REPO_ROOT/setup.cfg" ] && grep -q '^version\s*=' "$REPO_ROOT/setup.cfg" 2>/dev/null; then
+    version_file="setup.cfg"
+    version_pattern='version\s*=\s*[0-9]'
+  # Check Go version constants — capture find result once to avoid double traversal
+  elif go_file="$(find "$REPO_ROOT" -maxdepth 4 -name '*.go' -exec grep -l 'const Version\s*=\|var Version\s*=' {} + 2>/dev/null | head -1)" && [ -n "$go_file" ]; then
+    # Store relative path from repo root
+    version_file="${go_file#"$REPO_ROOT/"}"
+    version_pattern='(const|var) Version\s*=\s*"[^"]*"'
+  # Check CHANGELOG.md heading as fallback
+  elif [ -f "$REPO_ROOT/CHANGELOG.md" ] && grep -q '## \[[0-9]' "$REPO_ROOT/CHANGELOG.md" 2>/dev/null; then
+    version_file="CHANGELOG.md"
+    version_pattern='## \[[0-9]+\.[0-9]+\.[0-9]+\]'
+  fi
+
+  # Skip if config is unparsable — don't attempt to sed-fix it (overly broad regex risks corruption)
+  if ! jq '.' "$config" >/dev/null 2>&1; then
+    warn "workflow-config.json is not valid JSON — skipping version file detection"
+    return 0
+  fi
+
+  if [ -n "$version_file" ]; then
+    jq --arg vf "$version_file" --arg vp "$version_pattern" \
+      '.release = { version_file: $vf, version_pattern: $vp }' \
+      "$config" > "$config.$$" && mv "$config.$$" "$config"
+    ok "Detected version file: $version_file"
+  else
+    jq '.release = { version_file: null, version_pattern: null }' \
+      "$config" > "$config.$$" && mv "$config.$$" "$config"
+    info "No version file detected — /crelease will ask on first run"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Migration: move old artifacts to .correctless/
 # Old paths are constructed via variables to avoid grep false-positives
 # when verifying no old-path references remain in distributions (R-015).
@@ -789,6 +845,9 @@ if command -v jq >/dev/null 2>&1 && [ -f "$CONFIG_DEST" ]; then
     info "AGENT_CONTEXT.md has real content — /csetup will offer to add Correctless sections"
   fi
 fi
+
+# Detect version file for /crelease (R-004, R-013)
+detect_version_file "$CONFIG_DEST"
 
 # Create .claude directory (still needed for settings.json)
 mkdir -p "$REPO_ROOT/.claude"

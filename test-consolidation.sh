@@ -299,10 +299,8 @@ test_r006() {
     && local audit_config="true" || local audit_config="false"
   assert_eq "R-006: audit-trail reads .correctless/config/workflow-config.json" "true" "$audit_config"
 
-  # B-02: statusline.sh should reference .correctless/config/workflow-config.json
-  file_contains "$hooks_dir/statusline.sh" '\.correctless/config/workflow-config\.json' \
-    && local sl_config="true" || local sl_config="false"
-  assert_eq "R-006: statusline reads .correctless/config/workflow-config.json" "true" "$sl_config"
+  # Note: statusline.sh does NOT read workflow-config.json — it receives JSON via stdin
+  # and reads state files from .correctless/artifacts/. No config file reference needed.
 
   # None of the hooks should reference old .claude/artifacts or .claude/workflow-config
   for hook in workflow-advance.sh workflow-gate.sh audit-trail.sh statusline.sh; do
