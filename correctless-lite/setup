@@ -565,7 +565,10 @@ detect_full_tools() {
 
 detect_version_file() {
   local config="$1"
-  command -v jq >/dev/null 2>&1 || return 0
+  if ! command -v jq >/dev/null 2>&1; then
+    warn "jq not found — skipping version file detection (install jq for /crelease support)"
+    return 0
+  fi
 
   local version_file=""
   local version_pattern=""
@@ -575,15 +578,15 @@ detect_version_file() {
     version_file="package.json"
     version_pattern=".version"
   # Check Cargo.toml — section-aware: version must be under [package], not [workspace]
-  elif [ -f "$REPO_ROOT/Cargo.toml" ] && sed -n '/^\[package\]/,/^\[/p' "$REPO_ROOT/Cargo.toml" 2>/dev/null | grep -Eq '^version[[:space:]]*='; then
+  elif [ -f "$REPO_ROOT/Cargo.toml" ] && sed -n '/^\[package\]/,/^\[/p' "$REPO_ROOT/Cargo.toml" 2>/dev/null | grep -Eq '^[[:space:]]*version[[:space:]]*='; then
     version_file="Cargo.toml"
     version_pattern='version[[:space:]]*=[[:space:]]*"[^"]*"'
   # Check pyproject.toml — section-aware: version must be under [project]
-  elif [ -f "$REPO_ROOT/pyproject.toml" ] && sed -n '/^\[project\]/,/^\[/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | grep -Eq '^version[[:space:]]*='; then
+  elif [ -f "$REPO_ROOT/pyproject.toml" ] && sed -n '/^\[project\]/,/^\[/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | grep -Eq '^[[:space:]]*version[[:space:]]*='; then
     version_file="pyproject.toml"
     version_pattern='version[[:space:]]*=[[:space:]]*"[^"]*"'
   # Check setup.cfg
-  elif [ -f "$REPO_ROOT/setup.cfg" ] && grep -Eq '^version[[:space:]]*=' "$REPO_ROOT/setup.cfg" 2>/dev/null; then
+  elif [ -f "$REPO_ROOT/setup.cfg" ] && grep -Eq '^[[:space:]]*version[[:space:]]*=' "$REPO_ROOT/setup.cfg" 2>/dev/null; then
     version_file="setup.cfg"
     version_pattern='version[[:space:]]*=[[:space:]]*[0-9]'
   # Check Go version constants — capture find result once to avoid double traversal
@@ -604,13 +607,22 @@ detect_version_file() {
   fi
 
   if [ -n "$version_file" ]; then
-    jq --arg vf "$version_file" --arg vp "$version_pattern" \
+    if jq --arg vf "$version_file" --arg vp "$version_pattern" \
       '.release = { version_file: $vf, version_pattern: $vp }' \
-      "$config" > "$config.$$" && mv "$config.$$" "$config"
-    ok "Detected version file: $version_file"
+      "$config" > "$config.$$"; then
+      mv "$config.$$" "$config"
+      ok "Detected version file: $version_file"
+    else
+      rm -f "$config.$$"
+      warn "Failed to write release config — /crelease will ask on first run"
+    fi
   else
-    jq '.release = { version_file: null, version_pattern: null }' \
-      "$config" > "$config.$$" && mv "$config.$$" "$config"
+    if jq '.release = { version_file: null, version_pattern: null }' \
+      "$config" > "$config.$$"; then
+      mv "$config.$$" "$config"
+    else
+      rm -f "$config.$$"
+    fi
     info "No version file detected — /crelease will ask on first run"
   fi
 }

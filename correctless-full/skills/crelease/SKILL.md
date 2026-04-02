@@ -151,7 +151,7 @@ Run these checks before creating the tag. All blockers must pass:
 4. **Tag doesn't already exist**: Verify no tag already exists with the proposed version (prevent tag collision)
 
 **Warnings** (non-blocking):
-- If `.correctless/artifacts/workflow-state-*.json` files exist with phase other than `documented` on other branches, warn about active workflows: "{N} active workflows on other branches. Continue?"
+- If `.correctless/artifacts/workflow-state-*.json` files exist with phase other than `documented` on other branches, warn about active workflows: "{N} active workflows on other branches. **This release only includes main.** Continue?"
 
 Each failed blocker produces a specific error identifying the check and how to fix it. The user can fix blockers and re-run, or abort.
 

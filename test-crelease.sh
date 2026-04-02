@@ -830,6 +830,89 @@ CL
 }
 
 # ---------------------------------------------------------------------------
+# Test: R-004 — Section-aware TOML parsing (negative tests)
+# ---------------------------------------------------------------------------
+
+test_r004_toml_wrong_section() {
+  echo ""
+  echo "=== R-004: Section-aware TOML parsing rejects wrong sections ==="
+
+  # Cargo.toml with version only under [workspace] (no [package]) → should NOT detect
+  setup_test_project
+  rm -f package.json
+  cat > Cargo.toml <<'TOML'
+[workspace]
+members = ["crates/*"]
+version = "1.0.0"
+TOML
+  git add -A && git commit -q -m "cargo workspace only"
+  .claude/skills/workflow/setup >/dev/null 2>&1
+
+  local config_file=".correctless/config/workflow-config.json"
+  local version_file
+  version_file="$(jq -r '.release.version_file' "$config_file" 2>/dev/null || echo "missing")"
+  assert_eq "R-004: Cargo.toml [workspace] version not detected as version file" "null" "$version_file"
+
+  # pyproject.toml with version only under [tool.poetry] (no [project]) → should NOT detect
+  setup_test_project
+  rm -f package.json
+  cat > pyproject.toml <<'TOML'
+[tool.poetry]
+name = "test-app"
+version = "2.0.0"
+TOML
+  git add -A && git commit -q -m "poetry only"
+  .claude/skills/workflow/setup >/dev/null 2>&1
+
+  version_file="$(jq -r '.release.version_file' "$config_file" 2>/dev/null || echo "missing")"
+  assert_eq "R-004: pyproject.toml [tool.poetry] version not detected" "null" "$version_file"
+}
+
+# ---------------------------------------------------------------------------
+# Test: R-004 — Version file priority ordering
+# ---------------------------------------------------------------------------
+
+test_r004_version_priority() {
+  echo ""
+  echo "=== R-004: Version file priority (package.json > Cargo.toml > pyproject.toml) ==="
+
+  # Project with both package.json and Cargo.toml → package.json wins
+  setup_test_project
+  cat > Cargo.toml <<'TOML'
+[package]
+name = "test-app"
+version = "0.5.1"
+edition = "2021"
+TOML
+  git add -A && git commit -q -m "dual project"
+  .claude/skills/workflow/setup >/dev/null 2>&1
+
+  local config_file=".correctless/config/workflow-config.json"
+  local version_file
+  version_file="$(jq -r '.release.version_file // empty' "$config_file" 2>/dev/null || echo "")"
+  assert_eq "R-004: package.json takes priority over Cargo.toml" "package.json" "$version_file"
+
+  # Project with both Cargo.toml and pyproject.toml → Cargo.toml wins
+  setup_test_project
+  rm -f package.json
+  cat > Cargo.toml <<'TOML'
+[package]
+name = "test-app"
+version = "0.5.1"
+TOML
+  cat > pyproject.toml <<'TOML'
+[project]
+name = "test-app"
+version = "2.0.0"
+TOML
+  git add -A && git commit -q -m "rust+python"
+  .claude/skills/workflow/setup >/dev/null 2>&1
+
+  version_file="$(jq -r '.release.version_file // empty' "$config_file" 2>/dev/null || echo "")"
+  assert_eq "R-004: Cargo.toml takes priority over pyproject.toml" "Cargo.toml" "$version_file"
+}
+
+# ---------------------------------------------------------------------------
 # Test: SKILL.md structural integrity (B-1: prevents keyword-stuffing)
 # ---------------------------------------------------------------------------
 
@@ -900,6 +983,8 @@ test_r019_skill_content
 test_r004_go_detection
 test_r004_setupcfg_detection
 test_r004_changelog_fallback
+test_r004_toml_wrong_section
+test_r004_version_priority
 test_skill_structure
 
 echo ""
