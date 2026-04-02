@@ -461,8 +461,8 @@ test_r020() {
   local lite_total full_total
   lite_total=$(find "$REPO_DIR/correctless-lite/skills" -name "SKILL.md" | wc -l)
   full_total=$(find "$REPO_DIR/correctless-full/skills" -name "SKILL.md" | wc -l)
-  assert_eq "R-020: Lite has 17 skills total" "17" "$lite_total"
-  assert_eq "R-020: Full has 24 skills total" "24" "$full_total"
+  assert_eq "R-020: Lite has 18 skills total" "18" "$lite_total"
+  assert_eq "R-020: Full has 25 skills total" "25" "$full_total"
 }
 
 # ---------------------------------------------------------------------------

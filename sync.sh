@@ -87,23 +87,23 @@ else
   info "PBT helpers → correctless-full"
 fi
 
-# --- Lite skills: csetup cspec creview ctdd cverify cdocs crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick ---
-for skill in csetup cspec creview ctdd cverify cdocs crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick; do
+# --- Lite skills: csetup cspec creview ctdd cverify cdocs crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease ---
+for skill in csetup cspec creview ctdd cverify cdocs crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease; do
   if [ "$CHECK_ONLY" = false ]; then
     mkdir -p "correctless-lite/skills/$skill"
   fi
   sync_file "skills/$skill/SKILL.md" "correctless-lite/skills/$skill/SKILL.md"
 done
-[ "$CHECK_ONLY" = false ] && info "Lite skills (17) → correctless-lite"
+[ "$CHECK_ONLY" = false ] && info "Lite skills (18) → correctless-lite"
 
-# --- Full skills (all): csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick ---
-for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick; do
+# --- Full skills (all): csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease ---
+for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease; do
   if [ "$CHECK_ONLY" = false ]; then
     mkdir -p "correctless-full/skills/$skill"
   fi
   sync_file "skills/$skill/SKILL.md" "correctless-full/skills/$skill/SKILL.md"
 done
-[ "$CHECK_ONLY" = false ] && info "Full skills (24) → correctless-full"
+[ "$CHECK_ONLY" = false ] && info "Full skills (25) → correctless-full"
 
 if [ "$CHECK_ONLY" = true ]; then
   if [ "$DIRTY" = true ]; then

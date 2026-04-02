@@ -3,7 +3,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Skills: 24](https://img.shields.io/badge/skills-24-blue.svg)](docs/skills/)
+[![Skills: 25](https://img.shields.io/badge/skills-25-blue.svg)](docs/skills/)
 [![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
@@ -205,6 +205,7 @@ graph TD
 | [`/ctdd`](docs/skills/ctdd.md) | After review approves spec | RED → test audit → GREEN → /simplify → QA |
 | [`/cverify`](docs/skills/cverify.md) | After /ctdd completes | Verify implementation matches spec |
 | [`/cdocs`](docs/skills/cdocs.md) | After /cverify | Update README, AGENT_CONTEXT, feature docs |
+| [`/crelease`](docs/skills/crelease.md) | After merging features, ready to tag | Version bump, changelog, sanity checks, annotated tag |
 
 ### Code Quality
 
@@ -334,7 +335,7 @@ This bypasses the gate for 10 tool calls. Use for: typos, config tweaks, one-lin
 
 | | Lite | Full |
 |---|------|------|
-| Skills | 16 | 23 |
+| Skills | 18 | 25 |
 | Spec format | 5 sections, simple rules | 12+ sections, typed invariants |
 | Spec research | Current best practices, dependency health | Same |
 | Review | Single-pass + auto security checklist | 4-agent adversarial team |
@@ -390,7 +391,7 @@ Optional (Full only):
 
 ## Status
 
-**Correctless 2.0.0 — Early release.** 24 skills (16 Lite, 24 Full), 598 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
+**Correctless 2.0.0 — Early release.** 25 skills (18 Lite, 25 Full), 696 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
 
 ## License
 

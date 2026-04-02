@@ -4,7 +4,7 @@
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Skills | `skills/*/SKILL.md` | 23 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
+| Skills | `skills/*/SKILL.md` | 25 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
 | Hooks | `hooks/` | 4 bash scripts: workflow gate (PreToolUse), state machine (workflow-advance), statusline, audit trail. These enforce the workflow. |
 | Templates | `templates/` | Scaffolding templates for ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, invariant templates (Full-only), workflow configs. |
 | Helpers | `helpers/` | Property-based testing guides per language (Go, Python, TypeScript, Rust). Full-only. |
@@ -13,7 +13,7 @@
 | Docs | `docs/` | Per-skill user-facing documentation and feature docs. |
 | Design Specs | `correctless.md`, `correctless-lite.md` | Original design specifications for Full and Lite modes. |
 | Setup | `setup` | Bash script: detects stack, scaffolds config/hooks/templates, registers Claude Code hooks. Idempotent. |
-| Tests | `test*.sh` | 6 shell test suites (429 tests): setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline. |
+| Tests | `test*.sh` | 8 shell test suites: setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline, consolidation, crelease. |
 | Sync | `sync.sh` | Copies source files into both distribution targets (`correctless-lite/`, `correctless-full/`). |
 
 ## Design Patterns

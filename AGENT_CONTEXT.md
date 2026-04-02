@@ -10,14 +10,14 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Skills | `skills/*/SKILL.md` | 24 skill definitions. Each is a slash command with frontmatter contract. |
+| Skills | `skills/*/SKILL.md` | 25 skill definitions. Each is a slash command with frontmatter contract. |
 | Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh |
 | Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs |
 | Helpers | `helpers/` | PBT guides per language (Full-only) |
 | Lite dist | `correctless-lite/` | 16-skill distribution target — never edit directly |
 | Full dist | `correctless-full/` | 23-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh`, `test-statusline.sh`, `test-consolidation.sh` | 598 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, .correctless/ consolidation |
+| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh`, `test-statusline.sh`, `test-consolidation.sh`, `test-crelease.sh` | 696 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease |
 | Sync | `sync.sh` | Propagates source edits to both distribution targets |
 
 ## Design Patterns
@@ -38,7 +38,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 
 | Need to... | Do this |
 |------------|---------|
-| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh && bash test-statusline.sh && bash test-consolidation.sh` |
+| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh && bash test-statusline.sh && bash test-consolidation.sh && bash test-crelease.sh` |
 | Lint shell scripts | `shellcheck hooks/*.sh test.sh sync.sh setup` |
 | Sync to distributions | `bash sync.sh` |
 | Find a skill | `skills/{name}/SKILL.md` |
