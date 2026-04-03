@@ -35,3 +35,6 @@ ROADMAP.md
 
 # Serena local data
 .serena/
+
+# Local dev scripts
+refresh-plugins.sh
