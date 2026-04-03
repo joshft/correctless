@@ -7,21 +7,20 @@
 | Skills | `skills/*/SKILL.md` | 26 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
 | Hooks | `hooks/` | 4 bash scripts: workflow gate (PreToolUse), state machine (workflow-advance), statusline, audit trail. These enforce the workflow. |
 | Templates | `templates/` | Scaffolding templates for ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, invariant templates (Full-only), workflow configs. |
-| Helpers | `helpers/` | Property-based testing guides per language (Go, Python, TypeScript, Rust). Full-only. |
-| Distribution: Lite | `correctless-lite/` | 19-skill subset. No Alloy, STRIDE, convergence, red team, or PBT. |
-| Distribution: Full | `correctless-full/` | 26-skill suite with formal modeling, adversarial review, and convergence auditing. |
+| Helpers | `helpers/` | Property-based testing guides per language (Go, Python, TypeScript, Rust). High+ intensity. |
+| Distribution | `correctless/` | Single 26-skill distribution. Intensity gates control which skills activate at each level. |
 | Docs | `docs/` | Per-skill user-facing documentation and feature docs. |
-| Design Specs | `docs/design/correctless.md`, `docs/design/correctless-lite.md` | Original design specifications for Full and Lite modes. |
+| Design Specs | `docs/design/correctless.md` | Design specification covering all intensity levels. |
 | Setup | `setup` | Bash script: detects stack, scaffolds config/hooks/templates, registers Claude Code hooks. Idempotent. |
-| Tests | `tests/test*.sh` | 10 shell test suites: setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets. |
-| Sync | `sync.sh` | Copies source files into both distribution targets (`correctless-lite/`, `correctless-full/`). |
+| Tests | `tests/test*.sh` | 11 shell test suites: setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor. |
+| Sync | `sync.sh` | Copies source files into the `correctless/` distribution target. |
 
 ## Design Patterns
 
 ### PAT-001: Source → Distribution Sync
 - All development happens in root-level `skills/`, `hooks/`, `templates/`, `helpers/`
-- `sync.sh` copies to `correctless-lite/` and `correctless-full/` — these are never edited directly
-- Lite gets 19 skills; Full gets all 26 plus helpers and extra templates
+- `sync.sh` copies to `correctless/` — this directory is never edited directly
+- All 26 skills are included; intensity gates control which activate at each level
 
 ### PAT-002: Agent Separation (The Lens Principle)
 - Never let an agent grade its own work
@@ -53,7 +52,7 @@
 - State machine transitions validated before execution — invalid transitions error with actionable message
 - Config read via `jq` from `.claude/workflow-config.json`
 - Test assertions use `assert_eq`, `assert_contains`, `assert_exit` helpers
-- Skills detect Lite vs Full by checking for `workflow.intensity` in config
+- Skills check `workflow.intensity` in config to determine which features activate (absent = standard)
 
 ## Known Limitations
 
