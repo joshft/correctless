@@ -17,7 +17,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Lite dist | `correctless-lite/` | 19-skill distribution target — never edit directly |
 | Full dist | `correctless-full/` | 26-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh`, `test-statusline.sh`, `test-consolidation.sh`, `test-crelease.sh`, `test-cexplain.sh`, `test-calm-resets.sh` | 923 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets |
+| Tests | `tests/test*.sh` | 10 test suites, 923 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets |
 | Sync | `sync.sh` | Propagates source edits to both distribution targets |
 
 ## Design Patterns
@@ -31,15 +31,15 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 ## Common Pitfalls
 
 - **Editing distribution targets directly**: changes in `correctless-lite/` or `correctless-full/` will be overwritten by `sync.sh` — **Instead**: edit in root `skills/`, `hooks/`, `templates/`, `helpers/` then run `bash sync.sh`
-- **Forgetting to sync after edits**: distribution targets go stale — **Instead**: always run `bash sync.sh` after editing source files, then `bash test.sh` to verify
+- **Forgetting to sync after edits**: distribution targets go stale — **Instead**: always run `bash sync.sh` after editing source files, then `bash tests/test.sh` to verify
 - **Adding a skill without updating sync.sh**: new skills won't appear in distributions — **Instead**: add the skill directory to the appropriate list in `sync.sh` (Lite list and/or Full list)
 
 ## Quick Reference
 
 | Need to... | Do this |
 |------------|---------|
-| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh && bash test-statusline.sh && bash test-consolidation.sh && bash test-crelease.sh && bash test-cexplain.sh && bash test-calm-resets.sh` |
-| Lint shell scripts | `shellcheck hooks/*.sh test.sh sync.sh setup` |
+| Run tests | `bash tests/test.sh && bash tests/test-mcp.sh` (or run all: see workflow-config.json `commands.test`) |
+| Lint shell scripts | `shellcheck hooks/*.sh tests/test*.sh sync.sh setup` |
 | Sync to distributions | `bash sync.sh` |
 | Find a skill | `skills/{name}/SKILL.md` |
 | Find skill docs | `docs/skills/{name}.md` |
