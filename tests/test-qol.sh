@@ -107,24 +107,16 @@ else
   assert_eq "R-004: requires writing tests before implementing" "yes" "no"
 fi
 
-# R-005: sync.sh Lite and Full skill lists contain "cquick"
-echo "--- R-005: cquick in sync.sh skill lists ---"
+# R-005: sync.sh skill list contains "cquick"
+echo "--- R-005: cquick in sync.sh skill list ---"
 SYNC="$REPO_DIR/sync.sh"
 
-# Check Lite list (the first for-loop listing skills — does not contain cmodel)
-lite_line=$(grep "^for skill in" "$SYNC" | grep -v "cmodel" | head -1)
-if echo "$lite_line" | grep -q "cquick"; then
-  assert_eq "R-005a: cquick in Lite skill list" "yes" "yes"
+# Check the skill list (single for-loop listing all 26 skills)
+skill_line=$(grep "^for skill in" "$SYNC" | head -1)
+if echo "$skill_line" | grep -q "cquick"; then
+  assert_eq "R-005a: cquick in skill list" "yes" "yes"
 else
-  assert_eq "R-005a: cquick in Lite skill list" "yes" "no"
-fi
-
-# Check Full list (the for-loop listing skills — contains cmodel)
-full_line=$(grep "^for skill in.*cmodel" "$SYNC" | head -1)
-if echo "$full_line" | grep -q "cquick"; then
-  assert_eq "R-005b: cquick in Full skill list" "yes" "yes"
-else
-  assert_eq "R-005b: cquick in Full skill list" "yes" "no"
+  assert_eq "R-005a: cquick in skill list" "yes" "no"
 fi
 
 # R-006: chelp SKILL.md lists /cquick in commands section

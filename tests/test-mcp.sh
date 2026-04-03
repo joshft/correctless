@@ -428,41 +428,24 @@ test_r020() {
   echo ""
   echo "=== R-020: Sync produces distributions with MCP blocks ==="
 
-  # Check that Lite distribution skills with Serena have the MCP block
-  local lite_serena_count=0
-  local lite_serena_expected=0
+  # Check that distribution skills with Serena have the MCP block
+  local dist_serena_count=0
+  local dist_serena_expected=0
   for skill in $SERENA_SKILLS; do
-    local lite_skill="$REPO_DIR/correctless-lite/skills/$skill/SKILL.md"
-    # Only count skills that exist in Lite (not all 15 are in Lite)
-    if [ -f "$lite_skill" ]; then
-      lite_serena_expected=$((lite_serena_expected + 1))
-      if file_contains "$lite_skill" "mcp.serena"; then
-        lite_serena_count=$((lite_serena_count + 1))
+    local dist_skill="$REPO_DIR/correctless/skills/$skill/SKILL.md"
+    if [ -f "$dist_skill" ]; then
+      dist_serena_expected=$((dist_serena_expected + 1))
+      if file_contains "$dist_skill" "mcp.serena"; then
+        dist_serena_count=$((dist_serena_count + 1))
       fi
     fi
   done
-  assert_eq "R-020: Lite has Serena blocks in all applicable skills" "$lite_serena_expected" "$lite_serena_count"
+  assert_eq "R-020: correctless has Serena blocks in all applicable skills" "$dist_serena_expected" "$dist_serena_count"
 
-  # Check that Full distribution skills with Serena have the MCP block
-  local full_serena_count=0
-  local full_serena_expected=0
-  for skill in $SERENA_SKILLS; do
-    local full_skill="$REPO_DIR/correctless-full/skills/$skill/SKILL.md"
-    if [ -f "$full_skill" ]; then
-      full_serena_expected=$((full_serena_expected + 1))
-      if file_contains "$full_skill" "mcp.serena"; then
-        full_serena_count=$((full_serena_count + 1))
-      fi
-    fi
-  done
-  assert_eq "R-020: Full has Serena blocks in all 15 skills" "$full_serena_expected" "$full_serena_count"
-
-  # Assert absolute skill counts in each distribution
-  local lite_total full_total
-  lite_total=$(find "$REPO_DIR/correctless-lite/skills" -name "SKILL.md" | wc -l)
-  full_total=$(find "$REPO_DIR/correctless-full/skills" -name "SKILL.md" | wc -l)
-  assert_eq "R-020: Lite has 19 skills total" "19" "$lite_total"
-  assert_eq "R-020: Full has 26 skills total" "26" "$full_total"
+  # Assert absolute skill count in distribution
+  local dist_total
+  dist_total=$(find "$REPO_DIR/correctless/skills" -name "SKILL.md" | wc -l)
+  assert_eq "R-020: correctless has 26 skills total" "26" "$dist_total"
 }
 
 # ---------------------------------------------------------------------------
@@ -471,27 +454,19 @@ test_r020() {
 
 test_r021() {
   echo ""
-  echo "=== R-021: MCP is in both distributions ==="
+  echo "=== R-021: MCP is in distribution ==="
 
-  # Check a specific Serena skill that exists in both: ctdd
-  local lite_ctdd="$REPO_DIR/correctless-lite/skills/ctdd/SKILL.md"
-  local full_ctdd="$REPO_DIR/correctless-full/skills/ctdd/SKILL.md"
+  # Check a specific Serena skill: ctdd
+  local dist_ctdd="$REPO_DIR/correctless/skills/ctdd/SKILL.md"
 
-  file_contains "$lite_ctdd" "mcp.serena" && local lite_has="true" || local lite_has="false"
-  assert_eq "R-021: Lite ctdd has Serena block" "true" "$lite_has"
+  file_contains "$dist_ctdd" "mcp.serena" && local dist_has="true" || local dist_has="false"
+  assert_eq "R-021: correctless ctdd has Serena block" "true" "$dist_has"
 
-  file_contains "$full_ctdd" "mcp.serena" && local full_has="true" || local full_has="false"
-  assert_eq "R-021: Full ctdd has Serena block" "true" "$full_has"
+  # Context7: cspec
+  local dist_cspec="$REPO_DIR/correctless/skills/cspec/SKILL.md"
 
-  # Context7: cspec exists in both
-  local lite_cspec="$REPO_DIR/correctless-lite/skills/cspec/SKILL.md"
-  local full_cspec="$REPO_DIR/correctless-full/skills/cspec/SKILL.md"
-
-  file_contains "$lite_cspec" "mcp.context7" && local lite_c7="true" || local lite_c7="false"
-  assert_eq "R-021: Lite cspec has Context7 block" "true" "$lite_c7"
-
-  file_contains "$full_cspec" "mcp.context7" && local full_c7="true" || local full_c7="false"
-  assert_eq "R-021: Full cspec has Context7 block" "true" "$full_c7"
+  file_contains "$dist_cspec" "mcp.context7" && local dist_c7="true" || local dist_c7="false"
+  assert_eq "R-021: correctless cspec has Context7 block" "true" "$dist_c7"
 }
 
 # ---------------------------------------------------------------------------

@@ -998,29 +998,24 @@ test_r015() {
   # B-09: Added .claude/hooks/ to old path patterns
   local old_path_patterns=('.claude/artifacts' '.claude/workflow-config' '.claude/antipatterns' 'docs/specs/' 'docs/verification/' 'docs/decisions/' '.claude/hooks/')
 
-  for dist in correctless-lite correctless-full; do
-    [ -d "$REPO_DIR/$dist" ] || continue
-
+  if [ -d "$REPO_DIR/correctless" ]; then
     for pattern in "${old_path_patterns[@]}"; do
       local found
-      found="$(grep -rl "$pattern" "$REPO_DIR/$dist" 2>/dev/null | head -1 || true)"
+      found="$(grep -rl "$pattern" "$REPO_DIR/correctless" 2>/dev/null | head -1 || true)"
       if [ -n "$found" ]; then
-        echo "  FAIL: R-015: $dist contains old path '$pattern' in $(basename "$found")"
+        echo "  FAIL: R-015: correctless/ contains old path '$pattern' in $(basename "$found")"
         FAIL=$((FAIL + 1))
       fi
     done
-  done
+  fi
 
-  # If we got through all checks with no failures for this test
-  local old_refs_lite=0
-  local old_refs_full=0
+  # Count remaining old path references in the single distribution
+  local old_refs=0
   for pattern in "${old_path_patterns[@]}"; do
-    old_refs_lite=$((old_refs_lite + $(grep -rl "$pattern" "$REPO_DIR/correctless-lite" 2>/dev/null | wc -l)))
-    old_refs_full=$((old_refs_full + $(grep -rl "$pattern" "$REPO_DIR/correctless-full" 2>/dev/null | wc -l)))
+    old_refs=$((old_refs + $(grep -rl "$pattern" "$REPO_DIR/correctless" 2>/dev/null | wc -l)))
   done
 
-  assert_eq "R-015: correctless-lite has zero old path references" "0" "$old_refs_lite"
-  assert_eq "R-015: correctless-full has zero old path references" "0" "$old_refs_full"
+  assert_eq "R-015: correctless/ has zero old path references" "0" "$old_refs"
 }
 
 # ---------------------------------------------------------------------------
@@ -1334,17 +1329,15 @@ test_r019() {
     PASS=$((PASS + 1))
   fi
 
-  # Also check distribution directories after sync
+  # Also check distribution directory after sync
   cd "$REPO_DIR" && bash sync.sh >/dev/null 2>&1
 
-  for dist in correctless-lite correctless-full; do
-    local dist_dir="$REPO_DIR/$dist/skills"
-    [ -d "$dist_dir" ] || continue
-
+  local dist_dir="$REPO_DIR/correctless/skills"
+  if [ -d "$dist_dir" ]; then
     local dist_old_refs
     dist_old_refs="$(grep -rl '\.claude/hooks/' "$dist_dir" 2>/dev/null | wc -l | tr -d ' ')"
-    assert_eq "R-019: $dist skills have zero .claude/hooks/ references" "0" "$dist_old_refs"
-  done
+    assert_eq "R-019: correctless/ skills have zero .claude/hooks/ references" "0" "$dist_old_refs"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -1360,7 +1353,6 @@ test_r020() {
 
   local doc_files=(
     "$REPO_DIR/docs/design/correctless.md"
-    "$REPO_DIR/docs/design/correctless-lite.md"
     "$REPO_DIR/README.md"
     "$REPO_DIR/CONTRIBUTING.md"
     "$REPO_DIR/templates/AGENT_CONTEXT.md"

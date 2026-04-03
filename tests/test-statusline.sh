@@ -736,20 +736,13 @@ echo ""
 echo "=== R-013: Sync to distributions ==="
 # ===========================================================================
 
-# Tests R-013 [integration]: hooks/statusline.sh is identical in both distributions
+# Tests R-013 [integration]: hooks/statusline.sh is identical in the distribution
 
-echo "--- R-013a: hooks/statusline.sh matches correctless-lite/hooks/statusline.sh ---"
-if diff -q "$REPO_DIR/hooks/statusline.sh" "$REPO_DIR/correctless-lite/hooks/statusline.sh" >/dev/null 2>&1; then
-  assert_eq "R-013a: source matches correctless-lite distribution" "match" "match"
+echo "--- R-013: hooks/statusline.sh matches correctless/hooks/statusline.sh ---"
+if diff -q "$REPO_DIR/hooks/statusline.sh" "$REPO_DIR/correctless/hooks/statusline.sh" >/dev/null 2>&1; then
+  assert_eq "R-013: source matches correctless distribution" "match" "match"
 else
-  assert_eq "R-013a: source matches correctless-lite distribution" "match" "diff"
-fi
-
-echo "--- R-013b: hooks/statusline.sh matches correctless-full/hooks/statusline.sh ---"
-if diff -q "$REPO_DIR/hooks/statusline.sh" "$REPO_DIR/correctless-full/hooks/statusline.sh" >/dev/null 2>&1; then
-  assert_eq "R-013b: source matches correctless-full distribution" "match" "match"
-else
-  assert_eq "R-013b: source matches correctless-full distribution" "match" "diff"
+  assert_eq "R-013: source matches correctless distribution" "match" "diff"
 fi
 
 # ===========================================================================

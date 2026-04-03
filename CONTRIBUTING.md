@@ -9,7 +9,7 @@ git clone https://github.com/joshft/correctless.git
 cd correctless
 bash tests/test.sh        # Infrastructure tests
 bash tests/test-mcp.sh    # MCP integration tests
-bash sync.sh              # Propagate source → both plugins
+bash sync.sh              # Propagate source → correctless/ distribution
 bash sync.sh --check      # Verify distributions are in sync (exit 0 = clean)
 ```
 
@@ -22,14 +22,13 @@ templates/            # Config, doc, and spec templates
 helpers/              # PBT helpers (Full mode only)
 tests/                # 10 test suites (923 assertions)
 setup                 # Install script
-sync.sh               # Copies source → correctless-lite/ and correctless-full/
-correctless-lite/     # Lite plugin (19 skills)
-correctless-full/     # Full plugin (26 skills)
+sync.sh               # Copies source → correctless/ distribution
+correctless/          # Single distribution (26 skills, intensity-gated)
 docs/skills/          # Per-skill documentation pages
-docs/design/          # Original design specifications
+docs/design/          # Design specification
 ```
 
-**Important:** Never edit files in `correctless-lite/` or `correctless-full/` directly. Edit in `skills/`, `hooks/`, or `templates/`, then run `bash sync.sh` to propagate.
+**Important:** Never edit files in `correctless/` directly. Edit in `skills/`, `hooks/`, or `templates/`, then run `bash sync.sh` to propagate.
 
 ## How to Contribute
 
@@ -51,7 +50,7 @@ docs/design/          # Original design specifications
    - Constraints section with: `evidence-before-claims`, `no-auto-invoke` (if applicable), `redaction` (if external-facing)
 2. Create `docs/skills/myskill.md` documentation page following the template (see any existing page)
 3. Register the skill in ALL of these files:
-   - `sync.sh` — add to both Lite and/or Full loops, update counts
+   - `sync.sh` — add to the skill list, update count
    - `setup` — add to both CLAUDE.md command list blocks
    - `hooks/workflow-advance.sh` — add to help text
    - `skills/cstatus/SKILL.md` — add to available commands
@@ -59,7 +58,7 @@ docs/design/          # Original design specifications
    - `skills/chelp/SKILL.md` — add to command list + quick reference
    - `README.md` — add to skill table, update counts
    - `.claude-plugin/marketplace.json` — update counts
-   - `docs/design/correctless-lite.md` and `docs/design/correctless.md` — update evolution notes
+   - `docs/design/correctless.md` — update evolution notes
 4. Run `bash sync.sh && bash tests/test.sh`
 5. Open a PR
 
