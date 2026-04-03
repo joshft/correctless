@@ -112,6 +112,29 @@ Clean up the checkpoint file when the audit converges and completes successfully
 
 **Divergence**: if a round finds MORE issues than previous, check if fixes introduced regressions.
 
+### Divergence Calm Reset Prompt (R-003)
+
+When a round produces more findings than the previous round (diverging instead of converging), the orchestrator injects a divergence reset prompt into the fix-round agent prompts. The trigger fires when the finding count increases compared to the previous round — i.e., `findings_count[round_N] > findings_count[round_N-1]`. The orchestrator tracks finding counts per round in its own conversation context (working memory), not in persisted state.
+
+> **Reset — diverging instead of converging.**
+> This round produced more findings than the previous round. Divergence means the fixes are introducing new issues rather than resolving existing ones.
+>
+> Re-read the original findings before the fix attempt. Understand what each original finding described before making changes. Re-read the findings before applying any new fix.
+>
+> Make smaller, more isolated changes. Each fix should touch the minimum code necessary to address one finding without affecting unrelated behavior.
+>
+> If you're still stuck after this attempt, stop and ask the human for guidance rather than trying another approach.
+
+### Reset Escalation and Tracking
+
+The divergence reset prompt fires at most once per round. If the subsequent fix round also diverges (finding count increases again), the orchestrator escalates to the human rather than injecting another reset. The escalation message includes:
+
+1. The number of rounds and the finding count trend across rounds
+2. A summary of what fixes were attempted and which ones introduced new issues
+3. An explicit ask for the human's guidance on whether to continue, change strategy, or stop
+
+Finding counts per round are tracked in the orchestrator's conversation context (working memory), not in persisted state. No additional files or state fields are needed — the orchestrator observes the finding count from each round's artifacts and compares them in memory.
+
 **Cost visibility**: after each round, report: findings found, findings fixed, total rounds. Human decides whether to continue.
 
 After each round, present the convergence decision:

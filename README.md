@@ -392,7 +392,7 @@ Optional (Full only):
 
 ## Status
 
-**Correctless 2.0.0 — Early release.** 26 skills (19 Lite, 26 Full), 841 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
+**Correctless 2.0.0 — Early release.** 26 skills (19 Lite, 26 Full), 923 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
 
 ## License
 

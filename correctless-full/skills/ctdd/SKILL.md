@@ -251,7 +251,22 @@ Spawn an **implementation agent** as a separate forked subagent:
 >
 > The implementation agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Edit, Write(source and test files inside project root), Write(.correctless/artifacts/tdd-test-edits.log), Bash(test and build commands)`
 
-After the implementation agent completes and tests pass, run `/simplify` to clean up code quality issues before QA. If `/simplify` is not available (it is a built-in Claude Code skill, not part of Correctless), skip this step and proceed to QA.
+### GREEN Phase Calm Reset Prompt (R-001)
+
+The orchestrator tracks the implementation agent's consecutive failure count in its own conversation context (working memory). When the attempt count reaches 3 or more consecutive failures within the GREEN phase, the orchestrator appends this calm reset prompt to the implementation agent's next prompt:
+
+> **Reset — stop building on previous failed approaches.**
+> You have had 3 consecutive failed attempts. Stop. Do not continue iterating on the approach that has failed — abandon previous failed approaches entirely.
+>
+> Re-read the spec rule and the failing test output fresh. Read them as if for the first time. Then ask yourself: what is the test ACTUALLY checking? Describe the assertion literally — not what you assume it checks, but what the code on the line does.
+>
+> There is no time pressure. There is no rush. Correctness matters more than speed. Re-read the test file fresh before writing any code.
+>
+> If you're still stuck after this attempt, stop and ask the human for guidance rather than trying another approach.
+
+This reset prompt fires at most once per trigger point per phase — no stacking. If the subsequent attempt after the reset also fails, the orchestrator escalates to the human instead of injecting another reset (see Reset Escalation below).
+
+After the implementation agent completes and tests pass, run `/simplify` to clean up code quality issues before QA. If `/simplify` is not available (it is a built-in Claude Code skill, not part of Correctless), omit this step and proceed to QA.
 
 ### Commit Metadata (Git Trailers)
 
@@ -370,6 +385,49 @@ This artifact is consumed by `/cverify` (to check class fixes were implemented),
   > After fixing each finding, the fix agent must update `.correctless/artifacts/qa-findings-{task-slug}.json`: set `"status": "fixed"` on the findings you addressed. This ensures the findings artifact stays current as fixes land.
 
   The fix round implements BOTH instance and class fixes. Then re-run QA. After each fix round, the orchestrator must verify the findings JSON: any finding whose instance_fix was applied but still shows `"status": "open"` should be updated to `"fixed"` by you (the orchestrator). This catches cases where the fix agent forgot to update the status.
+
+### Fix Round Calm Reset Prompt (R-011)
+
+The orchestrator tracks the fix agent's consecutive failure count separately from the GREEN phase count. When the fix phase reaches 3 consecutive failures within a single fix round, the orchestrator appends this fix reset prompt to the fix agent's next prompt:
+
+> **Fix phase reset — stop building on previous failed approaches.**
+> You have had 3 consecutive failed attempts in the fix phase. Stop. Do not continue the approach that has failed — fix attempts must abandon previous failed strategies.
+>
+> Re-read the specific QA finding's `instance_fix` and `class_fix` fields from the findings JSON. Read each field literally. Then ask yourself: what is the finding ACTUALLY describing? Describe the desired behavior change, not what you assume it means.
+>
+> Fix phase: there is no rush. There is no time pressure. Take the time to understand the finding before writing any code. Re-read the finding fresh.
+>
+> If you're still stuck after this attempt, stop and ask the human for guidance rather than trying another approach.
+
+This is distinct from the GREEN phase reset (R-001) — R-011 fires on consecutive failures within a single fix round, not during initial implementation. It is also distinct from R-002 (recurring BLOCKINGs across QA rounds).
+
+### QA Fix Round Calm Reset — Recurring BLOCKINGs (R-002)
+
+When a QA round returns 2 or more BLOCKING findings after a previous fix round already addressed BLOCKING findings (i.e., recurring BLOCKING findings — the fix didn't stick), the orchestrator appends this reset prompt to the fix agent for the next fix round. This reset fires when 2+ BLOCKING findings recur across QA rounds, which means the previous fix approach was insufficient:
+
+> **Reset for recurring BLOCKING findings.**
+> QA findings are descriptions of desired behavior, not criticism. Each finding describes a concrete gap between the current code and the spec.
+>
+> Re-read each finding's `instance_fix` and `class_fix` fields from the findings JSON before attempting any fixes. Do not re-attempt the same approach that failed in the previous round — the recurring BLOCKINGs prove that approach was wrong.
+>
+> Re-read the findings fresh. Understand what each finding is actually asking for before writing code.
+>
+> If you're still stuck after this attempt, stop and ask the human for guidance rather than trying another approach.
+
+### Reset Escalation (R-008)
+
+Reset prompts fire at most once per trigger per phase — no stacking. After a calm reset prompt fires and the subsequent attempt also fails, the orchestrator MUST escalate to the human rather than injecting another reset prompt. The escalation message includes:
+
+1. How many attempts were made across the phase
+2. A summary of the approaches tried and what was changed
+3. The escalation's current error or failing test output
+4. An explicit ask for the human's guidance: "Please provide guidance on how to proceed."
+
+When the failure involves an unclear root cause (hard-to-understand bug), include the `/cdebug` option in the escalation: "Consider running `/cdebug` for structured root cause analysis before the next attempt — failed attempts suggest the root cause may not be obvious."
+
+### Attempt Tracking (R-009)
+
+The orchestrator tracks attempt counts for all calm reset triggers in its own conversation context (working memory), not in persisted state. Attempt counts live entirely in orchestrator memory and clear when a new phase begins. No additional files, state fields, or checkpoint entries are needed — the orchestrator simply observes its own conversation history to determine how many attempts have been made.
 - **If no BLOCKING findings**:
   - **Lite mode**: `workflow-advance.sh done`
   - **Full mode**: `workflow-advance.sh verify-phase` (goes to tdd-verify for final verification, then `done`)

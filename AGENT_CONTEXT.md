@@ -17,7 +17,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Lite dist | `correctless-lite/` | 19-skill distribution target — never edit directly |
 | Full dist | `correctless-full/` | 26-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh`, `test-statusline.sh`, `test-consolidation.sh`, `test-crelease.sh`, `test-cexplain.sh` | 841 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain |
+| Tests | `test.sh`, `test-mcp.sh`, `test-bugfixes.sh`, `test-qol.sh`, `test-decisions.sh`, `test-statusline.sh`, `test-consolidation.sh`, `test-crelease.sh`, `test-cexplain.sh`, `test-calm-resets.sh` | 923 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets |
 | Sync | `sync.sh` | Propagates source edits to both distribution targets |
 
 ## Design Patterns
@@ -38,7 +38,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 
 | Need to... | Do this |
 |------------|---------|
-| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh && bash test-statusline.sh && bash test-consolidation.sh && bash test-crelease.sh && bash test-cexplain.sh` |
+| Run tests | `bash test.sh && bash test-mcp.sh && bash test-bugfixes.sh && bash test-qol.sh && bash test-statusline.sh && bash test-consolidation.sh && bash test-crelease.sh && bash test-cexplain.sh && bash test-calm-resets.sh` |
 | Lint shell scripts | `shellcheck hooks/*.sh test.sh sync.sh setup` |
 | Sync to distributions | `bash sync.sh` |
 | Find a skill | `skills/{name}/SKILL.md` |

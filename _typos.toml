@@ -4,3 +4,5 @@ ommit = "ommit"
 anual = "anual"
 elease = "elease"
 ibrary = "ibrary"
+# BLOCKINGs is the plural of BLOCKING (severity level) — typos sees BLOCKIN as a misspelling
+BLOCKIN = "BLOCKIN"
