@@ -3,7 +3,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Skills: 25](https://img.shields.io/badge/skills-25-blue.svg)](docs/skills/)
+[![Skills: 26](https://img.shields.io/badge/skills-26-blue.svg)](docs/skills/)
 [![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
@@ -232,6 +232,7 @@ graph TD
 | [`/csummary`](docs/skills/csummary.md) | After a feature or mid-feature | What the workflow caught, by phase |
 | [`/cmetrics`](docs/skills/cmetrics.md) | Monthly or for ROI analysis | Token cost, bugs caught, session analytics, trends |
 | [`/cwtf`](docs/skills/cwtf.md) | When you suspect agents shortcut | Did agents actually follow instructions? |
+| [`/cexplain`](docs/skills/cexplain.md) | Onboarding or exploring a codebase | Guided mermaid diagrams, prose walkthroughs, HTML export |
 
 ### Full Mode Only
 
@@ -391,7 +392,7 @@ Optional (Full only):
 
 ## Status
 
-**Correctless 2.0.0 — Early release.** 25 skills (18 Lite, 25 Full), 696 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
+**Correctless 2.0.0 — Early release.** 26 skills (19 Lite, 26 Full), 841 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
 
 ## License
 
