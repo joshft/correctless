@@ -6,7 +6,7 @@
 
 set -uo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATUSLINE="$REPO_DIR/hooks/statusline.sh"
 TEST_DIR="/tmp/correctless-statusline-test-$$"
 PASS=0
@@ -795,7 +795,7 @@ setup_install_project() {
   git -c user.email="t@t.com" -c user.name="T" commit -q --allow-empty -m "init"
   git checkout -q -b main 2>/dev/null || true
   mkdir -p .claude/skills/workflow
-  rsync -a --exclude='.git' "$REPO_DIR/" .claude/skills/workflow/
+  rsync -a --exclude='.git' --exclude='tests' "$REPO_DIR/" .claude/skills/workflow/
 }
 
 cleanup_setup() {

@@ -7,10 +7,8 @@ Thanks for your interest in contributing! Correctless is a set of Claude Code sk
 ```bash
 git clone https://github.com/joshft/correctless.git
 cd correctless
-bash test.sh              # 57 infrastructure tests
-bash test-mcp.sh          # 192 MCP integration tests
-bash test-bugfixes.sh     # 15 bug fix tests
-bash test-qol.sh          # 25 QoL improvement tests
+bash tests/test.sh        # Infrastructure tests
+bash tests/test-mcp.sh    # MCP integration tests
 bash sync.sh              # Propagate source → both plugins
 bash sync.sh --check      # Verify distributions are in sync (exit 0 = clean)
 ```
@@ -18,19 +16,17 @@ bash sync.sh --check      # Verify distributions are in sync (exit 0 = clean)
 ## Project Structure
 
 ```
-skills/               # Source skills (24 SKILL.md files)
+skills/               # Source skills (26 SKILL.md files)
 hooks/                # Bash hooks (gate, state machine, statusline, audit trail)
 templates/            # Config, doc, and spec templates
 helpers/              # PBT helpers (Full mode only)
+tests/                # 10 test suites (923 assertions)
 setup                 # Install script
-test.sh               # Infrastructure tests (57)
-test-mcp.sh           # MCP integration tests (192)
-test-bugfixes.sh      # Bug fix tests (15)
-test-qol.sh           # QoL improvement tests (25)
 sync.sh               # Copies source → correctless-lite/ and correctless-full/
-correctless-lite/     # Lite plugin (17 skills)
-correctless-full/     # Full plugin (24 skills)
+correctless-lite/     # Lite plugin (19 skills)
+correctless-full/     # Full plugin (26 skills)
 docs/skills/          # Per-skill documentation pages
+docs/design/          # Original design specifications
 ```
 
 **Important:** Never edit files in `correctless-lite/` or `correctless-full/` directly. Edit in `skills/`, `hooks/`, or `templates/`, then run `bash sync.sh` to propagate.
@@ -42,7 +38,7 @@ docs/skills/          # Per-skill documentation pages
 1. Fork the repo and create a branch: `git checkout -b fix/description`
 2. Read the relevant hook or skill file
 3. Make the fix
-4. Run `bash test.sh` — all tests must pass
+4. Run `bash tests/test.sh` — all tests must pass
 5. Run `bash sync.sh` — plugins must be in sync
 6. Open a PR with: what was broken, why, and how you fixed it
 
@@ -64,7 +60,7 @@ docs/skills/          # Per-skill documentation pages
    - `README.md` — add to skill table, update counts
    - `.claude-plugin/marketplace.json` — update counts
    - `docs/design/correctless-lite.md` and `docs/design/correctless.md` — update evolution notes
-4. Run `bash sync.sh && bash test.sh`
+4. Run `bash sync.sh && bash tests/test.sh`
 5. Open a PR
 
 ### Modifying a Hook
@@ -83,17 +79,15 @@ Run ShellCheck before submitting: `shellcheck hooks/*.sh`
 
 - **Skills:** Markdown with YAML frontmatter. Keep descriptions as trigger conditions ("Use when X"), not capability summaries.
 - **Hooks:** Bash with `set -euo pipefail`. Portable to macOS bash 3.2 + BSD tools.
-- **Tests:** Bash assertions in `test.sh`. Each test is a function that prints PASS/FAIL.
+- **Tests:** Bash assertions in `tests/test*.sh`. Each test is a function that prints PASS/FAIL.
 - **No emojis in skill files** unless the user explicitly requests them.
 - **No model overrides** in skill frontmatter (`model:` field). Removed early to avoid rate limits.
 
 ## Testing
 
 ```bash
-bash test.sh              # 57 infrastructure tests
-bash test-mcp.sh          # 192 MCP integration tests
-bash test-bugfixes.sh     # 15 bug fix tests
-bash test-qol.sh          # 25 QoL improvement tests
+bash tests/test.sh        # Infrastructure tests
+bash tests/test-mcp.sh    # MCP integration tests
 bash sync.sh --check      # Distributions must be in sync
 shellcheck hooks/*.sh     # Must pass with -S warning
 ```

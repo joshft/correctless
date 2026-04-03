@@ -6,7 +6,7 @@
 
 set -uo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIR="/tmp/correctless-crelease-test-$$"
 PASS=0
 FAIL=0
@@ -27,7 +27,7 @@ setup_test_project() {
 
   # Install correctless (exclude .git to avoid nested repo confusion)
   mkdir -p .claude/skills/workflow
-  rsync -a --exclude='.git' "$REPO_DIR/" .claude/skills/workflow/
+  rsync -a --exclude='.git' --exclude='tests' "$REPO_DIR/" .claude/skills/workflow/
 }
 
 cleanup() {
