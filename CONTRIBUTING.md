@@ -63,7 +63,7 @@ docs/skills/          # Per-skill documentation pages
    - `skills/chelp/SKILL.md` — add to command list + quick reference
    - `README.md` — add to skill table, update counts
    - `.claude-plugin/marketplace.json` — update counts
-   - `correctless-lite.md` and `correctless.md` — update evolution notes
+   - `docs/design/correctless-lite.md` and `docs/design/correctless.md` — update evolution notes
 4. Run `bash sync.sh && bash test.sh`
 5. Open a PR
 

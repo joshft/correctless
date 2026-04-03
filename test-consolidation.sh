@@ -1359,8 +1359,8 @@ test_r020() {
   # B-11: Check ALL old-path patterns across ALL documentation files
 
   local doc_files=(
-    "$REPO_DIR/correctless.md"
-    "$REPO_DIR/correctless-lite.md"
+    "$REPO_DIR/docs/design/correctless.md"
+    "$REPO_DIR/docs/design/correctless-lite.md"
     "$REPO_DIR/README.md"
     "$REPO_DIR/CONTRIBUTING.md"
     "$REPO_DIR/templates/AGENT_CONTEXT.md"

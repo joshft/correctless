@@ -38,3 +38,8 @@ ROADMAP.md
 
 # Local dev scripts
 refresh-plugins.sh
+
+# Correctless development artifacts (not user-facing)
+docs/specs/
+docs/verification/
+schmitthub-pr-review.md

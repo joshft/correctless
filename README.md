@@ -53,7 +53,7 @@ graph LR
     style C5 fill:#ffd43b,color:#000
 ```
 
-Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. [Full spec &rarr;](correctless-lite.md)
+Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. [Full spec &rarr;](docs/design/correctless-lite.md)
 
 ### Correctless (Full)
 
@@ -73,7 +73,7 @@ graph LR
     style H fill:#ff922b,color:#fff
 ```
 
-Everything in Lite plus: formal modeling, STRIDE threat analysis, adversarial spec review, mutation testing, convergence-based auditing, and more. [Full spec &rarr;](correctless.md)
+Everything in Lite plus: formal modeling, STRIDE threat analysis, adversarial spec review, mutation testing, convergence-based auditing, and more. [Full spec &rarr;](docs/design/correctless.md)
 
 ### Which One?
 
