@@ -1,0 +1,16 @@
+{
+  "preset": "hacker",
+  "date": "2026-04-04",
+  "round": 1,
+  "findings_count": 32,
+  "fixed_count": 18,
+  "deferred_count": 6,
+  "deferred_items": [
+    "eval of config-sourced test commands (by design, needs mitigation strategy)",
+    "Default-deny Bash in locked phases (major behavior change)",
+    "Plugin integrity verification (GPG signing, checksums)",
+    "MD5 hash length increase 6->12 chars",
+    "audit phase code-level enforcement",
+    "scorecard id-token:write permission"
+  ]
+}

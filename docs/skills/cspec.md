@@ -64,11 +64,11 @@ Agent: Based on our discussion, here's what I understand: rate limiting on
 
 | Reads | Writes |
 |-------|--------|
-| `AGENT_CONTEXT.md` | `docs/specs/{task-slug}.md` |
-| `ARCHITECTURE.md` | `.claude/artifacts/research/{slug}-research.md` (if research triggered) |
-| `.claude/antipatterns.md` | `.claude/artifacts/token-log-{slug}.json` |
-| `.claude/meta/drift-debt.json` (Full) | Workflow state (advances to review phase) |
-| `.claude/artifacts/qa-findings-*.json` | |
+| `AGENT_CONTEXT.md` | `.correctless/specs/{task-slug}.md` |
+| `ARCHITECTURE.md` | `.correctless/artifacts/research/{slug}-research.md` (if research triggered) |
+| `.correctless/antipatterns.md` | `.correctless/artifacts/token-log-{slug}.json` |
+| `.correctless/meta/drift-debt.json` (Full) | Workflow state (advances to review phase) |
+| `.correctless/artifacts/qa-findings-*.json` | |
 | Git log (recent 20 commits) | |
 
 ## Lite vs Full

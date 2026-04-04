@@ -41,12 +41,12 @@ You run `/caudit qa` after landing a connection pool feature.
 
 | Reads | Writes |
 |-------|--------|
-| Source code (scoped by preset) | Per-round findings (`.claude/artifacts/findings/audit-{preset}-{date}-round-{N}.json`) |
-| `ARCHITECTURE.md` | Persistent history (`.claude/artifacts/findings/audit-{preset}-history.md`) |
+| Source code (scoped by preset) | Per-round findings (`.correctless/artifacts/findings/audit-{preset}-{date}-round-{N}.json`) |
+| `ARCHITECTURE.md` | Persistent history (`.correctless/artifacts/findings/audit-{preset}-history.md`) |
 | `AGENT_CONTEXT.md` | Regression tests |
-| `.claude/antipatterns.md` | Updated antipatterns (`.claude/antipatterns.md`) |
-| Previous findings history | Token log (`.claude/artifacts/token-log-{slug}.json`) |
-| QA findings from TDD | Checkpoint (`.claude/artifacts/checkpoint-caudit-{slug}.json`) |
+| `.correctless/antipatterns.md` | Updated antipatterns (`.correctless/antipatterns.md`) |
+| Previous findings history | Token log (`.correctless/artifacts/token-log-{slug}.json`) |
+| QA findings from TDD | Checkpoint (`.correctless/artifacts/checkpoint-caudit-{slug}.json`) |
 
 ## Options
 

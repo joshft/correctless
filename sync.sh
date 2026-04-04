@@ -60,7 +60,7 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 # --- All templates (common + high-intensity) ---
-for tmpl in ARCHITECTURE.md AGENT_CONTEXT.md antipatterns.md workflow-config.json redaction-rules.md workflow-config-full.json workflow-effectiveness.json drift-debt.json external-review-history.json; do
+for tmpl in ARCHITECTURE.md AGENT_CONTEXT.md antipatterns.md workflow-config.json redaction-rules.md workflow-config-full.json workflow-effectiveness.json drift-debt.json external-review-history.json spec-lite.md spec-full.md; do
   sync_file "templates/$tmpl" "correctless/templates/$tmpl"
 done
 sync_dir "templates/invariants" "correctless/templates/invariants"

@@ -59,12 +59,12 @@ Agent: Spawning test-writing agent — reading spec (5 rules),
 
 | Reads | Writes |
 |-------|--------|
-| Approved spec (`docs/specs/{slug}.md`) | Test files (project test directory) |
+| Approved spec (`.correctless/specs/{slug}.md`) | Test files (project test directory) |
 | `AGENT_CONTEXT.md`, `ARCHITECTURE.md` | Source files (implementation) |
-| `.claude/workflow-config.json` | `.claude/artifacts/qa-findings-{slug}.json` |
-| `.claude/antipatterns.md` | `.claude/artifacts/tdd-test-edits.log` |
-| | `.claude/artifacts/checkpoint-ctdd-{slug}.json` |
-| | `.claude/artifacts/token-log-{slug}.json` |
+| `.correctless/config/workflow-config.json` | `.correctless/artifacts/qa-findings-{slug}.json` |
+| `.correctless/antipatterns.md` | `.correctless/artifacts/tdd-test-edits.log` |
+| | `.correctless/artifacts/checkpoint-ctdd-{slug}.json` |
+| | `.correctless/artifacts/token-log-{slug}.json` |
 
 ## Lite vs Full
 
@@ -74,4 +74,4 @@ Both modes run the full RED → test audit → GREEN → QA pipeline with agent 
 
 - **Tests won't compile without stubs (`STUB:TDD`)**: This is expected. The test agent creates structural stubs with `STUB:TDD` markers and zero-value returns. The GREEN agent replaces these with real implementations. If compilation fails before GREEN, verify the stubs have correct signatures.
 - **Context overflow on large features**: The orchestrator warns at 70% context usage. If you hit overflow, run `/compact` before the next phase. The checkpoint system saves progress, so you can resume after compacting.
-- **Test command not found**: The skill verifies the test runner works before starting. If it fails, check that `.claude/workflow-config.json` has the correct `commands.test` entry and that your test runner is installed.
+- **Test command not found**: The skill verifies the test runner works before starting. If it fails, check that `.correctless/config/workflow-config.json` has the correct `commands.test` entry and that your test runner is installed.

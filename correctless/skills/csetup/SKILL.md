@@ -296,7 +296,7 @@ If the user says "looks good" — move on immediately. Don't ask about each fiel
 
 **Monorepo**: if `is_monorepo` is true, include per-package commands in the summary: "Package `api` — `go test ./...` / `golangci-lint run`. Package `web` — `pnpm test` / `pnpm lint`." One confirmation for all, not per-package interrogation.
 
-**At high+ intensity**: if the config has `workflow.intensity`, include it in the summary: "Intensity: standard (low skips STRIDE, high adds fail-closed, critical requires formal modeling)." Let the user change it if they want — don't force a question about it.
+**At high+ intensity**: if the config has `workflow.intensity`, include it in the summary: "Intensity: standard (standard skips STRIDE, high adds fail-closed, critical requires formal modeling)." Let the user change it if they want — don't force a question about it.
 
 ## Step 4: Discover and Bootstrap .correctless/ARCHITECTURE.md
 
@@ -1085,7 +1085,7 @@ Check workflow state anytime: `.correctless/hooks/workflow-advance.sh status`"
 Start a feature: `git checkout -b feature/my-feature` then `/cspec`.
 Or review a PR: `/cpr-review {number}`.
 
-Current commands: `/csetup`, `/cspec`, `/creview`, `/ctdd`, `/cverify`, `/cdocs`, `/crefactor`, `/cpr-review`, `/ccontribute`, `/cmaintain`, `/cstatus`, `/csummary`, `/cmetrics`, `/cdebug`, `/chelp`, `/cwtf`
+Current commands: `/csetup`, `/cspec`, `/creview`, `/ctdd`, `/cverify`, `/cdocs`, `/crefactor`, `/cpr-review`, `/ccontribute`, `/cmaintain`, `/cstatus`, `/csummary`, `/cmetrics`, `/cdebug`, `/chelp`, `/cwtf`, `/cquick`, `/crelease`, `/cexplain`
 Check workflow state: `.correctless/hooks/workflow-advance.sh status`"
 
 If the human says they want to start a feature, ask what they want to build and suggest they run `/cspec`. **Do not auto-invoke `/cspec`.**

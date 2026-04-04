@@ -53,9 +53,9 @@ Agent: Diff analysis complete — 1 new feature (login rate limiting),
 | Reads | Writes |
 |-------|--------|
 | `docs/verification/{slug}-verification.md` | `README.md` (updated) |
-| `docs/specs/{slug}.md` | `AGENT_CONTEXT.md` (updated) |
+| `.correctless/specs/{slug}.md` | `AGENT_CONTEXT.md` (updated) |
 | `README.md`, `ARCHITECTURE.md`, `AGENT_CONTEXT.md` | `docs/features/{slug}.md` (new or updated) |
-| `.claude/workflow-config.json` | `ARCHITECTURE.md` (additions, if approved) |
+| `.correctless/config/workflow-config.json` | `ARCHITECTURE.md` (additions, if approved) |
 | Git diff against main | `CLAUDE.md` (convention learning, if 3+ features share a pattern) |
 | | Workflow state (advances to documented) |
 

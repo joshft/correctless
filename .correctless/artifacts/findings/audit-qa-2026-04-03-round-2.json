@@ -1,0 +1,14 @@
+{
+  "preset": "qa",
+  "date": "2026-04-03",
+  "round": 2,
+  "findings_count": 30,
+  "fixed_count": 28,
+  "deferred_count": 3,
+  "deferred_items": [
+    "26 docs/skills Lite vs Full section renaming (systematic terminology change)",
+    "setup heredoc JSON generation with jq -n (install path change)",
+    "Protected branch config field (new config schema)"
+  ],
+  "note": "Round 2 included a Technical Writer agent not present in Round 1. Many doc findings are new-to-audit rather than missed-by-R1."
+}

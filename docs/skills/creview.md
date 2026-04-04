@@ -52,12 +52,12 @@ Agent: Assumptions check complete — found 2 unstated assumptions.
 
 | Reads | Writes |
 |-------|--------|
-| Spec artifact (`docs/specs/{slug}.md`) | Updated spec (new rules appended) |
-| `AGENT_CONTEXT.md` | `.claude/artifacts/reviews/{slug}-review.md` |
-| `ARCHITECTURE.md` | `.claude/artifacts/token-log-{slug}.json` |
-| `.claude/antipatterns.md` | Workflow state (advances to tests phase) |
-| `.claude/meta/workflow-effectiveness.json` (Full) | |
-| `.claude/artifacts/qa-findings-*.json` | |
+| Spec artifact (`.correctless/specs/{slug}.md`) | Updated spec (new rules appended) |
+| `AGENT_CONTEXT.md` | `.correctless/artifacts/reviews/{slug}-review.md` |
+| `ARCHITECTURE.md` | `.correctless/artifacts/token-log-{slug}.json` |
+| `.correctless/antipatterns.md` | Workflow state (advances to tests phase) |
+| `.correctless/meta/workflow-effectiveness.json` (Full) | |
+| `.correctless/artifacts/qa-findings-*.json` | |
 | Relevant source code | |
 
 ## Lite vs Full

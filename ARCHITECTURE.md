@@ -6,13 +6,13 @@
 |-----------|----------|---------|
 | Skills | `skills/*/SKILL.md` | 26 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
 | Hooks | `hooks/` | 4 bash scripts: workflow gate (PreToolUse), state machine (workflow-advance), statusline, audit trail. These enforce the workflow. |
-| Templates | `templates/` | Scaffolding templates for ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, invariant templates (Full-only), workflow configs. |
+| Templates | `templates/` | Scaffolding templates for ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, invariant templates (high+ intensity), spec templates, workflow configs. |
 | Helpers | `helpers/` | Property-based testing guides per language (Go, Python, TypeScript, Rust). High+ intensity. |
 | Distribution | `correctless/` | Single 26-skill distribution. Intensity gates control which skills activate at each level. |
 | Docs | `docs/` | Per-skill user-facing documentation and feature docs. |
 | Design Specs | `docs/design/correctless.md` | Design specification covering all intensity levels. |
 | Setup | `setup` | Bash script: detects stack, scaffolds config/hooks/templates, registers Claude Code hooks. Idempotent. |
-| Tests | `tests/test*.sh` | 11 shell test suites: setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor. |
+| Tests | `tests/test*.sh` | 14 test files covering setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline. |
 | Sync | `sync.sh` | Copies source files into the `correctless/` distribution target. |
 
 ## Design Patterns
@@ -41,16 +41,21 @@
 - State includes phase, task, spec_file, qa_rounds, timestamps
 - `override` allows temporary bypass (10 tool calls, logged)
 
-### PAT-005: Skill Frontmatter Contract
+### PAT-005: Effective Intensity
+- Each pipeline skill and gated skill computes `max(project_intensity, feature_intensity)` using ordering `standard < high < critical`
+- Project intensity from `workflow.intensity` in config, feature intensity from `workflow-advance.sh status`
+- Fallback: feature_intensity → workflow.intensity → standard
+
+### PAT-006: Skill Frontmatter Contract
 - Each `SKILL.md` starts with YAML frontmatter: `name`, `description`, `allowed-tools`
-- Optional: `model` (which Claude model), `context: fork` (agent separation), `agent` type
+- Optional: `context: fork` (agent separation), `agent` type
 - The frontmatter is the skill's API contract with Claude Code
 
 ## Conventions
 
 - Shell scripts use `set -euo pipefail` (strict mode)
 - State machine transitions validated before execution — invalid transitions error with actionable message
-- Config read via `jq` from `.claude/workflow-config.json`
+- Config read via `jq` from `.correctless/config/workflow-config.json`
 - Test assertions use `assert_eq`, `assert_contains`, `assert_exit` helpers
 - Skills check `workflow.intensity` in config to determine which features activate (absent = standard)
 

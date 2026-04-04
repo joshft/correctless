@@ -115,11 +115,11 @@ Agent: Project Health Check — recipe-api (TypeScript/Express)
 
 | Reads | Writes |
 |-------|--------|
-| Project manifest files (package.json, go.mod, etc.) | `.claude/workflow-config.json` |
+| Project manifest files (package.json, go.mod, etc.) | `.correctless/config/workflow-config.json` |
 | Existing ARCHITECTURE.md, AGENT_CONTEXT.md | `ARCHITECTURE.md` (populated or minimal stub) |
-| `.claude/workflow-config.json` (architecture_state, agent_context_state) | `AGENT_CONTEXT.md` (populated or minimal stub) |
+| `.correctless/config/workflow-config.json` (architecture_state, agent_context_state) | `AGENT_CONTEXT.md` (populated or minimal stub) |
 | Source files (convention mining) | `CLAUDE.md` (conventions appended) |
-| .env, .gitignore, CI configs | `.claude/artifacts/checkpoint-csetup.json` |
+| .env, .gitignore, CI configs | `.correctless/artifacts/checkpoint-csetup.json` |
 | Git history (commit conventions) | `.pre-commit-config.yaml` (if accepted) |
 | | `.github/workflows/ci.yml` (if accepted) |
 | | `.github/dependabot.yml` (if accepted) |
@@ -131,7 +131,7 @@ Agent: Project Health Check — recipe-api (TypeScript/Express)
 
 ## Lite vs Full
 
-Both modes run the same adaptive flow and health check. Full mode additionally surfaces the workflow intensity setting (low/standard/high/critical) during config confirmation and lets you change it. Intensity configures STRIDE analysis, formal modeling, and stricter QA rounds.
+The adaptive flow and health check run at all intensity levels. At high+ intensity, the setup additionally surfaces the workflow intensity setting (standard/high/critical) during config confirmation. Intensity configures STRIDE analysis, formal modeling, and stricter QA rounds.
 
 ## Common Issues
 

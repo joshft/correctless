@@ -111,13 +111,13 @@ test_r011_skill_exists() {
     && local in_lite_loop="true" || local in_lite_loop="false"
   assert_eq "R-011: cexplain in sync.sh Lite skill loop" "true" "$in_lite_loop"
 
-  # Check both Lite and Full for-loops contain cexplain
+  # Check unified skill loop contains cexplain
   local cexplain_count
   cexplain_count="$(grep -c 'cexplain' "$sync_file" 2>/dev/null || true)"
   cexplain_count="${cexplain_count:-0}"
-  # Should appear at least twice (once per distribution)
-  assert_eq "R-011: cexplain in both Lite and Full sync lists (appears 2+ times)" "true" \
-    "$([ "$cexplain_count" -ge 2 ] 2>/dev/null && echo true || echo false)"
+  # Should appear at least once (in the unified skill loop)
+  assert_eq "R-011: cexplain in sync.sh skill loop (appears 1+ times)" "true" \
+    "$([ "$cexplain_count" -ge 1 ] 2>/dev/null && echo true || echo false)"
 
   # Tests R-011 [integration]: documented in docs/skills/cexplain.md
   local docs_file="$REPO_DIR/docs/skills/cexplain.md"

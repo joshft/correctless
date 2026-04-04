@@ -19,8 +19,8 @@ bash sync.sh --check      # Verify distributions are in sync (exit 0 = clean)
 skills/               # Source skills (26 SKILL.md files)
 hooks/                # Bash hooks (gate, state machine, statusline, audit trail)
 templates/            # Config, doc, and spec templates
-helpers/              # PBT helpers (Full mode only)
-tests/                # 10 test suites (923 assertions)
+helpers/              # PBT guides per language (high+ intensity)
+tests/                # 14 test files (~1,518 assertions)
 setup                 # Install script
 sync.sh               # Copies source → correctless/ distribution
 correctless/          # Single distribution (26 skills, intensity-gated)
@@ -59,6 +59,9 @@ docs/design/          # Design specification
    - `README.md` — add to skill table, update counts
    - `.claude-plugin/marketplace.json` — update counts
    - `docs/design/correctless.md` — update evolution notes
+   - `ARCHITECTURE.md` — update skill count if changed
+   - `AGENT_CONTEXT.md` — update skill count and test count if changed
+   - `CHANGELOG.md` — add entry in current version section
 4. Run `bash sync.sh && bash tests/test.sh`
 5. Open a PR
 
@@ -85,8 +88,13 @@ Run ShellCheck before submitting: `shellcheck hooks/*.sh`
 ## Testing
 
 ```bash
-bash tests/test.sh        # Infrastructure tests
-bash tests/test-mcp.sh    # MCP integration tests
+# Run all 14 test suites (canonical command from workflow-config.json):
+bash tests/test.sh && bash tests/test-mcp.sh && bash tests/test-bugfixes.sh && bash tests/test-qol.sh && bash tests/test-decisions.sh && bash tests/test-statusline.sh && bash tests/test-consolidation.sh && bash tests/test-crelease.sh && bash tests/test-calm-resets.sh && bash tests/test-dynamic-rigor.sh && bash tests/test-intensity-detection.sh && bash tests/test-wire-intensity-creview.sh && bash tests/test-wire-intensity-pipeline.sh && bash tests/test-cexplain.sh
+
+# Quick smoke test (2 suites):
+bash tests/test.sh && bash tests/test-mcp.sh
+
+# Other checks:
 bash sync.sh --check      # Distributions must be in sync
 shellcheck hooks/*.sh     # Must pass with -S warning
 ```

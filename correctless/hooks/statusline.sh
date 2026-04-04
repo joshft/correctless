@@ -37,12 +37,13 @@ eval "$(echo "$input" | jq -r '
   @sh "TOTAL_IN=\(.context_window.total_input_tokens)",
   @sh "TOTAL_OUT=\(.context_window.total_output_tokens)",
   @sh "DURATION_MS=\(.total_duration_ms)"
-')"
+' 2>/dev/null)"
 
 # --- Helper: format token count ---
 # <1000 → integer, 1000-999999 → N.Nk, 1000000+ → N.NM
 fmt_tokens() {
   local n="$1"
+  [[ "$n" =~ ^[0-9]+$ ]] || { echo "$n"; return; }
   if [ "$n" -lt 1000 ]; then
     echo "$n"
   elif [ "$n" -lt 1000000 ]; then
@@ -56,6 +57,7 @@ fmt_tokens() {
 # --- Helper: format duration ms → Nm or Nh Nm ---
 fmt_duration() {
   local ms="$1"
+  [[ "$ms" =~ ^[0-9]+$ ]] || { echo ""; return; }
   local total_min=$(( ms / 60000 ))
   if [ "$total_min" -lt 60 ]; then
     echo "${total_min}m"
@@ -75,7 +77,7 @@ if [ -z "$DIR" ] || [ "$DIR" = "null" ]; then
   branch=""
 else
 
-sec1+="$(basename "$DIR")/"
+sec1+="${DIR##*/}/"
 
 # Git branch
 cd "$DIR" 2>/dev/null || true
@@ -84,8 +86,9 @@ branch=$(git --no-optional-locks rev-parse --abbrev-ref HEAD 2>/dev/null)
 if [ -n "$branch" ]; then
   sec1+=$(printf " ${GRAY}%s${NC}" "$branch")
 
-  # Dirty file count
-  dirty_count=$(git --no-optional-locks status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  # Dirty file count (bash arithmetic strips whitespace from wc -l, avoids tr subprocess)
+  dirty_count=$(git --no-optional-locks status --porcelain 2>/dev/null | wc -l)
+  dirty_count=$((dirty_count + 0))
   if [ "$dirty_count" -gt 0 ] 2>/dev/null; then
     sec1+=$(printf " ${ORANGE}%s dirty${NC}" "$dirty_count")
   fi
@@ -144,12 +147,13 @@ if [ "$DURATION_MS" != "null" ] && [ "$DURATION_MS" != "0" ] && [ -n "$DURATION_
   sec3+="$(fmt_duration "$DURATION_MS")"
 fi
 
-# Cost (rounded to 2 decimal places)
+# Cost (rounded to 2 decimal places) — single awk: format + zero-check combined
 # QA-002: Handle both "0" and "0.0" by using awk numeric comparison
-if [ "$COST" != "null" ] && [ -n "$COST" ] && awk "BEGIN { exit !($COST != 0) }"; then
-  cost_fmt=$(awk "BEGIN { printf \"%.2f\", $COST }")
-  if [ -n "$sec3" ]; then sec3+=" "; fi
-  sec3+="\$${cost_fmt}"
+if [ "$COST" != "null" ] && [ -n "$COST" ]; then
+  cost_fmt=$(awk "BEGIN { v=($COST+0); if(v==0) exit 1; printf \"%.2f\", v }") && {
+    if [ -n "$sec3" ]; then sec3+=" "; fi
+    sec3+="\$${cost_fmt}"
+  }
 fi
 
 # Lines delta
@@ -163,10 +167,12 @@ fi
 # --- Section 4: Workflow ---
 
 sec4=""
+NOW_EPOCH=$(date +%s)
 if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
-  slug="$(echo "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
-  hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
-  STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${hash}.json"
+  slug="${branch//[^a-zA-Z0-9]/-}"
+  slug="${slug:0:80}"
+  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
+  STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${raw_hash:0:6}.json"
 
   if [ -f "$STATE_FILE" ]; then
     eval "$(jq -r '
@@ -174,16 +180,15 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
       @sh "QA_ROUNDS=\(.qa_rounds // 0)",
       @sh "TASK=\(.task // empty)",
       @sh "PHASE_ENTERED=\(.phase_entered_at // empty)",
-      @sh "OVERRIDE_REMAINING=\(.override_remaining // empty)",
+      @sh "OVERRIDE_REMAINING=\(.override.remaining_calls // empty)",
       @sh "SPEC_UPDATES=\(.spec_updates // 0)"
     ' "$STATE_FILE" 2>/dev/null)"
 
     if [ -n "$PHASE" ]; then
       # Task name (truncate to 20 chars + ellipsis)
-      # QA-008: Use cut -c for character-aware truncation (multibyte safe)
       task_display="$TASK"
       if [ "${#TASK}" -gt 20 ]; then
-        task_display="$(printf '%s' "$TASK" | cut -c1-20)…"
+        task_display="${TASK:0:20}…"
       fi
 
       # Color-coded phase
@@ -218,7 +223,7 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
       if [ -n "$PHASE_ENTERED" ]; then
         entered_epoch=$(date -d "$PHASE_ENTERED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$PHASE_ENTERED" +%s 2>/dev/null || echo "")
         if [ -n "$entered_epoch" ]; then
-          now_epoch=$(date +%s)
+          now_epoch=$NOW_EPOCH
           elapsed_ms=$(( (now_epoch - entered_epoch) * 1000 ))
           # QA-003: Only show time if >= 60000ms (1 minute) to avoid misleading "0m"
           if [ "$elapsed_ms" -ge 60000 ]; then

@@ -42,7 +42,7 @@ You approve TB-004 and ABS-007, reject PAT-005 as too granular. ARCHITECTURE.md 
 | Reads | Writes |
 |-------|--------|
 | `ARCHITECTURE.md` | `ARCHITECTURE.md` (updated entries) |
-| `docs/specs/*.md` | `docs/architecture/*.md` (fragments, if size threshold exceeded) |
+| `.correctless/specs/*.md` | `docs/architecture/*.md` (fragments, if size threshold exceeded) |
 | `docs/verification/*.md` | |
 | Source code (scan for patterns) | |
 

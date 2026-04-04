@@ -54,9 +54,9 @@ User: /cpr-review 42
 | PR diff and metadata (via `gh` / `glab`) | Nothing (read-only) |
 | `ARCHITECTURE.md` | Optionally posts a PR comment |
 | `AGENT_CONTEXT.md` | |
-| `.claude/antipatterns.md` | |
-| `.claude/workflow-config.json` | |
-| `docs/specs/*.md` (if referenced) | |
+| `.correctless/antipatterns.md` | |
+| `.correctless/config/workflow-config.json` | |
+| `.correctless/specs/*.md` (if referenced) | |
 
 ## Lite vs Full
 

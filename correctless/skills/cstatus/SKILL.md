@@ -136,6 +136,9 @@ Available commands:
   /csetup         Re-run setup / validate configuration
   /chelp          Quick help — workflow pipeline and commands
   /cwtf           Workflow accountability — did agents do their job?
+  /cquick         Lightweight TDD — quick-start without full spec
+  /crelease       Versioning and changelog management
+  /cexplain       Guided codebase exploration
 
 State management:
   .correctless/hooks/workflow-advance.sh status      Current phase

@@ -215,8 +215,8 @@ Write the spec to `.correctless/specs/{task-slug}.md`.
 **At standard intensity** — use 5 sections (What, Rules with R-xxx IDs, Won't Do, Risks, Open Questions). Keep it simple.
 
 **At high+ intensity** — use the full format. **Artifact weight scales with intensity**:
-- `low` intensity: Metadata, Context, Scope, Invariants, Prohibitions (5 sections) (note: `low` is treated as `standard` for intensity detection purposes)
-- `standard`: add Boundary Conditions
+- `standard` intensity: Metadata, Context, Scope, Invariants, Prohibitions (5 sections)
+- `high`: add Boundary Conditions
 - `high`/`critical`: all sections including Complexity Budget, STRIDE, Environment Assumptions, Design Decisions
 
 **High+ intensity spec format:**

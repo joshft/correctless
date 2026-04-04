@@ -33,6 +33,7 @@ setup_test_project() {
 cleanup() {
   rm -rf "$TEST_DIR"
 }
+trap cleanup EXIT
 
 assert_eq() {
   local desc="$1" expected="$2" actual="$3"

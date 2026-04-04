@@ -45,12 +45,12 @@ You approve the timeout, idempotency key, and replay protection additions. The s
 
 | Reads | Writes |
 |-------|--------|
-| Spec artifact (`docs/specs/{slug}.md`) | Updated spec (incorporated findings) |
-| `ARCHITECTURE.md` | Checkpoint (`.claude/artifacts/checkpoint-creview-spec-{slug}.json`) |
-| `AGENT_CONTEXT.md` | Token log (`.claude/artifacts/token-log-{slug}.json`) |
-| `.claude/antipatterns.md` | |
-| `.claude/workflow-config.json` | |
-| `.claude/meta/workflow-effectiveness.json` | |
+| Spec artifact (`.correctless/specs/{slug}.md`) | Updated spec (incorporated findings) |
+| `ARCHITECTURE.md` | Checkpoint (`.correctless/artifacts/checkpoint-creview-spec-{slug}.json`) |
+| `AGENT_CONTEXT.md` | Token log (`.correctless/artifacts/token-log-{slug}.json`) |
+| `.correctless/antipatterns.md` | |
+| `.correctless/config/workflow-config.json` | |
+| `.correctless/meta/workflow-effectiveness.json` | |
 
 ## Options
 
@@ -62,7 +62,7 @@ Intensity scales with risk:
 | `standard` | + Red Team | ~10 min |
 | `high` / `critical` | All 4 agents | 10-20 min |
 
-Intensity is set in `.claude/workflow-config.json`.
+Intensity is set in `.correctless/config/workflow-config.json`.
 
 ## Common Issues
 

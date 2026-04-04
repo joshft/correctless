@@ -30,14 +30,17 @@ branch_slug() {
   [ -n "$branch" ] || die "Detached HEAD — checkout a branch first"
   # Truncate to 80 chars and append short hash to avoid collisions
   # (feature/foo-bar and feature/foo_bar produce different hashes)
-  local slug hash
-  slug="$(echo "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
-  hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
-  echo "${slug}-${hash}"
+  local slug raw_hash
+  slug="${branch//[^a-zA-Z0-9]/-}"
+  slug="${slug:0:80}"
+  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
+  echo "${slug}-${raw_hash:0:6}"
 }
 
 state_file() {
-  echo "$ARTIFACTS_DIR/workflow-state-$(branch_slug).json"
+  local slug
+  slug="$(branch_slug)" || die "Cannot determine branch slug"
+  echo "$ARTIFACTS_DIR/workflow-state-${slug}.json"
 }
 
 read_state() {
@@ -56,8 +59,11 @@ read_phase() {
 write_state() {
   local sf
   sf="$(state_file)"
+  local tmp="$sf.$$"
   mkdir -p "$(dirname "$sf")"
-  echo "$1" | jq '.' > "$sf.$$" && mv "$sf.$$" "$sf"
+  trap 'rm -f "$tmp"' EXIT
+  echo "$1" | jq '.' > "$tmp" && mv "$tmp" "$sf"
+  trap - EXIT
 }
 
 update_phase() {
@@ -120,7 +126,10 @@ is_full_mode() {
   [ -f "$CONFIG_FILE" ] || return 1
   local intensity
   intensity="$(jq -r '.workflow.intensity // empty' "$CONFIG_FILE")"
-  [ -n "$intensity" ] && [ "$intensity" != "null" ]
+  case "$intensity" in
+    high|critical) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # Monorepo package resolution (longest-prefix match)
@@ -133,9 +142,13 @@ is_monorepo() {
 # Usage: read_package_config '.commands.test' 'api'
 read_package_config() {
   local field="$1" scope="${2:-.}"
+  # Validate field is a safe jq dotpath (letters, digits, underscores, dots only)
+  if [[ "$field" =~ [^a-zA-Z0-9_.] ]]; then
+    die "read_package_config: unsafe field path: '$field'"
+  fi
   if [ "$scope" != "." ] && is_monorepo; then
     local val
-    val="$(jq -r ".packages[\"$scope\"]$field // $field // empty" "$CONFIG_FILE" 2>/dev/null)"
+    val="$(jq -r --arg s "$scope" "(.packages[\$s]$field) // ($field) // empty" "$CONFIG_FILE" 2>/dev/null)"
     if [ -n "$val" ] && [ "$val" != "null" ]; then echo "$val"; return; fi
   fi
   read_config_field "$field" 2>/dev/null || echo ""
@@ -152,8 +165,8 @@ detect_affected_packages() {
   local packages=""
   while IFS= read -r key; do
     local pkg_path
-    pkg_path="$(jq -r ".packages[\"$key\"].path" "$CONFIG_FILE")"
-    if echo "$changed_files" | grep -q "^$pkg_path/"; then
+    pkg_path="$(jq -r --arg k "$key" '.packages[$k].path' "$CONFIG_FILE")"
+    if echo "$changed_files" | awk -v p="${pkg_path}/" 'index($0, p) == 1 { found=1; exit } END { exit !found }'; then
       packages="${packages:+$packages }$key"
     fi
   done < <(jq -r '.packages | keys[]' "$CONFIG_FILE" 2>/dev/null)
@@ -178,35 +191,6 @@ DRIFT_DEBT_FILE="$REPO_ROOT/.correctless/meta/drift-debt.json"
 # ---------------------------------------------------------------------------
 # Test execution helpers
 # ---------------------------------------------------------------------------
-
-run_tests() {
-  # In monorepo mode, run tests for all affected packages
-  if is_monorepo; then
-    local packages
-    packages="$(detect_affected_packages)"
-    local any_run=false
-    for pkg in $packages; do
-      [ "$pkg" = "." ] && continue
-      local cmd
-      cmd="$(read_package_config '.commands.test' "$pkg")"
-      if [ -n "$cmd" ] && [ "$cmd" != "null" ]; then
-        any_run=true
-        eval "$cmd"
-      fi
-    done
-    if [ "$any_run" = "false" ]; then
-      local test_cmd
-      test_cmd="$(read_config_field '.commands.test')"
-      [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
-      eval "$test_cmd"
-    fi
-  else
-    local test_cmd
-    test_cmd="$(read_config_field '.commands.test')"
-    [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured in workflow-config.json"
-    eval "$test_cmd"
-  fi
-}
 
 tests_fail_not_build_error() {
   local test_cmd fail_pattern build_pattern
@@ -507,12 +491,13 @@ cmd_qa() {
     eval "$cov_cmd" > "$ARTIFACTS_DIR/coverage-baseline.out" 2>&1 || true
   fi
 
-  # Increment QA round counter
+  # Increment QA round counter and transition phase in a single write
   local state
   state="$(read_state)"
-  state="$(echo "$state" | jq '.qa_rounds += 1')"
+  state="$(echo "$state" | jq --arg t "$(date -u +%FT%TZ)" \
+    '.qa_rounds += 1 | .phase = "tdd-qa" | .phase_entered_at = $t')"
   write_state "$state"
-  update_phase "tdd-qa"
+  info "Phase: tdd-qa"
   info "Next: QA review (edits blocked)"
 }
 
@@ -535,6 +520,7 @@ cmd_verify() {
   local min_rounds
   min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
   [ "$min_rounds" = "null" ] && min_rounds=1
+  [[ "$min_rounds" =~ ^[0-9]+$ ]] || die "workflow.min_qa_rounds must be a non-negative integer, got: '$min_rounds'"
   local qa_rounds
   qa_rounds="$(read_state | jq -r '.qa_rounds // 0')"
 
@@ -558,6 +544,7 @@ cmd_done() {
   local min_rounds
   min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
   [ "$min_rounds" = "null" ] && min_rounds=1
+  [[ "$min_rounds" =~ ^[0-9]+$ ]] || die "workflow.min_qa_rounds must be a non-negative integer, got: '$min_rounds'"
   local qa_rounds
   qa_rounds="$(read_state | jq -r '.qa_rounds // 0')"
 
@@ -721,9 +708,12 @@ cmd_resolve_drift() {
     die "Drift item '$drift_id' not found"
   fi
 
+  local tmp="$DRIFT_DEBT_FILE.$$"
+  trap 'rm -f "$tmp"' EXIT
   jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
-    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
+    "$DRIFT_DEBT_FILE" > "$tmp" && mv "$tmp" "$DRIFT_DEBT_FILE"
+  trap - EXIT
 
   info "Drift item $drift_id marked as resolved: $reason"
 }
@@ -747,9 +737,9 @@ cmd_spec_update() {
     --arg from "$from_phase" \
     --arg ts "$(now_iso)" \
     --argjson count "$update_count" \
-    '.spec_updates = $count | .spec_update_history = (.spec_update_history // []) + [{from_phase: $from, reason: $reason, timestamp: $ts}]')"
+    '.spec_updates = $count | .spec_update_history = (.spec_update_history // []) + [{from_phase: $from, reason: $reason, timestamp: $ts}] | .phase = "spec" | .phase_entered_at = $ts')"
   write_state "$state"
-  update_phase "spec"
+  info "Phase: spec"
 
   if [ "$update_count" -ge 3 ]; then
     info "WARNING: This spec has been revised $update_count times during implementation."
@@ -773,6 +763,7 @@ cmd_reset() {
     rm -f "$ARTIFACTS_DIR/adherence-state-${slug_hash}.json"
     rm -f "$ARTIFACTS_DIR/checkpoint-ctdd-"*.json "$ARTIFACTS_DIR/checkpoint-crefactor-"*.json \
           "$ARTIFACTS_DIR/checkpoint-creview-spec-"*.json "$ARTIFACTS_DIR/checkpoint-caudit-"*.json 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/.pkg-cache-"*.json 2>/dev/null
     info "Workflow state, audit trail, adherence state, and checkpoints removed for branch '$(current_branch)'"
   else
     info "No workflow state for branch '$(current_branch)'"
@@ -801,6 +792,15 @@ cmd_override() {
     die "Override limit reached (3 per workflow). If the gate is consistently blocking legitimate edits, the workflow config or patterns may need adjustment. Use 'reset' as a last resort."
   fi
 
+  # Block renewal while an override is still active
+  local override_active
+  override_active="$(echo "$state" | jq -r '.override.active // false')"
+  local remaining
+  remaining="$(echo "$state" | jq -r '.override.remaining_calls // 0')"
+  if [ "$override_active" = "true" ] && [ "$remaining" -gt 0 ]; then
+    die "An override is already active ($remaining calls remaining). It must expire before requesting another."
+  fi
+
   # Write override marker into state
   state="$(echo "$state" | jq \
     --arg reason "$reason" \
@@ -822,8 +822,11 @@ cmd_override() {
     --arg ts "$ts" \
     --arg branch "$(current_branch)" \
     '{phase: $phase, reason: $reason, timestamp: $ts, branch: $branch}')"
-  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
-    && mv "$OVERRIDE_LOG.$$" "$OVERRIDE_LOG"
+  local ol_tmp="$OVERRIDE_LOG.$$"
+  trap 'rm -f "$ol_tmp"' EXIT
+  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$ol_tmp" \
+    && mv "$ol_tmp" "$OVERRIDE_LOG"
+  trap - EXIT
 
   info "Override active for next 10 tool calls"
   info "Reason logged: $reason"
@@ -931,43 +934,58 @@ cmd_diagnose() {
 }
 
 cmd_status() {
-  local phase
-  phase="$(read_phase)"
-  if [ "$phase" = "none" ]; then
+  local state
+  state="$(read_state 2>/dev/null)" || {
+    info "No active workflow on branch '$(current_branch)'"
+    return
+  }
+
+  # Bulk-extract all fields in one jq call (IO-007, IO-008)
+  local s_phase s_branch s_task s_spec s_started s_qa s_intensity s_updates s_override s_override_rem
+  eval "$(echo "$state" | jq -r '
+    @sh "s_phase=\(.phase // "none")",
+    @sh "s_branch=\(.branch // "")",
+    @sh "s_task=\(.task // "")",
+    @sh "s_spec=\(.spec_file // "")",
+    @sh "s_started=\(.started_at // "")",
+    @sh "s_qa=\(.qa_rounds // 0)",
+    @sh "s_intensity=\(.feature_intensity // "")",
+    @sh "s_updates=\(.spec_updates // 0)",
+    @sh "s_override=\(.override.active // false)",
+    @sh "s_override_rem=\(.override.remaining_calls // 0)"
+  ')"
+
+  if [ "$s_phase" = "none" ]; then
     info "No active workflow on branch '$(current_branch)'"
     return
   fi
 
-  check_branch_match
-
-  local state
-  state="$(read_state)"
-
-  info "=== Workflow Status ==="
-  info "Branch:  $(echo "$state" | jq -r '.branch')"
-  info "Phase:   $phase"
-  info "Task:    $(echo "$state" | jq -r '.task')"
-  info "Spec:    $(echo "$state" | jq -r '.spec_file')"
-  info "Started: $(echo "$state" | jq -r '.started_at')"
-  info "QA rounds: $(echo "$state" | jq -r '.qa_rounds // 0')"
-
-  local intensity
-  intensity="$(echo "$state" | jq -r '.feature_intensity // empty')"
-  if [ -n "$intensity" ]; then
-    info "Intensity: $intensity"
+  # Verify branch matches
+  local cur
+  cur="$(current_branch)"
+  if [ "$s_branch" != "$cur" ]; then
+    die "Workflow state was created on branch '$s_branch', current branch is '$cur'. Run 'reset' to clear stale state."
   fi
 
-  local updates
-  updates="$(echo "$state" | jq -r '.spec_updates // 0')"
-  if [ "$updates" -gt 0 ]; then
-    info "Spec updates: $updates"
+  info "=== Workflow Status ==="
+  info "Branch:  $s_branch"
+  info "Phase:   $s_phase"
+  info "Task:    $s_task"
+  info "Spec:    $s_spec"
+  info "Started: $s_started"
+  info "QA rounds: $s_qa"
+
+  if [ -n "$s_intensity" ]; then
+    info "Intensity: $s_intensity"
+  fi
+
+  if [ "$s_updates" -gt 0 ] 2>/dev/null; then
+    info "Spec updates: $s_updates"
     echo "$state" | jq -r '.spec_update_history[]? | "  - \(.from_phase): \(.reason) (\(.timestamp))"'
   fi
 
-  local override_active
-  override_active="$(echo "$state" | jq -r '.override.active // false')"
-  if [ "$override_active" = "true" ]; then
-    info "Override: ACTIVE ($(echo "$state" | jq -r '.override.remaining_calls') calls remaining)"
+  if [ "$s_override" = "true" ]; then
+    info "Override: ACTIVE ($s_override_rem calls remaining)"
   fi
 }
 
@@ -977,13 +995,16 @@ cmd_status_all() {
   for sf in "$ARTIFACTS_DIR"/workflow-state-*.json; do
     [ -f "$sf" ] || continue
     found=true
-    local branch phase task started qa_rounds
-    branch="$(jq -r '.branch' "$sf")"
-    phase="$(jq -r '.phase' "$sf")"
-    task="$(jq -r '.task' "$sf")"
-    started="$(jq -r '.started_at' "$sf" | cut -c1-10)"
-    qa_rounds="$(jq -r '.qa_rounds // 0' "$sf")"
-    printf "  %-35s phase: %-10s task: %-20s started: %s  qa_rounds: %s\n" "$branch" "$phase" "$task" "$started" "$qa_rounds"
+    # Bulk-extract all fields in one jq call (IO-009)
+    local sa_branch sa_phase sa_task sa_started sa_qa
+    eval "$(jq -r '
+      @sh "sa_branch=\(.branch // "")",
+      @sh "sa_phase=\(.phase // "")",
+      @sh "sa_task=\(.task // "")",
+      @sh "sa_started=\(.started_at // "" | .[0:10])",
+      @sh "sa_qa=\(.qa_rounds // 0)"
+    ' "$sf")"
+    printf "  %-35s phase: %-10s task: %-20s started: %s  qa_rounds: %s\n" "$sa_branch" "$sa_phase" "$sa_task" "$sa_started" "$sa_qa"
   done
   if [ "$found" = "false" ]; then
     info "  (none)"
@@ -1053,8 +1074,8 @@ case "$cmd" in
     echo "  status             Print current workflow state"
     echo "  status-all         Print all active workflows across branches"
     echo ""
-    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /crefactor /cpr-review /ccontribute /cmaintain /cstatus /csummary /cmetrics /cdebug /chelp /cwtf"
-    echo "Full:   /cmodel /creview-spec /caudit /cupdate-arch /cpostmortem /cdevadv /credteam"
+    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /crefactor /cpr-review /ccontribute /cmaintain /cstatus /csummary /cmetrics /cdebug /chelp /cwtf /cquick /crelease /cexplain"
+    echo "High+:  /cmodel /creview-spec /caudit /cupdate-arch /cpostmortem /cdevadv /credteam"
     exit 1
     ;;
 esac

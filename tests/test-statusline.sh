@@ -686,7 +686,7 @@ echo "--- R-011a: override_remaining > 0 → ⚠override(N) in workflow section 
 setup_test_repo
 state_file="$(state_filename "main")"
 cat > "$TEST_DIR/$state_file" <<SFJSON
-{"phase": "tdd-impl", "task": "add-auth", "qa_rounds": 0, "override_remaining": 3}
+{"phase": "tdd-impl", "task": "add-auth", "qa_rounds": 0, "override": {"active": true, "remaining_calls": 3}}
 SFJSON
 out=$(run_sl "$(integration_json)")
 assert_contains_str "R-011a: override warning shown" '⚠override(3)' "$out"
