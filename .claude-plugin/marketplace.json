@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "correctless",
-      "source": "./correctless",
+      "source": "../correctless",
       "description": "Correctness workflow for structured development. 26 skills with configurable intensity levels: spec-before-code, skeptical review, enforced TDD, formal modeling, adversarial review, verification, documentation, and metrics. Intensity gates let you choose standard, high, or critical rigor per project.",
       "version": "3.0.0"
     }
