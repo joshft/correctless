@@ -1,5 +1,11 @@
 # Spec: {TITLE}
 
+## Metadata
+- **Task**: {feature name}
+- **Intensity**: {standard|high|critical}
+- **Intensity reason**: {triggering signals or "user override"}
+- **Override**: {none|raised|lowered}
+
 ## What
 
 {One paragraph describing what this feature does, who it's for, and why it matters.}

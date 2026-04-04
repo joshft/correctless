@@ -1,6 +1,6 @@
 # Agent Context — Correctless
 
-> Last updated: 2026-04-02
+> Last updated: 2026-04-03
 
 ## What This Project Does
 
@@ -16,7 +16,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 26-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 11 test suites, 1,024 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor |
+| Tests | `tests/test*.sh` | 12 test suites, 1,275 shell tests covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns
@@ -47,3 +47,5 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Find a spec | `.correctless/specs/{feature}.md` |
 | Verify sync is clean | `bash sync.sh --check` |
 | Check MCP status | `jq '.mcp' .correctless/config/workflow-config.json` |
+| Set feature intensity | `bash hooks/workflow-advance.sh set-intensity <standard\|high\|critical>` |
+| Configure detection signals | Add `workflow.intensity_signals` to `.correctless/config/workflow-config.json` |

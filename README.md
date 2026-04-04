@@ -162,7 +162,7 @@ On first run, [`/csetup`](docs/skills/csetup.md) scans your project for baseline
 
 ### 2. Spec Before Code
 
-Every feature starts with a spec ([`/cspec`](docs/skills/cspec.md)) that defines what "correct" means — testable rules, not vague goals. The spec agent reads your architecture docs, known bug patterns, and QA findings history. When the feature involves libraries or protocols that may have changed, a **research subagent** searches the web for current docs, CVEs, and deprecations before rules are written.
+Every feature starts with a spec ([`/cspec`](docs/skills/cspec.md)) that defines what "correct" means — testable rules, not vague goals. Automatic intensity detection evaluates file paths, keywords, trust boundaries, and antipattern history to recommend the right rigor level for each feature. The spec agent reads your architecture docs, known bug patterns, and QA findings history. When the feature involves libraries or protocols that may have changed, a **research subagent** searches the web for current docs, CVEs, and deprecations before rules are written.
 
 ### 3. Skeptical Review with Security Checklist
 
