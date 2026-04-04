@@ -32,13 +32,13 @@
     "context7": true
   },
   "paths": {
-    "architecture_doc": ".correctless/ARCHITECTURE.md",
-    "agent_context": ".correctless/AGENT_CONTEXT.md",
-    "antipatterns": ".correctless/antipatterns.md",
+    "architecture_doc": "ARCHITECTURE.md",
+    "agent_context": "AGENT_CONTEXT.md",
+    "antipatterns": ".claude/antipatterns.md",
     "docs": "docs/",
-    "specs": ".correctless/specs/",
-    "artifacts": ".correctless/artifacts/",
-    "state": ".correctless/artifacts/workflow-state-{branch-slug}.json"
+    "specs": "docs/specs/",
+    "artifacts": ".claude/artifacts/",
+    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
   },
   "setup": {
     "architecture_state": "existing",
