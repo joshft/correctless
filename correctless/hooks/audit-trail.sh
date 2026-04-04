@@ -9,24 +9,29 @@
 # Fast-path bail: if no .correctless/artifacts/ directory, exit immediately.
 [ -d ".correctless/artifacts" ] || exit 0
 
-# Read input
+# Bulk-parse all needed fields from stdin in one jq call (R2-PERF-001)
 INPUT="$(cat)"
-TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // empty')"
+eval "$(echo "$INPUT" | jq -r '
+  @sh "TOOL_NAME=\(.tool_name // "")",
+  @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
+  @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
+  @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))"
+' 2>/dev/null)" || exit 0
 
 # Fast-path bail: no tool name = malformed input
 [ -n "$TOOL_NAME" ] || exit 0
 
-# Extract target file(s) — bulk parse from single jq call above
+# Extract target file(s) from pre-parsed fields
 FILES=""
 case "$TOOL_NAME" in
   Bash)
-    FILES="$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h)' | head -1)" || true
+    FILES="$(echo "$TOOL_INPUT_COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h)' | head -1)" || true
     ;;
   MultiEdit)
-    FILES="$(echo "$INPUT" | jq -r '.tool_input.edits[]?.file_path // empty' 2>/dev/null)"
+    FILES="$TOOL_INPUT_EDITS"
     ;;
   *)
-    FILES="$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)"
+    FILES="$TOOL_INPUT_FILE"
     ;;
 esac
 
@@ -55,7 +60,7 @@ CONFIG_FILE=".correctless/config/workflow-config.json"
 TRAIL=".correctless/artifacts/audit-trail-${slug}-${hash}.jsonl"
 TS="$(date -u +%FT%TZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-printf '%s\n' "$FILES" | jq -Rn \
+printf '%s\n' "$FILES" | jq -Rnc \
   --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$branch" \
   '[inputs | select(length > 0)] | .[] | {ts:$ts,phase:$phase,tool:$tool,file:.,branch:$branch}' \
   >> "$TRAIL" 2>/dev/null
@@ -77,7 +82,7 @@ fi
 # Simple file classifier (matches gate logic)
 classify() {
   local file="$1" bname
-  bname="$(basename "$file")"
+  bname="${file##*/}"
   if [ -n "$TEST_PATTERN" ]; then
     local oldifs="$IFS"; IFS='|'
     for pat in $TEST_PATTERN; do
@@ -113,22 +118,22 @@ echo "$FILES" | while IFS= read -r f; do
     tdd-qa|tdd-verify)
       # QA/verify phases should be read-only for source and test files
       if [ "$fclass" = "source" ] && [ "$TOOL_NAME" != "Read" ]; then
-        echo "⚠ $PHASE: Source file modified — $(basename "$f") (this phase should be read-only)" >&2
+        echo "⚠ $PHASE: Source file modified — ${f##*/} (this phase should be read-only)" >&2
       fi
       if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
-        echo "⚠ $PHASE: Test file modified — $(basename "$f") (this phase should be read-only)" >&2
+        echo "⚠ $PHASE: Test file modified — ${f##*/} (this phase should be read-only)" >&2
       fi
       ;;
     tdd-impl)
       # GREEN phase: test edits should be logged
       if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
-        echo "📝 GREEN: Test file edited — $(basename "$f") (should be logged in test-edit-log)" >&2
+        echo "📝 GREEN: Test file edited — ${f##*/} (should be logged in test-edit-log)" >&2
       fi
       ;;
     spec|review|review-spec|model)
       # Spec/review phases: no source or test edits
       if [ "$fclass" = "source" ] || [ "$fclass" = "test" ]; then
-        echo "⚠ $PHASE: Code file modified — $(basename "$f") (spec/review phases are docs-only)" >&2
+        echo "⚠ $PHASE: Code file modified — ${f##*/} (spec/review phases are docs-only)" >&2
       fi
       ;;
   esac
@@ -140,8 +145,8 @@ done
 if [ "$IS_FULL" = "true" ]; then
   ADHERENCE=".correctless/artifacts/adherence-state-${slug}-${hash}.json"
 
-  # Initialize adherence state if missing
-  if [ ! -f "$ADHERENCE" ]; then
+  # Initialize adherence state if missing or empty (REG-R2-002: -s catches 0-byte files)
+  if [ ! -s "$ADHERENCE" ]; then
     jq -nc '{phase_files:{},modified_files:[],read_files:[]}' > "$ADHERENCE" 2>/dev/null
   fi
 
@@ -155,12 +160,10 @@ if [ "$IS_FULL" = "true" ]; then
       || rm -f "$ADHERENCE.$$" 2>/dev/null
   else
     # Batch-add all files to modified_files + increment phase counter
-    _file_count=0
-    while IFS= read -r _f; do [ -n "$_f" ] && _file_count=$((_file_count + 1)); done <<< "$FILES"
-    printf '%s\n' "$FILES" | jq -Rn --slurpfile state "$ADHERENCE" --arg p "$PHASE" --argjson n "$_file_count" \
+    printf '%s\n' "$FILES" | jq -Rn --slurpfile state "$ADHERENCE" --arg p "$PHASE" \
       '[inputs | select(length > 0)] as $new_files |
        $state[0] | .modified_files = ([.modified_files[], $new_files[]] | unique)
-       | .phase_files[$p] = ((.phase_files[$p] // 0) + $n)' \
+       | .phase_files[$p] = ((.phase_files[$p] // 0) + ($new_files | length))' \
       > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null \
       || rm -f "$ADHERENCE.$$" 2>/dev/null
   fi

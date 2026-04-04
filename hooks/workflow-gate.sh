@@ -89,8 +89,12 @@ STATE_FILE="$ARTIFACTS_DIR/workflow-state-$(branch_slug).json"
 # No state file → check fail-closed config
 if [ ! -f "$STATE_FILE" ]; then
   FAIL_CLOSED="false"
+  FC_SOURCE_PAT=""
   if [ -f "$CONFIG_FILE" ]; then
-    FAIL_CLOSED="$(jq -r '.workflow.fail_closed_when_no_state // false' "$CONFIG_FILE")"
+    eval "$(jq -r '
+      @sh "FAIL_CLOSED=\(.workflow.fail_closed_when_no_state // false)",
+      @sh "FC_SOURCE_PAT=\(.patterns.source_file // "")"
+    ' "$CONFIG_FILE" 2>/dev/null)" || true
   fi
   if [ "$FAIL_CLOSED" = "true" ]; then
     # Full mode fail-closed: block source edits when no state file exists
@@ -99,7 +103,7 @@ if [ ! -f "$STATE_FILE" ]; then
       TARGET_FILE_CHECK="${TOOL_INPUT_EDITS%%$'\n'*}"
     fi
     if [ -n "$TARGET_FILE_CHECK" ]; then
-      SOURCE_PAT="$(jq -r '.patterns.source_file // empty' "$CONFIG_FILE")"
+      SOURCE_PAT="$FC_SOURCE_PAT"
       if [ -n "$SOURCE_PAT" ]; then
         BASENAME_CHECK="${TARGET_FILE_CHECK##*/}"
         _FC_OLDIFS="$IFS"
@@ -214,7 +218,7 @@ fi
 
 # For phase gating below, use the first file for single-file tools.
 # For MultiEdit, check ALL files — block if ANY is in a blocked class.
-TARGET_FILE="$(echo "$TARGET_FILES" | head -1)"
+TARGET_FILE="${TARGET_FILES%%$'\n'*}"
 REL_FILE="${TARGET_FILE#$REPO_ROOT/}"
 # Normalize: strip leading ./ to prevent classification bypass
 REL_FILE="${REL_FILE#./}"
@@ -287,9 +291,11 @@ resolve_package() {
 # Resolve package for the current file and read appropriate patterns
 PACKAGE_SCOPE="$(resolve_package "$REL_FILE")"
 if [ "$PACKAGE_SCOPE" != "." ]; then
-  # Monorepo: read package-scoped patterns (needs config re-read for package overlay)
-  TEST_PATTERN="$(jq -r --arg s "$PACKAGE_SCOPE" '(.packages[$s].patterns.test_file) // .patterns.test_file // empty' "$CONFIG_FILE")"
-  SOURCE_PATTERN="$(jq -r --arg s "$PACKAGE_SCOPE" '(.packages[$s].patterns.source_file) // .patterns.source_file // empty' "$CONFIG_FILE")"
+  # Monorepo: read package-scoped patterns in single jq call (IO-R2-002)
+  eval "$(jq -r --arg s "$PACKAGE_SCOPE" '
+    @sh "TEST_PATTERN=\((.packages[$s].patterns.test_file) // .patterns.test_file // "")",
+    @sh "SOURCE_PATTERN=\((.packages[$s].patterns.source_file) // .patterns.source_file // "")"
+  ' "$CONFIG_FILE" 2>/dev/null)" || true
 else
   # Single-package: use pre-loaded patterns
   TEST_PATTERN="$CFG_TEST_PATTERN"

@@ -77,7 +77,7 @@ if [ -z "$DIR" ] || [ "$DIR" = "null" ]; then
   branch=""
 else
 
-sec1+="$(basename "$DIR")/"
+sec1+="${DIR##*/}/"
 
 # Git branch
 cd "$DIR" 2>/dev/null || true
@@ -186,10 +186,9 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
 
     if [ -n "$PHASE" ]; then
       # Task name (truncate to 20 chars + ellipsis)
-      # QA-008: Use cut -c for character-aware truncation (multibyte safe)
       task_display="$TASK"
       if [ "${#TASK}" -gt 20 ]; then
-        task_display="$(printf '%s' "$TASK" | cut -c1-20)…"
+        task_display="${TASK:0:20}…"
       fi
 
       # Color-coded phase
