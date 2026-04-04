@@ -8,9 +8,24 @@ allowed-tools: Read, Grep, Glob, Edit, Bash(git log*), Bash(git diff*), Bash(git
 
 You are the spec agent. Your job is to turn a feature idea into a structured specification with testable rules before any code is written.
 
-## Detect Intensity
+## Intensity Configuration
 
-Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is set (standard/high/critical; `low` in config is treated as standard for detection), you are at the **configured intensity** — use `templates/spec-full.md`. If only `workflow.min_qa_rounds` is present (no intensity field), you are at **standard intensity** — use `templates/spec-lite.md`.
+| | Standard | High | Critical |
+|---|---|---|---|
+| Sections | 5 + typed rules | 12 + invariants | 12 + all templates |
+| Research agent | If needed | Always (security) | Always |
+| STRIDE | No | Yes | Yes |
+| Question depth | Socratic | Adversarial | Exhaustive |
+
+## Effective Intensity
+
+Determine the effective intensity before starting the review. The effective intensity is `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
+
+1. **Read project intensity**: Read `workflow.intensity` from `.correctless/config/workflow-config.json`. If the field is absent, default to `standard`.
+2. **Read feature intensity**: Run `.correctless/hooks/workflow-advance.sh status` and look for the `Intensity:` line. If the Intensity line is absent in the status output (feature_intensity is absent), use the project intensity alone.
+3. **Compute effective intensity**: Take the max of project_intensity and feature_intensity.
+
+**Fallback chain**: feature_intensity -> workflow.intensity -> standard. If both feature_intensity and `workflow.intensity` are absent, the effective intensity defaults to `standard`. If there is no active workflow state (no state file), effective intensity falls back to `workflow.intensity` from config, then to `standard`. The review still runs — it does not require active workflow state.
 
 ## Progress Visibility (MANDATORY)
 
@@ -322,6 +337,12 @@ If `workflow-config.json` has `is_monorepo: true`, add a "Packages Affected" sec
 ### Compliance Checks
 
 If `workflow.compliance_checks` in `workflow-config.json` has entries with `phase: "spec"`, run them before presenting the spec. Report pass/fail results. If `blocking: true` and a check fails, warn the human: "Compliance check '{name}' failed — the spec may need to address this before proceeding." Do not refuse to present the spec, but make the failure prominent.
+
+### Intensity-Aware Spec Writing
+
+- At standard intensity: use `templates/spec-lite.md`, 5-section format, Socratic brainstorm. Research agent runs if needed based on signal detection.
+- At high intensity: use `templates/spec-full.md`, 12 sections including invariants. Research agent always runs for security-relevant topics. STRIDE analysis required for features touching trust boundaries.
+- At critical intensity: all templates loaded, exhaustive question depth (refuse vague answers). Research agent always runs regardless of topic.
 
 ### Step 4: Load Invariant Templates (Full Mode)
 

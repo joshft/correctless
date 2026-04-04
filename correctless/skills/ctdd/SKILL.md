@@ -9,9 +9,34 @@ context: fork
 
 You are the TDD orchestrator. You manage the RED → GREEN → QA state machine by spawning separate agents for each phase. **You do not write tests or code yourself.**
 
+## Intensity Configuration
+
+| | Standard | High | Critical |
+|---|---|---|---|
+| Test audit | Blocking | Strict | Strict + PBT recommendations |
+| QA rounds | 2 max | 3 max | 5 max (convergence, capped) |
+| Mutation testing | No | Yes | Yes |
+| Calm resets | After 3 failures | After 2 failures | After 2 + supervisor notified |
+
+## Effective Intensity
+
+Determine the effective intensity before starting the review. The effective intensity is `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
+
+1. **Read project intensity**: Read `workflow.intensity` from `.correctless/config/workflow-config.json`. If the field is absent, default to `standard`.
+2. **Read feature intensity**: Run `.correctless/hooks/workflow-advance.sh status` and look for the `Intensity:` line. If the Intensity line is absent in the status output (feature_intensity is absent), use the project intensity alone.
+3. **Compute effective intensity**: Take the max of project_intensity and feature_intensity.
+
+**Fallback chain**: feature_intensity -> workflow.intensity -> standard. If both feature_intensity and `workflow.intensity` are absent, the effective intensity defaults to `standard`. If there is no active workflow state (no state file), effective intensity falls back to `workflow.intensity` from config, then to `standard`. The review still runs — it does not require active workflow state.
+
 ## Philosophy
 
 This workflow optimizes for correctness, not speed. Every step exists because skipping it has caused production bugs. You do not get to decide which steps are worth running — they all are. Do not abbreviate the pipeline. Do not combine steps. Do not skip steps because the feature looks simple. Run every phase, every time, in order.
+
+### Intensity-Aware TDD Behavior
+
+- At standard intensity: QA runs 2 max rounds. Test audit is blocking (must pass before GREEN).
+- At high intensity: QA runs 3 max rounds. Mutation testing is required. Calm resets trigger after 2 failures.
+- At critical intensity: QA runs 5 max rounds (convergence, capped). PBT (property-based testing) recommendations are included in the test audit. Mutation testing is required. Calm resets trigger after 2 failures with supervisor notified.
 
 The full pipeline: **RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge.**
 

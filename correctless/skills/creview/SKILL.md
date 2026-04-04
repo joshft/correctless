@@ -20,6 +20,8 @@ You are a separate agent from the spec author. Do not assume the spec is correct
 | Agents | 1 + security checklist | Routes to /creview-spec (4-agent adversarial) | Routes to /creview-spec + external model |
 | Finding threshold | Disposition required | All addressed | Zero unresolved |
 
+<!-- Canonical: this Effective Intensity section is the source of truth. Verbatim copies exist in cspec, ctdd, cverify, cdocs, cstatus. R-022 enforces identity. -->
+
 ## Effective Intensity
 
 Determine the effective intensity before starting the review. The effective intensity is `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
@@ -30,7 +32,7 @@ Determine the effective intensity before starting the review. The effective inte
 
 **Fallback chain**: feature_intensity -> workflow.intensity -> standard. If both feature_intensity and `workflow.intensity` are absent, the effective intensity defaults to `standard`. If there is no active workflow state (no state file), effective intensity falls back to `workflow.intensity` from config, then to `standard`. The review still runs — it does not require active workflow state.
 
-### Intensity-Aware Behavior
+## Intensity-Aware Behavior
 
 **If effective intensity is high:**
 

@@ -1,0 +1,42 @@
+{
+  "task": "wire-intensity-pipeline",
+  "round": 1,
+  "findings": [
+    {
+      "id": "QA-001",
+      "severity": "NON-BLOCKING",
+      "description": "R-022 spec mentions canonical provenance comment in /creview Effective Intensity section — not added. Comment belongs outside section boundary to avoid breaking verbatim identity.",
+      "rule_ref": "R-022",
+      "instance_fix": "Add markdown comment before ## Effective Intensity in /creview only",
+      "class_fix": "Add test assertion checking canonical comment exists in /creview",
+      "status": "open"
+    },
+    {
+      "id": "QA-002",
+      "severity": "NON-BLOCKING",
+      "description": "Verbatim text uses /creview-specific language ('before starting the review', 'The review still runs') in all 6 skills. Design consequence of R-022 verbatim requirement.",
+      "rule_ref": "R-002",
+      "instance_fix": "N/A — spec requires verbatim identity",
+      "class_fix": "Consider updating canonical text to skill-agnostic language in future spec",
+      "status": "open"
+    },
+    {
+      "id": "QA-003",
+      "severity": "NON-BLOCKING",
+      "description": "Body reference tests could theoretically match table rows instead of body content. Current patterns are selective enough in practice.",
+      "rule_ref": "R-003",
+      "instance_fix": "N/A — tests correct in practice",
+      "class_fix": "For higher confidence, extract body text only before grepping",
+      "status": "open"
+    },
+    {
+      "id": "QA-004",
+      "severity": "NON-BLOCKING",
+      "description": "Intensity-aware subsections placed inside Progress Visibility/Behavior as ### subsections. Consistent across skills, not a spec violation.",
+      "rule_ref": "R-012",
+      "instance_fix": "N/A — not a violation",
+      "class_fix": "N/A — consistent pattern",
+      "status": "open"
+    }
+  ]
+}
