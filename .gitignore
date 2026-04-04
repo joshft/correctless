@@ -45,3 +45,4 @@ refresh-plugins.sh
 docs/specs/
 docs/verification/
 schmitthub-pr-review.md
+.correctless/specs/features-to-adopt.md
