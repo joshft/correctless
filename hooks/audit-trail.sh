@@ -110,7 +110,7 @@ classify() {
 
 # --- Lite mode: phase-violation alerts ---
 
-echo "$FILES" | while IFS= read -r f; do
+while IFS= read -r f; do
   [ -z "$f" ] && continue
   fclass="$(classify "$f")"
 
@@ -137,7 +137,7 @@ echo "$FILES" | while IFS= read -r f; do
       fi
       ;;
   esac
-done
+done <<< "$FILES"
 
 # --- Full mode: adherence tracking with coverage progress ---
 # IS_FULL was set from the bulk config read above

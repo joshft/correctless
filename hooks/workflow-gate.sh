@@ -32,7 +32,8 @@ eval "$(echo "$INPUT" | jq -r '
   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
   @sh "TOOL_INPUT_NEW=\(.tool_input.new_string // .tool_input.content // "")",
-  @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))"
+  @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))",
+  @sh "TOOL_INPUT_EDITS_NEW=\([.tool_input.edits[]?.new_string // empty] | join("\n"))"
 ' 2>/dev/null)" || exit 0
 
 # Only gate write operations
@@ -75,7 +76,7 @@ esac
 
 branch_slug() {
   local branch
-  branch="$(git branch --show-current 2>/dev/null)"
+  branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
   [ -n "$branch" ] || { exit 0; }  # detached HEAD: no workflow, allow all
   local slug raw_hash
   slug="${branch//[^a-zA-Z0-9]/-}"
@@ -419,7 +420,7 @@ case "$PHASE" in
           if ! grep -q 'STUB:TDD' "$REPO_ROOT/$_src_rel" 2>/dev/null; then
             # File exists but no STUB:TDD — check if the edit adds it
             if [ "$TOOL_NAME" != "Bash" ]; then
-              if [[ "$TOOL_INPUT_NEW" == *"STUB:TDD"* ]]; then
+              if [[ "$TOOL_INPUT_NEW" == *"STUB:TDD"* ]] || [[ "$TOOL_INPUT_EDITS_NEW" == *"STUB:TDD"* ]]; then
                 continue  # Edit is adding STUB:TDD to this file — allow
               fi
             fi
@@ -432,7 +433,11 @@ case "$PHASE" in
         else
           # New file — check if content contains STUB:TDD
           if [ "$TOOL_NAME" != "Bash" ]; then
-            if [ -n "$TOOL_INPUT_NEW" ] && [[ "$TOOL_INPUT_NEW" != *"STUB:TDD"* ]]; then
+            # Check both single-edit and multi-edit content fields
+            _has_stub=false
+            [[ "$TOOL_INPUT_NEW" == *"STUB:TDD"* ]] && _has_stub=true
+            [[ "$TOOL_INPUT_EDITS_NEW" == *"STUB:TDD"* ]] && _has_stub=true
+            if { [ -n "$TOOL_INPUT_NEW" ] || [ -n "$TOOL_INPUT_EDITS_NEW" ]; } && [ "$_has_stub" = "false" ]; then
               block "RED phase — new source file '$_src_rel' must contain STUB:TDD tag.
   Add '// STUB:TDD' (or '# STUB:TDD' in Python) to function bodies.
   Stub bodies should contain only the tag, zero-value returns, or panic(\"not implemented\")."
