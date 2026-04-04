@@ -16,7 +16,7 @@ TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // empty')"
 # Fast-path bail: no tool name = malformed input
 [ -n "$TOOL_NAME" ] || exit 0
 
-# Extract target file(s) — MultiEdit may have multiple
+# Extract target file(s) — bulk parse from single jq call above
 FILES=""
 case "$TOOL_NAME" in
   Bash)
@@ -30,12 +30,17 @@ case "$TOOL_NAME" in
     ;;
 esac
 
-# Compute branch slug and find state file
+# Fast-path bail: no files identified = nothing to audit
+[ -n "$FILES" ] || exit 0
+
+# Compute branch slug and find state file (bash builtins instead of sed+cut)
 branch="$(git --no-optional-locks branch --show-current 2>/dev/null)" || exit 0
 [ -n "$branch" ] || exit 0
 
-slug="$(echo "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
-hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
+slug="${branch//[^a-zA-Z0-9]/-}"
+slug="${slug:0:80}"
+raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
+hash="${raw_hash:0:6}"
 STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${hash}.json"
 
 # Fast-path bail: no state file = no active workflow = nothing to audit
@@ -45,25 +50,28 @@ STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${hash}.json"
 PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)"
 CONFIG_FILE=".correctless/config/workflow-config.json"
 
-# --- Audit trail logging (always, both modes) ---
+# --- Audit trail logging (batch all files in single jq call) ---
 
 TRAIL=".correctless/artifacts/audit-trail-${slug}-${hash}.jsonl"
 TS="$(date -u +%FT%TZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-echo "$FILES" | while IFS= read -r f; do
-  [ -z "$f" ] && continue
-  jq -nc --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg file "$f" --arg branch "$branch" \
-    '{ts:$ts,phase:$phase,tool:$tool,file:$file,branch:$branch}' >> "$TRAIL" 2>/dev/null
-done
+printf '%s\n' "$FILES" | jq -Rn \
+  --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$branch" \
+  '[inputs | select(length > 0)] | .[] | {ts:$ts,phase:$phase,tool:$tool,file:.,branch:$branch}' \
+  >> "$TRAIL" 2>/dev/null
 
 # --- Adherence feedback (Lite: violations only, Full: + coverage tracking) ---
 
-# Read test/source patterns for file classification
+# Bulk-read config: patterns + intensity in one jq call (IO-004)
 TEST_PATTERN=""
 SOURCE_PATTERN=""
+IS_FULL="false"
 if [ -f "$CONFIG_FILE" ]; then
-  TEST_PATTERN="$(jq -r '.patterns.test_file // empty' "$CONFIG_FILE" 2>/dev/null)"
-  SOURCE_PATTERN="$(jq -r '.patterns.source_file // empty' "$CONFIG_FILE" 2>/dev/null)"
+  eval "$(jq -r '
+    @sh "TEST_PATTERN=\(.patterns.test_file // "")",
+    @sh "SOURCE_PATTERN=\(.patterns.source_file // "")",
+    @sh "IS_FULL=\(if (.workflow.intensity // "") | IN("high","critical") then "true" else "false" end)"
+  ' "$CONFIG_FILE" 2>/dev/null)" || true
 fi
 
 # Simple file classifier (matches gate logic)
@@ -127,12 +135,7 @@ echo "$FILES" | while IFS= read -r f; do
 done
 
 # --- Full mode: adherence tracking with coverage progress ---
-
-IS_FULL="false"
-if [ -f "$CONFIG_FILE" ]; then
-  intensity="$(jq -r '.workflow.intensity // empty' "$CONFIG_FILE" 2>/dev/null)"
-  [ -n "$intensity" ] && [ "$intensity" != "null" ] && IS_FULL="true"
-fi
+# IS_FULL was set from the bulk config read above
 
 if [ "$IS_FULL" = "true" ]; then
   ADHERENCE=".correctless/artifacts/adherence-state-${slug}-${hash}.json"
@@ -142,33 +145,38 @@ if [ "$IS_FULL" = "true" ]; then
     jq -nc '{phase_files:{},modified_files:[],read_files:[]}' > "$ADHERENCE" 2>/dev/null
   fi
 
-  # Track which files are modified and read per phase
-  echo "$FILES" | while IFS= read -r f; do
-    [ -z "$f" ] && continue
+  # Track which files are modified and read per phase — single jq call for all files (IO-005)
+  if [ "$TOOL_NAME" = "Read" ] || [ "$TOOL_NAME" = "Grep" ]; then
+    # Batch-add all files to read_files with set-like dedup (ALGO-002)
+    printf '%s\n' "$FILES" | jq -Rn --slurpfile state "$ADHERENCE" \
+      '[inputs | select(length > 0)] as $new_files |
+       $state[0] | .read_files = ([.read_files[], $new_files[]] | unique)' \
+      > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null \
+      || rm -f "$ADHERENCE.$$" 2>/dev/null
+  else
+    # Batch-add all files to modified_files + increment phase counter
+    _file_count=0
+    while IFS= read -r _f; do [ -n "$_f" ] && _file_count=$((_file_count + 1)); done <<< "$FILES"
+    printf '%s\n' "$FILES" | jq -Rn --slurpfile state "$ADHERENCE" --arg p "$PHASE" --argjson n "$_file_count" \
+      '[inputs | select(length > 0)] as $new_files |
+       $state[0] | .modified_files = ([.modified_files[], $new_files[]] | unique)
+       | .phase_files[$p] = ((.phase_files[$p] // 0) + $n)' \
+      > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null \
+      || rm -f "$ADHERENCE.$$" 2>/dev/null
+  fi
 
-    if [ "$TOOL_NAME" = "Read" ] || [ "$TOOL_NAME" = "Grep" ]; then
-      # Track reads (for QA coverage analysis)
-      jq --arg f "$f" --arg p "$PHASE" \
-        '.read_files += [$f] | .read_files |= unique' \
-        "$ADHERENCE" > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null \
-        || rm -f "$ADHERENCE.$$" 2>/dev/null
-    else
-      # Track writes
-      jq --arg f "$f" --arg p "$PHASE" \
-        '.modified_files += [$f] | .modified_files |= unique | .phase_files[$p] = ((.phase_files[$p] // 0) + 1)' \
-        "$ADHERENCE" > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null \
-        || rm -f "$ADHERENCE.$$" 2>/dev/null
-    fi
-  done
-
-  # Show coverage progress during QA phase
+  # Show coverage progress during QA phase (single jq call for both counters, O(R+M) algorithm)
   if [ "$PHASE" = "tdd-qa" ] && [ "$TOOL_NAME" = "Read" ]; then
-    # Count how many modified files QA has read
     if [ -f "$ADHERENCE" ]; then
-      mod_count="$(jq '.modified_files | length' "$ADHERENCE" 2>/dev/null || echo 0)"
-      read_count="$(jq '[.read_files[] as $r | .modified_files[] | select(. == $r)] | unique | length' "$ADHERENCE" 2>/dev/null || echo 0)"
-      if [ "$mod_count" -gt 0 ] 2>/dev/null; then
-        echo "🔍 QA: Read $(basename "$(echo "$FILES" | head -1)") ($read_count of $mod_count modified files reviewed)" >&2
+      eval "$(jq -r '
+        (.modified_files | map({key:.,value:1}) | from_entries) as $mod_set |
+        @sh "mod_count=\(.modified_files | length)",
+        @sh "read_count=\([.read_files[] | select($mod_set[.])] | length)"
+      ' "$ADHERENCE" 2>/dev/null)" || true
+      # shellcheck disable=SC2154  # mod_count, read_count assigned via eval
+      if [ "${mod_count:-0}" -gt 0 ] 2>/dev/null; then
+        _first_file="${FILES%%$'\n'*}"
+        echo "🔍 QA: Read ${_first_file##*/} ($read_count of $mod_count modified files reviewed)" >&2
       fi
     fi
   fi

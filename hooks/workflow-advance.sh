@@ -30,10 +30,11 @@ branch_slug() {
   [ -n "$branch" ] || die "Detached HEAD — checkout a branch first"
   # Truncate to 80 chars and append short hash to avoid collisions
   # (feature/foo-bar and feature/foo_bar produce different hashes)
-  local slug hash
-  slug="$(echo "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
-  hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
-  echo "${slug}-${hash}"
+  local slug raw_hash
+  slug="${branch//[^a-zA-Z0-9]/-}"
+  slug="${slug:0:80}"
+  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
+  echo "${slug}-${raw_hash:0:6}"
 }
 
 state_file() {
@@ -141,9 +142,8 @@ is_monorepo() {
 # Usage: read_package_config '.commands.test' 'api'
 read_package_config() {
   local field="$1" scope="${2:-.}"
-  # Validate field is a safe jq dotpath — prevent filter injection
   # Validate field is a safe jq dotpath (letters, digits, underscores, dots only)
-  if echo "$field" | grep -qE '[^a-zA-Z0-9_.]'; then
+  if [[ "$field" =~ [^a-zA-Z0-9_.] ]]; then
     die "read_package_config: unsafe field path: '$field'"
   fi
   if [ "$scope" != "." ] && is_monorepo; then
@@ -934,43 +934,58 @@ cmd_diagnose() {
 }
 
 cmd_status() {
-  local phase
-  phase="$(read_phase)"
-  if [ "$phase" = "none" ]; then
+  local state
+  state="$(read_state 2>/dev/null)" || {
+    info "No active workflow on branch '$(current_branch)'"
+    return
+  }
+
+  # Bulk-extract all fields in one jq call (IO-007, IO-008)
+  local s_phase s_branch s_task s_spec s_started s_qa s_intensity s_updates s_override s_override_rem
+  eval "$(echo "$state" | jq -r '
+    @sh "s_phase=\(.phase // "none")",
+    @sh "s_branch=\(.branch // "")",
+    @sh "s_task=\(.task // "")",
+    @sh "s_spec=\(.spec_file // "")",
+    @sh "s_started=\(.started_at // "")",
+    @sh "s_qa=\(.qa_rounds // 0)",
+    @sh "s_intensity=\(.feature_intensity // "")",
+    @sh "s_updates=\(.spec_updates // 0)",
+    @sh "s_override=\(.override.active // false)",
+    @sh "s_override_rem=\(.override.remaining_calls // 0)"
+  ')"
+
+  if [ "$s_phase" = "none" ]; then
     info "No active workflow on branch '$(current_branch)'"
     return
   fi
 
-  check_branch_match
-
-  local state
-  state="$(read_state)"
-
-  info "=== Workflow Status ==="
-  info "Branch:  $(echo "$state" | jq -r '.branch')"
-  info "Phase:   $phase"
-  info "Task:    $(echo "$state" | jq -r '.task')"
-  info "Spec:    $(echo "$state" | jq -r '.spec_file')"
-  info "Started: $(echo "$state" | jq -r '.started_at')"
-  info "QA rounds: $(echo "$state" | jq -r '.qa_rounds // 0')"
-
-  local intensity
-  intensity="$(echo "$state" | jq -r '.feature_intensity // empty')"
-  if [ -n "$intensity" ]; then
-    info "Intensity: $intensity"
+  # Verify branch matches
+  local cur
+  cur="$(current_branch)"
+  if [ "$s_branch" != "$cur" ]; then
+    die "Workflow state was created on branch '$s_branch', current branch is '$cur'. Run 'reset' to clear stale state."
   fi
 
-  local updates
-  updates="$(echo "$state" | jq -r '.spec_updates // 0')"
-  if [ "$updates" -gt 0 ]; then
-    info "Spec updates: $updates"
+  info "=== Workflow Status ==="
+  info "Branch:  $s_branch"
+  info "Phase:   $s_phase"
+  info "Task:    $s_task"
+  info "Spec:    $s_spec"
+  info "Started: $s_started"
+  info "QA rounds: $s_qa"
+
+  if [ -n "$s_intensity" ]; then
+    info "Intensity: $s_intensity"
+  fi
+
+  if [ "$s_updates" -gt 0 ] 2>/dev/null; then
+    info "Spec updates: $s_updates"
     echo "$state" | jq -r '.spec_update_history[]? | "  - \(.from_phase): \(.reason) (\(.timestamp))"'
   fi
 
-  local override_active
-  override_active="$(echo "$state" | jq -r '.override.active // false')"
-  if [ "$override_active" = "true" ]; then
-    info "Override: ACTIVE ($(echo "$state" | jq -r '.override.remaining_calls') calls remaining)"
+  if [ "$s_override" = "true" ]; then
+    info "Override: ACTIVE ($s_override_rem calls remaining)"
   fi
 }
 
@@ -980,13 +995,16 @@ cmd_status_all() {
   for sf in "$ARTIFACTS_DIR"/workflow-state-*.json; do
     [ -f "$sf" ] || continue
     found=true
-    local branch phase task started qa_rounds
-    branch="$(jq -r '.branch' "$sf")"
-    phase="$(jq -r '.phase' "$sf")"
-    task="$(jq -r '.task' "$sf")"
-    started="$(jq -r '.started_at' "$sf" | cut -c1-10)"
-    qa_rounds="$(jq -r '.qa_rounds // 0' "$sf")"
-    printf "  %-35s phase: %-10s task: %-20s started: %s  qa_rounds: %s\n" "$branch" "$phase" "$task" "$started" "$qa_rounds"
+    # Bulk-extract all fields in one jq call (IO-009)
+    local sa_branch sa_phase sa_task sa_started sa_qa
+    eval "$(jq -r '
+      @sh "sa_branch=\(.branch // "")",
+      @sh "sa_phase=\(.phase // "")",
+      @sh "sa_task=\(.task // "")",
+      @sh "sa_started=\(.started_at // "" | .[0:10])",
+      @sh "sa_qa=\(.qa_rounds // 0)"
+    ' "$sf")"
+    printf "  %-35s phase: %-10s task: %-20s started: %s  qa_rounds: %s\n" "$sa_branch" "$sa_phase" "$sa_task" "$sa_started" "$sa_qa"
   done
   if [ "$found" = "false" ]; then
     info "  (none)"

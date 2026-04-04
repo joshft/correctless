@@ -86,8 +86,9 @@ branch=$(git --no-optional-locks rev-parse --abbrev-ref HEAD 2>/dev/null)
 if [ -n "$branch" ]; then
   sec1+=$(printf " ${GRAY}%s${NC}" "$branch")
 
-  # Dirty file count
-  dirty_count=$(git --no-optional-locks status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  # Dirty file count (bash arithmetic strips whitespace from wc -l, avoids tr subprocess)
+  dirty_count=$(git --no-optional-locks status --porcelain 2>/dev/null | wc -l)
+  dirty_count=$((dirty_count + 0))
   if [ "$dirty_count" -gt 0 ] 2>/dev/null; then
     sec1+=$(printf " ${ORANGE}%s dirty${NC}" "$dirty_count")
   fi
@@ -146,12 +147,13 @@ if [ "$DURATION_MS" != "null" ] && [ "$DURATION_MS" != "0" ] && [ -n "$DURATION_
   sec3+="$(fmt_duration "$DURATION_MS")"
 fi
 
-# Cost (rounded to 2 decimal places)
+# Cost (rounded to 2 decimal places) — single awk: format + zero-check combined
 # QA-002: Handle both "0" and "0.0" by using awk numeric comparison
-if [ "$COST" != "null" ] && [ -n "$COST" ] && awk "BEGIN { exit !($COST != 0) }"; then
-  cost_fmt=$(awk "BEGIN { printf \"%.2f\", $COST }")
-  if [ -n "$sec3" ]; then sec3+=" "; fi
-  sec3+="\$${cost_fmt}"
+if [ "$COST" != "null" ] && [ -n "$COST" ]; then
+  cost_fmt=$(awk "BEGIN { v=($COST+0); if(v==0) exit 1; printf \"%.2f\", v }") && {
+    if [ -n "$sec3" ]; then sec3+=" "; fi
+    sec3+="\$${cost_fmt}"
+  }
 fi
 
 # Lines delta
@@ -165,10 +167,12 @@ fi
 # --- Section 4: Workflow ---
 
 sec4=""
+NOW_EPOCH=$(date +%s)
 if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
-  slug="$(echo "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
-  hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
-  STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${hash}.json"
+  slug="${branch//[^a-zA-Z0-9]/-}"
+  slug="${slug:0:80}"
+  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
+  STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${raw_hash:0:6}.json"
 
   if [ -f "$STATE_FILE" ]; then
     eval "$(jq -r '
@@ -220,7 +224,7 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
       if [ -n "$PHASE_ENTERED" ]; then
         entered_epoch=$(date -d "$PHASE_ENTERED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$PHASE_ENTERED" +%s 2>/dev/null || echo "")
         if [ -n "$entered_epoch" ]; then
-          now_epoch=$(date +%s)
+          now_epoch=$NOW_EPOCH
           elapsed_ms=$(( (now_epoch - entered_epoch) * 1000 ))
           # QA-003: Only show time if >= 60000ms (1 minute) to avoid misleading "0m"
           if [ "$elapsed_ms" -ge 60000 ]; then
