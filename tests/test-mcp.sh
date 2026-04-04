@@ -585,6 +585,32 @@ test_r026() {
 }
 
 # ---------------------------------------------------------------------------
+# Test: R-027 — Serena config uses -p 3.13 Python version pin
+# ---------------------------------------------------------------------------
+
+test_r027() {
+  echo ""
+  echo "=== R-027: Serena Python version pin ==="
+
+  # R-027a: .mcp.json must include -p 3.13 in serena args
+  local mcp_json="$REPO_DIR/.mcp.json"
+  if [ -f "$mcp_json" ]; then
+    jq -e '.mcpServers.serena.args | index("-p")' "$mcp_json" >/dev/null 2>&1 && local has_p="true" || local has_p="false"
+    assert_eq "R-027a: .mcp.json serena args include -p flag" "true" "$has_p"
+
+    jq -e '.mcpServers.serena.args | index("3.13")' "$mcp_json" >/dev/null 2>&1 && local has_ver="true" || local has_ver="false"
+    assert_eq "R-027a: .mcp.json serena args include 3.13" "true" "$has_ver"
+  else
+    assert_eq "R-027a: .mcp.json exists" "true" "false"
+  fi
+
+  # R-027b: csetup SKILL.md template must include -p 3.13
+  local csetup_skill="$REPO_DIR/skills/csetup/SKILL.md"
+  grep -q '"-p", "3.13"' "$csetup_skill" && local skill_has_pin="true" || local skill_has_pin="false"
+  assert_eq "R-027b: csetup template includes -p 3.13 pin" "true" "$skill_has_pin"
+}
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
@@ -616,6 +642,7 @@ test_r023
 test_r024
 test_r025
 test_r026
+test_r027
 
 echo ""
 echo "=================================="

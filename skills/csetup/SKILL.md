@@ -214,6 +214,7 @@ When writing `.mcp.json` in the project root, use this template with version-pin
     "serena": {
       "command": "uvx",
       "args": [
+        "-p", "3.13",
         "--from", "git+https://github.com/oraios/serena@v0.1.4",
         "serena-mcp-server",
         "--transport", "stdio"
