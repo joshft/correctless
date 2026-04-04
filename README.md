@@ -1,4 +1,6 @@
-# Correctless
+<p align="center">
+  <img src="assets/logo.png" alt="Correctless" width="400">
+</p>
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)

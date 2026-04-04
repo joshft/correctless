@@ -2,7 +2,7 @@
 
 All notable changes to Correctless are documented here.
 
-## [3.0.0] - 2026-04-03
+## [3.0.0] - 2026-04-04
 
 ### Changed — Single Distribution with Dynamic Rigor
 - Merged Lite and Full distributions into a single 26-skill plugin
@@ -26,11 +26,24 @@ All notable changes to Correctless are documented here.
 - Calm reset prompts in /ctdd and /caudit orchestrators
 - Spec template files (spec-lite.md, spec-full.md) for intensity-aware spec generation
 
+### Added — Security Hardening
+- Hacker Olympics audit: 22 findings fixed (gate bypass, config protection, CI pinning)
+- CODEOWNERS for security-sensitive files (workflow config, CI, pre-commit)
+- Pre-commit hooks pinned to commit SHAs (not mutable tags)
+- Gitleaks baseline for secret scanning
+
+### Added — Performance
+- Performance Olympics audit: 37 findings fixed across 3 convergence rounds
+- Hook subprocess spawns reduced from ~18-19 to ~5-6 per invocation (~30-72s saved per session)
+- Bulk eval+jq parsing, bash builtin replacements, batched I/O operations
+
 ### Fixed
 - QA Olympics audit: 24 findings fixed across hooks, gate, statusline, and documentation
 - Gate phase enforcement for project source files (pattern delimiter fix)
 - Override statusline display (correct state field path)
 - Atomic state writes (single write_state per command, trap cleanup for temp files)
+- Stale .claude/ path references in skill docs
+- Marketplace source path resolution
 
 ## [2.0.0] - 2026-03-31
 
