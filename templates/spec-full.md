@@ -6,6 +6,9 @@
 - **Impacts**: {other spec slugs}
 - **Branch**: {branch name}
 - **Research**: {path or null}
+- **Intensity**: {standard|high|critical}
+- **Intensity reason**: {triggering signals or "user override"}
+- **Override**: {none|raised|lowered}
 
 ## Context
 

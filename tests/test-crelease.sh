@@ -108,18 +108,18 @@ test_r012_skill_exists() {
     && local in_sync="true" || local in_sync="false"
   assert_eq "R-012: crelease registered in sync.sh" "true" "$in_sync"
 
-  # Check Lite skill list specifically
+  # Check skill list contains crelease
   grep -q 'for skill in.*crelease' "$sync_file" 2>/dev/null \
-    && local in_lite_loop="true" || local in_lite_loop="false"
-  assert_eq "R-012: crelease in sync.sh Lite skill loop" "true" "$in_lite_loop"
+    && local in_skill_loop="true" || local in_skill_loop="false"
+  assert_eq "R-012: crelease in sync.sh skill loop" "true" "$in_skill_loop"
 
-  # Check both Lite and Full for-loops contain crelease
+  # Check crelease appears in sync.sh
   local crelease_count
   crelease_count="$(grep -c 'crelease' "$sync_file" 2>/dev/null || true)"
   crelease_count="${crelease_count:-0}"
-  # Should appear at least twice (once per distribution)
-  assert_eq "R-012: crelease in both Lite and Full sync lists (appears 2+ times)" "true" \
-    "$([ "$crelease_count" -ge 2 ] 2>/dev/null && echo true || echo false)"
+  # Should appear at least once in the skill loop
+  assert_eq "R-012: crelease in sync.sh skill list (appears 1+ times)" "true" \
+    "$([ "$crelease_count" -ge 1 ] 2>/dev/null && echo true || echo false)"
 
   # Tests R-012 [integration]: documented in docs/skills/crelease.md
   local docs_file="$REPO_DIR/docs/skills/crelease.md"

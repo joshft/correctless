@@ -95,9 +95,8 @@ reset_section_not_contains() {
 CTDD_SKILL="$REPO_DIR/skills/ctdd/SKILL.md"
 CAUDIT_SKILL="$REPO_DIR/skills/caudit/SKILL.md"
 
-LITE_CTDD="$REPO_DIR/correctless-lite/skills/ctdd/SKILL.md"
-FULL_CTDD="$REPO_DIR/correctless-full/skills/ctdd/SKILL.md"
-FULL_CAUDIT="$REPO_DIR/correctless-full/skills/caudit/SKILL.md"
+DIST_CTDD="$REPO_DIR/correctless/skills/ctdd/SKILL.md"
+DIST_CAUDIT="$REPO_DIR/correctless/skills/caudit/SKILL.md"
 
 # ---------------------------------------------------------------------------
 # Test: R-001 — ctdd GREEN phase reset prompt
@@ -511,43 +510,30 @@ test_r009_no_new_state() {
 
 test_r010_sync_propagation() {
   echo ""
-  echo "=== R-010: sync propagation to both distributions ==="
+  echo "=== R-010: sync propagation to distribution ==="
 
-  # R-010: lite ctdd SKILL.md exists
-  assert_eq "R-010: correctless-lite/skills/ctdd/SKILL.md exists" "true" \
-    "$([ -f "$LITE_CTDD" ] && echo true || echo false)"
+  # R-010: ctdd SKILL.md exists in distribution
+  assert_eq "R-010: correctless/skills/ctdd/SKILL.md exists" "true" \
+    "$([ -f "$DIST_CTDD" ] && echo true || echo false)"
 
-  # R-010: full ctdd SKILL.md exists
-  assert_eq "R-010: correctless-full/skills/ctdd/SKILL.md exists" "true" \
-    "$([ -f "$FULL_CTDD" ] && echo true || echo false)"
+  # R-010: caudit SKILL.md exists in distribution
+  assert_eq "R-010: correctless/skills/caudit/SKILL.md exists" "true" \
+    "$([ -f "$DIST_CAUDIT" ] && echo true || echo false)"
 
-  # R-010: full caudit SKILL.md exists (caudit is Full-only)
-  assert_eq "R-010: correctless-full/skills/caudit/SKILL.md exists" "true" \
-    "$([ -f "$FULL_CAUDIT" ] && echo true || echo false)"
+  # R-010: ctdd contains reset-related keywords after sync
+  file_contains "$DIST_CTDD" "reset prompt\|calm reset\|reset.*fire\|consecutive.*fail.*reset" \
+    && local dist_ctdd_reset="true" || local dist_ctdd_reset="false"
+  assert_eq "R-010: correctless/skills/ctdd/SKILL.md contains reset keywords" "true" "$dist_ctdd_reset"
 
-  # R-010: lite ctdd contains reset-related keywords after sync
-  file_contains "$LITE_CTDD" "reset prompt\|calm reset\|reset.*fire\|consecutive.*fail.*reset" \
-    && local lite_ctdd_reset="true" || local lite_ctdd_reset="false"
-  assert_eq "R-010: lite ctdd SKILL.md contains reset keywords" "true" "$lite_ctdd_reset"
+  # R-010: caudit contains reset-related keywords after sync
+  file_contains "$DIST_CAUDIT" "reset prompt\|calm reset\|reset.*fire\|diverge.*reset\|divergence.*reset" \
+    && local dist_caudit_reset="true" || local dist_caudit_reset="false"
+  assert_eq "R-010: correctless/skills/caudit/SKILL.md contains reset keywords" "true" "$dist_caudit_reset"
 
-  # R-010: full ctdd contains reset-related keywords after sync
-  file_contains "$FULL_CTDD" "reset prompt\|calm reset\|reset.*fire\|consecutive.*fail.*reset" \
-    && local full_ctdd_reset="true" || local full_ctdd_reset="false"
-  assert_eq "R-010: full ctdd SKILL.md contains reset keywords" "true" "$full_ctdd_reset"
-
-  # R-010: full caudit contains reset-related keywords after sync
-  file_contains "$FULL_CAUDIT" "reset prompt\|calm reset\|reset.*fire\|diverge.*reset\|divergence.*reset" \
-    && local full_caudit_reset="true" || local full_caudit_reset="false"
-  assert_eq "R-010: full caudit SKILL.md contains reset keywords" "true" "$full_caudit_reset"
-
-  # R-010: the "re-read" keyword propagated to distributions
-  file_contains "$LITE_CTDD" "re-read" \
-    && local lite_reread="true" || local lite_reread="false"
-  assert_eq "R-010: lite ctdd SKILL.md contains 're-read' after sync" "true" "$lite_reread"
-
-  file_contains "$FULL_CTDD" "re-read" \
-    && local full_reread="true" || local full_reread="false"
-  assert_eq "R-010: full ctdd SKILL.md contains 're-read' after sync" "true" "$full_reread"
+  # R-010: the "re-read" keyword propagated to distribution
+  file_contains "$DIST_CTDD" "re-read" \
+    && local dist_reread="true" || local dist_reread="false"
+  assert_eq "R-010: correctless/skills/ctdd/SKILL.md contains 're-read' after sync" "true" "$dist_reread"
 
   # R-010: sync.sh --check exits 0 when source and distribution are in sync
   bash "$REPO_DIR/sync.sh" --check 2>/dev/null \
@@ -556,7 +542,7 @@ test_r010_sync_propagation() {
 
   # R-010 negative: skills that are NOT ctdd or caudit must NOT contain calm reset text
   local negative_ok="true"
-  for skill_dir in "$REPO_DIR"/correctless-lite/skills/*/; do
+  for skill_dir in "$REPO_DIR"/correctless/skills/*/; do
     local skill_name
     skill_name="$(basename "$skill_dir")"
     [ "$skill_name" = "ctdd" ] && continue

@@ -4,7 +4,7 @@
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Skills: 26](https://img.shields.io/badge/skills-26-blue.svg)](docs/skills/)
-[![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-green.svg)](CHANGELOG.md)
+[![Version: 3.0.0](https://img.shields.io/badge/version-3.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
 
@@ -24,9 +24,11 @@ Correctless fixes this by structuring the workflow so that **every phase is exec
 
 Same model — but the framing determines what the agent finds.
 
-## Two Versions
+## One Plugin, Three Intensity Levels
 
-### Correctless Lite
+Correctless ships as a single plugin with 26 skills. All skills are always visible. Seven skills are gated behind intensity levels — they check your project's `workflow.intensity` setting and warn if invoked below their minimum threshold. You choose the intensity that matches your project's risk profile.
+
+### Standard Intensity (default)
 
 For web apps, APIs, CLI tools, and everyday development. **~10-15 minutes per feature.**
 
@@ -53,11 +55,15 @@ graph LR
     style C5 fill:#ffd43b,color:#000
 ```
 
-Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. [Full spec &rarr;](docs/design/correctless-lite.md)
+Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests.
 
-### Correctless (Full)
+### High Intensity
 
-For security-critical infrastructure and anything where a bug is a vulnerability. **~1-2 hours per feature — but the code ships tested, reviewed, and assumption-challenged.**
+Adds adversarial spec review, convergence auditing, and architecture tracking. For features that handle user auth, payments, or sensitive data. **~30-60 minutes per feature.**
+
+### Critical Intensity
+
+Everything at high intensity plus formal Alloy modeling and live red team assessment. For security-critical infrastructure where a bug is a vulnerability. **~1-2 hours per feature — but the code ships tested, reviewed, and assumption-challenged.**
 
 ```mermaid
 graph LR
@@ -73,30 +79,27 @@ graph LR
     style H fill:#ff922b,color:#fff
 ```
 
-Everything in Lite plus: formal modeling, STRIDE threat analysis, adversarial spec review, mutation testing, convergence-based auditing, and more. [Full spec &rarr;](docs/design/correctless.md)
+### Intensity Level Table
 
-### Which One?
+| Intensity | Overhead | Unlocked Skills | Best For |
+|-----------|----------|----------------|----------|
+| **standard** (default) | ~10-15 min | 19 core skills | SaaS, APIs, CLI tools, content sites |
+| **high** | ~30-60 min | + /caudit, /creview-spec, /cupdate-arch | Auth, payments, sensitive data |
+| **critical** | ~1-2 hours | + /cmodel, /credteam | Security infrastructure, network proxies |
 
-| Building... | Use |
-|-------------|-----|
-| A SaaS dashboard, API, CLI tool, content site | **Lite** |
-| Something that handles user auth or payments | **Lite**, upgrade to Full when scope grows |
-| A network proxy, security tool, or infrastructure | **Full** |
-| A prototype or exploration | Neither — just code |
+Skills like `/cpostmortem` and `/cdevadv` are available at all intensity levels.
 
-You can upgrade from Lite to Full incrementally. Existing specs, antipatterns, and architecture docs carry over.
-
-**Put another way:** Lite is like having someone next to you going through a checklist to make sure your project has some sanity. Full is like taking your Claude Max subscription tokens, setting them on fire, collecting the ash, and using it to create a tiny diamond.
+**Put another way:** Standard intensity is like having someone next to you going through a checklist to make sure your project has some sanity. Critical intensity is like taking your Claude Max subscription tokens, setting them on fire, collecting the ash, and using it to create a tiny diamond.
 
 ## Quick Start
 
-You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and a Claude Max subscription ($100-200/mo). Not sure which version? See [Which One?](#which-one) above.
+You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and a Claude Max subscription ($100-200/mo).
 
 ### Via Plugin Marketplace (recommended)
 
 ```
 /plugin marketplace add joshft/correctless
-/plugin install correctless-lite          # or: /plugin install correctless
+/plugin install correctless
 /csetup
 ```
 
@@ -108,7 +111,7 @@ git clone https://github.com/joshft/correctless.git .claude/skills/workflow
 /csetup
 ```
 
-Lite mode by default. To enable Full: add `"intensity": "standard"` (or `"high"` / `"critical"`) to `.correctless/config/workflow-config.json` and re-run setup.
+Standard intensity by default. To increase intensity: add `"intensity": "high"` or `"critical"` to the `workflow` section of `.correctless/config/workflow-config.json` and re-run setup.
 
 ### After Install
 
@@ -119,16 +122,37 @@ git checkout -b feature/my-feature
 
 ### Updating
 
-**Plugin:** Claude Code's `plugin update` doesn't always pull latest. To update reliably (replace `correctless` with `correctless-lite` if you installed Lite):
 ```
-/plugin uninstall correctless              # or: correctless-lite
+/plugin uninstall correctless
 /plugin marketplace remove correctless
 /plugin marketplace add joshft/correctless
-/plugin install correctless                # or: correctless-lite
+/plugin install correctless
 ```
 Then restart Claude Code.
 
 **Git clone:** `cd .claude/skills/workflow && git pull && ./setup`
+
+### Migration from Previous Versions
+
+If you have `correctless-lite` installed:
+```
+/plugin uninstall correctless-lite
+/plugin marketplace remove correctless
+/plugin marketplace add joshft/correctless
+/plugin install correctless
+```
+
+If you have correctless (Full) installed:
+```
+/plugin uninstall correctless
+/plugin marketplace remove correctless
+/plugin marketplace add joshft/correctless
+/plugin install correctless
+```
+
+For git-clone users, `git pull && ./setup` handles the migration automatically — it detects old distribution directories and cleans them up.
+
+Your existing specs, antipatterns, architecture docs, and workflow config carry over. If you had `workflow.intensity` set, it is preserved at your configured level.
 
 ## How It Works
 
@@ -138,11 +162,11 @@ On first run, [`/csetup`](docs/skills/csetup.md) scans your project for baseline
 
 ### 2. Spec Before Code
 
-Every feature starts with a spec ([`/cspec`](docs/skills/cspec.md)) that defines what "correct" means — testable rules, not vague goals. The spec agent reads your architecture docs, known bug patterns, and QA findings history. When the feature involves libraries or protocols that may have changed, a **research subagent** searches the web for current docs, CVEs, and deprecations before rules are written.
+Every feature starts with a spec ([`/cspec`](docs/skills/cspec.md)) that defines what "correct" means — testable rules, not vague goals. Automatic intensity detection evaluates file paths, keywords, trust boundaries, and antipattern history to recommend the right rigor level for each feature. The spec agent reads your architecture docs, known bug patterns, and QA findings history. When the feature involves libraries or protocols that may have changed, a **research subagent** searches the web for current docs, CVEs, and deprecations before rules are written.
 
 ### 3. Skeptical Review with Security Checklist
 
-A fresh agent ([`/creview`](docs/skills/creview.md)) that didn't write the spec reads it cold. This includes an **automatic security checklist** that fires based on what the spec touches — auth, user input, data storage, payments, APIs, multi-tenant. It checks for the vulnerabilities that vibe-coded apps ship with: missing CSRF, SSRF, broken access control, SQL injection, XSS, missing database RLS. In Full, [`/creview-spec`](docs/skills/creview-spec.md) runs a four-agent adversarial team instead.
+A fresh agent ([`/creview`](docs/skills/creview.md)) that didn't write the spec reads it cold. This includes an **automatic security checklist** that fires based on what the spec touches — auth, user input, data storage, payments, APIs, multi-tenant. It checks for the vulnerabilities that vibe-coded apps ship with: missing CSRF, SSRF, broken access control, SQL injection, XSS, missing database RLS. At high+ intensity, [`/creview-spec`](docs/skills/creview-spec.md) runs a four-agent adversarial team instead.
 
 ### 4. Enforced TDD with Test Audit
 
@@ -177,10 +201,10 @@ Prompt-level instructions fade as context fills — enforcement that depends on 
 ```mermaid
 graph TD
     A["Agent wants to<br/>edit source file<br/>during QA phase"] --> B{"Layer 1: Gate<br/>(PreToolUse hook)"}
-    B -->|"BLOCK"| C["❌ Edit prevented<br/>Model can't bypass bash"]
+    B -->|"BLOCK"| C["Edit prevented<br/>Model can't bypass bash"]
     B -->|"ALLOW<br/>(Bash slip-through)"| D["File modified"]
     D --> E{"Layer 2: Audit Trail<br/>(PostToolUse hook)"}
-    E --> F["📝 Logged with phase context<br/>⚠ Alert shown to user"]
+    E --> F["Logged with phase context<br/>Alert shown to user"]
     F --> G["/cwtf reads trail<br/>reports deviations"]
 
     H["Layer 3: Skill Instructions<br/>(prompt-level, advisory)"] -.->|"Subject to<br/>context fade"| A
@@ -202,7 +226,7 @@ graph TD
 | [`/csetup`](docs/skills/csetup.md) | First run, or re-run for health check | Project detection, convention mining, 19-point health check |
 | [`/cspec`](docs/skills/cspec.md) | Starting a new feature | Write testable rules with research agent |
 | [`/creview`](docs/skills/creview.md) | After /cspec | Skeptical review + OWASP security checklist (~3 min) |
-| [`/ctdd`](docs/skills/ctdd.md) | After review approves spec | RED → test audit → GREEN → /simplify → QA |
+| [`/ctdd`](docs/skills/ctdd.md) | After review approves spec | RED -> test audit -> GREEN -> /simplify -> QA |
 | [`/cverify`](docs/skills/cverify.md) | After /ctdd completes | Verify implementation matches spec |
 | [`/cdocs`](docs/skills/cdocs.md) | After /cverify | Update README, AGENT_CONTEXT, feature docs |
 | [`/crelease`](docs/skills/crelease.md) | After merging features, ready to tag | Version bump, changelog, sanity checks, annotated tag |
@@ -213,7 +237,7 @@ graph TD
 |-------|------------|-------------|
 | [`/cquick`](docs/skills/cquick.md) | Small, well-understood changes | TDD without the ceremony — scope-guarded at 50 LOC / 3 files |
 | [`/crefactor`](docs/skills/crefactor.md) | Restructuring without changing behavior | Characterization tests, behavioral equivalence, agent separation |
-| [`/cdebug`](docs/skills/cdebug.md) | Stuck on a bug | Root cause → hypothesis → bisect → TDD fix → class fix |
+| [`/cdebug`](docs/skills/cdebug.md) | Stuck on a bug | Root cause -> hypothesis -> bisect -> TDD fix -> class fix |
 | [`/cpr-review`](docs/skills/cpr-review.md) | Someone opens a PR against your project | Architecture, security, tests, antipatterns, dep bumps |
 
 ### Open Source
@@ -234,17 +258,17 @@ graph TD
 | [`/cwtf`](docs/skills/cwtf.md) | When you suspect agents shortcut | Did agents actually follow instructions? |
 | [`/cexplain`](docs/skills/cexplain.md) | Onboarding or exploring a codebase | Guided mermaid diagrams, prose walkthroughs, HTML export |
 
-### Full Mode Only
+### Intensity-Gated Skills
 
-| Skill | When to Use | Description |
-|-------|------------|-------------|
-| [`/cmodel`](docs/skills/cmodel.md) | Security-critical specs with state machines | Alloy formal modeling |
-| [`/creview-spec`](docs/skills/creview-spec.md) | Critical features (~15 min) | 4-agent adversarial spec review |
-| [`/caudit`](docs/skills/caudit.md) | After major features or periodically | Olympics QA/Hacker/Performance convergence audit |
-| [`/cupdate-arch`](docs/skills/cupdate-arch.md) | After features land | Keep ARCHITECTURE.md current |
-| [`/cpostmortem`](docs/skills/cpostmortem.md) | When bugs escape to production | Trace which phase missed it, strengthen workflow |
-| [`/cdevadv`](docs/skills/cdevadv.md) | Quarterly or when assumptions feel stale | Challenge architecture and strategy |
-| [`/credteam`](docs/skills/credteam.md) | Security assessment (isolated env required) | Live adversarial penetration testing |
+| Skill | Minimum Intensity | Description |
+|-------|-------------------|-------------|
+| [`/caudit`](docs/skills/caudit.md) | high+ | Olympics QA/Hacker/Performance convergence audit |
+| [`/creview-spec`](docs/skills/creview-spec.md) | high+ | 4-agent adversarial spec review |
+| [`/cupdate-arch`](docs/skills/cupdate-arch.md) | high+ | Keep ARCHITECTURE.md current |
+| [`/cpostmortem`](docs/skills/cpostmortem.md) | standard | Trace which phase missed an escaped bug, strengthen workflow |
+| [`/cdevadv`](docs/skills/cdevadv.md) | standard | Challenge architecture and strategy |
+| [`/cmodel`](docs/skills/cmodel.md) | critical+ | Alloy formal modeling |
+| [`/credteam`](docs/skills/credteam.md) | critical+ | Live adversarial penetration testing |
 
 ## Platform Integration
 
@@ -260,7 +284,7 @@ graph TB
     end
 
     B -->|"block/allow"| I["Every file edit"]
-    D -->|"⚠ alerts"| J["Real-time feedback"]
+    D -->|"alerts"| J["Real-time feedback"]
     F -->|"RED QA:R2 $0.42"| K["Always visible"]
     H -->|"read by"| L["/cmetrics"]
 
@@ -275,14 +299,14 @@ The Correctless statusline shows your workflow state at a glance — no commands
 ```
 project/  feature/auth  Opus  34%  RED  QA:R0  $0.42  +87/-12
 ```
-Workflow phase (color-coded), QA round count, session cost, lines delta, context usage with red warning at 70%. Installed during `/csetup`. Both Lite and Full.
+Workflow phase (color-coded), QA round count, session cost, lines delta, context usage with red warning at 70%. Installed during `/csetup`.
 
 ### Real-Time Adherence Feedback (automatic)
 
-A PostToolUse hook monitors every file modification and alerts you immediately. Lite shows phase violations; Full adds coverage tracking:
-- `⚠ tdd-qa: Source file modified — middleware.ts (this phase should be read-only)`
-- `📝 GREEN: Test file edited — auth.test.ts (should be logged in test-edit-log)`
-- `🔍 QA: Read middleware.ts (3 of 7 modified files reviewed)` (Full mode)
+A PostToolUse hook monitors every file modification and alerts you immediately:
+- `tdd-qa: Source file modified — middleware.ts (this phase should be read-only)`
+- `GREEN: Test file edited — auth.test.ts (should be logged in test-edit-log)`
+- `QA: Read middleware.ts (3 of 7 modified files reviewed)` (at high+ intensity)
 
 ### Session Analytics
 
@@ -332,26 +356,6 @@ If you need to fix a typo while a workflow is active and the gate is blocking yo
 
 This bypasses the gate for 10 tool calls. Use for: typos, config tweaks, one-line fixes. When no workflow is active, the gate allows all edits freely.
 
-## Comparison
-
-| | Lite | Full |
-|---|------|------|
-| Skills | 18 | 25 |
-| Spec format | 5 sections, simple rules | 12+ sections, typed invariants |
-| Spec research | Current best practices, dependency health | Same |
-| Review | Single-pass + auto security checklist | 4-agent adversarial team |
-| Security checklist | CSRF, headers, SSRF, RLS, IDOR, XSS, SQLi | Same + STRIDE threat modeling |
-| TDD enforcement | Hooks + agent separation + test audit | Same + mutation testing |
-| Post-TDD pipeline | done → verified → documented (enforced) | Same + tdd-verify phase |
-| QA findings | Instance fix + class fix required | Same |
-| Formal modeling | No | Alloy (optional) |
-| Convergence audit | No | Olympics (QA/Hacker/Perf presets) |
-| Red team | No | Live adversarial assessment |
-| Devil's advocate | No | Challenges assumptions |
-| Postmortem | No | Structured bug analysis |
-| Feedback loop | Antipatterns + CLAUDE.md learning | Same + drift debt + workflow effectiveness + templates |
-| Overhead per feature | ~10-15 min | ~1-2 hours |
-
 ## Language Support
 
 | Language | Test Runner | Mutation Tool | PBT Library |
@@ -361,15 +365,15 @@ This bypasses the gate for 10 tool calls. Use for: typos, config tweaks, one-lin
 | Python | pytest | mutmut | hypothesis |
 | Rust | cargo test | cargo-mutants | proptest |
 
-Mutation testing and PBT helpers are Full-only. Lite works with any language that has a test runner.
+Mutation testing and PBT helpers are available at high+ intensity. Standard intensity works with any language that has a test runner.
 
 ## Requirements
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
-- A **Claude Max subscription** ($100/mo or $200/mo plan). Correctless spawns multiple agents per feature — the $200/mo Max plan is recommended, especially for Full mode.
+- A **Claude Max subscription** ($100/mo or $200/mo plan). Correctless spawns multiple agents per feature — the $200/mo Max plan is recommended, especially at high+ intensity.
 - A project with a test runner
 
-Optional (Full only):
+Optional (at high+/critical intensity):
 - [Alloy Analyzer](https://alloytools.org/) for formal modeling
 - Mutation testing tool for your language
 - Isolated environment (Docker/VPS) for red team assessments
@@ -386,13 +390,14 @@ Optional (Full only):
 | **Antipattern** | A known bug class from your project's history. Stored in `.correctless/antipatterns.md`, checked by every future spec and review. |
 | **Spec** | A document defining what "correct" means for a feature: testable rules, edge cases, security assumptions. A spec that can't be tested is incomplete. |
 | **Invariant** | A rule that must always be true: "auth tokens expire after 24 hours." Specs are lists of invariants. |
-| **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Full mode only. |
+| **Intensity** | The configured rigor level for a project: standard, high, or critical. Higher intensity unlocks more skills but costs more tokens and time. |
+| **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Available at high+ intensity. |
 | **STRIDE** | Threat modeling framework: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege. |
 | **RED / GREEN** | TDD phases. RED = write tests that fail. GREEN = write code to make tests pass. |
 
 ## Status
 
-**Correctless 2.0.0 — Early release.** 26 skills (19 Lite, 26 Full), 923 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
+**Correctless 3.0.0 — Early release.** 26 skills with configurable intensity levels, 1,024 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
 
 ## License
 
