@@ -19,7 +19,7 @@ This skill typically runs after `/cdocs` as the final step before merging. It ag
 - Reads QA findings, verification reports, test edit logs, and audit trails to gather every issue caught.
 - Calculates stats: total issues, issues by phase, QA rounds, spec updates, and branch duration.
 - **Classifies impact**: For each issue, assesses whether it "would have shipped" to production without the workflow, "might have been caught" by a careful developer, or was "cosmetic." The "would have shipped" count is the headline number.
-- Writes the summary to `.claude/artifacts/summary-{task-slug}.md` and prints it to the conversation.
+- Writes the summary to `.correctless/artifacts/summary-{task-slug}.md` and prints it to the conversation.
 
 ## Example
 
@@ -30,7 +30,7 @@ User: /csummary
 
 Branch: feature/rate-limiting
 Duration: 2 days
-Spec: docs/specs/rate-limiting.md
+Spec: .correctless/specs/rate-limiting.md
 
 ## What the Workflow Caught
 
@@ -60,11 +60,11 @@ Spec: docs/specs/rate-limiting.md
 
 | Reads | Writes |
 |-------|--------|
-| `docs/specs/{task-slug}.md` | `.claude/artifacts/summary-{task-slug}.md` |
-| `.claude/artifacts/qa-findings-{task-slug}.json` | |
+| `.correctless/specs/{task-slug}.md` | `.correctless/artifacts/summary-{task-slug}.md` |
+| `.correctless/artifacts/qa-findings-{task-slug}.json` | |
 | `docs/verification/{task-slug}-verification.md` | |
-| `.claude/artifacts/tdd-test-edits.log` | |
-| `.claude/artifacts/audit-trail-*.jsonl` | |
+| `.correctless/artifacts/tdd-test-edits.log` | |
+| `.correctless/artifacts/audit-trail-*.jsonl` | |
 | Workflow state file | |
 | Git log (branch duration, commit count) | |
 

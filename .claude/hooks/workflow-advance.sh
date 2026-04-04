@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2254
 # Correctless — workflow state machine
 # The ONLY way to change the workflow state file.
 # Validates transitions with real gates.
 # Supports both Lite and Full modes (Full adds: model, review-spec, tdd-verify, audit phases).
+# SC2254 disabled: unquoted $pat in case is intentional — we need glob matching
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-CONFIG_FILE="$REPO_ROOT/.claude/workflow-config.json"
-ARTIFACTS_DIR="$REPO_ROOT/.claude/artifacts"
+CONFIG_FILE="$REPO_ROOT/.correctless/config/workflow-config.json"
+ARTIFACTS_DIR="$REPO_ROOT/.correctless/artifacts"
 OVERRIDE_LOG="$ARTIFACTS_DIR/override-log.json"
 
 # ---------------------------------------------------------------------------
@@ -36,7 +37,9 @@ branch_slug() {
 }
 
 state_file() {
-  echo "$ARTIFACTS_DIR/workflow-state-$(branch_slug).json"
+  local slug
+  slug="$(branch_slug)" || die "Cannot determine branch slug"
+  echo "$ARTIFACTS_DIR/workflow-state-${slug}.json"
 }
 
 read_state() {
@@ -55,8 +58,11 @@ read_phase() {
 write_state() {
   local sf
   sf="$(state_file)"
+  local tmp="$sf.$$"
   mkdir -p "$(dirname "$sf")"
-  echo "$1" | jq '.' > "$sf.$$" && mv "$sf.$$" "$sf"
+  trap 'rm -f "$tmp"' EXIT
+  echo "$1" | jq '.' > "$tmp" && mv "$tmp" "$sf"
+  trap - EXIT
 }
 
 update_phase() {
@@ -119,7 +125,48 @@ is_full_mode() {
   [ -f "$CONFIG_FILE" ] || return 1
   local intensity
   intensity="$(jq -r '.workflow.intensity // empty' "$CONFIG_FILE")"
-  [ -n "$intensity" ] && [ "$intensity" != "null" ]
+  case "$intensity" in
+    high|critical) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Monorepo package resolution (longest-prefix match)
+is_monorepo() {
+  [ -f "$CONFIG_FILE" ] || return 1
+  jq -e '.is_monorepo' "$CONFIG_FILE" >/dev/null 2>&1
+}
+
+# Read a config field with package scope fallback
+# Usage: read_package_config '.commands.test' 'api'
+read_package_config() {
+  local field="$1" scope="${2:-.}"
+  if [ "$scope" != "." ] && is_monorepo; then
+    local val
+    val="$(jq -r --arg s "$scope" "(.packages[\$s]$field) // ($field) // empty" "$CONFIG_FILE" 2>/dev/null)"
+    if [ -n "$val" ] && [ "$val" != "null" ]; then echo "$val"; return; fi
+  fi
+  read_config_field "$field" 2>/dev/null || echo ""
+}
+
+# Detect which packages are affected by current branch changes
+detect_affected_packages() {
+  is_monorepo || { echo "."; return; }
+  local changed_files
+  # shellcheck disable=SC1083  # Braces in HEAD@{upstream} are git refspec syntax, not shell
+  changed_files="$(git diff --name-only "$(git merge-base HEAD "$(git rev-parse --abbrev-ref HEAD@{upstream} 2>/dev/null || echo HEAD~1)" 2>/dev/null)" HEAD 2>/dev/null || git diff --name-only HEAD~1 2>/dev/null || echo "")"
+  [ -n "$changed_files" ] || { echo "."; return; }
+
+  local packages=""
+  while IFS= read -r key; do
+    local pkg_path
+    pkg_path="$(jq -r --arg k "$key" '.packages[$k].path' "$CONFIG_FILE")"
+    if echo "$changed_files" | awk -v p="${pkg_path}/" 'index($0, p) == 1 { found=1; exit } END { exit !found }'; then
+      packages="${packages:+$packages }$key"
+    fi
+  done < <(jq -r '.packages | keys[]' "$CONFIG_FILE" 2>/dev/null)
+
+  echo "${packages:-.}"
 }
 
 is_fail_closed() {
@@ -134,24 +181,27 @@ has_formal_model() {
   [ "$val" = "true" ]
 }
 
-DRIFT_DEBT_FILE="$REPO_ROOT/.claude/meta/drift-debt.json"
+DRIFT_DEBT_FILE="$REPO_ROOT/.correctless/meta/drift-debt.json"
 
 # ---------------------------------------------------------------------------
 # Test execution helpers
 # ---------------------------------------------------------------------------
 
-run_tests() {
-  local test_cmd
-  test_cmd="$(read_config_field '.commands.test')"
-  [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured in workflow-config.json"
-  eval "$test_cmd"
-}
-
 tests_fail_not_build_error() {
   local test_cmd fail_pattern build_pattern
-  test_cmd="$(read_config_field '.commands.test')"
-  fail_pattern="$(read_config_field '.patterns.test_fail_pattern')"
-  build_pattern="$(read_config_field '.patterns.build_error_pattern')"
+  # Use first affected package's config, or global fallback
+  local pkg="."
+  if is_monorepo; then
+    pkg="$(detect_affected_packages | awk '{print $1}')"
+    [ "$pkg" = "." ] || true
+  fi
+  # Prefer commands.test_new if present (allows separate new-test file for RED gate)
+  test_cmd="$(read_package_config '.commands.test_new' "$pkg")"
+  if [ -z "$test_cmd" ] || [ "$test_cmd" = "null" ]; then
+    test_cmd="$(read_package_config '.commands.test' "$pkg")"
+  fi
+  fail_pattern="$(read_package_config '.patterns.test_fail_pattern' "$pkg")"
+  build_pattern="$(read_package_config '.patterns.build_error_pattern' "$pkg")"
 
   [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
 
@@ -180,6 +230,34 @@ tests_fail_not_build_error() {
 }
 
 tests_pass() {
+  # In monorepo mode, ALL affected packages must pass
+  if is_monorepo; then
+    local packages any_run=false
+    packages="$(detect_affected_packages)"
+    for pkg in $packages; do
+      [ "$pkg" = "." ] && continue
+      local cmd output exit_code
+      cmd="$(read_package_config '.commands.test' "$pkg")"
+      [ -n "$cmd" ] && [ "$cmd" != "null" ] || continue
+      any_run=true
+      output="$(eval "$cmd" 2>&1)" && exit_code=0 || exit_code=$?
+      if [ "$exit_code" -ne 0 ]; then
+        die "Tests do not pass in package '$pkg'. Fix failures before advancing.\n\nOutput (last 30 lines):\n$(echo "$output" | tail -30)"
+      fi
+    done
+    # If no package tests ran, fall back to global test command
+    if [ "$any_run" = "false" ]; then
+      local test_cmd output exit_code
+      test_cmd="$(read_config_field '.commands.test')"
+      [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
+      output="$(eval "$test_cmd" 2>&1)" && exit_code=0 || exit_code=$?
+      if [ "$exit_code" -ne 0 ]; then
+        die "Tests do not pass. Fix failures before advancing.\n\nOutput (last 30 lines):\n$(echo "$output" | tail -30)"
+      fi
+    fi
+    return 0
+  fi
+
   local test_cmd output exit_code
   test_cmd="$(read_config_field '.commands.test')"
   [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
@@ -204,6 +282,7 @@ test_files_exist() {
     local regex
     regex="$(printf '%s' "$pattern" | sed 's/\./\\./g; s/\*/.*/g')"
     local count
+    # shellcheck disable=SC1083  # Braces in HEAD@{upstream} are git refspec syntax, not shell
     count="$(git diff --name-only "$(git merge-base HEAD "$(git rev-parse --abbrev-ref HEAD@{upstream} 2>/dev/null || echo HEAD~1)" 2>/dev/null)" HEAD 2>/dev/null | grep -cE "$regex" || true)"
     if [ "$count" -gt 0 ]; then
       return 0
@@ -262,9 +341,42 @@ cmd_init() {
 
   local slug
   slug="$(echo "$task" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')"
-  local spec_file="docs/specs/${slug}.md"
+  # Truncate to first 4 hyphen-separated tokens, max 50 chars
+  slug="$(echo "$slug" | cut -d'-' -f1-4)"
+  slug="${slug:0:50}"
+  slug="${slug%-}"
+
+  # Guard: empty slug (all-punctuation or whitespace input)
+  [ -n "$slug" ] || die "Could not generate a valid slug from: '$task'. Provide a description containing at least one letter or digit."
+
+  # Check for collision against both spec files on disk AND state files claiming the same spec_file
+  spec_slug_in_use() {
+    local check_slug="$1"
+    [ -f "$REPO_ROOT/.correctless/specs/${check_slug}.md" ] && return 0
+    for state_f in "$ARTIFACTS_DIR"/workflow-state-*.json; do
+      [ -f "$state_f" ] || continue
+      local existing
+      existing="$(jq -r '.spec_file // empty' "$state_f" 2>/dev/null)"
+      [ "$existing" = ".correctless/specs/${check_slug}.md" ] && return 0
+    done
+    return 1
+  }
+
+  local base_slug="$slug"
+  local suffix=2
+  while spec_slug_in_use "$slug"; do
+    slug="${base_slug}-${suffix}"
+    suffix=$((suffix + 1))
+  done
+
+  local spec_file=".correctless/specs/${slug}.md"
 
   mkdir -p "$ARTIFACTS_DIR"
+  # Create the spec file stub so the path exists for downstream tools
+  mkdir -p "$REPO_ROOT/.correctless/specs"
+  if [ ! -f "$REPO_ROOT/$spec_file" ]; then
+    printf "# Spec: %s\n\n## Rules\n\n_(to be written)_\n" "$task" > "$REPO_ROOT/$spec_file"
+  fi
   write_state "$(jq -n \
     --arg phase "spec" \
     --arg task "$task" \
@@ -374,12 +486,13 @@ cmd_qa() {
     eval "$cov_cmd" > "$ARTIFACTS_DIR/coverage-baseline.out" 2>&1 || true
   fi
 
-  # Increment QA round counter
+  # Increment QA round counter and transition phase in a single write
   local state
   state="$(read_state)"
-  state="$(echo "$state" | jq '.qa_rounds += 1')"
+  state="$(echo "$state" | jq --arg t "$(date -u +%FT%TZ)" \
+    '.qa_rounds += 1 | .phase = "tdd-qa" | .phase_entered_at = $t')"
   write_state "$state"
-  update_phase "tdd-qa"
+  info "Phase: tdd-qa"
   info "Next: QA review (edits blocked)"
 }
 
@@ -402,6 +515,7 @@ cmd_verify() {
   local min_rounds
   min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
   [ "$min_rounds" = "null" ] && min_rounds=1
+  [[ "$min_rounds" =~ ^[0-9]+$ ]] || die "workflow.min_qa_rounds must be a non-negative integer, got: '$min_rounds'"
   local qa_rounds
   qa_rounds="$(read_state | jq -r '.qa_rounds // 0')"
 
@@ -425,6 +539,7 @@ cmd_done() {
   local min_rounds
   min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
   [ "$min_rounds" = "null" ] && min_rounds=1
+  [[ "$min_rounds" =~ ^[0-9]+$ ]] || die "workflow.min_qa_rounds must be a non-negative integer, got: '$min_rounds'"
   local qa_rounds
   qa_rounds="$(read_state | jq -r '.qa_rounds // 0')"
 
@@ -448,7 +563,7 @@ cmd_verified() {
   state="$(read_state)"
   spec_file="$(echo "$state" | jq -r '.spec_file')"
   slug="$(basename "$spec_file" .md)"
-  local report="$REPO_ROOT/docs/verification/${slug}-verification.md"
+  local report="$REPO_ROOT/.correctless/verification/${slug}-verification.md"
 
   if [ ! -f "$report" ]; then
     die "Verification report not found at $report. Run /cverify first — it must write the report file."
@@ -463,7 +578,7 @@ cmd_documented() {
   require_phase "verified"
 
   # Check that AGENT_CONTEXT.md has been updated (proxy for docs being written)
-  local agent_ctx="$REPO_ROOT/AGENT_CONTEXT.md"
+  local agent_ctx="$REPO_ROOT/.correctless/AGENT_CONTEXT.md"
   if [ -f "$agent_ctx" ]; then
     local last_mod
     last_mod="$(stat -c %Y "$agent_ctx" 2>/dev/null || stat -f %m "$agent_ctx" 2>/dev/null || echo 0)"
@@ -493,7 +608,8 @@ cmd_audit_start() {
   [ -z "$default_branch" ] && default_branch="main"
 
   # Audit can read from main but creates its own branch
-  local audit_branch="audit/${audit_type}-$(date +%Y-%m-%d)"
+  local audit_branch
+  audit_branch="audit/${audit_type}-$(date +%Y-%m-%d)"
   if [ "$branch" != "$audit_branch" ]; then
     info "Audit should run on branch '$audit_branch'"
     info "Create it with: git checkout -b $audit_branch"
@@ -544,6 +660,30 @@ cmd_audit_done() {
   info "Audit complete. Merge audit branch to main."
   info "Post-merge: update antipatterns, write regression tests."
 }
+
+cmd_set_intensity() {
+  local level="${1:-}"
+  if [ -z "$level" ]; then
+    die "Usage: workflow-advance.sh set-intensity <standard|high|critical>"
+  fi
+
+  # Validate intensity level
+  case "$level" in
+    standard|high|critical) ;;
+    *) die "Invalid intensity level: '$level'. Must be one of: standard, high, critical" ;;
+  esac
+
+  check_branch_match
+  # Phase guard: set-intensity only valid during spec-related phases
+  require_phase_oneof "spec" "review" "review-spec"
+
+  local state
+  state="$(read_state)" || die "No state file — run 'init' first"
+  state="$(echo "$state" | jq --arg level "$level" '.feature_intensity = $level')"
+  write_state "$state"
+  info "Feature intensity set to: $level"
+}
+
 cmd_resolve_drift() {
   local drift_id="${1:?Usage: workflow-advance.sh resolve-drift DRIFT-xxx \"reason\"}"
   local reason="${2:?Usage: workflow-advance.sh resolve-drift DRIFT-xxx \"reason\"}"
@@ -563,9 +703,12 @@ cmd_resolve_drift() {
     die "Drift item '$drift_id' not found"
   fi
 
+  local tmp="$DRIFT_DEBT_FILE.$$"
+  trap 'rm -f "$tmp"' EXIT
   jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
-    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
+    "$DRIFT_DEBT_FILE" > "$tmp" && mv "$tmp" "$DRIFT_DEBT_FILE"
+  trap - EXIT
 
   info "Drift item $drift_id marked as resolved: $reason"
 }
@@ -589,9 +732,9 @@ cmd_spec_update() {
     --arg from "$from_phase" \
     --arg ts "$(now_iso)" \
     --argjson count "$update_count" \
-    '.spec_updates = $count | .spec_update_history = (.spec_update_history // []) + [{from_phase: $from, reason: $reason, timestamp: $ts}]')"
+    '.spec_updates = $count | .spec_update_history = (.spec_update_history // []) + [{from_phase: $from, reason: $reason, timestamp: $ts}] | .phase = "spec" | .phase_entered_at = $ts')"
   write_state "$state"
-  update_phase "spec"
+  info "Phase: spec"
 
   if [ "$update_count" -ge 3 ]; then
     info "WARNING: This spec has been revised $update_count times during implementation."
@@ -608,7 +751,15 @@ cmd_reset() {
   sf="$(state_file)"
   if [ -f "$sf" ]; then
     rm "$sf"
-    info "Workflow state removed for branch '$(current_branch)'"
+    # Also remove audit trail and checkpoint files for this branch
+    local slug_hash
+    slug_hash="$(branch_slug)"
+    rm -f "$ARTIFACTS_DIR/audit-trail-${slug_hash}.jsonl"
+    rm -f "$ARTIFACTS_DIR/adherence-state-${slug_hash}.json"
+    rm -f "$ARTIFACTS_DIR/checkpoint-ctdd-"*.json "$ARTIFACTS_DIR/checkpoint-crefactor-"*.json \
+          "$ARTIFACTS_DIR/checkpoint-creview-spec-"*.json "$ARTIFACTS_DIR/checkpoint-caudit-"*.json 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/.pkg-cache-"*.json 2>/dev/null
+    info "Workflow state, audit trail, adherence state, and checkpoints removed for branch '$(current_branch)'"
   else
     info "No workflow state for branch '$(current_branch)'"
   fi
@@ -657,8 +808,11 @@ cmd_override() {
     --arg ts "$ts" \
     --arg branch "$(current_branch)" \
     '{phase: $phase, reason: $reason, timestamp: $ts, branch: $branch}')"
-  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
-    && mv "$OVERRIDE_LOG.$$" "$OVERRIDE_LOG"
+  local ol_tmp="$OVERRIDE_LOG.$$"
+  trap 'rm -f "$ol_tmp"' EXIT
+  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$ol_tmp" \
+    && mv "$ol_tmp" "$OVERRIDE_LOG"
+  trap - EXIT
 
   info "Override active for next 10 tool calls"
   info "Reason logged: $reason"
@@ -786,6 +940,12 @@ cmd_status() {
   info "Started: $(echo "$state" | jq -r '.started_at')"
   info "QA rounds: $(echo "$state" | jq -r '.qa_rounds // 0')"
 
+  local intensity
+  intensity="$(echo "$state" | jq -r '.feature_intensity // empty')"
+  if [ -n "$intensity" ]; then
+    info "Intensity: $intensity"
+  fi
+
   local updates
   updates="$(echo "$state" | jq -r '.spec_updates // 0')"
   if [ "$updates" -gt 0 ]; then
@@ -829,7 +989,7 @@ cmd="${1:-}"
 shift || true
 
 case "$cmd" in
-  init)           cmd_init "$@" ;;
+  init|start)     cmd_init "$@" ;;
   review)         cmd_review ;;
   model)          cmd_model ;;
   review-spec)    cmd_review_spec ;;
@@ -844,6 +1004,7 @@ case "$cmd" in
   audit-start)    cmd_audit_start "$@" ;;
   audit-done)     cmd_audit_done ;;
   spec-update)    cmd_spec_update "$@" ;;
+  set-intensity)  cmd_set_intensity "$@" ;;
   resolve-drift)  cmd_resolve_drift "$@" ;;
   reset)          cmd_reset ;;
   override)       cmd_override "$@" ;;
@@ -874,14 +1035,15 @@ case "$cmd" in
     echo "  resolve-drift ID \"reason\"  Mark drift debt item as resolved"
     echo ""
     echo "Utilities:"
+    echo "  set-intensity lvl  Set feature intensity (standard|high|critical)"
     echo "  reset              Remove all workflow state for current branch"
     echo "  override \"reason\" Temporarily bypass gate for 10 tool calls"
     echo "  diagnose \"file\"   Show why a file would be blocked/allowed"
     echo "  status             Print current workflow state"
     echo "  status-all         Print all active workflows across branches"
     echo ""
-    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /crefactor /cpr-review /cstatus /csummary /cmetrics /cdebug /chelp"
-    echo "Full:   /cmodel /creview-spec /caudit /cupdate-arch /cpostmortem /cdevadv /credteam"
+    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /crefactor /cpr-review /ccontribute /cmaintain /cstatus /csummary /cmetrics /cdebug /chelp /cwtf /cquick /crelease /cexplain"
+    echo "High+:  /cmodel /creview-spec /caudit /cupdate-arch /cpostmortem /cdevadv /credteam"
     exit 1
     ;;
 esac

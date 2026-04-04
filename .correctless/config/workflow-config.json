@@ -5,7 +5,7 @@
     "description": "Claude Code plugin framework: structured workflow skills for spec-driven development with TDD, auditing, and project health"
   },
   "commands": {
-    "test": "bash tests/test.sh && bash tests/test-mcp.sh && bash tests/test-bugfixes.sh && bash tests/test-qol.sh && bash tests/test-decisions.sh && bash tests/test-statusline.sh && bash tests/test-consolidation.sh && bash tests/test-crelease.sh && bash tests/test-calm-resets.sh && bash tests/test-dynamic-rigor.sh && bash tests/test-intensity-detection.sh && bash tests/test-wire-intensity-creview.sh && bash tests/test-wire-intensity-pipeline.sh",
+    "test": "bash tests/test.sh && bash tests/test-mcp.sh && bash tests/test-bugfixes.sh && bash tests/test-qol.sh && bash tests/test-decisions.sh && bash tests/test-statusline.sh && bash tests/test-consolidation.sh && bash tests/test-crelease.sh && bash tests/test-calm-resets.sh && bash tests/test-dynamic-rigor.sh && bash tests/test-intensity-detection.sh && bash tests/test-wire-intensity-creview.sh && bash tests/test-wire-intensity-pipeline.sh && bash tests/test-cexplain.sh",
     "test_new": "bash tests/test-wire-intensity-pipeline.sh",
     "test_verbose": "bash tests/test.sh && bash tests/test-mcp.sh",
     "coverage": "",
@@ -14,11 +14,12 @@
   },
   "patterns": {
     "test_file": "tests/test*.sh",
-    "source_file": "*.sh,*.md",
+    "source_file": "*.sh|*.md",
     "test_fail_pattern": "FAIL:",
     "build_error_pattern": ""
   },
   "workflow": {
+    "intensity": "high",
     "min_qa_rounds": 1,
     "require_review": true,
     "auto_update_antipatterns": true,
@@ -34,11 +35,11 @@
   "paths": {
     "architecture_doc": "ARCHITECTURE.md",
     "agent_context": "AGENT_CONTEXT.md",
-    "antipatterns": ".claude/antipatterns.md",
+    "antipatterns": ".correctless/antipatterns.md",
     "docs": "docs/",
-    "specs": "docs/specs/",
-    "artifacts": ".claude/artifacts/",
-    "state": ".claude/artifacts/workflow-state-{branch-slug}.json"
+    "specs": ".correctless/specs/",
+    "artifacts": ".correctless/artifacts/",
+    "state": ".correctless/artifacts/workflow-state-{branch-slug}.json"
   },
   "setup": {
     "architecture_state": "existing",

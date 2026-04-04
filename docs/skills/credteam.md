@@ -41,10 +41,10 @@ The agent crafts a request to `/internal/services` and receives a list of intern
 
 | Reads | Writes |
 |-------|--------|
-| Source code (full access) | Report (`.claude/artifacts/redteam/report-{date}.md`) |
+| Source code (full access) | Report (`.correctless/artifacts/redteam/report-{date}.md`) |
 | `ARCHITECTURE.md` | Regression tests |
-| Running target (live requests) | Updated antipatterns (`.claude/antipatterns.md`) |
-| | Token log (`.claude/artifacts/token-log-{slug}.json`) |
+| Running target (live requests) | Updated antipatterns (`.correctless/antipatterns.md`) |
+| | Token log (`.correctless/artifacts/token-log-{slug}.json`) |
 
 ## Options
 

@@ -150,12 +150,14 @@ if [ "$IS_FULL" = "true" ]; then
       # Track reads (for QA coverage analysis)
       jq --arg f "$f" --arg p "$PHASE" \
         '.read_files += [$f] | .read_files |= unique' \
-        "$ADHERENCE" > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null
+        "$ADHERENCE" > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null \
+        || rm -f "$ADHERENCE.$$" 2>/dev/null
     else
       # Track writes
       jq --arg f "$f" --arg p "$PHASE" \
         '.modified_files += [$f] | .modified_files |= unique | .phase_files[$p] = ((.phase_files[$p] // 0) + 1)' \
-        "$ADHERENCE" > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null
+        "$ADHERENCE" > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null \
+        || rm -f "$ADHERENCE.$$" 2>/dev/null
     fi
   done
 

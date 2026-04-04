@@ -20,7 +20,7 @@ Runs outside the normal pipeline, triggered by a production bug or post-merge di
 - Gathers facts from the human: what broke, severity, which feature, which phases ran
 - Traces the bug to a specific workflow gap: missing spec invariant, insufficient review, weak QA lens, skipped phase
 - Determines class-level corrective actions (not instance fixes): new antipatterns, structural tests, invariant template updates, drift debt entries
-- Writes a PMB (Post-Merge Bug) entry to `.claude/meta/workflow-effectiveness.json`
+- Writes a PMB (Post-Merge Bug) entry to `.correctless/meta/workflow-effectiveness.json`
 - Appends a learning to the `## Correctless Learnings` section of `CLAUDE.md` so all future agents know what escaped testing
 
 ## Example
@@ -44,17 +44,17 @@ The PMB entry is written, phase effectiveness counters are updated (review-spec 
 
 | Reads | Writes |
 |-------|--------|
-| `.claude/meta/workflow-effectiveness.json` | `.claude/meta/workflow-effectiveness.json` (PMB entry) |
-| `.claude/antipatterns.md` | `.claude/antipatterns.md` (new AP-xxx entry) |
-| Spec artifact (`docs/specs/{slug}.md`) | `.claude/templates/invariants/` (template updates) |
+| `.correctless/meta/workflow-effectiveness.json` | `.correctless/meta/workflow-effectiveness.json` (PMB entry) |
+| `.correctless/antipatterns.md` | `.correctless/antipatterns.md` (new AP-xxx entry) |
+| Spec artifact (`.correctless/specs/{slug}.md`) | `.claude/templates/invariants/` (template updates) |
 | Verification report (`docs/verification/`) | `CLAUDE.md` (Correctless Learnings section) |
-| Debug investigations (`.claude/artifacts/debug-investigation-*.md`) | Token log (`.claude/artifacts/token-log-{slug}.json`) |
+| Debug investigations (`.correctless/artifacts/debug-investigation-*.md`) | Token log (`.correctless/artifacts/token-log-{slug}.json`) |
 
 ## Corrective Action Types
 
 | Action | What It Does | When to Use |
 |--------|-------------|-------------|
-| New antipattern (AP-xxx) | Adds a class-level bug pattern to `.claude/antipatterns.md` | The bug class is not yet tracked |
+| New antipattern (AP-xxx) | Adds a class-level bug pattern to `.correctless/antipatterns.md` | The bug class is not yet tracked |
 | Structural test | Automated test that catches all current and future instances | Highest-value action — turns a process gap into a CI check |
 | Invariant template update | Adds a rule to spec templates so future specs include it | The spec domain template should have required this invariant |
 | Drift debt (DRIFT-xxx) | Tracks unresolved architectural drift | The bug reveals a gap between docs and reality |

@@ -69,12 +69,12 @@ or shortcuts detected.
 
 | Reads | Writes |
 |-------|--------|
-| `.claude/artifacts/workflow-state-*.json` | Nothing (read-only) |
-| Spec file (`docs/specs/{task-slug}.md`) | |
-| `.claude/artifacts/qa-findings-{task-slug}.json` | |
-| `.claude/artifacts/tdd-test-edits.log` | |
-| `.claude/artifacts/audit-trail-*.jsonl` | |
-| `.claude/artifacts/override-log.json` | |
+| `.correctless/artifacts/workflow-state-*.json` | Nothing (read-only) |
+| Spec file (`.correctless/specs/{task-slug}.md`) | |
+| `.correctless/artifacts/qa-findings-{task-slug}.json` | |
+| `.correctless/artifacts/tdd-test-edits.log` | |
+| `.correctless/artifacts/audit-trail-*.jsonl` | |
+| `.correctless/artifacts/override-log.json` | |
 | `docs/verification/{task-slug}-verification.md` | |
 | `~/.claude/usage-data/session-meta/*.json` | |
 | Conversation JSONL (targeted queries only) | |

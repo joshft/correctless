@@ -60,6 +60,7 @@ esac
 branch_slug() {
   local branch
   branch="$(git branch --show-current 2>/dev/null)"
+  [ -n "$branch" ] || { exit 0; }  # detached HEAD: no workflow, allow all
   local slug hash
   slug="$(echo "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
   hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
@@ -100,7 +101,10 @@ if [ ! -f "$STATE_FILE" ]; then
   exit 0
 fi
 
-PHASE="$(jq -r '.phase' "$STATE_FILE")"
+PHASE="$(jq -r '.phase' "$STATE_FILE" 2>/dev/null)" || {
+  echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
+  exit 2
+}
 
 # Validate phase is a known value
 case "$PHASE" in
@@ -129,7 +133,8 @@ if [ "$OVERRIDE_ACTIVE" = "true" ]; then
           .override.remaining_calls -= 1
           | if .override.remaining_calls <= 0 then .override.active = false else . end
         else . end' "$STATE_FILE" > "$STATE_FILE.$$" \
-      && mv "$STATE_FILE.$$" "$STATE_FILE"
+      && mv "$STATE_FILE.$$" "$STATE_FILE" \
+      || { rm -f "$STATE_FILE.$$"; exit 2; }
     exit 0
   fi
 fi
@@ -222,7 +227,7 @@ resolve_package() {
   local best="." best_len=0
   while IFS= read -r key; do
     local pkg_path
-    pkg_path="$(jq -r ".packages[\"$key\"].path" "$CONFIG_FILE")"
+    pkg_path="$(jq -r --arg k "$key" '.packages[$k].path' "$CONFIG_FILE")"
     case "$file" in
       "$pkg_path"/*)
         if [ ${#pkg_path} -gt $best_len ]; then
@@ -233,10 +238,12 @@ resolve_package() {
 
   # Write to cache (only if mtime was available)
   if [ -n "$cache_file" ]; then
+    # Prune stale cache files from previous config versions
+    find "$ARTIFACTS_DIR" -maxdepth 1 -name '.pkg-cache-*.json' ! -name ".pkg-cache-${mtime}.json" -delete 2>/dev/null || true
     if [ -f "$cache_file" ]; then
-      jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null
+      jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null || true
     else
-      jq -nc --arg f "$file" --arg p "$best" '{($f): $p}' > "$cache_file" 2>/dev/null
+      jq -nc --arg f "$file" --arg p "$best" '{($f): $p}' > "$cache_file" 2>/dev/null || true
     fi
   fi
 
@@ -246,8 +253,8 @@ resolve_package() {
 # Resolve package for the current file and read appropriate patterns
 PACKAGE_SCOPE="$(resolve_package "$REL_FILE")"
 if [ "$PACKAGE_SCOPE" != "." ]; then
-  TEST_PATTERN="$(jq -r ".packages[\"$PACKAGE_SCOPE\"].patterns.test_file // .patterns.test_file // empty" "$CONFIG_FILE")"
-  SOURCE_PATTERN="$(jq -r ".packages[\"$PACKAGE_SCOPE\"].patterns.source_file // .patterns.source_file // empty" "$CONFIG_FILE")"
+  TEST_PATTERN="$(jq -r --arg s "$PACKAGE_SCOPE" '(.packages[$s].patterns.test_file) // .patterns.test_file // empty' "$CONFIG_FILE")"
+  SOURCE_PATTERN="$(jq -r --arg s "$PACKAGE_SCOPE" '(.packages[$s].patterns.source_file) // .patterns.source_file // empty' "$CONFIG_FILE")"
 else
   TEST_PATTERN="$(jq -r '.patterns.test_file // empty' "$CONFIG_FILE")"
   SOURCE_PATTERN="$(jq -r '.patterns.source_file // empty' "$CONFIG_FILE")"

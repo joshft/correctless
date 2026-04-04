@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2254
 # Correctless — PreToolUse gate hook (supports both Lite and Full modes)
 # Blocks file operations that violate the current workflow phase.
 #
@@ -8,6 +9,7 @@
 # Exit codes:
 #   0 — allow the operation
 #   2 — block the operation (message printed to stderr)
+# SC2254 disabled: unquoted $pat in case is intentional — we need glob matching
 
 set -euo pipefail
 
@@ -16,8 +18,8 @@ set -f
 command -v jq >/dev/null 2>&1 || { echo "BLOCKED: jq not found — required for workflow gate" >&2; exit 2; }
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-CONFIG_FILE="$REPO_ROOT/.claude/workflow-config.json"
-ARTIFACTS_DIR="$REPO_ROOT/.claude/artifacts"
+CONFIG_FILE="$REPO_ROOT/.correctless/config/workflow-config.json"
+ARTIFACTS_DIR="$REPO_ROOT/.correctless/artifacts"
 TEST_EDIT_LOG="$ARTIFACTS_DIR/tdd-test-edits.log"
 
 # ---------------------------------------------------------------------------
@@ -58,6 +60,7 @@ esac
 branch_slug() {
   local branch
   branch="$(git branch --show-current 2>/dev/null)"
+  [ -n "$branch" ] || { exit 0; }  # detached HEAD: no workflow, allow all
   local slug hash
   slug="$(echo "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
   hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
@@ -84,7 +87,7 @@ if [ ! -f "$STATE_FILE" ]; then
           case "$BASENAME_CHECK" in
             $p)
               echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
-  Start a workflow: .claude/hooks/workflow-advance.sh init \"task description\"
+  Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
   (You must be on a feature branch, not main.)
   Or run /cstatus to see what's going on." >&2
               exit 2
@@ -98,7 +101,10 @@ if [ ! -f "$STATE_FILE" ]; then
   exit 0
 fi
 
-PHASE="$(jq -r '.phase' "$STATE_FILE")"
+PHASE="$(jq -r '.phase' "$STATE_FILE" 2>/dev/null)" || {
+  echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
+  exit 2
+}
 
 # Validate phase is a known value
 case "$PHASE" in
@@ -127,7 +133,8 @@ if [ "$OVERRIDE_ACTIVE" = "true" ]; then
           .override.remaining_calls -= 1
           | if .override.remaining_calls <= 0 then .override.active = false else . end
         else . end' "$STATE_FILE" > "$STATE_FILE.$$" \
-      && mv "$STATE_FILE.$$" "$STATE_FILE"
+      && mv "$STATE_FILE.$$" "$STATE_FILE" \
+      || { rm -f "$STATE_FILE.$$"; exit 2; }
     exit 0
   fi
 fi
@@ -195,8 +202,63 @@ if [ ! -f "$CONFIG_FILE" ]; then
   exit 0  # No config → can't classify → allow
 fi
 
-TEST_PATTERN="$(jq -r '.patterns.test_file // empty' "$CONFIG_FILE")"
-SOURCE_PATTERN="$(jq -r '.patterns.source_file // empty' "$CONFIG_FILE")"
+# ---------------------------------------------------------------------------
+# Package resolution for monorepos (longest-prefix match with caching)
+# ---------------------------------------------------------------------------
+
+resolve_package() {
+  local file="$1"
+  # Fast bail: not a monorepo
+  jq -e '.is_monorepo' "$CONFIG_FILE" >/dev/null 2>&1 || { echo "."; return; }
+
+  # Check cache (invalidated by config mtime)
+  local mtime cache_file=""
+  mtime="$(stat -c %Y "$CONFIG_FILE" 2>/dev/null || stat -f %m "$CONFIG_FILE" 2>/dev/null)"
+  if [ -n "$mtime" ] && [ -d "$ARTIFACTS_DIR" ]; then
+    cache_file="$ARTIFACTS_DIR/.pkg-cache-${mtime}.json"
+    if [ -f "$cache_file" ]; then
+      local cached
+      cached="$(jq -r --arg f "$file" '.[$f] // empty' "$cache_file" 2>/dev/null)"
+      if [ -n "$cached" ]; then echo "$cached"; return; fi
+    fi
+  fi
+
+  # Longest-prefix match
+  local best="." best_len=0
+  while IFS= read -r key; do
+    local pkg_path
+    pkg_path="$(jq -r --arg k "$key" '.packages[$k].path' "$CONFIG_FILE")"
+    case "$file" in
+      "$pkg_path"/*)
+        if [ ${#pkg_path} -gt $best_len ]; then
+          best="$key"; best_len=${#pkg_path}
+        fi ;;
+    esac
+  done < <(jq -r '.packages | keys[]' "$CONFIG_FILE" 2>/dev/null)
+
+  # Write to cache (only if mtime was available)
+  if [ -n "$cache_file" ]; then
+    # Prune stale cache files from previous config versions
+    find "$ARTIFACTS_DIR" -maxdepth 1 -name '.pkg-cache-*.json' ! -name ".pkg-cache-${mtime}.json" -delete 2>/dev/null || true
+    if [ -f "$cache_file" ]; then
+      jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null || true
+    else
+      jq -nc --arg f "$file" --arg p "$best" '{($f): $p}' > "$cache_file" 2>/dev/null || true
+    fi
+  fi
+
+  echo "$best"
+}
+
+# Resolve package for the current file and read appropriate patterns
+PACKAGE_SCOPE="$(resolve_package "$REL_FILE")"
+if [ "$PACKAGE_SCOPE" != "." ]; then
+  TEST_PATTERN="$(jq -r --arg s "$PACKAGE_SCOPE" '(.packages[$s].patterns.test_file) // .patterns.test_file // empty' "$CONFIG_FILE")"
+  SOURCE_PATTERN="$(jq -r --arg s "$PACKAGE_SCOPE" '(.packages[$s].patterns.source_file) // .patterns.source_file // empty' "$CONFIG_FILE")"
+else
+  TEST_PATTERN="$(jq -r '.patterns.test_file // empty' "$CONFIG_FILE")"
+  SOURCE_PATTERN="$(jq -r '.patterns.source_file // empty' "$CONFIG_FILE")"
+fi
 
 classify_file() {
   local file="$1"
@@ -292,8 +354,8 @@ case "$PHASE" in
     if [ "$FILE_CLASS" = "source" ] || [ "$FILE_CLASS" = "test" ]; then
       block "You're in the $PHASE phase — source and test files are locked until the spec is reviewed and approved.
   What to do: finish the spec conversation, then advance the workflow.
-  Run: .claude/hooks/workflow-advance.sh status  (to see current state)
-  Bypass: .claude/hooks/workflow-advance.sh override \"reason\"  (emergency only)"
+  Run: .correctless/hooks/workflow-advance.sh status  (to see current state)
+  Bypass: .correctless/hooks/workflow-advance.sh override \"reason\"  (emergency only)"
     fi
     ;;
 
@@ -316,7 +378,7 @@ case "$PHASE" in
   Source file '$_src_rel' is blocked — no STUB:TDD marker found.
   What to do: write your test files first. For type signatures that tests need to compile,
   create stub functions with '// STUB:TDD' in the body and zero-value returns.
-  When tests exist and fail: .claude/hooks/workflow-advance.sh impl  (unlocks source files)"
+  When tests exist and fail: .correctless/hooks/workflow-advance.sh impl  (unlocks source files)"
           fi
         else
           # New file — check if content contains STUB:TDD
@@ -349,12 +411,12 @@ case "$PHASE" in
       if [ "$PHASE" = "tdd-qa" ]; then
         block "QA phase — code is frozen while the QA agent reviews.
   Source and test files are locked. Report findings as text, don't edit code.
-  If issues found: .claude/hooks/workflow-advance.sh fix  (returns to implementation)
-  If clean: .claude/hooks/workflow-advance.sh done  (completes the workflow)"
+  If issues found: .correctless/hooks/workflow-advance.sh fix  (returns to implementation)
+  If clean: .correctless/hooks/workflow-advance.sh done  (completes the workflow)"
       else
         block "Verification phase — code is frozen for final checks.
-  If all checks pass: .claude/hooks/workflow-advance.sh done
-  Bypass: .claude/hooks/workflow-advance.sh override \"reason\"  (emergency only)"
+  If all checks pass: .correctless/hooks/workflow-advance.sh done
+  Bypass: .correctless/hooks/workflow-advance.sh override \"reason\"  (emergency only)"
       fi
     fi
     ;;

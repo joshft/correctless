@@ -49,7 +49,7 @@ No problems detected.
 
 | Reads | Writes |
 |-------|--------|
-| `.claude/workflow-config.json` | Nothing (read-only) |
+| `.correctless/config/workflow-config.json` | Nothing (read-only) |
 | `.claude/hooks/workflow-advance.sh` (status output) | |
 | `ARCHITECTURE.md` | |
 | `AGENT_CONTEXT.md` | |

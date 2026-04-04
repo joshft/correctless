@@ -20,7 +20,7 @@ This skill is standalone and project-wide. It reads accumulated data from every 
 - Breaks down issues by phase (Review, Test Audit, QA, Verify, Audit) to show where value concentrates.
 - Tracks antipattern growth by category, flagging systemic issues that may need architectural fixes.
 - Monitors drift debt health: open items, staleness, accumulation vs. resolution rate.
-- **Token ROI Analysis**: Reads `.claude/artifacts/token-log-*.json` to compute cost per bug caught, tokens per feature by phase, tokens per LOC, and estimated production fix cost avoided. Shows whether token spend is efficient (e.g., "65% of tokens go to TDD, which catches 60% of bugs").
+- **Token ROI Analysis**: Reads `.correctless/artifacts/token-log-*.json` to compute cost per bug caught, tokens per feature by phase, tokens per LOC, and estimated production fix cost avoided. Shows whether token spend is efficient (e.g., "65% of tokens go to TDD, which catches 60% of bugs").
 - **Session Analytics**: Reads Claude Code `session-meta` and `facets` data from `~/.claude/usage-data/`, filtered to the current project. Reports exact token cost (ground truth), tool distribution, friction rate, user engagement, and outcome rate.
 - **Correctless vs Freeform comparison**: Identifies which sessions used Correctless (by checking artifact timestamps and tool patterns) vs. freeform coding, then compares outcome rate, friction, duration, and token usage between the two groups.
 - Cross-metric correlation analysis: flags patterns like "specs revised mid-TDD frequently AND antipattern growth accelerating in the same category."
@@ -66,16 +66,16 @@ User: /cmetrics
 
 | Reads | Writes |
 |-------|--------|
-| `.claude/artifacts/qa-findings-*.json` | `.claude/artifacts/metrics-{date}.md` |
+| `.correctless/artifacts/qa-findings-*.json` | `.correctless/artifacts/metrics-{date}.md` |
 | `docs/verification/*-verification.md` | |
-| `.claude/meta/workflow-effectiveness.json` | |
-| `.claude/antipatterns.md` | |
-| `.claude/meta/drift-debt.json` | |
-| `.claude/artifacts/findings/audit-*-history.md` | |
-| `docs/specs/*.md` | |
-| `.claude/artifacts/summary-*.md` | |
-| `.claude/artifacts/token-log-*.json` | |
-| `.claude/artifacts/audit-trail-*.jsonl` | |
+| `.correctless/meta/workflow-effectiveness.json` | |
+| `.correctless/antipatterns.md` | |
+| `.correctless/meta/drift-debt.json` | |
+| `.correctless/artifacts/findings/audit-*-history.md` | |
+| `.correctless/specs/*.md` | |
+| `.correctless/artifacts/summary-*.md` | |
+| `.correctless/artifacts/token-log-*.json` | |
+| `.correctless/artifacts/audit-trail-*.jsonl` | |
 | `~/.claude/usage-data/session-meta/*.json` | |
 | `~/.claude/usage-data/facets/*.json` | |
 | `docs/decisions/*.md` | |

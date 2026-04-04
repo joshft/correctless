@@ -37,9 +37,9 @@ You revise the spec to require atomic check-and-consume, then advance to `/crevi
 
 | Reads | Writes |
 |-------|--------|
-| Spec artifact (`docs/specs/{slug}.md`) | Alloy model (`docs/models/{slug}.also`) |
+| Spec artifact (`.correctless/specs/{slug}.md`) | Alloy model (`docs/models/{slug}.also`) |
 | `ARCHITECTURE.md` | Analysis results (`docs/models/{slug}-results.md`) |
-| `.claude/workflow-config.json` | Token log (`.claude/artifacts/token-log-{slug}.json`) |
+| `.correctless/config/workflow-config.json` | Token log (`.correctless/artifacts/token-log-{slug}.json`) |
 
 ## Common Issues
 

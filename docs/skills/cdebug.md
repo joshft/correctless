@@ -71,11 +71,11 @@ Agent: Bisect found commit `a3f2c91`: "refactor: reorganize middleware"
 
 | Reads | Writes |
 |-------|--------|
-| `AGENT_CONTEXT.md` | `.claude/artifacts/debug-investigation-{slug}.md` |
-| `ARCHITECTURE.md` | `.claude/artifacts/debug-bisect-test.sh` (temporary, cleaned up) |
-| `.claude/antipatterns.md` | `.claude/antipatterns.md` (new entry, if class fix) |
-| `.claude/artifacts/qa-findings-*.json` | `.claude/artifacts/token-log-{slug}.json` |
-| `.claude/meta/drift-debt.json` | Test and source files (fix) |
+| `AGENT_CONTEXT.md` | `.correctless/artifacts/debug-investigation-{slug}.md` |
+| `ARCHITECTURE.md` | `.correctless/artifacts/debug-bisect-test.sh` (temporary, cleaned up) |
+| `.correctless/antipatterns.md` | `.correctless/antipatterns.md` (new entry, if class fix) |
+| `.correctless/artifacts/qa-findings-*.json` | `.correctless/artifacts/token-log-{slug}.json` |
+| `.correctless/meta/drift-debt.json` | Test and source files (fix) |
 | Git history and blame | |
 
 ## Lite vs Full

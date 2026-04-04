@@ -37,12 +37,13 @@ eval "$(echo "$input" | jq -r '
   @sh "TOTAL_IN=\(.context_window.total_input_tokens)",
   @sh "TOTAL_OUT=\(.context_window.total_output_tokens)",
   @sh "DURATION_MS=\(.total_duration_ms)"
-')"
+' 2>/dev/null)"
 
 # --- Helper: format token count ---
 # <1000 → integer, 1000-999999 → N.Nk, 1000000+ → N.NM
 fmt_tokens() {
   local n="$1"
+  [[ "$n" =~ ^[0-9]+$ ]] || { echo "$n"; return; }
   if [ "$n" -lt 1000 ]; then
     echo "$n"
   elif [ "$n" -lt 1000000 ]; then
@@ -56,6 +57,7 @@ fmt_tokens() {
 # --- Helper: format duration ms → Nm or Nh Nm ---
 fmt_duration() {
   local ms="$1"
+  [[ "$ms" =~ ^[0-9]+$ ]] || { echo ""; return; }
   local total_min=$(( ms / 60000 ))
   if [ "$total_min" -lt 60 ]; then
     echo "${total_min}m"
@@ -174,7 +176,7 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
       @sh "QA_ROUNDS=\(.qa_rounds // 0)",
       @sh "TASK=\(.task // empty)",
       @sh "PHASE_ENTERED=\(.phase_entered_at // empty)",
-      @sh "OVERRIDE_REMAINING=\(.override_remaining // empty)",
+      @sh "OVERRIDE_REMAINING=\(.override.remaining_calls // empty)",
       @sh "SPEC_UPDATES=\(.spec_updates // 0)"
     ' "$STATE_FILE" 2>/dev/null)"
 

@@ -45,12 +45,12 @@ You run `/cdevadv layers` after a quarter of development.
 
 | Reads | Writes |
 |-------|--------|
-| `ARCHITECTURE.md` | Report (`.claude/artifacts/devadv/report-{date}.md`) |
-| `AGENT_CONTEXT.md` | Drift debt updates (`.claude/meta/drift-debt.json`) |
-| `.claude/antipatterns.md` | Token log (`.claude/artifacts/token-log-{slug}.json`) |
-| `.claude/meta/drift-debt.json` | |
-| `.claude/meta/workflow-effectiveness.json` | |
-| `.claude/artifacts/findings/audit-*-history.md` | |
+| `ARCHITECTURE.md` | Report (`.correctless/artifacts/devadv/report-{date}.md`) |
+| `AGENT_CONTEXT.md` | Drift debt updates (`.correctless/meta/drift-debt.json`) |
+| `.correctless/antipatterns.md` | Token log (`.correctless/artifacts/token-log-{slug}.json`) |
+| `.correctless/meta/drift-debt.json` | |
+| `.correctless/meta/workflow-effectiveness.json` | |
+| `.correctless/artifacts/findings/audit-*-history.md` | |
 | Dependency manifests (go.mod, package.json, etc.) | |
 | Source code (targeted, Pass 4 only) | |
 

@@ -239,7 +239,7 @@ If no spec is referenced, skip this step.
 
 ## Full Mode Additional Checks
 
-Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is set (any value: `"low"`, `"standard"`, `"high"`, or `"critical"`), you are at high+ intensity — run these additional checks.
+Compute the effective intensity using the same method as other pipeline skills: read `workflow.intensity` from `.correctless/config/workflow-config.json` (project_intensity, default `standard`), read the `Intensity:` line from `.correctless/hooks/workflow-advance.sh status` (feature_intensity), and take `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`. If the effective intensity is `high` or `critical`, run these additional checks. At `standard` intensity, skip this section.
 
 ### Concurrency Analysis
 - Does the PR introduce shared mutable state?

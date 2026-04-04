@@ -56,12 +56,12 @@ Agent: Rule coverage complete — 5/5 rules covered, 1 weak.
 
 | Reads | Writes |
 |-------|--------|
-| Spec (`docs/specs/{slug}.md`) | `docs/verification/{slug}-verification.md` |
-| Implementation (changed files on branch) | `.claude/meta/drift-debt.json` (appended if drift found) |
-| Test files | `.claude/artifacts/token-log-{slug}.json` |
+| Spec (`.correctless/specs/{slug}.md`) | `docs/verification/{slug}-verification.md` |
+| Implementation (changed files on branch) | `.correctless/meta/drift-debt.json` (appended if drift found) |
+| Test files | `.correctless/artifacts/token-log-{slug}.json` |
 | `ARCHITECTURE.md` | Workflow state (advances to verified) |
-| `.claude/artifacts/qa-findings-{slug}.json` | |
-| `.claude/meta/workflow-effectiveness.json` | |
+| `.correctless/artifacts/qa-findings-{slug}.json` | |
+| `.correctless/meta/workflow-effectiveness.json` | |
 | Package manifests (diff against base branch) | |
 
 ## Lite vs Full

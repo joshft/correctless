@@ -71,11 +71,11 @@ Agent: Approved. Resuming...
 
 | Reads | Writes |
 |-------|--------|
-| Source files being refactored | `.claude/artifacts/refactor-intent-{slug}.md` |
-| Test files (behavioral contract) | `.claude/artifacts/refactor-baseline-{slug}.json` |
-| `ARCHITECTURE.md` | `.claude/artifacts/refactor-summary-{slug}.md` |
-| `.claude/antipatterns.md` | `.claude/artifacts/qa-findings-refactor-{slug}.json` |
-| `.claude/workflow-config.json` | Characterization test files (if needed) |
+| Source files being refactored | `.correctless/artifacts/refactor-intent-{slug}.md` |
+| Test files (behavioral contract) | `.correctless/artifacts/refactor-baseline-{slug}.json` |
+| `ARCHITECTURE.md` | `.correctless/artifacts/refactor-summary-{slug}.md` |
+| `.correctless/antipatterns.md` | `.correctless/artifacts/qa-findings-refactor-{slug}.json` |
+| `.correctless/config/workflow-config.json` | Characterization test files (if needed) |
 | | `ARCHITECTURE.md` (if patterns changed, with approval) |
 
 ## Lite vs Full

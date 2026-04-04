@@ -2,9 +2,39 @@
 
 All notable changes to Correctless are documented here.
 
+## [3.0.0] - 2026-04-03
+
+### Changed — Single Distribution with Dynamic Rigor
+- Merged Lite and Full distributions into a single 26-skill plugin
+- Retired "Lite mode" / "Full mode" terminology in favor of intensity levels (standard, high, critical)
+- Intensity gates control which features activate — standard (~10-15 min/feature), high/critical (~1-2 hr/feature)
+- Per-feature intensity override via `workflow-advance.sh set-intensity`
+
+### Added — Skills
+- `/cquick` — Lightweight TDD without full spec ceremony
+- `/crelease` — Versioning, changelog management, and release workflow
+- `/cexplain` — Guided codebase exploration with structured question flow
+
+### Added — Dynamic Rigor System
+- Intensity detection from spec signals (STRIDE, invariants, compliance keywords)
+- Per-feature intensity stored in workflow state, computed as `max(project, feature)` (PAT-005)
+- Intensity Configuration tables in all 6 pipeline skills (cspec, creview, ctdd, cverify, cdocs, cstatus)
+- Verbatim Effective Intensity section (R-022) across all pipeline skills
+
+### Added — Infrastructure
+- 14 test files with ~1,518 assertions (up from 57 in v2.0.0)
+- Calm reset prompts in /ctdd and /caudit orchestrators
+- Spec template files (spec-lite.md, spec-full.md) for intensity-aware spec generation
+
+### Fixed
+- QA Olympics audit: 24 findings fixed across hooks, gate, statusline, and documentation
+- Gate phase enforcement for project source files (pattern delimiter fix)
+- Override statusline display (correct state field path)
+- Atomic state writes (single write_state per command, trap cleanup for temp files)
+
 ## [2.0.0] - 2026-03-31
 
-### Added — Skills (23 total: 16 Lite, 23 Full)
+### Added — Skills (23 at v2.0.0: 16 standard-intensity, 7 high+-intensity only)
 
 **Core Workflow (Lite)**
 - `/csetup` — Project health check with 17 checks, convention mining, existing project discovery
@@ -65,7 +95,7 @@ All notable changes to Correctless are documented here.
 - README rewritten with categorized skill tables and Platform Integration section
 - SECURITY.md with vulnerability reporting process
 - CONTRIBUTING.md with skill creation guide
-- Glossary with 11 terms
+- Glossary with 12 terms
 
 ### Infrastructure
 - 4 hooks: workflow-gate.sh, workflow-advance.sh, statusline.sh, audit-trail.sh

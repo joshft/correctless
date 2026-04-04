@@ -158,7 +158,7 @@ Your existing specs, antipatterns, architecture docs, and workflow config carry 
 
 ### 1. Project Health Check
 
-On first run, [`/csetup`](docs/skills/csetup.md) scans your project for baseline hygiene: hardcoded secrets, missing CI, no linter, no tests, committed build artifacts. Produces a health card with 17 checks across security, code quality, testing, CI/CD, documentation, and git hygiene. For existing projects, it mines your codebase for conventions and architecture patterns before asking you to describe them.
+On first run, [`/csetup`](docs/skills/csetup.md) scans your project for baseline hygiene: hardcoded secrets, missing CI, no linter, no tests, committed build artifacts. Produces a health card with 19 checks across security, code quality, testing, CI/CD, documentation, and git hygiene. For existing projects, it mines your codebase for conventions and architecture patterns before asking you to describe them.
 
 ### 2. Spec Before Code
 
@@ -326,7 +326,7 @@ After postmortems, feature completions, and audits, learnings are appended to CL
 
 `/csetup` offers to configure two MCP servers that improve code analysis across all skills:
 
-- **Serena** — symbol-level code queries (call graphs, references, symbol lookup) instead of reading entire files. 14 skills use it for precise analysis with 40-60% token savings on larger projects.
+- **Serena** — symbol-level code queries (call graphs, references, symbol lookup) instead of reading entire files. 15 skills use it for precise analysis with 40-60% token savings on larger projects.
 - **Context7** — current library documentation on demand. The `/cspec` research agent gets real docs for real versions instead of relying on training data.
 
 Both are free, open source, run locally, and fall back silently to grep/read when unavailable. Zero maintenance after setup.
@@ -397,7 +397,7 @@ Optional (at high+/critical intensity):
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 26 skills with configurable intensity levels, 1,024 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
+**Correctless 3.0.0 — Early release.** 26 skills with configurable intensity levels, 1,518 automated tests, 4 hooks (gate, state machine, statusline, audit trail). Real-world usage ongoing — file issues as you find them.
 
 ## License
 

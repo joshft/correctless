@@ -14,7 +14,7 @@ This skill can be invoked at any time. It is a read-only reference card that det
 
 ## What It Does
 
-- Detects the current mode (not set up / Lite / Full) from `.claude/workflow-config.json`.
+- Detects the current mode (not set up / Lite / Full) from `.correctless/config/workflow-config.json`.
 - Prints the pipeline diagram for your mode.
 - Lists all available commands grouped by category (feature workflow, standalone tools, Full-mode additions).
 - Shows a quick-reference table mapping common tasks to commands.
@@ -52,7 +52,7 @@ No active workflow. Start one: git checkout -b feature/my-feature then /cspec
 
 | Reads | Writes |
 |-------|--------|
-| `.claude/workflow-config.json` | Nothing (read-only) |
+| `.correctless/config/workflow-config.json` | Nothing (read-only) |
 | `.claude/hooks/workflow-advance.sh` (status output) | |
 
 ## Lite vs Full
