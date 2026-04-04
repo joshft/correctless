@@ -50,7 +50,7 @@ No problems detected.
 | Reads | Writes |
 |-------|--------|
 | `.correctless/config/workflow-config.json` | Nothing (read-only) |
-| `.claude/hooks/workflow-advance.sh` (status output) | |
+| `.correctless/hooks/workflow-advance.sh` (status output) | |
 | `ARCHITECTURE.md` | |
 | `AGENT_CONTEXT.md` | |
 | Workflow state file | |
