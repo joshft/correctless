@@ -127,7 +127,7 @@ Agent: Project Health Check — recipe-api (TypeScript/Express)
 | | `.gitignore` (additions, if accepted) |
 | | Linter/formatter config (if accepted) |
 | | PR template (if accepted) |
-| | `.claude/settings.json` (hook registration) |
+| | `.claude/settings.json` (Claude Code hook registration) |
 
 ## Lite vs Full
 

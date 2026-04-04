@@ -46,7 +46,7 @@ The PMB entry is written, phase effectiveness counters are updated (review-spec 
 |-------|--------|
 | `.correctless/meta/workflow-effectiveness.json` | `.correctless/meta/workflow-effectiveness.json` (PMB entry) |
 | `.correctless/antipatterns.md` | `.correctless/antipatterns.md` (new AP-xxx entry) |
-| Spec artifact (`.correctless/specs/{slug}.md`) | `.claude/templates/invariants/` (template updates) |
+| Spec artifact (`.correctless/specs/{slug}.md`) | `.correctless/templates/invariants/` (template updates) |
 | Verification report (`docs/verification/`) | `CLAUDE.md` (Correctless Learnings section) |
 | Debug investigations (`.correctless/artifacts/debug-investigation-*.md`) | Token log (`.correctless/artifacts/token-log-{slug}.json`) |
 

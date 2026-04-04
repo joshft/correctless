@@ -53,7 +53,7 @@ No active workflow. Start one: git checkout -b feature/my-feature then /cspec
 | Reads | Writes |
 |-------|--------|
 | `.correctless/config/workflow-config.json` | Nothing (read-only) |
-| `.claude/hooks/workflow-advance.sh` (status output) | |
+| `.correctless/hooks/workflow-advance.sh` (status output) | |
 
 ## Lite vs Full
 
