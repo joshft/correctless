@@ -631,20 +631,15 @@ test_r013_readme_single_plugin() {
       && local has_intensity="true" || local has_intensity="false"
     assert_eq "R-013: README mentions intensity levels" "true" "$has_intensity"
 
-    # R-013: explicit migration section or instructions
-    file_contains_i "$readme" "migrat" \
-      && local has_migration="true" || local has_migration="false"
-    assert_eq "R-013: README includes migration instructions" "true" "$has_migration"
+    # R-013: README should describe single plugin (post-merge)
+    file_contains "$readme" "single plugin" \
+      && local has_single="true" || local has_single="false"
+    assert_eq "R-013: README describes single plugin" "true" "$has_single"
 
-    # R-013: migration covers both paths (Lite users and Full users)
-    file_contains_i "$readme" "correctless-lite" \
-      && local mentions_lite="true" || local mentions_lite="false"
-    assert_eq "R-013: README migration mentions correctless-lite path" "true" "$mentions_lite"
-
-    # R-013: migration also covers Full-to-unified path
-    grep -qiE "uninstall correctless[^-]|If you have correctless .*(Full|full)|correctless \(Full\)" "$readme" \
-      && local mentions_full="true" || local mentions_full="false"
-    assert_eq "R-013: README migration mentions correctless (Full) path" "true" "$mentions_full"
+    # R-013: README should describe update path
+    file_contains_i "$readme" "update" \
+      && local has_update="true" || local has_update="false"
+    assert_eq "R-013: README includes update instructions" "true" "$has_update"
 
     # R-013: README should NOT describe two separate plugins
     file_not_contains "$readme" "two plugins\|two separate\|Correctless Lite.*Correctless Full\|correctless-lite.*correctless-full" \

@@ -41,9 +41,26 @@ case "$TOOL_NAME" in
     if [ -z "$COMMAND" ]; then
       exit 0
     fi
-    # Only inspect commands that contain write-like patterns
-    # Use space-padded matching instead of \b for BSD grep portability
-    if ! echo " $COMMAND " | grep -qE '(>>?|tee |sed -i| cp | mv | install )'; then
+    # Detect write/destructive patterns — tokenize to catch chained commands
+    _has_write_pattern() {
+      local cmd="$1"
+      # Check redirect operators (work regardless of spacing)
+      echo "$cmd" | grep -qE '>>' && return 0
+      echo "$cmd" | grep -qE '[^-0-9]>' && return 0
+      # Tokenize on shell metacharacters and check each token
+      # shellcheck disable=SC2141
+      local IFS=$' \t\n;|&()`'
+      for tok in $cmd; do
+        case "$tok" in
+          cp|mv|tee|install|rm|rmdir|unlink|dd|curl|wget|rsync|patch|truncate|shred|ln) return 0 ;;
+          sed) echo "$cmd" | grep -qE 'sed[[:space:]]+-i' && return 0 ;;
+          perl) echo "$cmd" | grep -qE 'perl[[:space:]]+-i' && return 0 ;;
+          python|python3|node|ruby) return 0 ;;
+        esac
+      done
+      return 1
+    }
+    if ! _has_write_pattern "$COMMAND"; then
       exit 0
     fi
     # Fall through to phase checking with the command as context
@@ -77,13 +94,15 @@ if [ ! -f "$STATE_FILE" ]; then
   fi
   if [ "$FAIL_CLOSED" = "true" ]; then
     # Full mode fail-closed: block source edits when no state file exists
-    TARGET_FILE_CHECK="$(echo "$TOOL_INPUT" | jq -r '.file_path // empty')"
+    TARGET_FILE_CHECK="$(echo "$TOOL_INPUT" | jq -r '.file_path // (.edits[0]?.file_path) // empty')"
     if [ -n "$TARGET_FILE_CHECK" ]; then
       SOURCE_PAT="$(jq -r '.patterns.source_file // empty' "$CONFIG_FILE")"
       if [ -n "$SOURCE_PAT" ]; then
         BASENAME_CHECK="$(basename "$TARGET_FILE_CHECK")"
+        _FC_OLDIFS="$IFS"
         IFS='|'
         for p in $SOURCE_PAT; do
+          IFS="$_FC_OLDIFS"
           case "$BASENAME_CHECK" in
             $p)
               echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
@@ -94,7 +113,7 @@ if [ ! -f "$STATE_FILE" ]; then
               ;;
           esac
         done
-        unset IFS
+        IFS="$_FC_OLDIFS"
       fi
     fi
   fi
@@ -145,8 +164,8 @@ fi
 
 get_target_file() {
   if [ "$TOOL_NAME" = "Bash" ]; then
-    # Try to extract file target from shell command — best-effort
-    echo "$COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h)' | head -1 || true
+    # Extract file targets from shell command — includes all common extensions
+    echo "$COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)' | head -5 || true
     return
   fi
   # Handle MultiEdit which uses .edits[].file_path instead of .file_path
@@ -169,12 +188,8 @@ check_protected_file() {
     exit 2
   fi
   if echo "$tf" | grep -q 'workflow-config\.json'; then
-    case "$PHASE" in
-      tdd-tests|tdd-impl|tdd-qa|tdd-verify)
-        echo "BLOCKED [$PHASE]: workflow-config.json is protected during TDD phases to prevent test command manipulation." >&2
-        exit 2
-        ;;
-    esac
+    echo "BLOCKED [$PHASE]: workflow-config.json is protected during active workflows to prevent test command manipulation. Use 'reset' to reconfigure." >&2
+    exit 2
   fi
 }
 
@@ -193,6 +208,8 @@ fi
 # For MultiEdit, check ALL files — block if ANY is in a blocked class.
 TARGET_FILE="$(echo "$TARGET_FILES" | head -1)"
 REL_FILE="${TARGET_FILE#$REPO_ROOT/}"
+# Normalize: strip leading ./ to prevent classification bypass
+REL_FILE="${REL_FILE#./}"
 
 # ---------------------------------------------------------------------------
 # Classify file
@@ -260,8 +277,16 @@ else
   SOURCE_PATTERN="$(jq -r '.patterns.source_file // empty' "$CONFIG_FILE")"
 fi
 
+# Fail closed if patterns are empty — prevents classification bypass via config tampering
+if [ -z "$SOURCE_PATTERN" ] && [ -z "$TEST_PATTERN" ]; then
+  echo "BLOCKED: File classification patterns are empty — workflow config may be corrupt or tampered." >&2
+  exit 2
+fi
+
 classify_file() {
   local file="$1"
+  # Normalize case — patterns are lowercase, filenames may not be
+  file="$(echo "$file" | tr '[:upper:]' '[:lower:]')"
   local bname
   bname="$(basename "$file")"
 

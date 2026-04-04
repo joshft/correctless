@@ -141,6 +141,11 @@ is_monorepo() {
 # Usage: read_package_config '.commands.test' 'api'
 read_package_config() {
   local field="$1" scope="${2:-.}"
+  # Validate field is a safe jq dotpath — prevent filter injection
+  # Validate field is a safe jq dotpath (letters, digits, underscores, dots only)
+  if echo "$field" | grep -qE '[^a-zA-Z0-9_.]'; then
+    die "read_package_config: unsafe field path: '$field'"
+  fi
   if [ "$scope" != "." ] && is_monorepo; then
     local val
     val="$(jq -r --arg s "$scope" "(.packages[\$s]$field) // ($field) // empty" "$CONFIG_FILE" 2>/dev/null)"
@@ -785,6 +790,15 @@ cmd_override() {
   override_count="$(echo "$state" | jq -r '.override_count // 0')"
   if [ "$override_count" -ge 3 ]; then
     die "Override limit reached (3 per workflow). If the gate is consistently blocking legitimate edits, the workflow config or patterns may need adjustment. Use 'reset' as a last resort."
+  fi
+
+  # Block renewal while an override is still active
+  local override_active
+  override_active="$(echo "$state" | jq -r '.override.active // false')"
+  local remaining
+  remaining="$(echo "$state" | jq -r '.override.remaining_calls // 0')"
+  if [ "$override_active" = "true" ] && [ "$remaining" -gt 0 ]; then
+    die "An override is already active ($remaining calls remaining). It must expire before requesting another."
   fi
 
   # Write override marker into state

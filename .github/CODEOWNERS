@@ -4,3 +4,7 @@ skills/*/SKILL.md @joshft
 templates/ @joshft
 hooks/ @joshft
 setup @joshft
+.correctless/config/workflow-config.json @joshft
+correctless/templates/workflow-config*.json @joshft
+.github/workflows/ @joshft
+.pre-commit-config.yaml @joshft
