@@ -8,17 +8,21 @@ allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.correctless/ARCHITECTU
 
 ## Intensity Gate
 
-This skill requires intensity `high` or above. Read `.correctless/config/workflow-config.json` and check `workflow.intensity`. If the field is absent or not set, default to `standard`.
+This skill requires effective intensity `high` or above. Compute effective intensity as `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
+
+1. Read `workflow.intensity` from `.correctless/config/workflow-config.json` (project_intensity). If absent, default to `standard`.
+2. Run `.correctless/hooks/workflow-advance.sh status` and read the `Intensity:` line (feature_intensity). If absent, use project_intensity alone.
+3. Effective intensity = `max(project_intensity, feature_intensity)`.
 
 **Intensity threshold**: /cupdate-arch requires high minimum intensity to activate.
 
-- If the current project intensity is below the required intensity, print an informational message:
+- If the effective intensity is below the required intensity, print an informational message:
   - Skill name: /cupdate-arch
   - Required intensity: high
-  - Current intensity: (the configured intensity from `.correctless/config/workflow-config.json`)
+  - Effective intensity: (computed above)
   - Override: pass `--force` to override the intensity gate, or set `workflow.intensity` to `high` or above in `.correctless/config/workflow-config.json`
   - Then **do not proceed** with the skill body. Stop here.
-- If the project intensity is at or above the threshold, or if the user passed `--force`, proceed normally and execute normally — no gate message is shown, skip the gate entirely without gate output.
+- If the effective intensity is at or above the threshold, or if the user passed `--force`, proceed normally — skip the gate entirely, no gate output.
 
 You are the architecture documentation agent. Your job is to keep .correctless/ARCHITECTURE.md current after features land.
 

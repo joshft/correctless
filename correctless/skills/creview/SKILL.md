@@ -7,11 +7,50 @@ context: fork
 
 # /creview — Skeptical Spec Review
 
-**When to use:** This is the standard review at standard intensity. At high+ intensity, use `/creview-spec` instead (4-agent adversarial team) — unless you want a quick 3-minute single-pass review on a low-risk feature.
+**When to use:** After `/cspec` produces a spec. This skill adapts based on effective intensity — at standard it runs a single-pass review, at high or critical it recommends routing to `/creview-spec` for multi-agent adversarial review.
 
 You are the review agent. You did NOT write this spec. Your job is to read it cold and find what the spec author missed. Your lens: **"this spec is incomplete — what's missing?"**
 
 You are a separate agent from the spec author. Do not assume the spec is correct. Do not assume the rules are sufficient. Do not assume the author considered all edge cases.
+
+## Intensity Configuration
+
+| | Standard | High | Critical |
+|---|---|---|---|
+| Agents | 1 + security checklist | Routes to /creview-spec (4-agent adversarial) | Routes to /creview-spec + external model |
+| Finding threshold | Disposition required | All addressed | Zero unresolved |
+
+## Effective Intensity
+
+Determine the effective intensity before starting the review. The effective intensity is `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
+
+1. **Read project intensity**: Read `workflow.intensity` from `.correctless/config/workflow-config.json`. If the field is absent, default to `standard`.
+2. **Read feature intensity**: Run `.correctless/hooks/workflow-advance.sh status` and look for the `Intensity:` line. If the Intensity line is absent in the status output (feature_intensity is absent), use the project intensity alone.
+3. **Compute effective intensity**: Take the max of project_intensity and feature_intensity.
+
+**Fallback chain**: feature_intensity -> workflow.intensity -> standard. If both feature_intensity and `workflow.intensity` are absent, the effective intensity defaults to `standard`. If there is no active workflow state (no state file), effective intensity falls back to `workflow.intensity` from config, then to `standard`. The review still runs — it does not require active workflow state.
+
+### Intensity-Aware Behavior
+
+**If effective intensity is high:**
+
+> This feature's effective intensity is high. Run `/creview-spec` instead for the 4-agent adversarial review. To proceed with single-pass review anyway, confirm below.
+
+Present numbered options:
+1. Switch to /creview-spec (recommended)
+2. Proceed with single-pass review
+
+If the user chooses option 2, proceed with the standard single-pass review (all 8 checks, security checklist, disposition required).
+
+**If effective intensity is critical:**
+
+> This feature's effective intensity is critical. Run `/creview-spec` instead — it includes 4-agent adversarial review plus external model verification.
+
+Present the same numbered options:
+1. Switch to /creview-spec (recommended)
+2. Proceed with single-pass review
+
+If the user chooses option 2, proceed with single-pass review but enforce the **zero-unresolved threshold**: every finding must be addressed with a disposition (accept, reject, modify, or defer). The agent does not advance workflow state until all findings have a disposition. State this requirement before presenting findings.
 
 ## Progress Visibility (MANDATORY)
 

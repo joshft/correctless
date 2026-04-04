@@ -5,8 +5,8 @@
     "description": "Claude Code plugin framework: structured workflow skills for spec-driven development with TDD, auditing, and project health"
   },
   "commands": {
-    "test": "bash tests/test.sh && bash tests/test-mcp.sh && bash tests/test-bugfixes.sh && bash tests/test-qol.sh && bash tests/test-decisions.sh && bash tests/test-statusline.sh && bash tests/test-consolidation.sh && bash tests/test-crelease.sh && bash tests/test-calm-resets.sh && bash tests/test-dynamic-rigor.sh && bash tests/test-intensity-detection.sh",
-    "test_new": "bash tests/test-intensity-detection.sh",
+    "test": "bash tests/test.sh && bash tests/test-mcp.sh && bash tests/test-bugfixes.sh && bash tests/test-qol.sh && bash tests/test-decisions.sh && bash tests/test-statusline.sh && bash tests/test-consolidation.sh && bash tests/test-crelease.sh && bash tests/test-calm-resets.sh && bash tests/test-dynamic-rigor.sh && bash tests/test-intensity-detection.sh && bash tests/test-wire-intensity-creview.sh",
+    "test_new": "bash tests/test-wire-intensity-creview.sh",
     "test_verbose": "bash tests/test.sh && bash tests/test-mcp.sh",
     "coverage": "",
     "lint": "shellcheck hooks/*.sh tests/test*.sh sync.sh setup",
