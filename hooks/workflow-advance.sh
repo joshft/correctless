@@ -678,6 +678,30 @@ cmd_audit_done() {
   info "Audit complete. Merge audit branch to main."
   info "Post-merge: update antipatterns, write regression tests."
 }
+
+cmd_set_intensity() {
+  local level="${1:-}"
+  if [ -z "$level" ]; then
+    die "Usage: workflow-advance.sh set-intensity <standard|high|critical>"
+  fi
+
+  # Validate intensity level
+  case "$level" in
+    standard|high|critical) ;;
+    *) die "Invalid intensity level: '$level'. Must be one of: standard, high, critical" ;;
+  esac
+
+  check_branch_match
+  # Phase guard: set-intensity only valid during spec-related phases
+  require_phase_oneof "spec" "review" "review-spec"
+
+  local state
+  state="$(read_state)" || die "No state file — run 'init' first"
+  state="$(echo "$state" | jq --arg level "$level" '.feature_intensity = $level')"
+  write_state "$state"
+  info "Feature intensity set to: $level"
+}
+
 cmd_resolve_drift() {
   local drift_id="${1:?Usage: workflow-advance.sh resolve-drift DRIFT-xxx \"reason\"}"
   local reason="${2:?Usage: workflow-advance.sh resolve-drift DRIFT-xxx \"reason\"}"
@@ -927,6 +951,12 @@ cmd_status() {
   info "Started: $(echo "$state" | jq -r '.started_at')"
   info "QA rounds: $(echo "$state" | jq -r '.qa_rounds // 0')"
 
+  local intensity
+  intensity="$(echo "$state" | jq -r '.feature_intensity // empty')"
+  if [ -n "$intensity" ]; then
+    info "Intensity: $intensity"
+  fi
+
   local updates
   updates="$(echo "$state" | jq -r '.spec_updates // 0')"
   if [ "$updates" -gt 0 ]; then
@@ -985,6 +1015,7 @@ case "$cmd" in
   audit-start)    cmd_audit_start "$@" ;;
   audit-done)     cmd_audit_done ;;
   spec-update)    cmd_spec_update "$@" ;;
+  set-intensity)  cmd_set_intensity "$@" ;;
   resolve-drift)  cmd_resolve_drift "$@" ;;
   reset)          cmd_reset ;;
   override)       cmd_override "$@" ;;
@@ -1015,6 +1046,7 @@ case "$cmd" in
     echo "  resolve-drift ID \"reason\"  Mark drift debt item as resolved"
     echo ""
     echo "Utilities:"
+    echo "  set-intensity lvl  Set feature intensity (standard|high|critical)"
     echo "  reset              Remove all workflow state for current branch"
     echo "  override \"reason\" Temporarily bypass gate for 10 tool calls"
     echo "  diagnose \"file\"   Show why a file would be blocked/allowed"

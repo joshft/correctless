@@ -10,7 +10,7 @@ You are the spec agent. Your job is to turn a feature idea into a structured spe
 
 ## Detect Intensity
 
-Read `.correctless/config/workflow-config.json`. If it has `workflow.intensity` set (low/standard/high/critical), you're at the **configured intensity** — use the full invariant format. If it only has `workflow.min_qa_rounds` (no intensity field), you're at **standard intensity** — use the simple rules format.
+Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is set (standard/high/critical; `low` in config is treated as standard for detection), you are at the **configured intensity** — use `templates/spec-full.md`. If only `workflow.min_qa_rounds` is present (no intensity field), you are at **standard intensity** — use `templates/spec-lite.md`.
 
 ## Progress Visibility (MANDATORY)
 
@@ -200,7 +200,7 @@ Write the spec to `.correctless/specs/{task-slug}.md`.
 **At standard intensity** — use 5 sections (What, Rules with R-xxx IDs, Won't Do, Risks, Open Questions). Keep it simple.
 
 **At high+ intensity** — use the full format. **Artifact weight scales with intensity**:
-- `low` intensity: Metadata, Context, Scope, Invariants, Prohibitions (5 sections)
+- `low` intensity: Metadata, Context, Scope, Invariants, Prohibitions (5 sections) (note: `low` is treated as `standard` for intensity detection purposes)
 - `standard`: add Boundary Conditions
 - `high`/`critical`: all sections including Complexity Budget, STRIDE, Environment Assumptions, Design Decisions
 
@@ -210,11 +210,15 @@ Write the spec to `.correctless/specs/{task-slug}.md`.
 # Spec: {Task Title}
 
 ## Metadata
+(keep in sync with templates/spec-lite.md and templates/spec-full.md)
 - **Created**: ISO timestamp
 - **Status**: draft | reviewed | approved
 - **Impacts**: (other spec slugs whose invariants may be affected)
 - **Branch**: feature branch name
 - **Research**: (path to research brief if research was conducted, null otherwise)
+- **Intensity**: (standard|high|critical)
+- **Intensity reason**: (triggering signals or "user override")
+- **Override**: (none|raised|lowered)
 
 ## Context
 What this feature does and why. One paragraph.
@@ -269,6 +273,13 @@ What this covers and — critically — what it does NOT.
 
 ```markdown
 # Spec: {Task Title}
+
+## Metadata
+(keep in sync with templates/spec-lite.md and templates/spec-full.md)
+- **Task**: {feature name}
+- **Intensity**: {standard|high|critical}
+- **Intensity reason**: {triggering signals or "user override"}
+- **Override**: {none|raised|lowered}
 
 ## What
 One paragraph.
@@ -336,15 +347,18 @@ For each AP-xxx entry in `.correctless/antipatterns.md`, ask: does this feature 
 
 Read `.correctless/meta/drift-debt.json`. If any open drift items involve files or abstractions this feature touches, surface them to the human.
 
-### Step 7: Recommend Intensity (Full Mode)
+### Step 7: Run Intensity Detection
 
-After drafting the spec, recommend an intensity level:
-- Touches a trust boundary → recommend `high` or `critical`
-- Security-categorized invariants → recommend `high` or `critical`
-- Concurrency invariants → recommend at least `standard`
-- Pure functional change → `low` is fine
+Before presenting the spec, run the Intensity Detection process described below. This is NOT gated by Full Mode or any config setting.
 
-The recommendation is advisory — the human decides.
+1. Evaluate all four detection signals against the feature scope (file paths, keywords, trust boundaries, antipattern/QA history).
+2. Apply the signal-to-intensity mapping to determine the recommended level.
+3. Check the humility qualifier (project maturity from workflow-history.md).
+4. Check project floor from `workflow.intensity` config (R-009).
+5. Check `workflow.allow_intensity_downgrade` config (R-008).
+6. Record the recommendation with triggering signals for presentation in Step 8.
+
+See the **Intensity Detection** section below for the full signal definitions, mapping rules, and configuration options.
 
 ### Step 8: Present to Human
 
@@ -444,6 +458,118 @@ If `mcp.context7` is `true` in `workflow-config.json`, use Context7 for the rese
 - Use `get-library-docs` to retrieve current documentation and API references
 
 When Context7 is unavailable, fall back to web search for library documentation. If Context7 was unavailable during this run, notify the user once at the end: "Note: Context7 was unavailable — fell back to web search for library docs."
+
+## Intensity Detection
+
+Per-feature intensity detection evaluates four signals to recommend an intensity level (standard, high, or critical) for the current feature. It runs for all projects regardless of whether `workflow.intensity` is set in config.
+
+### Detection Signals
+
+The detection uses four signals. Each signal is evaluated independently against the feature's scope (affected files, spec content, feature description):
+
+1. **File path patterns signal**: If any affected file paths match `hooks/`, security-related skills, or setup scripts, the recommended intensity is at least `high`.
+
+2. **Keyword matching signal**: Scan the spec and feature description for security-sensitive keywords.
+   - Keywords producing at least `high`: auth, credential, payment, encrypt, token, secret, session, certificate, CSRF, injection
+   - Keywords producing `critical`: trust boundary, adversary, threat model, penetration
+
+3. **Trust boundary signal (TB-xxx)**: If the spec references TB-xxx identifiers from `.correctless/ARCHITECTURE.md`, the recommended intensity is at least `high`. If `.correctless/ARCHITECTURE.md` contains no TB-xxx entries, this signal is dormant.
+
+4. **Antipattern/QA history signal**: Check whether the feature's affected files overlap with known antipatterns or historical QA findings.
+   - If 2 or more antipattern matches overlap with the feature scope in `.correctless/antipatterns.md`, recommend at least `high`.
+   - If 3 or more historical QA findings (from `qa-findings-*.json` files) reference specs in the same area, recommend at least `high`.
+   - When `antipatterns.md` does not exist, the antipattern signal is dormant.
+   - When no `qa-findings-*.json` files exist, the QA history signal is dormant.
+
+A dormant signal does not contribute to the recommendation — it is not an error condition.
+
+### Signal-to-Intensity Mapping
+
+| Signal | Condition | Minimum Intensity |
+|--------|-----------|-------------------|
+| File path | Matches `hooks/`, security skills, setup | high |
+| Keyword | auth, credential, payment, encrypt, token, secret, session, certificate, CSRF, injection | high |
+| Keyword | trust boundary, adversary, threat model, penetration | critical |
+| TB-xxx ref | Spec references TB-xxx from `.correctless/ARCHITECTURE.md` | high |
+| Antipattern | 2+ antipattern matches overlap with feature scope | high |
+| QA history | 3+ QA findings in affected area | high |
+
+When multiple signals fire, the final recommendation is the **highest intensity level** among all triggered signals (highest-wins). The ordering is: `standard < high < critical`. If no signals trigger, the default recommendation is `standard` (or the project floor, whichever is higher).
+
+### Humility Qualifier
+
+Count `###` headers in `docs/workflow-history.md` to determine project maturity. If the file does not exist, the count is 0.
+
+- **Fewer than 5 completed features**: Include a humility qualifier in the recommendation — language indicating "low confidence due to limited project history." The detection has insufficient calibration data and should say so explicitly.
+- **5 or more completed features**: State the recommendation confidence without the qualifier — the detection has enough history to be reliable.
+
+### Project Floor (R-009)
+
+When `workflow.intensity` is set, it acts as a floor — detection can recommend higher but never lower than the configured project-level intensity. When `workflow.intensity` is absent, `standard` is the baseline.
+
+If `workflow.intensity` contains a value not in the detection vocabulary (`standard`/`high`/`critical`) — such as `low` — treat it as `standard` for floor comparison purposes. The detection vocabulary only uses three levels; any unrecognized value maps to the lowest detection level.
+
+### Downgrade Policy (R-008)
+
+Check `workflow.allow_intensity_downgrade` in `workflow-config.json`:
+- If `false`: the user cannot lower the intensity below the recommended level. They can still raise it.
+- If absent or `true`: the user can override in both directions (raise or lower).
+
+### Configurable Signals (R-010)
+
+Detection signals are configurable via an optional `workflow.intensity_signals` object in `workflow-config.json`. The `intensity_signals` object supports `path_patterns` and `keywords` arrays. If absent, the built-in defaults from the mapping table above are used. If present, the object overrides signal mappings using this structure:
+
+```json
+{
+  "workflow": {
+    "intensity_signals": {
+      "path_patterns": [{"glob": "hooks/*", "intensity": "high"}],
+      "keywords": [{"word": "auth", "intensity": "high"}],
+      "keyword_floor": "high",
+      "path_floor": "high"
+    }
+  }
+}
+```
+
+`keyword_floor` and `path_floor` set the minimum intensity level for any keyword or path pattern match, respectively.
+
+Valid intensity values are: `standard`, `high`, `critical`. If `intensity_signals` is present but malformed (missing expected keys, invalid values, wrong types), fall back to the built-in defaults and log a one-line warning to the user about the malformed config.
+
+### Spec Metadata (R-005)
+
+Every spec produced by `/cspec` includes a `## Metadata` section at the top containing at minimum:
+- **Task** (feature name)
+- **Intensity** (the approved level: standard/high/critical)
+- **Intensity reason** (which signals triggered the recommendation, or "user override" if overridden)
+- **Override** field (none, raised, or lowered — indicating whether the user changed the recommendation)
+
+### Writing Intensity to State (R-006)
+
+After the user approves the intensity, write `feature_intensity` to the workflow state file. Call `workflow-advance.sh set-intensity` during Step 8 after the user approves the intensity, before advancing the workflow in Step 9.
+
+```bash
+.correctless/hooks/workflow-advance.sh set-intensity "level"
+```
+
+Do NOT write directly to the state file via jq. Only workflow-advance.sh is the state file writer (PAT-004).
+
+### Presentation in Step 8
+
+Present the intensity recommendation as the **first item in Step 8** (human presentation), before walking through the rules. The presentation includes:
+
+1. The recommended intensity level
+2. The signals that triggered the recommendation (with specific file paths or keywords found)
+3. The humility qualifier if applicable (fewer than 5 completed features)
+4. Numbered options for the user:
+   1. Accept [level] (recommended)
+   2. Raise to [higher level]
+   3. Lower to [lower level]
+   4. Override with custom level
+
+Mark the recommended option with "(recommended)".
+
+If `workflow.allow_intensity_downgrade` is `false`, omit the "lower" option and note that downgrading is disabled by project config.
 
 ## If Something Goes Wrong
 
