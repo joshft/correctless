@@ -49,6 +49,19 @@ cd packages/api && npx prisma migrate deploy
 
 Banner comments for scripts reviewed as files. Echo prefixes for scripts watched in real time. Inline `#` comments stay normal — only section headers get the visual treatment.
 
+## Post-Merge Routine
+
+After a PR is merged on GitHub, run this sequence to sync local state:
+
+```bash
+git checkout main
+git fetch --prune
+git reset --hard origin/main
+git branch -d <merged-branch>        # delete local branch
+```
+
+GitHub squash-merges PRs, so the local branch history will diverge from main. `reset --hard origin/main` is safe here because the PR was just merged — origin/main has everything. Do not attempt `git pull --rebase` after a squash merge; it creates conflicts with the pre-squash commits.
+
 ## Correctless Learnings
 
 ### 2026-04-02 — Convention confirmed: Serena MCP silent fallback

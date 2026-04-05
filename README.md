@@ -257,15 +257,18 @@ graph TB
     subgraph "Claude Code Hooks"
         A["PreToolUse"] --> B["workflow-gate.sh<br/>Phase enforcement"]
         C["PostToolUse"] --> D["audit-trail.sh<br/>Adherence feedback"]
+        C --> G["auto-format.sh<br/>Auto-formatting"]
         E["Statusline"] --> F["statusline.sh<br/>Phase + cost + context"]
     end
 
     B -->|"block/allow"| I["Every file edit"]
     D -->|"alerts"| J["Real-time violations"]
+    G -->|"formats"| L["Edited files"]
     F -->|"live display"| K["Always visible"]
 
     style B fill:#ff6b6b,color:#fff
     style D fill:#ffd43b,color:#000
+    style G fill:#74c0fc,color:#000
     style F fill:#51cf66,color:#fff
 ```
 
@@ -273,6 +276,7 @@ graph TB
 |------|------|---------|
 | **workflow-gate.sh** | Before every file edit | Blocks writes that violate the current phase (RED blocks source, QA blocks everything) |
 | **audit-trail.sh** | After every tool call | Logs modifications with phase context, alerts on violations |
+| **auto-format.sh** | After Edit/Write/MultiEdit | Runs project formatter (Prettier, Black, gofmt, etc.) with allowlist validation |
 | **statusline.sh** | Continuously | Shows phase, QA round, cost, context %, lines delta |
 | **workflow-advance.sh** | On command | State machine — validates transitions, enforces gates |
 
