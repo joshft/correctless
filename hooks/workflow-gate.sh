@@ -105,16 +105,11 @@ if [ ! -f "$STATE_FILE" ]; then
   if [ "$FAIL_CLOSED" = "true" ]; then
     # Full mode fail-closed: block source edits when no state file exists
     TARGET_FILE_CHECK="$TOOL_INPUT_FILE"
-    if [ -z "$TARGET_FILE_CHECK" ] && [ -n "$TOOL_INPUT_EDITS" ]; then
-      TARGET_FILE_CHECK="${TOOL_INPUT_EDITS%%$'\n'*}"
-    fi
-    if [ -z "$TARGET_FILE_CHECK" ] && [ "$TOOL_NAME" = "Bash" ] && [ -n "$TOOL_INPUT_COMMAND" ]; then
-      TARGET_FILE_CHECK="$(echo "$TOOL_INPUT_COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)' | head -1)" || true
-    fi
     if [ -n "$TARGET_FILE_CHECK" ]; then
       SOURCE_PAT="$FC_SOURCE_PAT"
       if [ -n "$SOURCE_PAT" ]; then
         BASENAME_CHECK="${TARGET_FILE_CHECK##*/}"
+        BASENAME_CHECK="${BASENAME_CHECK,,}"
         _FC_OLDIFS="$IFS"
         IFS='|'
         for p in $SOURCE_PAT; do
@@ -130,6 +125,54 @@ if [ ! -f "$STATE_FILE" ]; then
           esac
         done
         IFS="$_FC_OLDIFS"
+      fi
+    fi
+    if [ -z "$TARGET_FILE_CHECK" ] && [ -n "$TOOL_INPUT_EDITS" ]; then
+      while IFS= read -r _fc_file; do
+        [ -z "$_fc_file" ] && continue
+        _fc_bn="${_fc_file##*/}"
+        _fc_bn="${_fc_bn,,}"
+        if [ -n "$FC_SOURCE_PAT" ]; then
+          _FC_OLDIFS2="$IFS"; IFS='|'
+          for p in $FC_SOURCE_PAT; do
+            IFS="$_FC_OLDIFS2"
+            case "$_fc_bn" in
+              $p)
+                echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+  Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
+  (You must be on a feature branch, not main.)
+  Or run /cstatus to see what's going on." >&2
+                exit 2
+                ;;
+            esac
+          done
+          IFS="$_FC_OLDIFS2"
+        fi
+      done <<< "$TOOL_INPUT_EDITS"
+    fi
+    if [ -z "$TARGET_FILE_CHECK" ] && [ -z "$TOOL_INPUT_EDITS" ] && [ "$TOOL_NAME" = "Bash" ] && [ -n "$TOOL_INPUT_COMMAND" ]; then
+      TARGET_FILE_CHECK="$(echo "$TOOL_INPUT_COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)' | head -1)" || true
+      if [ -n "$TARGET_FILE_CHECK" ]; then
+        SOURCE_PAT="$FC_SOURCE_PAT"
+        if [ -n "$SOURCE_PAT" ]; then
+          BASENAME_CHECK="${TARGET_FILE_CHECK##*/}"
+          BASENAME_CHECK="${BASENAME_CHECK,,}"
+          _FC_OLDIFS="$IFS"
+          IFS='|'
+          for p in $SOURCE_PAT; do
+            IFS="$_FC_OLDIFS"
+            case "$BASENAME_CHECK" in
+              $p)
+                echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+  Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
+  (You must be on a feature branch, not main.)
+  Or run /cstatus to see what's going on." >&2
+                exit 2
+                ;;
+            esac
+          done
+          IFS="$_FC_OLDIFS"
+        fi
       fi
     fi
   fi
@@ -435,7 +478,7 @@ case "$PHASE" in
             if [ "$TOOL_NAME" != "Bash" ]; then
               # For MultiEdit: extract this specific file's new_string content (H2 fix)
               if [ "$TOOL_NAME" = "MultiEdit" ]; then
-                _file_content="$(echo "$INPUT" | jq -r --arg fp "$_src_rel" --arg afp "$REPO_ROOT/$_src_rel" '[.tool_input.edits[] | select(.file_path == $fp or .file_path == $afp) | .new_string // ""] | join("\n")')"
+                _file_content="$(echo "$INPUT" | jq -r --arg fp "$_src_rel" --arg afp "$REPO_ROOT/$_src_rel" '[.tool_input.edits[] | select(.file_path == $fp or .file_path == $afp or .file_path == ("./"+$fp)) | .new_string // ""] | join("\n")')"
               else
                 _file_content="$TOOL_INPUT_NEW"
               fi
@@ -454,7 +497,7 @@ case "$PHASE" in
           if [ "$TOOL_NAME" != "Bash" ]; then
             # For MultiEdit: extract this specific file's new_string content (H2 fix)
             if [ "$TOOL_NAME" = "MultiEdit" ]; then
-              _file_content="$(echo "$INPUT" | jq -r --arg fp "$_src_rel" --arg afp "$REPO_ROOT/$_src_rel" '[.tool_input.edits[] | select(.file_path == $fp or .file_path == $afp) | .new_string // ""] | join("\n")')"
+              _file_content="$(echo "$INPUT" | jq -r --arg fp "$_src_rel" --arg afp "$REPO_ROOT/$_src_rel" '[.tool_input.edits[] | select(.file_path == $fp or .file_path == $afp or .file_path == ("./"+$fp)) | .new_string // ""] | join("\n")')"
             else
               _file_content="$TOOL_INPUT_NEW"
             fi

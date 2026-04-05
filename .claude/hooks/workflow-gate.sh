@@ -17,7 +17,7 @@ set -euo pipefail
 set -f
 command -v jq >/dev/null 2>&1 || { echo "BLOCKED: jq not found — required for workflow gate" >&2; exit 2; }
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+REPO_ROOT="$(git --no-optional-locks rev-parse --show-toplevel 2>/dev/null || pwd)"
 CONFIG_FILE="$REPO_ROOT/.correctless/config/workflow-config.json"
 ARTIFACTS_DIR="$REPO_ROOT/.correctless/artifacts"
 TEST_EDIT_LOG="$ARTIFACTS_DIR/tdd-test-edits.log"
@@ -27,6 +27,8 @@ TEST_EDIT_LOG="$ARTIFACTS_DIR/tdd-test-edits.log"
 # ---------------------------------------------------------------------------
 
 INPUT="$(cat)"
+# shellcheck disable=SC2034  # Variables assigned via eval+jq below, used later
+TOOL_NAME="" TOOL_INPUT_FILE="" TOOL_INPUT_COMMAND="" TOOL_INPUT_NEW="" TOOL_INPUT_EDITS="" TOOL_INPUT_EDITS_NEW=""
 eval "$(echo "$INPUT" | jq -r '
   @sh "TOOL_NAME=\(.tool_name // "")",
   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
@@ -46,7 +48,7 @@ case "$TOOL_NAME" in
     _has_write_pattern() {
       local cmd="$1"
       # Check redirect operators (single combined grep)
-      echo "$cmd" | grep -qE '>>|[^-0-9]>' && return 0
+      echo "$cmd" | grep -qE '>>|[0-9]*>' && return 0
       # Tokenize on shell metacharacters and check each token
       # shellcheck disable=SC2141
       local IFS=$' \t\n;|&()`'
@@ -85,6 +87,9 @@ branch_slug() {
   echo "${slug}-${raw_hash:0:6}"
 }
 
+_gate_branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
+[ -n "$_gate_branch" ] || exit 0  # detached HEAD: no workflow, allow all
+
 STATE_FILE="$ARTIFACTS_DIR/workflow-state-$(branch_slug).json"
 
 # No state file → check fail-closed config
@@ -100,13 +105,11 @@ if [ ! -f "$STATE_FILE" ]; then
   if [ "$FAIL_CLOSED" = "true" ]; then
     # Full mode fail-closed: block source edits when no state file exists
     TARGET_FILE_CHECK="$TOOL_INPUT_FILE"
-    if [ -z "$TARGET_FILE_CHECK" ] && [ -n "$TOOL_INPUT_EDITS" ]; then
-      TARGET_FILE_CHECK="${TOOL_INPUT_EDITS%%$'\n'*}"
-    fi
     if [ -n "$TARGET_FILE_CHECK" ]; then
       SOURCE_PAT="$FC_SOURCE_PAT"
       if [ -n "$SOURCE_PAT" ]; then
         BASENAME_CHECK="${TARGET_FILE_CHECK##*/}"
+        BASENAME_CHECK="${BASENAME_CHECK,,}"
         _FC_OLDIFS="$IFS"
         IFS='|'
         for p in $SOURCE_PAT; do
@@ -122,6 +125,54 @@ if [ ! -f "$STATE_FILE" ]; then
           esac
         done
         IFS="$_FC_OLDIFS"
+      fi
+    fi
+    if [ -z "$TARGET_FILE_CHECK" ] && [ -n "$TOOL_INPUT_EDITS" ]; then
+      while IFS= read -r _fc_file; do
+        [ -z "$_fc_file" ] && continue
+        _fc_bn="${_fc_file##*/}"
+        _fc_bn="${_fc_bn,,}"
+        if [ -n "$FC_SOURCE_PAT" ]; then
+          _FC_OLDIFS2="$IFS"; IFS='|'
+          for p in $FC_SOURCE_PAT; do
+            IFS="$_FC_OLDIFS2"
+            case "$_fc_bn" in
+              $p)
+                echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+  Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
+  (You must be on a feature branch, not main.)
+  Or run /cstatus to see what's going on." >&2
+                exit 2
+                ;;
+            esac
+          done
+          IFS="$_FC_OLDIFS2"
+        fi
+      done <<< "$TOOL_INPUT_EDITS"
+    fi
+    if [ -z "$TARGET_FILE_CHECK" ] && [ -z "$TOOL_INPUT_EDITS" ] && [ "$TOOL_NAME" = "Bash" ] && [ -n "$TOOL_INPUT_COMMAND" ]; then
+      TARGET_FILE_CHECK="$(echo "$TOOL_INPUT_COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)' | head -1)" || true
+      if [ -n "$TARGET_FILE_CHECK" ]; then
+        SOURCE_PAT="$FC_SOURCE_PAT"
+        if [ -n "$SOURCE_PAT" ]; then
+          BASENAME_CHECK="${TARGET_FILE_CHECK##*/}"
+          BASENAME_CHECK="${BASENAME_CHECK,,}"
+          _FC_OLDIFS="$IFS"
+          IFS='|'
+          for p in $SOURCE_PAT; do
+            IFS="$_FC_OLDIFS"
+            case "$BASENAME_CHECK" in
+              $p)
+                echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+  Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
+  (You must be on a feature branch, not main.)
+  Or run /cstatus to see what's going on." >&2
+                exit 2
+                ;;
+            esac
+          done
+          IFS="$_FC_OLDIFS"
+        fi
       fi
     fi
   fi
@@ -160,12 +211,14 @@ if [ "$OVERRIDE_ACTIVE" = "true" ]; then
   REMAINING="$OVERRIDE_REMAINING"
   if [ "$REMAINING" -gt 0 ]; then
     # Atomic read-modify-write: decrement and deactivate in a single jq call
+    trap 'rm -f "$STATE_FILE.$$"' EXIT
     jq 'if .override.remaining_calls > 0 then
           .override.remaining_calls -= 1
           | if .override.remaining_calls <= 0 then .override.active = false else . end
         else . end' "$STATE_FILE" > "$STATE_FILE.$$" \
       && mv "$STATE_FILE.$$" "$STATE_FILE" \
       || { rm -f "$STATE_FILE.$$"; exit 2; }
+    trap - EXIT
     exit 0
   fi
 fi
@@ -280,7 +333,9 @@ resolve_package() {
       [ -f "$_old_cache" ] && [ "$_old_cache" != "$cache_file" ] && rm -f "$_old_cache" 2>/dev/null
     done
     if [ -f "$cache_file" ]; then
-      jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null || true
+      trap 'rm -f "$cache_file.$$"' EXIT
+      jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null || { rm -f "$cache_file.$$" 2>/dev/null; true; }
+      trap - EXIT
     else
       jq -nc --arg f "$file" --arg p "$best" '{($f): $p}' > "$cache_file" 2>/dev/null || true
     fi
@@ -371,6 +426,7 @@ ALL_SOURCE_FILES=""
 while IFS= read -r _check_file; do
   [ -z "$_check_file" ] && continue
   _rel="${_check_file#$REPO_ROOT/}"
+  _rel="${_rel#./}"
   _cls="$(classify_file "$_rel")"
   if [ "$_cls" = "source" ]; then
     MOST_RESTRICTIVE="source"
@@ -420,7 +476,13 @@ case "$PHASE" in
           if ! grep -q 'STUB:TDD' "$REPO_ROOT/$_src_rel" 2>/dev/null; then
             # File exists but no STUB:TDD — check if the edit adds it
             if [ "$TOOL_NAME" != "Bash" ]; then
-              if [[ "$TOOL_INPUT_NEW" == *"STUB:TDD"* ]] || [[ "$TOOL_INPUT_EDITS_NEW" == *"STUB:TDD"* ]]; then
+              # For MultiEdit: extract this specific file's new_string content (H2 fix)
+              if [ "$TOOL_NAME" = "MultiEdit" ]; then
+                _file_content="$(echo "$INPUT" | jq -r --arg fp "$_src_rel" --arg afp "$REPO_ROOT/$_src_rel" '[.tool_input.edits[] | select(.file_path == $fp or .file_path == $afp or .file_path == ("./"+$fp)) | .new_string // ""] | join("\n")')"
+              else
+                _file_content="$TOOL_INPUT_NEW"
+              fi
+              if [[ "$_file_content" == *"STUB:TDD"* ]]; then
                 continue  # Edit is adding STUB:TDD to this file — allow
               fi
             fi
@@ -433,11 +495,15 @@ case "$PHASE" in
         else
           # New file — check if content contains STUB:TDD
           if [ "$TOOL_NAME" != "Bash" ]; then
-            # Check both single-edit and multi-edit content fields
+            # For MultiEdit: extract this specific file's new_string content (H2 fix)
+            if [ "$TOOL_NAME" = "MultiEdit" ]; then
+              _file_content="$(echo "$INPUT" | jq -r --arg fp "$_src_rel" --arg afp "$REPO_ROOT/$_src_rel" '[.tool_input.edits[] | select(.file_path == $fp or .file_path == $afp or .file_path == ("./"+$fp)) | .new_string // ""] | join("\n")')"
+            else
+              _file_content="$TOOL_INPUT_NEW"
+            fi
             _has_stub=false
-            [[ "$TOOL_INPUT_NEW" == *"STUB:TDD"* ]] && _has_stub=true
-            [[ "$TOOL_INPUT_EDITS_NEW" == *"STUB:TDD"* ]] && _has_stub=true
-            if { [ -n "$TOOL_INPUT_NEW" ] || [ -n "$TOOL_INPUT_EDITS_NEW" ]; } && [ "$_has_stub" = "false" ]; then
+            [[ "$_file_content" == *"STUB:TDD"* ]] && _has_stub=true
+            if [ -n "$_file_content" ] && [ "$_has_stub" = "false" ]; then
               block "RED phase — new source file '$_src_rel' must contain STUB:TDD tag.
   Add '// STUB:TDD' (or '# STUB:TDD' in Python) to function bodies.
   Stub bodies should contain only the tag, zero-value returns, or panic(\"not implemented\")."

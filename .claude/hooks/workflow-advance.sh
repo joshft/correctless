@@ -59,10 +59,10 @@ read_phase() {
 write_state() {
   local sf
   sf="$(state_file)"
-  local tmp="$sf.$$"
   mkdir -p "$(dirname "$sf")"
-  trap 'rm -f "$tmp"' EXIT
-  echo "$1" | jq '.' > "$tmp" && mv "$tmp" "$sf"
+  # shellcheck disable=SC2064  # Intentional: capture $sf at definition time, not at trap execution
+  trap "rm -f '$sf.$$'" EXIT
+  echo "$1" | jq '.' > "$sf.$$" && mv "$sf.$$" "$sf"
   trap - EXIT
 }
 
@@ -488,7 +488,7 @@ cmd_qa() {
   cov_cmd="$(read_config_field '.commands.coverage' 2>/dev/null || echo "")"
   if [ -n "$cov_cmd" ] && [ "$cov_cmd" != "null" ]; then
     info "Capturing coverage baseline..."
-    eval "$cov_cmd" > "$ARTIFACTS_DIR/coverage-baseline.out" 2>&1 || true
+    eval "$cov_cmd" > "$ARTIFACTS_DIR/coverage-baseline-$(branch_slug).out" 2>&1 || true
   fi
 
   # Increment QA round counter and transition phase in a single write
@@ -708,11 +708,11 @@ cmd_resolve_drift() {
     die "Drift item '$drift_id' not found"
   fi
 
-  local tmp="$DRIFT_DEBT_FILE.$$"
-  trap 'rm -f "$tmp"' EXIT
+  # shellcheck disable=SC2064
+  trap "rm -f '$DRIFT_DEBT_FILE.$$'" EXIT
   jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
-    "$DRIFT_DEBT_FILE" > "$tmp" && mv "$tmp" "$DRIFT_DEBT_FILE"
+    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
   trap - EXIT
 
   info "Drift item $drift_id marked as resolved: $reason"
@@ -764,6 +764,7 @@ cmd_reset() {
     rm -f "$ARTIFACTS_DIR/checkpoint-ctdd-"*.json "$ARTIFACTS_DIR/checkpoint-crefactor-"*.json \
           "$ARTIFACTS_DIR/checkpoint-creview-spec-"*.json "$ARTIFACTS_DIR/checkpoint-caudit-"*.json 2>/dev/null
     rm -f "$ARTIFACTS_DIR/.pkg-cache-"*.json 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/tdd-test-edits.log" "$ARTIFACTS_DIR/coverage-baseline-${slug_hash}.out" 2>/dev/null
     info "Workflow state, audit trail, adherence state, and checkpoints removed for branch '$(current_branch)'"
   else
     info "No workflow state for branch '$(current_branch)'"
@@ -822,10 +823,10 @@ cmd_override() {
     --arg ts "$ts" \
     --arg branch "$(current_branch)" \
     '{phase: $phase, reason: $reason, timestamp: $ts, branch: $branch}')"
-  local ol_tmp="$OVERRIDE_LOG.$$"
-  trap 'rm -f "$ol_tmp"' EXIT
-  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$ol_tmp" \
-    && mv "$ol_tmp" "$OVERRIDE_LOG"
+  # shellcheck disable=SC2064
+  trap "rm -f '$OVERRIDE_LOG.$$'" EXIT
+  jq --argjson entry "$entry" '(. += [$entry]) | .[-100:]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
+    && mv "$OVERRIDE_LOG.$$" "$OVERRIDE_LOG"
   trap - EXIT
 
   info "Override active for next 10 tool calls"
@@ -835,6 +836,8 @@ cmd_override() {
 
 cmd_diagnose() {
   local filepath="${1:?Usage: workflow-advance.sh diagnose \"filepath\"}"
+  # Normalize case to match gate logic (bash 4+ builtin)
+  filepath="${filepath,,}"
   local phase
   phase="$(read_phase)"
 
@@ -848,7 +851,7 @@ cmd_diagnose() {
   # Classify file (mirrors gate logic: path-based patterns match full path, others match basename)
   local classification="other"
   local bname
-  bname="$(basename "$filepath")"
+  bname="${filepath##*/}"
   if [ -n "$test_pattern" ] && [ "$test_pattern" != "null" ]; then
     local IFS='|'
     for pat in $test_pattern; do

@@ -836,6 +836,8 @@ cmd_override() {
 
 cmd_diagnose() {
   local filepath="${1:?Usage: workflow-advance.sh diagnose \"filepath\"}"
+  # Normalize case to match gate logic (bash 4+ builtin)
+  filepath="${filepath,,}"
   local phase
   phase="$(read_phase)"
 
@@ -849,7 +851,7 @@ cmd_diagnose() {
   # Classify file (mirrors gate logic: path-based patterns match full path, others match basename)
   local classification="other"
   local bname
-  bname="$(basename "$filepath")"
+  bname="${filepath##*/}"
   if [ -n "$test_pattern" ] && [ "$test_pattern" != "null" ]; then
     local IFS='|'
     for pat in $test_pattern; do
