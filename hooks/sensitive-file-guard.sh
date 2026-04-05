@@ -28,6 +28,7 @@ command -v jq >/dev/null 2>&1 || { echo "BLOCKED [sensitive-file]: jq not found"
 # ============================================
 
 INPUT="$(cat)"
+TOOL_NAME="" TOOL_INPUT_FILE="" TOOL_INPUT_COMMAND="" TOOL_INPUT_EDITS=""
 eval "$(echo "$INPUT" | jq -r '
   @sh "TOOL_NAME=\(.tool_name // "")",
   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
@@ -60,13 +61,13 @@ if [ "$TOOL_NAME" = "Bash" ]; then
   _has_write_pattern() {
     local cmd="$1"
     # Check redirect operators (handle > at start of command too — QA-003)
-    echo "$cmd" | grep -qE '>>|(^|[^-0-9])>' && return 0
+    echo "$cmd" | grep -qE '>>|[0-9]*>' && return 0
     # Tokenize on shell metacharacters and check each token
     # shellcheck disable=SC2141
     local IFS=$' \t\n;|&()`'
     for tok in $cmd; do
       case "$tok" in
-        cp|mv|tee|install|dd|rsync|patch|truncate|shred) return 0 ;;
+        cp|mv|tee|install|dd|rsync|patch|truncate|shred|curl|wget|ln) return 0 ;;
         sed) [[ "$cmd" =~ sed[[:space:]]+-i ]] && return 0 ;;
         perl) [[ "$cmd" =~ perl[[:space:]]+-i ]] && return 0 ;;
       esac
@@ -160,6 +161,69 @@ _extract_bash_targets() {
         done
         continue
         ;;
+      # curl -o / --output: emit output file
+      curl)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -o)
+              local next_i=$((i + 1))
+              if [ $next_i -lt ${#tokens[@]} ]; then
+                _strip_quotes "${tokens[$next_i]}"
+                i=$((i + 2)); continue
+              fi
+              ;;
+            --output)
+              local next_i=$((i + 1))
+              if [ $next_i -lt ${#tokens[@]} ]; then
+                _strip_quotes "${tokens[$next_i]}"
+                i=$((i + 2)); continue
+              fi
+              ;;
+            --output=*)
+              _strip_quotes "${tokens[$i]#--output=}"
+              ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # wget -O / --output-document: emit output file
+      wget)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -O)
+              local next_i=$((i + 1))
+              if [ $next_i -lt ${#tokens[@]} ]; then
+                _strip_quotes "${tokens[$next_i]}"
+                i=$((i + 2)); continue
+              fi
+              ;;
+            --output-document=*)
+              _strip_quotes "${tokens[$i]#--output-document=}"
+              ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # ln: emit last argument (LINK_NAME)
+      ln)
+        i=$((i + 1))
+        local ln_last=""
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;  # skip flags
+            *) ln_last="${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        if [ -n "$ln_last" ]; then
+          _strip_quotes "$ln_last"
+        fi
+        continue
+        ;;
       # sed -i: skip expression, emit file arguments
       sed)
         if [[ "$cmd" =~ sed[[:space:]]+-i ]]; then
@@ -205,7 +269,27 @@ fi
 # STEP 6: Hardcoded default patterns (INV-004)
 # ============================================
 
-DEFAULTS=".env .env.* *.pem *.key *.p12 *.pfx credentials.json credentials.yml service-account*.json *.secret *.secrets secrets.yml secrets.yaml secrets.json .secrets id_rsa id_rsa.* id_ed25519 id_ed25519.* *.keystore *.jks"
+DEFAULTS=".env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+credentials.yml
+service-account*.json
+*.secret
+*.secrets
+secrets.yml
+secrets.yaml
+secrets.json
+.secrets
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.keystore
+*.jks"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)
@@ -221,11 +305,11 @@ if [ -f "$CONFIG_FILE" ]; then
   CUSTOM_PATTERNS="$(jq -r '.protected_files.custom_patterns // [] | if type == "array" then .[] else empty end' "$CONFIG_FILE" 2>/dev/null)" || CUSTOM_PATTERNS=""
 fi
 
-# Combine defaults + custom into a single space-separated list, pre-lowercased
+# Combine defaults + custom into a single newline-separated list, pre-lowercased
 ALL_PATTERNS="$DEFAULTS"
 if [ -n "$CUSTOM_PATTERNS" ]; then
-  # Append newline-separated custom patterns as space-separated
-  ALL_PATTERNS="$ALL_PATTERNS ${CUSTOM_PATTERNS//$'\n'/ }"
+  ALL_PATTERNS="$ALL_PATTERNS
+$CUSTOM_PATTERNS"
 fi
 # Pre-lowercase all patterns once (avoids per-file lowercasing in the match loop)
 ALL_PATTERNS="${ALL_PATTERNS,,}"
@@ -246,8 +330,8 @@ _check_file_against_patterns() {
     return 1
   fi
 
-  local IFS=' '
-  for pat in $ALL_PATTERNS; do
+  while IFS= read -r pat; do
+    [ -z "$pat" ] && continue
     case "$pat" in
       */*)
         # Full-path pattern: match against the full filepath
@@ -263,7 +347,7 @@ _check_file_against_patterns() {
         esac
         ;;
     esac
-  done
+  done <<< "$ALL_PATTERNS"
 
   return 1
 }

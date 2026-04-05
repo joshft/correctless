@@ -59,10 +59,10 @@ read_phase() {
 write_state() {
   local sf
   sf="$(state_file)"
-  local tmp="$sf.$$"
   mkdir -p "$(dirname "$sf")"
-  trap 'rm -f "$tmp"' EXIT
-  echo "$1" | jq '.' > "$tmp" && mv "$tmp" "$sf"
+  # shellcheck disable=SC2064  # Intentional: capture $sf at definition time, not at trap execution
+  trap "rm -f '$sf.$$'" EXIT
+  echo "$1" | jq '.' > "$sf.$$" && mv "$sf.$$" "$sf"
   trap - EXIT
 }
 
@@ -708,11 +708,11 @@ cmd_resolve_drift() {
     die "Drift item '$drift_id' not found"
   fi
 
-  local tmp="$DRIFT_DEBT_FILE.$$"
-  trap 'rm -f "$tmp"' EXIT
+  # shellcheck disable=SC2064
+  trap "rm -f '$DRIFT_DEBT_FILE.$$'" EXIT
   jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
-    "$DRIFT_DEBT_FILE" > "$tmp" && mv "$tmp" "$DRIFT_DEBT_FILE"
+    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
   trap - EXIT
 
   info "Drift item $drift_id marked as resolved: $reason"
@@ -822,10 +822,10 @@ cmd_override() {
     --arg ts "$ts" \
     --arg branch "$(current_branch)" \
     '{phase: $phase, reason: $reason, timestamp: $ts, branch: $branch}')"
-  local ol_tmp="$OVERRIDE_LOG.$$"
-  trap 'rm -f "$ol_tmp"' EXIT
-  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$ol_tmp" \
-    && mv "$ol_tmp" "$OVERRIDE_LOG"
+  # shellcheck disable=SC2064
+  trap "rm -f '$OVERRIDE_LOG.$$'" EXIT
+  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
+    && mv "$OVERRIDE_LOG.$$" "$OVERRIDE_LOG"
   trap - EXIT
 
   info "Override active for next 10 tool calls"

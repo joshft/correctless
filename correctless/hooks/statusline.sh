@@ -112,7 +112,7 @@ fi
 
 # Context window percentage — guard against null/0/missing (R-017)
 ctx=''
-if [ "$CURRENT_TOKENS" != "null" ] && [ -n "$CURRENT_TOKENS" ] && [ "$CONTEXT_SIZE" != "null" ] && [ "$CONTEXT_SIZE" != "" ] && [ "$CONTEXT_SIZE" -gt 0 ] 2>/dev/null; then
+if [ "$CURRENT_TOKENS" != "null" ] && [ -n "$CURRENT_TOKENS" ] && [[ "$CURRENT_TOKENS" =~ ^[0-9]+$ ]] && [ "$CONTEXT_SIZE" != "null" ] && [ "$CONTEXT_SIZE" != "" ] && [ "$CONTEXT_SIZE" -gt 0 ] 2>/dev/null; then
   PERCENT_USED=$((CURRENT_TOKENS * 100 / CONTEXT_SIZE))
   if [ "$PERCENT_USED" -lt 40 ]; then
     ctx=$(printf "${GREEN}%d%%${NC}" "$PERCENT_USED")
@@ -150,7 +150,7 @@ fi
 # Cost (rounded to 2 decimal places) — single awk: format + zero-check combined
 # QA-002: Handle both "0" and "0.0" by using awk numeric comparison
 if [ "$COST" != "null" ] && [ -n "$COST" ]; then
-  cost_fmt=$(awk "BEGIN { v=($COST+0); if(v==0) exit 1; printf \"%.2f\", v }") && {
+  cost_fmt=$(awk -v cost="$COST" 'BEGIN { v=(cost+0); if(v==0) exit 1; printf "%.2f", v }') && {
     if [ -n "$sec3" ]; then sec3+=" "; fi
     sec3+="\$${cost_fmt}"
   }

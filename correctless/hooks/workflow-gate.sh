@@ -17,7 +17,7 @@ set -euo pipefail
 set -f
 command -v jq >/dev/null 2>&1 || { echo "BLOCKED: jq not found — required for workflow gate" >&2; exit 2; }
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+REPO_ROOT="$(git --no-optional-locks rev-parse --show-toplevel 2>/dev/null || pwd)"
 CONFIG_FILE="$REPO_ROOT/.correctless/config/workflow-config.json"
 ARTIFACTS_DIR="$REPO_ROOT/.correctless/artifacts"
 TEST_EDIT_LOG="$ARTIFACTS_DIR/tdd-test-edits.log"
@@ -46,7 +46,7 @@ case "$TOOL_NAME" in
     _has_write_pattern() {
       local cmd="$1"
       # Check redirect operators (single combined grep)
-      echo "$cmd" | grep -qE '>>|[^-0-9]>' && return 0
+      echo "$cmd" | grep -qE '>>|[0-9]*>' && return 0
       # Tokenize on shell metacharacters and check each token
       # shellcheck disable=SC2141
       local IFS=$' \t\n;|&()`'
@@ -84,6 +84,9 @@ branch_slug() {
   raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
   echo "${slug}-${raw_hash:0:6}"
 }
+
+_gate_branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
+[ -n "$_gate_branch" ] || exit 0  # detached HEAD: no workflow, allow all
 
 STATE_FILE="$ARTIFACTS_DIR/workflow-state-$(branch_slug).json"
 
@@ -160,12 +163,14 @@ if [ "$OVERRIDE_ACTIVE" = "true" ]; then
   REMAINING="$OVERRIDE_REMAINING"
   if [ "$REMAINING" -gt 0 ]; then
     # Atomic read-modify-write: decrement and deactivate in a single jq call
+    trap 'rm -f "$STATE_FILE.$$"' EXIT
     jq 'if .override.remaining_calls > 0 then
           .override.remaining_calls -= 1
           | if .override.remaining_calls <= 0 then .override.active = false else . end
         else . end' "$STATE_FILE" > "$STATE_FILE.$$" \
       && mv "$STATE_FILE.$$" "$STATE_FILE" \
       || { rm -f "$STATE_FILE.$$"; exit 2; }
+    trap - EXIT
     exit 0
   fi
 fi
@@ -280,7 +285,7 @@ resolve_package() {
       [ -f "$_old_cache" ] && [ "$_old_cache" != "$cache_file" ] && rm -f "$_old_cache" 2>/dev/null
     done
     if [ -f "$cache_file" ]; then
-      jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null || true
+      jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null || { rm -f "$cache_file.$$" 2>/dev/null; true; }
     else
       jq -nc --arg f "$file" --arg p "$best" '{($f): $p}' > "$cache_file" 2>/dev/null || true
     fi

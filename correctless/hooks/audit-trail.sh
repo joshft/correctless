@@ -25,7 +25,7 @@ eval "$(echo "$INPUT" | jq -r '
 FILES=""
 case "$TOOL_NAME" in
   Bash)
-    FILES="$(echo "$TOOL_INPUT_COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h)' | head -1)" || true
+    FILES="$(echo "$TOOL_INPUT_COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)' | head -1)" || true
     ;;
   MultiEdit)
     FILES="$TOOL_INPUT_EDITS"
@@ -59,6 +59,17 @@ CONFIG_FILE=".correctless/config/workflow-config.json"
 
 TRAIL=".correctless/artifacts/audit-trail-${slug}-${hash}.jsonl"
 TS="$(date -u +%FT%TZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# Truncate oldest half if audit trail exceeds 5MB
+if [ -f "$TRAIL" ]; then
+  trail_size="$(wc -c < "$TRAIL" 2>/dev/null || echo 0)"
+  if [ "$trail_size" -gt 5242880 ] 2>/dev/null; then
+    total_lines="$(wc -l < "$TRAIL")"
+    keep_lines=$(( total_lines / 2 ))
+    tail -n "$keep_lines" "$TRAIL" > "$TRAIL.$$" 2>/dev/null && mv "$TRAIL.$$" "$TRAIL" 2>/dev/null \
+      || rm -f "$TRAIL.$$" 2>/dev/null
+  fi
+fi
 
 printf '%s\n' "$FILES" | jq -Rnc \
   --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$branch" \
@@ -153,19 +164,23 @@ if [ "$IS_FULL" = "true" ]; then
   # Track which files are modified and read per phase — single jq call for all files (IO-005)
   if [ "$TOOL_NAME" = "Read" ] || [ "$TOOL_NAME" = "Grep" ]; then
     # Batch-add all files to read_files with set-like dedup (ALGO-002)
+    trap 'rm -f "$ADHERENCE.$$"' EXIT
     printf '%s\n' "$FILES" | jq -Rn --slurpfile state "$ADHERENCE" \
       '[inputs | select(length > 0)] as $new_files |
        $state[0] | .read_files = ([.read_files[], $new_files[]] | unique)' \
       > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null \
       || rm -f "$ADHERENCE.$$" 2>/dev/null
+    trap - EXIT
   else
     # Batch-add all files to modified_files + increment phase counter
+    trap 'rm -f "$ADHERENCE.$$"' EXIT
     printf '%s\n' "$FILES" | jq -Rn --slurpfile state "$ADHERENCE" --arg p "$PHASE" \
       '[inputs | select(length > 0)] as $new_files |
        $state[0] | .modified_files = ([.modified_files[], $new_files[]] | unique)
        | .phase_files[$p] = ((.phase_files[$p] // 0) + ($new_files | length))' \
       > "$ADHERENCE.$$" 2>/dev/null && mv "$ADHERENCE.$$" "$ADHERENCE" 2>/dev/null \
       || rm -f "$ADHERENCE.$$" 2>/dev/null
+    trap - EXIT
   fi
 
   # Show coverage progress during QA phase (single jq call for both counters, O(R+M) algorithm)
