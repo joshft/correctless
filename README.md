@@ -113,7 +113,7 @@ graph LR
     style F fill:#51cf66,color:#fff
 ```
 
-Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. A PreToolUse hook blocks source code edits until tests exist — this isn't a suggestion, it's enforced by bash.
+Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. A PreToolUse hook blocks source code edits until tests exist — this isn't a suggestion, it's enforced by bash. See the [Standard Workflow Guide](https://joshft.github.io/correctless/standard-workflow) for state machine diagrams, hook architecture, and phase gating details.
 
 ### The Critical Workflow
 
