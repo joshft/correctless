@@ -255,17 +255,20 @@ Correctless hooks into Claude Code's infrastructure for real-time feedback and l
 ```mermaid
 graph TB
     subgraph "Claude Code Hooks"
-        A["PreToolUse"] --> B["workflow-gate.sh<br/>Phase enforcement"]
+        A["PreToolUse"] --> H["sensitive-file-guard.sh<br/>Secret protection"]
+        A --> B["workflow-gate.sh<br/>Phase enforcement"]
         C["PostToolUse"] --> D["audit-trail.sh<br/>Adherence feedback"]
         C --> G["auto-format.sh<br/>Auto-formatting"]
         E["Statusline"] --> F["statusline.sh<br/>Phase + cost + context"]
     end
 
+    H -->|"block/allow"| M[".env, keys, credentials"]
     B -->|"block/allow"| I["Every file edit"]
     D -->|"alerts"| J["Real-time violations"]
     G -->|"formats"| L["Edited files"]
     F -->|"live display"| K["Always visible"]
 
+    style H fill:#e64980,color:#fff
     style B fill:#ff6b6b,color:#fff
     style D fill:#ffd43b,color:#000
     style G fill:#74c0fc,color:#000
@@ -274,6 +277,7 @@ graph TB
 
 | Hook | Runs | Purpose |
 |------|------|---------|
+| **sensitive-file-guard.sh** | Before every file edit | Blocks writes to `.env`, credentials, keys, certificates — fail-closed, no overrides |
 | **workflow-gate.sh** | Before every file edit | Blocks writes that violate the current phase (RED blocks source, QA blocks everything) |
 | **audit-trail.sh** | After every tool call | Logs modifications with phase context, alerts on violations |
 | **auto-format.sh** | After Edit/Write/MultiEdit | Runs project formatter (Prettier, Black, gofmt, etc.) with allowlist validation |
