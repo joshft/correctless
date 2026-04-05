@@ -27,6 +27,8 @@ TEST_EDIT_LOG="$ARTIFACTS_DIR/tdd-test-edits.log"
 # ---------------------------------------------------------------------------
 
 INPUT="$(cat)"
+# shellcheck disable=SC2034  # Variables assigned via eval+jq below, used later
+TOOL_NAME="" TOOL_INPUT_FILE="" TOOL_INPUT_COMMAND="" TOOL_INPUT_NEW="" TOOL_INPUT_EDITS="" TOOL_INPUT_EDITS_NEW=""
 eval "$(echo "$INPUT" | jq -r '
   @sh "TOOL_NAME=\(.tool_name // "")",
   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
@@ -105,6 +107,9 @@ if [ ! -f "$STATE_FILE" ]; then
     TARGET_FILE_CHECK="$TOOL_INPUT_FILE"
     if [ -z "$TARGET_FILE_CHECK" ] && [ -n "$TOOL_INPUT_EDITS" ]; then
       TARGET_FILE_CHECK="${TOOL_INPUT_EDITS%%$'\n'*}"
+    fi
+    if [ -z "$TARGET_FILE_CHECK" ] && [ "$TOOL_NAME" = "Bash" ] && [ -n "$TOOL_INPUT_COMMAND" ]; then
+      TARGET_FILE_CHECK="$(echo "$TOOL_INPUT_COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)' | head -1)" || true
     fi
     if [ -n "$TARGET_FILE_CHECK" ]; then
       SOURCE_PAT="$FC_SOURCE_PAT"
@@ -285,7 +290,9 @@ resolve_package() {
       [ -f "$_old_cache" ] && [ "$_old_cache" != "$cache_file" ] && rm -f "$_old_cache" 2>/dev/null
     done
     if [ -f "$cache_file" ]; then
+      trap 'rm -f "$cache_file.$$"' EXIT
       jq --arg f "$file" --arg p "$best" '. + {($f): $p}' "$cache_file" > "$cache_file.$$" 2>/dev/null && mv "$cache_file.$$" "$cache_file" 2>/dev/null || { rm -f "$cache_file.$$" 2>/dev/null; true; }
+      trap - EXIT
     else
       jq -nc --arg f "$file" --arg p "$best" '{($f): $p}' > "$cache_file" 2>/dev/null || true
     fi
@@ -376,6 +383,7 @@ ALL_SOURCE_FILES=""
 while IFS= read -r _check_file; do
   [ -z "$_check_file" ] && continue
   _rel="${_check_file#$REPO_ROOT/}"
+  _rel="${_rel#./}"
   _cls="$(classify_file "$_rel")"
   if [ "$_cls" = "source" ]; then
     MOST_RESTRICTIVE="source"
@@ -425,7 +433,13 @@ case "$PHASE" in
           if ! grep -q 'STUB:TDD' "$REPO_ROOT/$_src_rel" 2>/dev/null; then
             # File exists but no STUB:TDD — check if the edit adds it
             if [ "$TOOL_NAME" != "Bash" ]; then
-              if [[ "$TOOL_INPUT_NEW" == *"STUB:TDD"* ]] || [[ "$TOOL_INPUT_EDITS_NEW" == *"STUB:TDD"* ]]; then
+              # For MultiEdit: extract this specific file's new_string content (H2 fix)
+              if [ "$TOOL_NAME" = "MultiEdit" ]; then
+                _file_content="$(echo "$INPUT" | jq -r --arg fp "$_src_rel" --arg afp "$REPO_ROOT/$_src_rel" '[.tool_input.edits[] | select(.file_path == $fp or .file_path == $afp) | .new_string // ""] | join("\n")')"
+              else
+                _file_content="$TOOL_INPUT_NEW"
+              fi
+              if [[ "$_file_content" == *"STUB:TDD"* ]]; then
                 continue  # Edit is adding STUB:TDD to this file — allow
               fi
             fi
@@ -438,11 +452,15 @@ case "$PHASE" in
         else
           # New file — check if content contains STUB:TDD
           if [ "$TOOL_NAME" != "Bash" ]; then
-            # Check both single-edit and multi-edit content fields
+            # For MultiEdit: extract this specific file's new_string content (H2 fix)
+            if [ "$TOOL_NAME" = "MultiEdit" ]; then
+              _file_content="$(echo "$INPUT" | jq -r --arg fp "$_src_rel" --arg afp "$REPO_ROOT/$_src_rel" '[.tool_input.edits[] | select(.file_path == $fp or .file_path == $afp) | .new_string // ""] | join("\n")')"
+            else
+              _file_content="$TOOL_INPUT_NEW"
+            fi
             _has_stub=false
-            [[ "$TOOL_INPUT_NEW" == *"STUB:TDD"* ]] && _has_stub=true
-            [[ "$TOOL_INPUT_EDITS_NEW" == *"STUB:TDD"* ]] && _has_stub=true
-            if { [ -n "$TOOL_INPUT_NEW" ] || [ -n "$TOOL_INPUT_EDITS_NEW" ]; } && [ "$_has_stub" = "false" ]; then
+            [[ "$_file_content" == *"STUB:TDD"* ]] && _has_stub=true
+            if [ -n "$_file_content" ] && [ "$_has_stub" = "false" ]; then
               block "RED phase — new source file '$_src_rel' must contain STUB:TDD tag.
   Add '// STUB:TDD' (or '# STUB:TDD' in Python) to function bodies.
   Stub bodies should contain only the tag, zero-value returns, or panic(\"not implemented\")."

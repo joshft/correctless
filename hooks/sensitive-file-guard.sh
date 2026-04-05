@@ -173,6 +173,10 @@ _extract_bash_targets() {
                 i=$((i + 2)); continue
               fi
               ;;
+            -o*)
+              # Combined short option: -oFILENAME (M4 fix)
+              _strip_quotes "${tokens[$i]#-o}"
+              ;;
             --output)
               local next_i=$((i + 1))
               if [ $next_i -lt ${#tokens[@]} ]; then
@@ -194,6 +198,14 @@ _extract_bash_targets() {
         while [ $i -lt ${#tokens[@]} ]; do
           case "${tokens[$i]}" in
             -O)
+              local next_i=$((i + 1))
+              if [ $next_i -lt ${#tokens[@]} ]; then
+                _strip_quotes "${tokens[$next_i]}"
+                i=$((i + 2)); continue
+              fi
+              ;;
+            --output-document)
+              # Long option with space-separated value (M4 fix)
               local next_i=$((i + 1))
               if [ $next_i -lt ${#tokens[@]} ]; then
                 _strip_quotes "${tokens[$next_i]}"

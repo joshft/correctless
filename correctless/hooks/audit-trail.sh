@@ -66,8 +66,11 @@ if [ -f "$TRAIL" ]; then
   if [ "$trail_size" -gt 5242880 ] 2>/dev/null; then
     total_lines="$(wc -l < "$TRAIL")"
     keep_lines=$(( total_lines / 2 ))
+    [ "$keep_lines" -lt 1 ] && keep_lines=1
+    trap 'rm -f "$TRAIL.$$"' EXIT
     tail -n "$keep_lines" "$TRAIL" > "$TRAIL.$$" 2>/dev/null && mv "$TRAIL.$$" "$TRAIL" 2>/dev/null \
       || rm -f "$TRAIL.$$" 2>/dev/null
+    trap - EXIT
   fi
 fi
 
@@ -93,6 +96,7 @@ fi
 # Simple file classifier (matches gate logic)
 classify() {
   local file="$1" bname
+  file="${file,,}"
   bname="${file##*/}"
   if [ -n "$TEST_PATTERN" ]; then
     local oldifs="$IFS"; IFS='|'

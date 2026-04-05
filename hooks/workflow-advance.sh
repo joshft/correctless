@@ -488,7 +488,7 @@ cmd_qa() {
   cov_cmd="$(read_config_field '.commands.coverage' 2>/dev/null || echo "")"
   if [ -n "$cov_cmd" ] && [ "$cov_cmd" != "null" ]; then
     info "Capturing coverage baseline..."
-    eval "$cov_cmd" > "$ARTIFACTS_DIR/coverage-baseline.out" 2>&1 || true
+    eval "$cov_cmd" > "$ARTIFACTS_DIR/coverage-baseline-$(branch_slug).out" 2>&1 || true
   fi
 
   # Increment QA round counter and transition phase in a single write
@@ -764,6 +764,7 @@ cmd_reset() {
     rm -f "$ARTIFACTS_DIR/checkpoint-ctdd-"*.json "$ARTIFACTS_DIR/checkpoint-crefactor-"*.json \
           "$ARTIFACTS_DIR/checkpoint-creview-spec-"*.json "$ARTIFACTS_DIR/checkpoint-caudit-"*.json 2>/dev/null
     rm -f "$ARTIFACTS_DIR/.pkg-cache-"*.json 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/tdd-test-edits.log" "$ARTIFACTS_DIR/coverage-baseline-${slug_hash}.out" 2>/dev/null
     info "Workflow state, audit trail, adherence state, and checkpoints removed for branch '$(current_branch)'"
   else
     info "No workflow state for branch '$(current_branch)'"
@@ -824,7 +825,7 @@ cmd_override() {
     '{phase: $phase, reason: $reason, timestamp: $ts, branch: $branch}')"
   # shellcheck disable=SC2064
   trap "rm -f '$OVERRIDE_LOG.$$'" EXIT
-  jq --argjson entry "$entry" '. += [$entry]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
+  jq --argjson entry "$entry" '(. += [$entry]) | .[-100:]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
     && mv "$OVERRIDE_LOG.$$" "$OVERRIDE_LOG"
   trap - EXIT
 
