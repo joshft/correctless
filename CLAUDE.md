@@ -73,3 +73,8 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 - Observed in 3 features (workflow-gate.sh, sensitive-file-guard.sh, auto-format.sh uses PostToolUse variant) — treat as established project convention
 - Every PreToolUse hook must: (1) `set -euo pipefail` + `set -f`, (2) check `command -v jq` with fail-closed exit 2, (3) bulk-parse stdin with single `eval` + `jq -r @sh`, (4) fast-path `exit 0` for non-relevant tools BEFORE loading config, (5) exit 0 to allow, exit 2 to block. See PAT-001 in .correctless/ARCHITECTURE.md.
 - Source: /cdocs after sensitive-file-protection
+
+### 2026-04-05 — Audit pattern: Hook allowlist/extension drift
+- Recurs across 3 audit runs (QA 2026-04-03, Hacker 2026-04-04, QA 2026-04-05) — always check all hooks when adding commands or extensions to any one hook
+- Write-command lists (_has_write_pattern), file extension regexes (get_target_file), and case normalization must stay synchronized across workflow-gate.sh, sensitive-file-guard.sh, and audit-trail.sh
+- Source: /caudit qa

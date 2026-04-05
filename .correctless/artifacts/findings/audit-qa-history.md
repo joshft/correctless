@@ -71,7 +71,69 @@ Zero findings from Regression Hunter. **Converged.**
 - setup heredoc JSON generation with jq -n (install path change)
 - Protected branch config field addition (new config schema)
 
+## Run: 2026-04-05
+### Round 1
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| QA-R1-001 | high | confirmed | Numbered fd redirects (1>, 2>) bypass write detection | fixed | 026f31e |
+| QA-R1-002 | high | confirmed | workflow-gate.sh bare redirect bypass (regression of QA-003) | fixed | 026f31e |
+| QA-R1-003 | high | confirmed | curl/wget/ln missing from sensitive-file-guard | fixed | 026f31e |
+| QA-R1-004 | medium | confirmed | statusline COST awk injection via string interpolation | fixed | 026f31e |
+| QA-R1-005 | medium | confirmed | Non-JSON stdin causes exit 1 (unbound variable) | fixed | 026f31e |
+| QA-R1-006 | medium | confirmed | audit-trail.sh extension list drift from workflow-gate | fixed | 026f31e |
+| QA-R1-007 | medium | confirmed | workflow-gate.sh temp files no trap cleanup (3 locations) | fixed | 026f31e |
+| QA-R1-008 | medium | confirmed | audit-trail.sh adherence temp file no trap | fixed | 026f31e |
+| QA-R1-009 | medium | confirmed | audit trail JSONL grows without bounds | fixed | 026f31e |
+| QA-R1-010 | medium | confirmed | TOCTOU override decrement race | deferred | (low impact) |
+| QA-R1-011 | low | confirmed | write_state trap references local variable out of scope | fixed | 026f31e |
+| QA-R1-012 | low | confirmed | Custom patterns with spaces split into separate tokens | fixed | 026f31e |
+| QA-R1-013 | low | probable | CURRENT_TOKENS not validated as numeric | fixed | 026f31e |
+| QA-R1-014 | low | confirmed | git rev-parse missing --no-optional-locks | fixed | 026f31e |
+| QA-R1-015 | low | confirmed | pkg-cache files not cleaned for non-monorepo | deferred | (minor) |
+
+### Round 2
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| QA-R2-001 | high | confirmed | MultiEdit STUB:TDD bypass via concatenated content | fixed | 76ad68d |
+| QA-R2-002 | medium | confirmed | workflow-gate.sh missing variable init before eval | fixed | 76ad68d |
+| QA-R2-003 | medium | confirmed | Fail-closed doesn't check Bash command targets | fixed | 76ad68d |
+| QA-R2-004 | medium | confirmed | audit-trail classify() missing case normalization | fixed | 76ad68d |
+| QA-R2-005 | medium | probable | wget/curl option variants not extracted | fixed | 76ad68d |
+| QA-R2-006 | medium | probable | MultiEdit ./ prefix not stripped in classification | fixed | 76ad68d |
+| QA-R2-007 | low | confirmed | cmd_reset missing tdd-test-edits.log and coverage-baseline | fixed | 76ad68d |
+| QA-R2-008 | low | confirmed | Audit trail truncation temp file no trap | fixed | 76ad68d |
+| QA-R2-009 | low | confirmed | pkg-cache temp file no trap | fixed | 76ad68d |
+| QA-R2-010 | low | confirmed | coverage-baseline.out not branch-scoped | fixed | 76ad68d |
+| QA-R2-011 | low | confirmed | Audit trail truncation drops all on single-line file | fixed | 76ad68d |
+| QA-R2-012 | low | probable | override-log.json unbounded growth | fixed | 76ad68d |
+| QA-R2-013 | low | confirmed | Redirect regex [0-9]*> false positives on pre-check | deferred | (pre-check only, not blocking) |
+
+### Round 3
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| QA-R3-001 | medium | confirmed | .claude/hooks/ stale copies (all hooks) | fixed | ed74820 |
+| QA-R3-002 | medium | confirmed | cmd_diagnose missing case normalization | fixed | ed74820 |
+| QA-R3-003 | medium | confirmed | Fail-closed only checks first MultiEdit file | fixed | ed74820 |
+| QA-R3-004 | medium | confirmed | Fail-closed basename not case-normalized | fixed | ed74820 |
+| QA-R3-005 | low | confirmed | python/python3/node/ruby missing from sensitive-file-guard | fixed | ed74820 |
+| QA-R3-006 | low | confirmed | MultiEdit STUB:TDD jq ./ prefix mismatch | fixed | ed74820 |
+
+**Converged.** Round 1: 15 findings → Round 2: 13 → Round 3: 6 (0 HIGH). All fixed except 3 deferred.
+
+### Regression tests added
+- R1: curl/wget/ln write detection tests in sensitive-file-guard
+- R2: MultiEdit STUB:TDD per-file check
+- R3: .claude/hooks/ sync as part of commit workflow
+
+### Deferred for human review
+- QA-R1-010: TOCTOU override decrement race — would require flock, low impact
+- QA-R1-015: pkg-cache cleanup for non-monorepo — cleanup happens on reset
+- QA-R2-013: Redirect regex [0-9]*> false positives — pre-check only, not blocking decisions
+
 ## Recurring Patterns
 - **Stale path references after migration**: .claude/ → .correctless/ migration left references in 20+ files. Future migrations should include a grep sweep as part of the migration checklist.
 - **Skill registration drift**: 3 skills (cquick, crelease, cexplain) were added without updating 5 registration points. CONTRIBUTING.md checklist now includes ARCHITECTURE.md, AGENT_CONTEXT.md, CHANGELOG.md.
 - **"low" intensity ghost**: Retired intensity level persisted in 4 files after the standard/high/critical system was established. All references cleaned.
+- **Hook allowlist/extension drift**: Write-command lists and extension regexes drift between hooks (workflow-gate, sensitive-file-guard, audit-trail). When adding a command or extension to one hook, grep all hooks for the same pattern. (2026-04-03, 2026-04-05)
+- **Case normalization gaps**: Pattern matching in new code paths (fail-closed, classify, diagnose) frequently misses ${var,,} lowercasing that the main code path has. Every path that does case-insensitive matching must normalize. (2026-04-05)
+- **.claude/hooks/ stale copies**: sync.sh syncs to correctless/hooks/ but not .claude/hooks/. The installed hooks drift from source. (2026-04-03, 2026-04-05)
