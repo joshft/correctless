@@ -115,6 +115,8 @@ graph LR
 
 Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. A PreToolUse hook blocks source code edits until tests exist — this isn't a suggestion, it's enforced by bash.
 
+> **[View the interactive Standard Workflow guide](standard-workflow.html)** — state machine, hook architecture, phase gating decision tree, and data flow diagrams with rendered mermaid and prose walkthroughs.
+
 ### The Critical Workflow
 
 ```mermaid
