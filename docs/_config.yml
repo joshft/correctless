@@ -1,0 +1,5 @@
+title: Correctless
+description: Correctness-oriented development workflow for Claude Code
+remote_theme: pages-themes/primer@v0.5.4
+plugins:
+  - jekyll-remote-theme
