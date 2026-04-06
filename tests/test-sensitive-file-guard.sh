@@ -1010,6 +1010,56 @@ test_qa004_all_default_patterns
 test_bnd005_symlink_accepted_limitation
 test_qa006_quoted_filenames_in_bash
 
+# ===========================================================================
+# DA-003: Fail-closed on jq parse failure
+# ===========================================================================
+
+test_da003_fail_closed_on_jq_failure() {
+  echo ""
+  echo "=== DA-003: Fail-closed on jq parse failure ==="
+
+  # Feed invalid JSON to the security hook — must exit 2 (block), not 0 (allow)
+  local exit_code
+  echo "NOT VALID JSON {{{" | bash "$HOOK" 2>/dev/null
+  exit_code=$?
+  assert_eq "DA-003: jq parse failure exits 2 (fail-closed)" "2" "$exit_code"
+}
+
+# ===========================================================================
+# DA-004: Hook allowlist sync — deterministic check
+# ===========================================================================
+
+test_da004_hook_allowlist_sync() {
+  echo ""
+  echo "=== DA-004: Hook command allowlist sync ==="
+
+  local gate="$REPO_DIR/hooks/workflow-gate.sh"
+  local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
+
+  # Extract the shared write-command list from each hook
+  # workflow-gate.sh: the case pattern in _has_write_pattern
+  local gate_cmds guard_cmds
+  gate_cmds="$(grep -A1 '_has_write_pattern' "$gate" | grep -oE 'cp\|mv\|[a-z|]+\) return' | head -1 | sed 's/) return//')"
+  guard_cmds="$(grep -A1 '_has_write_pattern' "$guard" | grep -oE 'cp\|mv\|[a-z|]+\) return' | head -1 | sed 's/) return//')"
+
+  # The guard has extra scripted-write commands (python|python3|node|ruby)
+  # that the gate doesn't need. Strip those for comparison.
+  local guard_shared
+  guard_shared="$(echo "$guard_cmds" | sed 's/|python3\?//g; s/|node//g; s/|ruby//g')"
+
+  assert_eq "DA-004: shared write commands match between gate and guard" "$gate_cmds" "$guard_shared"
+
+  # Extension regex sync between workflow-gate.sh and audit-trail.sh
+  local gate_ext trail_ext
+  gate_ext="$(grep -oE '\.\(go\|ts\|[a-z|]+\)' "$gate" | head -1)"
+  trail_ext="$(grep -oE '\.\(go\|ts\|[a-z|]+\)' "$REPO_DIR/hooks/audit-trail.sh" | head -1)"
+
+  assert_eq "DA-004: extension regex matches between gate and audit-trail" "$gate_ext" "$trail_ext"
+}
+
+test_da003_fail_closed_on_jq_failure
+test_da004_hook_allowlist_sync
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
