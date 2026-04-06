@@ -182,9 +182,7 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
   if command -v branch_slug >/dev/null 2>&1; then
     _slug="$(branch_slug 2>/dev/null)" || _slug=""
   else
-    # Inline fallback (statusline must never fail)
-    _s="${branch//[^a-zA-Z0-9]/-}"; _s="${_s:0:80}"
-    _h="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"; _slug="${_s}-${_h:0:6}"
+    _slug=""  # lib.sh not available — skip workflow section
   fi
   STATE_FILE=".correctless/artifacts/workflow-state-${_slug}.json"
 

@@ -48,16 +48,13 @@ elif [ -f "scripts/lib.sh" ]; then
 fi
 unset _LIB_DIR
 
-# Compute state file path using shared branch_slug (or inline fallback)
+# Compute state file path using shared branch_slug (ABS-001: single definition in lib.sh)
 if command -v branch_slug >/dev/null 2>&1; then
   _slug="$(branch_slug 2>/dev/null)" || exit 0
   [ -n "$_slug" ] || exit 0
 else
-  # Inline fallback if lib.sh not available (audit-trail must not fail-closed)
-  branch="$(git --no-optional-locks branch --show-current 2>/dev/null)" || exit 0
-  [ -n "$branch" ] || exit 0
-  slug="${branch//[^a-zA-Z0-9]/-}"; slug="${slug:0:80}"
-  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"; _slug="${slug}-${raw_hash:0:6}"
+  # lib.sh not available — can't determine state, skip audit
+  exit 0
 fi
 STATE_FILE=".correctless/artifacts/workflow-state-${_slug}.json"
 
@@ -66,7 +63,7 @@ STATE_FILE=".correctless/artifacts/workflow-state-${_slug}.json"
 
 # Read phase and config
 PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)"
-CONFIG_FILE=".correctless/config/workflow-config.json"
+CONFIG_FILE="$(config_file 2>/dev/null)" || CONFIG_FILE=".correctless/config/workflow-config.json"
 
 # --- Audit trail logging (batch all files in single jq call) ---
 
@@ -87,15 +84,19 @@ if [ -f "$TRAIL" ]; then
   fi
 fi
 
+# Get branch name for audit trail (branch_slug doesn't expose it as a variable)
+_audit_branch="$(git --no-optional-locks branch --show-current 2>/dev/null || true)"
 printf '%s\n' "$FILES" | jq -Rnc \
-  --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$branch" \
+  --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$_audit_branch" \
   '[inputs | select(length > 0)] | .[] | {ts:$ts,phase:$phase,tool:$tool,file:.,branch:$branch}' \
   >> "$TRAIL" 2>/dev/null
 
 # --- Adherence feedback (Lite: violations only, Full: + coverage tracking) ---
 
 # Bulk-read config: patterns + intensity in one jq call (IO-004)
+# shellcheck disable=SC2034  # Used by classify_file() in lib.sh
 TEST_PATTERN=""
+# shellcheck disable=SC2034
 SOURCE_PATTERN=""
 IS_FULL="false"
 if [ -f "$CONFIG_FILE" ]; then
@@ -106,41 +107,14 @@ if [ -f "$CONFIG_FILE" ]; then
   ' "$CONFIG_FILE" 2>/dev/null)" || true
 fi
 
-# Simple file classifier (matches gate logic)
-classify() {
-  local file="$1" bname
-  file="${file,,}"
-  bname="${file##*/}"
-  if [ -n "$TEST_PATTERN" ]; then
-    local oldifs="$IFS"; IFS='|'
-    for pat in $TEST_PATTERN; do
-      IFS="$oldifs"
-      case "$pat" in
-        */*) case "$file" in $pat) echo "test"; return ;; esac ;;
-        *)   case "$bname" in $pat) echo "test"; return ;; esac ;;
-      esac
-    done
-    IFS="$oldifs"
-  fi
-  if [ -n "$SOURCE_PATTERN" ]; then
-    local oldifs="$IFS"; IFS='|'
-    for pat in $SOURCE_PATTERN; do
-      IFS="$oldifs"
-      case "$pat" in
-        */*) case "$file" in $pat) echo "source"; return ;; esac ;;
-        *)   case "$bname" in $pat) echo "source"; return ;; esac ;;
-      esac
-    done
-    IFS="$oldifs"
-  fi
-  echo "other"
-}
+# classify_file() is provided by lib.sh (ABS-001: single definition)
+# Requires TEST_PATTERN and SOURCE_PATTERN globals set above.
 
 # --- Lite mode: phase-violation alerts ---
 
 while IFS= read -r f; do
   [ -z "$f" ] && continue
-  fclass="$(classify "$f")"
+  fclass="$(classify_file "$f")"
 
   case "$PHASE" in
     tdd-qa|tdd-verify)
