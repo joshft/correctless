@@ -1,6 +1,6 @@
 # Agent Context — Correctless
 
-> Last updated: 2026-04-03
+> Last updated: 2026-04-06
 
 ## What This Project Does
 
@@ -16,7 +16,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 26-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 17 test files (~1,900 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan |
+| Tests | `tests/test*.sh` | 18 test files (~2,050 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, shift-left-review |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns
@@ -26,6 +26,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 - **Phase-gated writes** (PAT-003): `workflow-gate.sh` blocks file operations that violate the current phase (RED blocks source, QA blocks everything)
 - **Branch-scoped state** (PAT-004): state lives in `.correctless/artifacts/workflow-state-{branch-slug}.json` — `workflow-advance.sh` is the only writer
 - **Effective intensity** (PAT-005): each pipeline skill and gated skill computes `max(project_intensity, feature_intensity)` using ordering `standard < high < critical`. Project intensity from `workflow.intensity` in config, feature intensity from `workflow-advance.sh status`. Fallback: feature_intensity → workflow.intensity → standard
+- **Shift-left review** (PAT-006): `/creview` and `/creview-spec` read historical findings (QA, Olympics audits, Devil's Advocate reports) to detect recurring patterns. Classification is ephemeral — see ABS-002 in ARCHITECTURE.md. 10-file budget (PAT-004)
 - **MCP integration** (optional): Serena for symbol-level code analysis, Context7 for library docs — check `mcp.serena` and `mcp.context7` in workflow-config.json. Falls back to grep/read silently when unavailable
 
 ## Common Pitfalls
@@ -39,7 +40,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Need to... | Do this |
 |------------|---------|
 | Run tests | `bash tests/test.sh && bash tests/test-mcp.sh` (or run all: see workflow-config.json `commands.test`) |
-| Lint shell scripts | `shellcheck hooks/*.sh tests/test*.sh sync.sh setup` |
+| Lint shell scripts | `shellcheck hooks/*.sh scripts/*.sh tests/test*.sh sync.sh setup` |
 | Sync to distribution | `bash sync.sh` |
 | Find a skill | `skills/{name}/SKILL.md` |
 | Find skill docs | `docs/skills/{name}.md` |
