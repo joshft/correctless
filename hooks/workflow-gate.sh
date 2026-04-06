@@ -76,28 +76,19 @@ esac
 # Read state
 # ---------------------------------------------------------------------------
 
-# Source shared library for branch_slug() — fall back to inline if lib.sh not found
-# (hooks must not fail-closed on missing lib.sh)
+# Source shared library for branch_slug() (ABS-001: single definition in lib.sh)
 _GATE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
 if [ -n "$_GATE_LIB_DIR" ] && [ -f "$_GATE_LIB_DIR/lib.sh" ]; then
   # shellcheck source=../scripts/lib.sh
   source "$_GATE_LIB_DIR/lib.sh"
 elif [ -f "$REPO_ROOT/scripts/lib.sh" ]; then
   source "$REPO_ROOT/scripts/lib.sh"
-else
-  # Inline fallback — keeps gate functional without lib.sh
-  branch_slug() {
-    local branch
-    branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
-    [ -n "$branch" ] || { exit 0; }  # detached HEAD: no workflow, allow all
-    local slug raw_hash
-    slug="${branch//[^a-zA-Z0-9]/-}"
-    slug="${slug:0:80}"
-    raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
-    echo "${slug}-${raw_hash:0:6}"
-  }
 fi
 unset _GATE_LIB_DIR
+# If lib.sh wasn't found, branch_slug won't be available — can't determine state.
+# Deliberate fail-open: lib.sh absence means a broken installation. Exit 0 prevents
+# false blocking. Previously had an inline fallback; removed in hook-config-consolidation.
+command -v branch_slug >/dev/null 2>&1 || exit 0
 
 _gate_branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
 [ -n "$_gate_branch" ] || exit 0  # detached HEAD: no workflow, allow all
@@ -376,60 +367,8 @@ if [ -z "$SOURCE_PATTERN" ] && [ -z "$TEST_PATTERN" ]; then
   exit 2
 fi
 
-classify_file() {
-  local file="$1"
-  # Normalize case — patterns are lowercase, filenames may not be (bash 4+ builtin)
-  file="${file,,}"
-  local bname
-  bname="${file##*/}"
-
-  # Check test patterns (pipe-delimited globs like "*.test.ts|*.spec.ts|tests/*.rs")
-  if [ -n "$TEST_PATTERN" ]; then
-    local oldifs="$IFS"
-    IFS='|'
-    for pat in $TEST_PATTERN; do
-      IFS="$oldifs"
-      # Patterns containing "/" need to match against the full relative path
-      case "$pat" in
-        */*)
-          case "$file" in
-            $pat) echo "test"; return ;;
-          esac
-          ;;
-        *)
-          case "$bname" in
-            $pat) echo "test"; return ;;
-          esac
-          ;;
-      esac
-    done
-    IFS="$oldifs"
-  fi
-
-  # Check source patterns
-  if [ -n "$SOURCE_PATTERN" ]; then
-    local oldifs="$IFS"
-    IFS='|'
-    for pat in $SOURCE_PATTERN; do
-      IFS="$oldifs"
-      case "$pat" in
-        */*)
-          case "$file" in
-            $pat) echo "source"; return ;;
-          esac
-          ;;
-        *)
-          case "$bname" in
-            $pat) echo "source"; return ;;
-          esac
-          ;;
-      esac
-    done
-    IFS="$oldifs"
-  fi
-
-  echo "other"
-}
+# classify_file() is provided by lib.sh (ABS-001: single definition)
+# Requires TEST_PATTERN and SOURCE_PATTERN globals set above.
 
 # For MultiEdit, find the most restrictive classification across all files.
 # Collect ALL source files (needed for per-file STUB:TDD checks in RED phase).

@@ -87,6 +87,19 @@ if [ "$TOOL_NAME" = "Bash" ]; then
 fi
 
 # ============================================
+# STEP 4b: Source shared library (after fast-path bails)
+# ============================================
+
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
+if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
+  # shellcheck source=../scripts/lib.sh
+  source "$_LIB_DIR/lib.sh"
+elif [ -f "scripts/lib.sh" ]; then
+  source "scripts/lib.sh"
+fi
+unset _LIB_DIR
+
+# ============================================
 # STEP 5: Collect file targets to check
 # ============================================
 
@@ -340,8 +353,8 @@ id_ed25519.*
 
 CUSTOM_PATTERNS=""
 
-# Find config file relative to cwd (the hook runs in the project dir)
-CONFIG_FILE=".correctless/config/workflow-config.json"
+# Resolve config file path via lib.sh (falls back to relative if unavailable)
+CONFIG_FILE="$(config_file 2>/dev/null)" || CONFIG_FILE=".correctless/config/workflow-config.json"
 
 if [ -f "$CONFIG_FILE" ]; then
   # Read custom_patterns as newline-separated list; on failure, CUSTOM_PATTERNS stays empty
