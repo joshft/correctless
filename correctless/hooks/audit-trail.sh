@@ -84,15 +84,19 @@ if [ -f "$TRAIL" ]; then
   fi
 fi
 
+# Get branch name for audit trail (branch_slug doesn't expose it as a variable)
+_audit_branch="$(git --no-optional-locks branch --show-current 2>/dev/null || true)"
 printf '%s\n' "$FILES" | jq -Rnc \
-  --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$branch" \
+  --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$_audit_branch" \
   '[inputs | select(length > 0)] | .[] | {ts:$ts,phase:$phase,tool:$tool,file:.,branch:$branch}' \
   >> "$TRAIL" 2>/dev/null
 
 # --- Adherence feedback (Lite: violations only, Full: + coverage tracking) ---
 
 # Bulk-read config: patterns + intensity in one jq call (IO-004)
+# shellcheck disable=SC2034  # Used by classify_file() in lib.sh
 TEST_PATTERN=""
+# shellcheck disable=SC2034
 SOURCE_PATTERN=""
 IS_FULL="false"
 if [ -f "$CONFIG_FILE" ]; then
