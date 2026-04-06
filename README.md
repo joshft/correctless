@@ -403,7 +403,7 @@ Optional (high+/critical):
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 26 skills, 3 intensity levels, 1,518 automated tests, 4 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 26 skills, 3 intensity levels, ~1,900 automated tests, 4 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 

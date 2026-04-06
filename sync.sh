@@ -66,6 +66,15 @@ done
 sync_dir "templates/invariants" "correctless/templates/invariants"
 [ "$CHECK_ONLY" = false ] && info "Templates → correctless/"
 
+# --- Scripts (phase-transition scripts) ---
+if [ "$CHECK_ONLY" = false ]; then
+  mkdir -p "correctless/scripts"
+fi
+for script in lib.sh antipattern-scan.sh; do
+  sync_file "scripts/$script" "correctless/scripts/$script"
+done
+[ "$CHECK_ONLY" = false ] && info "Scripts → correctless/"
+
 # --- Helpers (PBT guides) ---
 sync_dir "helpers" "correctless/helpers"
 [ "$CHECK_ONLY" = false ] && info "PBT helpers → correctless/"
@@ -103,7 +112,7 @@ if [ "$CHECK_ONLY" = true ]; then
     local_item="$(basename "$dist_item")"
     # Expected top-level dirs: skills, hooks, templates, helpers
     case "$local_item" in
-      skills|hooks|templates|helpers) ;; # expected — already checked via sync_file/sync_dir
+      skills|hooks|templates|helpers|scripts) ;; # expected — already checked via sync_file/sync_dir
       *) DIRTY=true ;; # unexpected directory in distribution
     esac
   done

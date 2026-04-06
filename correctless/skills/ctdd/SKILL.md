@@ -335,6 +335,22 @@ Then advance:
 .correctless/hooks/workflow-advance.sh qa
 ```
 
+## Pre-QA: Antipattern Scan
+
+Before spawning the QA agent, run the deterministic antipattern scanner:
+
+```bash
+bash scripts/antipattern-scan.sh {default_branch}
+```
+
+where `{default_branch}` is read from `workflow.default_branch` in `workflow-config.json`, falling back to `main` if absent.
+
+Validate that stdout is non-empty valid JSON with a `.findings` key before treating it as findings. Empty or invalid output means the scanner itself failed and must be reported as an error, not "zero findings." Also check if the JSON contains an `errors` array with entries — if so, report these scanner errors to the user rather than silently discarding them.
+
+If the JSON output includes a `summaries` array (present when files exceed the 20-finding cap), include these in the report.
+
+Pass the scanner's findings to the QA agent as context: "Deterministic scan found {N} antipatterns. These are already identified — focus on semantic issues. Note: these findings are heuristic (grep-based), not authoritative — verify before citing." The QA agent should also review the semantic ai-antipatterns checklist at `.correctless/checklists/ai-antipatterns.md` for patterns not detectable by grep.
+
 ## Phase: QA (tdd-qa)
 
 Spawn a **QA agent** as a third forked subagent:

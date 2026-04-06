@@ -255,6 +255,18 @@ install_hooks() {
   done
   chmod +x "$hook_dest/workflow-gate.sh" "$hook_dest/workflow-advance.sh" "$hook_dest/statusline.sh" "$hook_dest/audit-trail.sh"
   ok "Installed hooks to .correctless/hooks/"
+
+  # Install phase-transition scripts (sourced by hooks and invoked by skills)
+  if [ -d "$SCRIPT_DIR/scripts" ]; then
+    local script_dest="$REPO_ROOT/scripts"
+    mkdir -p "$script_dest"
+    for script in lib.sh antipattern-scan.sh; do
+      if [ -f "$SCRIPT_DIR/scripts/$script" ] && [ ! -f "$script_dest/$script" ]; then
+        cp "$SCRIPT_DIR/scripts/$script" "$script_dest/$script"
+      fi
+    done
+    chmod +x "$script_dest/antipattern-scan.sh" 2>/dev/null || true
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -326,7 +338,7 @@ HEOF
   elif command -v jq >/dev/null 2>&1; then
     # Append missing hook entries — only add entries not already present
     local tmp="$settings.$$"
-    jq --arg cmd "$hook_path" --arg adv "$advance_path" --arg audit "$audit_path" --arg sl "$statusline_path" '
+    if jq --arg cmd "$hook_path" --arg adv "$advance_path" --arg audit "$audit_path" --arg sl "$statusline_path" '
       .hooks.PreToolUse = (
         if (.hooks.PreToolUse // [] | any(.hooks[]?.command == $cmd)) then
           .hooks.PreToolUse
@@ -355,8 +367,12 @@ HEOF
           (.permissions.allow // []) + ["Bash(\($adv) *)"]
         end
       )
-    ' "$settings" > "$tmp" && mv "$tmp" "$settings"
-    ok "Registered hooks in existing settings.json"
+    ' "$settings" > "$tmp" 2>/dev/null && mv "$tmp" "$settings"; then
+      ok "Registered hooks in existing settings.json"
+    else
+      rm -f "$tmp"
+      warn "settings.json may contain invalid JSON — hooks not auto-registered. Add manually to $settings"
+    fi
   else
     warn "Cannot auto-register hooks (jq not found). Add manually to $settings"
   fi
@@ -372,11 +388,15 @@ HEOF
 
     if [ "$current_pre" != "$expected_pre" ] || [ "$current_post" != "$expected_post" ]; then
       local tmp="$settings.$$"
-      jq --arg pre "$expected_pre" --arg post "$expected_post" '
+      if jq --arg pre "$expected_pre" --arg post "$expected_post" '
         .hooks.PreToolUse = [.hooks.PreToolUse[]? | if (.hooks[]?.command | test("workflow-gate")) then .matcher = $pre else . end] |
         .hooks.PostToolUse = [.hooks.PostToolUse[]? | if (.hooks[]?.command | test("audit-trail")) then .matcher = $post else . end]
-      ' "$settings" > "$tmp" && mv "$tmp" "$settings"
-      ok "Updated hook matchers to current version"
+      ' "$settings" > "$tmp" 2>/dev/null && mv "$tmp" "$settings"; then
+        ok "Updated hook matchers to current version"
+      else
+        rm -f "$tmp"
+        warn "settings.json may contain invalid JSON — matchers not updated"
+      fi
     fi
   fi
 }

@@ -76,16 +76,28 @@ esac
 # Read state
 # ---------------------------------------------------------------------------
 
-branch_slug() {
-  local branch
-  branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
-  [ -n "$branch" ] || { exit 0; }  # detached HEAD: no workflow, allow all
-  local slug raw_hash
-  slug="${branch//[^a-zA-Z0-9]/-}"
-  slug="${slug:0:80}"
-  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
-  echo "${slug}-${raw_hash:0:6}"
-}
+# Source shared library for branch_slug() — fall back to inline if lib.sh not found
+# (hooks must not fail-closed on missing lib.sh)
+_GATE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
+if [ -n "$_GATE_LIB_DIR" ] && [ -f "$_GATE_LIB_DIR/lib.sh" ]; then
+  # shellcheck source=../scripts/lib.sh
+  source "$_GATE_LIB_DIR/lib.sh"
+elif [ -f "$REPO_ROOT/scripts/lib.sh" ]; then
+  source "$REPO_ROOT/scripts/lib.sh"
+else
+  # Inline fallback — keeps gate functional without lib.sh
+  branch_slug() {
+    local branch
+    branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
+    [ -n "$branch" ] || { exit 0; }  # detached HEAD: no workflow, allow all
+    local slug raw_hash
+    slug="${branch//[^a-zA-Z0-9]/-}"
+    slug="${slug:0:80}"
+    raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
+    echo "${slug}-${raw_hash:0:6}"
+  }
+fi
+unset _GATE_LIB_DIR
 
 _gate_branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
 [ -n "$_gate_branch" ] || exit 0  # detached HEAD: no workflow, allow all
