@@ -464,6 +464,43 @@ test_utilities
 test_full_mode
 test_additional_coverage
 
+# ===========================================================================
+# DA-001: Eval detection — no unexpected eval of config values
+# ===========================================================================
+
+echo ""
+echo "=== DA-001: eval-detection ==="
+
+# workflow-advance.sh is the ONLY hook/script allowed to eval config commands (TB-001a).
+# All other hooks and scripts must not eval config-sourced values.
+# This test detects new eval sites outside the documented exception.
+_da001_fail=0
+for f in "$REPO_DIR"/hooks/workflow-gate.sh \
+         "$REPO_DIR"/hooks/sensitive-file-guard.sh \
+         "$REPO_DIR"/hooks/audit-trail.sh \
+         "$REPO_DIR"/hooks/statusline.sh \
+         "$REPO_DIR"/scripts/antipattern-scan.sh; do
+  if [ -f "$f" ] && grep -qE 'eval "\$\(.*read_config|eval "\$.*_cmd|eval "\$test_cmd|eval "\$cov_cmd' "$f" 2>/dev/null; then
+    bname="$(basename "$f")"
+    echo "  FAIL: DA-001: $bname contains eval of config-sourced values (TB-001a violation)"
+    _da001_fail=1
+    FAIL=$((FAIL + 1))
+  fi
+done
+if [ "$_da001_fail" -eq 0 ]; then
+  echo "  PASS: DA-001: no unexpected eval of config values in hooks/scripts"
+  PASS=$((PASS + 1))
+fi
+
+# workflow-advance.sh IS allowed (TB-001a exception) — verify it exists there
+if grep -qE 'eval "\$' "$REPO_DIR/hooks/workflow-advance.sh" 2>/dev/null; then
+  echo "  PASS: DA-001: workflow-advance.sh eval sites present (TB-001a exception, documented)"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: DA-001: workflow-advance.sh has no eval sites — test may need updating"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "======================"
 echo "Results: $PASS passed, $FAIL failed"

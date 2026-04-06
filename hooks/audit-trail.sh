@@ -38,15 +38,28 @@ esac
 # Fast-path bail: no files identified = nothing to audit
 [ -n "$FILES" ] || exit 0
 
-# Compute branch slug and find state file (bash builtins instead of sed+cut)
-branch="$(git --no-optional-locks branch --show-current 2>/dev/null)" || exit 0
-[ -n "$branch" ] || exit 0
+# Source shared library for branch_slug() (ABS-001: single definition)
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
+if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
+  # shellcheck source=../scripts/lib.sh
+  source "$_LIB_DIR/lib.sh"
+elif [ -f "scripts/lib.sh" ]; then
+  source "scripts/lib.sh"
+fi
+unset _LIB_DIR
 
-slug="${branch//[^a-zA-Z0-9]/-}"
-slug="${slug:0:80}"
-raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
-hash="${raw_hash:0:6}"
-STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${hash}.json"
+# Compute state file path using shared branch_slug (or inline fallback)
+if command -v branch_slug >/dev/null 2>&1; then
+  _slug="$(branch_slug 2>/dev/null)" || exit 0
+  [ -n "$_slug" ] || exit 0
+else
+  # Inline fallback if lib.sh not available (audit-trail must not fail-closed)
+  branch="$(git --no-optional-locks branch --show-current 2>/dev/null)" || exit 0
+  [ -n "$branch" ] || exit 0
+  slug="${branch//[^a-zA-Z0-9]/-}"; slug="${slug:0:80}"
+  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"; _slug="${slug}-${raw_hash:0:6}"
+fi
+STATE_FILE=".correctless/artifacts/workflow-state-${_slug}.json"
 
 # Fast-path bail: no state file = no active workflow = nothing to audit
 [ -f "$STATE_FILE" ] || exit 0
@@ -57,7 +70,7 @@ CONFIG_FILE=".correctless/config/workflow-config.json"
 
 # --- Audit trail logging (batch all files in single jq call) ---
 
-TRAIL=".correctless/artifacts/audit-trail-${slug}-${hash}.jsonl"
+TRAIL=".correctless/artifacts/audit-trail-${_slug}.jsonl"
 TS="$(date -u +%FT%TZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 # Truncate oldest half if audit trail exceeds 5MB
@@ -158,7 +171,7 @@ done <<< "$FILES"
 # IS_FULL was set from the bulk config read above
 
 if [ "$IS_FULL" = "true" ]; then
-  ADHERENCE=".correctless/artifacts/adherence-state-${slug}-${hash}.json"
+  ADHERENCE=".correctless/artifacts/adherence-state-${_slug}.json"
 
   # Initialize adherence state if missing or empty (REG-R2-002: -s catches 0-byte files)
   if [ ! -s "$ADHERENCE" ]; then

@@ -8,7 +8,14 @@
 - **Data sensitivity change**: Trusted config values → shell arguments
 - **Invariant**: Config-sourced values must never be passed through eval, $(), or backtick execution. Commands validated via exact-match allowlist (auto-format.sh). Patterns matched via bash `case` glob only (sensitive-file-guard.sh).
 - **Violated when**: A config value is interpolated into a shell command string or passed to eval
-- **Test**: PRH-001 in sensitive-file-guard tests (canary file injection), INV-011 in auto-format tests (allowlist validation)
+- **Test**: PRH-001 in sensitive-file-guard tests (canary file injection), INV-011 in auto-format tests (allowlist validation), DA-001 eval-detection test
+
+#### TB-001a: Test runner exception (DA-001)
+- **Scoped exception**: `workflow-advance.sh` eval's `commands.test`, `commands.test_new`, and `commands.coverage` from workflow-config.json. This is required because test commands contain shell operators (`&&`, `|`) that need eval to execute.
+- **Trust model**: These values originate from the project owner via `/csetup` or manual edit. The config file is local and under the owner's control.
+- **Constraint**: If the trust model is ever extended (shared team configs, marketplace templates, CI-supplied configs), this exception MUST be revisited — eval of externally-supplied commands is arbitrary code execution.
+- **Spec review rule**: Every future spec that adds a config-consumed command must be flagged: "TB-001a: commands from config are eval'd. Sanitize or allowlist."
+- **Test**: DA-001 eval-detection test verifies no new eval sites appear in hooks/ or scripts/ beyond the documented exceptions.
 
 ### TB-002: Script-generated JSON → LLM agent context
 - **Crosses**: Deterministic scan output → agent reasoning context

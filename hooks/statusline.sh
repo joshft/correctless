@@ -169,10 +169,24 @@ fi
 sec4=""
 NOW_EPOCH=$(date +%s)
 if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
-  slug="${branch//[^a-zA-Z0-9]/-}"
-  slug="${slug:0:80}"
-  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
-  STATE_FILE=".correctless/artifacts/workflow-state-${slug}-${raw_hash:0:6}.json"
+  # Source shared library for branch_slug() (ABS-001)
+  if [ -z "${_LIBS_LOADED:-}" ]; then
+    _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
+    if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
+      source "$_LIB_DIR/lib.sh"; _LIBS_LOADED=1
+    elif [ -f "scripts/lib.sh" ]; then
+      source "scripts/lib.sh"; _LIBS_LOADED=1
+    fi
+  fi
+
+  if command -v branch_slug >/dev/null 2>&1; then
+    _slug="$(branch_slug 2>/dev/null)" || _slug=""
+  else
+    # Inline fallback (statusline must never fail)
+    _s="${branch//[^a-zA-Z0-9]/-}"; _s="${_s:0:80}"
+    _h="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"; _slug="${_s}-${_h:0:6}"
+  fi
+  STATE_FILE=".correctless/artifacts/workflow-state-${_slug}.json"
 
   if [ -f "$STATE_FILE" ]; then
     eval "$(jq -r '

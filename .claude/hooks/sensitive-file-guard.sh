@@ -29,12 +29,18 @@ command -v jq >/dev/null 2>&1 || { echo "BLOCKED [sensitive-file]: jq not found"
 
 INPUT="$(cat)"
 TOOL_NAME="" TOOL_INPUT_FILE="" TOOL_INPUT_COMMAND="" TOOL_INPUT_EDITS=""
-eval "$(echo "$INPUT" | jq -r '
+_PARSED="$(echo "$INPUT" | jq -r '
   @sh "TOOL_NAME=\(.tool_name // "")",
   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
   @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))"
-' 2>/dev/null)" || exit 0
+' 2>/dev/null)" || true
+# Fail-closed: if jq produced no output (parse failure), block the operation (DA-003)
+if [ -z "$_PARSED" ]; then
+  echo "BLOCKED [fail-closed]: failed to parse tool input JSON" >&2
+  exit 2
+fi
+eval "$_PARSED"
 
 # ============================================
 # STEP 3: Fast-path bail — only write tools (INV-010)
