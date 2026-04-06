@@ -209,7 +209,7 @@ test_r003_marketplace_single_entry() {
     # R-003: plugin source is ./correctless
     local plugin_source
     plugin_source="$(jq -r '.plugins[0].source' "$mp" 2>/dev/null || echo "")"
-    assert_eq "R-003: plugin source is '../correctless'" "../correctless" "$plugin_source"
+    assert_eq "R-003: plugin source is './correctless'" "./correctless" "$plugin_source"
 
     # R-003: no correctless-lite entry
     local lite_count

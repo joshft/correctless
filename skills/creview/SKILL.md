@@ -119,7 +119,7 @@ Does the spec have rules that cover these? If not, propose additions.
 
 ### 4. Antipattern Check
 
-Does this feature match any pattern in `.correctless/antipatterns.md`?
+Does this feature match any pattern in `.correctless/antipatterns.md`? Also review the semantic ai-antipatterns checklist at `.correctless/checklists/ai-antipatterns.md` for AI-specific patterns like disconnected middleware, scope creep, and over-abstraction.
 
 If the project has historically had issues with (e.g.) forgetting to handle the loading state, or missing cleanup on error paths — check whether this spec has rules for those.
 

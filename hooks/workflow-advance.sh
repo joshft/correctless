@@ -24,18 +24,18 @@ require_jq() {
   command -v jq >/dev/null 2>&1 || die "jq is required but not installed"
 }
 
-branch_slug() {
-  local branch
-  branch="$(git branch --show-current 2>/dev/null)" || die "Not in a git repository"
-  [ -n "$branch" ] || die "Detached HEAD — checkout a branch first"
-  # Truncate to 80 chars and append short hash to avoid collisions
-  # (feature/foo-bar and feature/foo_bar produce different hashes)
-  local slug raw_hash
-  slug="${branch//[^a-zA-Z0-9]/-}"
-  slug="${slug:0:80}"
-  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
-  echo "${slug}-${raw_hash:0:6}"
-}
+# Source shared library (provides branch_slug and other utilities).
+# Try: relative to hook dir, then REPO_ROOT/scripts (installed by setup).
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
+if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
+  # shellcheck source=../scripts/lib.sh
+  source "$_LIB_DIR/lib.sh"
+elif [ -f "$REPO_ROOT/scripts/lib.sh" ]; then
+  source "$REPO_ROOT/scripts/lib.sh"
+else
+  die "Cannot find scripts/lib.sh — run setup or check installation"
+fi
+unset _LIB_DIR
 
 state_file() {
   local slug

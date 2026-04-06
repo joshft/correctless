@@ -67,7 +67,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     local IFS=$' \t\n;|&()`'
     for tok in $cmd; do
       case "$tok" in
-        cp|mv|tee|install|dd|rsync|patch|truncate|shred|curl|wget|ln|python|python3|node|ruby) return 0 ;;
+        cp|mv|tee|install|rm|rmdir|unlink|dd|rsync|patch|truncate|shred|curl|wget|ln|python|python3|node|ruby) return 0 ;;
         sed) [[ "$cmd" =~ sed[[:space:]]+-i ]] && return 0 ;;
         perl) [[ "$cmd" =~ perl[[:space:]]+-i ]] && return 0 ;;
       esac
@@ -139,6 +139,18 @@ _extract_bash_targets() {
         ;;
       # cp/mv: emit all non-flag arguments
       cp|mv)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;  # skip flags
+            *) _strip_quotes "${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # rm/rmdir/unlink: emit all non-flag arguments
+      rm|rmdir|unlink)
         i=$((i + 1))
         while [ $i -lt ${#tokens[@]} ]; do
           case "${tokens[$i]}" in

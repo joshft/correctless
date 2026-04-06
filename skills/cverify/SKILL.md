@@ -109,8 +109,23 @@ Compliance checks are custom scripts written by the team. Correctless runs them 
 "compliance_checks": [{"name": "audit-logging", "command": "./scripts/check-audit-logging.sh", "phase": "verify", "blocking": true}]
 ```
 
-### 4. Basic Smell Check
+### 4. Antipattern Scan and Basic Smell Check
 
+Run the deterministic antipattern-scan script to detect mechanical code smells:
+
+```bash
+bash scripts/antipattern-scan.sh {default_branch}
+```
+
+where `{default_branch}` is read from `workflow.default_branch` in `workflow-config.json`, falling back to `main` if absent.
+
+Validate that stdout is non-empty valid JSON with a `.findings` key before treating it as findings. Empty or invalid output means the scanner itself failed and must be reported as an error, not "zero findings." Also check if the JSON contains an `errors` array with entries — if so, report these scanner errors to the user rather than silently discarding them.
+
+If the JSON output includes a `summaries` array (present when files exceed the 20-finding cap), include these in the report.
+
+Include the results in the verification report under an "## Antipattern Scan" section with a table of findings. Also review the semantic ai-antipatterns checklist at `.correctless/checklists/ai-antipatterns.md` for patterns not detectable by grep.
+
+Additionally check for:
 - TODO/FIXME/HACK comments, debug statements, commented-out code
 - Overly broad error catches, hardcoded values, unused imports
 
