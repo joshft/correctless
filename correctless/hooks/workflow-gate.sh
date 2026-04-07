@@ -47,7 +47,9 @@ case "$TOOL_NAME" in
     # Detect write/destructive patterns — tokenize to catch chained commands
     _has_write_pattern() {
       local cmd="$1"
-      # Check redirect operators (single combined grep)
+      # Check redirect operators (single combined grep).
+      # Known limitation: matches '>' inside quoted strings (e.g., echo "x > y").
+      # False positives are fail-safe — read-only commands get phase-gated, not bypassed.
       echo "$cmd" | grep -qE '>>|[0-9]*>' && return 0
       # Tokenize on shell metacharacters and check each token
       # shellcheck disable=SC2141
@@ -65,6 +67,9 @@ case "$TOOL_NAME" in
     if ! _has_write_pattern "$COMMAND"; then
       exit 0
     fi
+    # R-024: workflow-advance.sh invocations always allowed (after write detection
+    # to avoid bypassing the gate for commands that merely mention the script name)
+    [[ "$COMMAND" == *"workflow-advance.sh"* ]] && exit 0
     # Fall through to phase checking with the command as context
     ;;
   *)
@@ -182,7 +187,10 @@ if [ ! -f "$STATE_FILE" ]; then
   exit 0
 fi
 
-# Bulk-read state file: phase + override fields in one jq call
+# Bulk-read state file: phase + override fields in one jq call.
+# Initialize before eval — jq failure on corrupt files produces empty output,
+# eval "" returns 0, so the || handler won't fire without pre-initialization.
+PHASE="" OVERRIDE_ACTIVE="false" OVERRIDE_REMAINING="0"
 eval "$(jq -r '
   @sh "PHASE=\(.phase // "")",
   @sh "OVERRIDE_ACTIVE=\(.override.active // false)",
@@ -191,6 +199,11 @@ eval "$(jq -r '
   echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
   exit 2
 }
+# Post-eval validation: if PHASE is still empty, jq produced no output (corrupt file)
+if [ -z "$PHASE" ]; then
+  echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
+  exit 2
+fi
 
 # Validate phase is a known value
 case "$PHASE" in
@@ -210,20 +223,15 @@ esac
 # Check for active override
 # ---------------------------------------------------------------------------
 
-if [ "$OVERRIDE_ACTIVE" = "true" ]; then
-  REMAINING="$OVERRIDE_REMAINING"
-  if [ "$REMAINING" -gt 0 ]; then
-    # Atomic read-modify-write: decrement and deactivate in a single jq call
-    trap 'rm -f "$STATE_FILE.$$"' EXIT
-    jq 'if .override.remaining_calls > 0 then
-          .override.remaining_calls -= 1
-          | if .override.remaining_calls <= 0 then .override.active = false else . end
-        else . end' "$STATE_FILE" > "$STATE_FILE.$$" \
-      && mv "$STATE_FILE.$$" "$STATE_FILE" \
-      || { rm -f "$STATE_FILE.$$"; exit 2; }
-    trap - EXIT
-    exit 0
-  fi
+if [ "$OVERRIDE_ACTIVE" = "true" ] && [ "$OVERRIDE_REMAINING" -gt 0 ]; then
+  # Decrement atomically under lock. The jq filter re-checks remaining_calls > 0
+  # inside the lock to handle the stale-read case (IBT-004).
+  locked_update_state "$STATE_FILE" \
+    'if .override.remaining_calls > 0 then
+       .override.remaining_calls -= 1
+       | if .override.remaining_calls <= 0 then .override.active = false else . end
+     else error("override_expired") end' || exit 2
+  exit 0
 fi
 
 # ---------------------------------------------------------------------------
@@ -270,6 +278,41 @@ done <<< "$TARGET_FILES"
 
 # No target files identified → allow
 if [ -z "$TARGET_FILES" ]; then
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Path exceptions — allow writes to workflow infrastructure paths
+# ---------------------------------------------------------------------------
+
+_check_path_exceptions() {
+  local tf="$1"
+  local rel="${tf#$REPO_ROOT/}"
+  rel="${rel#./}"
+  # Reject paths with traversal components to prevent allowlist bypass
+  case "$rel" in *../*) return 1 ;; esac
+
+  # R-023: .correctless/artifacts/ always writable (non-protected files)
+  case "$rel" in .correctless/artifacts/*) return 0 ;; esac
+
+  # R-022: spec phase allows .correctless/specs/ writes
+  if [ "$PHASE" = "spec" ]; then
+    case "$rel" in .correctless/specs/*) return 0 ;; esac
+  fi
+
+  return 1
+}
+
+# Check all target files for path exceptions
+_all_excepted=true
+while IFS= read -r _pe_file; do
+  [ -z "$_pe_file" ] && continue
+  if ! _check_path_exceptions "$_pe_file"; then
+    _all_excepted=false
+    break
+  fi
+done <<< "$TARGET_FILES"
+if [ "$_all_excepted" = "true" ]; then
   exit 0
 fi
 
@@ -378,6 +421,9 @@ while IFS= read -r _check_file; do
   [ -z "$_check_file" ] && continue
   _rel="${_check_file#$REPO_ROOT/}"
   _rel="${_rel#./}"
+  # Skip files covered by path exceptions — prevents excepted files from
+  # poisoning MOST_RESTRICTIVE classification in MultiEdit mixed-path scenarios
+  _check_path_exceptions "$_check_file" && continue
   _cls="$(classify_file "$_rel")"
   if [ "$_cls" = "source" ]; then
     MOST_RESTRICTIVE="source"

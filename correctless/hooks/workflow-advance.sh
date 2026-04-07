@@ -60,9 +60,16 @@ write_state() {
   local sf
   sf="$(state_file)"
   mkdir -p "$(dirname "$sf")"
+  _acquire_state_lock "$sf" || die "Failed to acquire state lock"
   # shellcheck disable=SC2064  # Intentional: capture $sf at definition time, not at trap execution
-  trap "rm -f '$sf.$$'" EXIT
-  echo "$1" | jq '.' > "$sf.$$" && mv "$sf.$$" "$sf"
+  trap "$(printf '_release_state_lock %q; rm -f %q' "$sf" "$sf.$$")" EXIT
+  if ! (echo "$1" | jq '.' > "$sf.$$" && mv "$sf.$$" "$sf"); then
+    rm -f "$sf.$$"
+    _release_state_lock "$sf"
+    trap - EXIT
+    die "Failed to write state file: $sf"
+  fi
+  _release_state_lock "$sf"
   trap - EXIT
 }
 
@@ -765,6 +772,9 @@ cmd_reset() {
           "$ARTIFACTS_DIR/checkpoint-creview-spec-"*.json "$ARTIFACTS_DIR/checkpoint-caudit-"*.json 2>/dev/null
     rm -f "$ARTIFACTS_DIR/.pkg-cache-"*.json 2>/dev/null
     rm -f "$ARTIFACTS_DIR/tdd-test-edits.log" "$ARTIFACTS_DIR/coverage-baseline-${slug_hash}.out" 2>/dev/null
+    # Clean lock dirs and temp files from locking operations
+    rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null
+    rm -f "${sf}."*.tmp "${sf}."[0-9]* 2>/dev/null
     info "Workflow state, audit trail, adherence state, and checkpoints removed for branch '$(current_branch)'"
   else
     info "No workflow state for branch '$(current_branch)'"
