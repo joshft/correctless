@@ -27,16 +27,21 @@ Compute effective intensity as `max(project_intensity, feature_intensity)` using
 
 ## Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the workflow state or spec file):
+After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.jsonl` (derive slug from the workflow state or spec file). The PostToolUse hook (`hooks/token-tracking.sh`) handles this mechanically for Agent tool completions — the prompt-based instruction below is a fallback for skills that spawn subagents in contexts where the hook may not fire:
 
 ```json
 {
-  "skill": "{skill-name}",
+  "timestamp": "ISO",
+  "branch": "{branch-slug}",
   "phase": "{phase}",
-  "agent_role": "{agent-role}",
+  "feature": "{feature-name}",
+  "agent_description": "{agent-description}",
+  "agent_type": "{agent-type}",
+  "input_tokens": N,
+  "output_tokens": N,
   "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
+  "total_cost_usd": N,
+  "duration_ms": N
 }
 ```
 

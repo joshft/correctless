@@ -32,7 +32,7 @@ Read everything in the accumulation layer. Skip files that don't exist.
 8. **Feature summaries** — `glob .correctless/artifacts/summary-*.md` — per-feature summaries (from /csummary)
 9. **Decision records** — `glob .correctless/decisions/*.md` — for staleness checks (revisit-when/revisit-by markers)
 10. **Workflow state files** — `glob .correctless/artifacts/workflow-state-*.json` — for spec_updates counts per feature
-11. **Token logs** — `glob .correctless/artifacts/token-log-*.json` — per-feature token usage from subagent spawns
+11. **Token logs** — `glob .correctless/artifacts/token-log-*.jsonl` — per-feature token usage from subagent spawns
 12. **Audit trails** — `glob .correctless/artifacts/audit-trail-*.jsonl` — per-branch tool invocation logs from the PostToolUse hook. Contains: timestamp, phase, tool name, file path, branch.
 13. **Git log** — commit history to measure feature velocity and branch durations
 14. **Session meta** — `glob ~/.claude/usage-data/session-meta/*.json` — filter by `project_path` matching the current project root. Contains exact token counts, tool usage, duration, error rates per session.
@@ -202,13 +202,13 @@ After computing the raw metrics above, analyze them for actionable insights. Thi
 
 ## Token ROI Analysis
 
-Read all `.correctless/artifacts/token-log-*.json` files. Correlate token spend with findings data from QA, verification, and audit artifacts.
+Read all `.correctless/artifacts/token-log-*.jsonl` files. Correlate token spend with findings data from QA, verification, and audit artifacts.
 
 ### Metrics to Compute
 
 **1. Cost per bug caught**: Total tokens across all features / total distinct findings. "Across {N} features, you spent {T} tokens and caught {B} bugs — {T/B} tokens per bug caught pre-merge."
 
-**2. Tokens per feature by phase**: Group all token log entries by the `skill` field and sum `total_tokens` per skill. Show as a table:
+**2. Tokens per feature by phase**: Group all token log entries by the `feature` field and sum `total_tokens` per feature. Show as a table:
 
 | Phase | Tokens | % of Total | Findings | Tokens/Finding |
 |-------|--------|-----------|----------|----------------|
