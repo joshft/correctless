@@ -82,6 +82,12 @@
 - **Violated when**: A skill reads all historical artifacts without a file count check
 - **Test**: R-010 in shift-left-review tests (budget instruction presence)
 
+### PAT-005: PostToolUse hook conventions
+- **Pattern**: Standard structure for all PostToolUse hooks
+- **Rule**: Every PostToolUse hook must: (1) NO `set -euo pipefail` (would cause early abort, violating fail-open), (2) `command -v jq` check with `exit 0` if missing (fail-open, NOT exit 2 like PreToolUse), (3) bulk-parse stdin with single `eval` + `jq -r @sh`, (4) fast-path `exit 0` for non-relevant tools BEFORE any I/O, (5) guard each operation with `|| exit 0` or `|| true`, (6) must ALWAYS exit 0 — PostToolUse hooks are advisory, never gating
+- **Violated when**: A PostToolUse hook uses `set -e`, exits non-zero, or fails to guard an operation with `|| exit 0`
+- **Test**: R-009 in token-tracking tests (6 static assertions), R-010 (5 fail-open runtime assertions)
+
 ## Environment Assumptions
 
 ### ENV-001: Bash 4+ required

@@ -11,6 +11,28 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|CreateFile|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/audit-trail.sh",
+            "timeout_ms": 1000
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/token-tracking.sh",
+            "timeout_ms": 1000
+          }
+        ]
+      }
     ]
   },
   "permissions": {

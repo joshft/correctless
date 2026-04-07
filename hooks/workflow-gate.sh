@@ -290,7 +290,7 @@ _check_path_exceptions() {
   local rel="${tf#$REPO_ROOT/}"
   rel="${rel#./}"
   # Reject paths with traversal components to prevent allowlist bypass
-  case "$rel" in *../*) return 1 ;; esac
+  case "$rel" in *../*|*..) return 1 ;; esac
 
   # R-023: .correctless/artifacts/ always writable (non-protected files)
   case "$rel" in .correctless/artifacts/*) return 0 ;; esac
