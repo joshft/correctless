@@ -280,6 +280,7 @@ graph TB
 | **sensitive-file-guard.sh** | Before every file edit | Blocks writes to `.env`, credentials, keys, certificates — fail-closed, no overrides |
 | **workflow-gate.sh** | Before every file edit | Blocks writes that violate the current phase (RED blocks source, QA blocks everything) |
 | **audit-trail.sh** | After every tool call | Logs modifications with phase context, alerts on violations |
+| **token-tracking.sh** | After Agent tool completion | Logs subagent token usage, cost, and duration to JSONL for `/cmetrics` analysis |
 | **auto-format.sh** | After Edit/Write/MultiEdit | Runs project formatter (Prettier, Black, gofmt, etc.) with allowlist validation |
 | **statusline.sh** | Continuously | Shows phase, QA round, cost, context %, lines delta |
 | **workflow-advance.sh** | On command | State machine — validates transitions, enforces gates |

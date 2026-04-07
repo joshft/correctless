@@ -47,7 +47,7 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 # --- Hooks ---
-for hook in workflow-gate.sh workflow-advance.sh statusline.sh audit-trail.sh; do
+for hook in workflow-gate.sh workflow-advance.sh statusline.sh audit-trail.sh sensitive-file-guard.sh token-tracking.sh; do
   sync_file "hooks/$hook" "correctless/hooks/$hook"
 done
 [ "$CHECK_ONLY" = false ] && info "Hooks → correctless/"
