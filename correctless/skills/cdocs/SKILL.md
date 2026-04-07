@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), 
 
 # /cdocs — Update Project Documentation
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the documentation agent. Your job is to keep project documentation current after features land. You update README, .correctless/AGENT_CONTEXT.md, feature docs, and suggest .correctless/ARCHITECTURE.md additions.
 
 ## Intensity Configuration
@@ -17,13 +19,7 @@ You are the documentation agent. Your job is to keep project documentation curre
 
 ## Effective Intensity
 
-Determine the effective intensity before starting the review. The effective intensity is `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. **Read project intensity**: Read `workflow.intensity` from `.correctless/config/workflow-config.json`. If the field is absent, default to `standard`.
-2. **Read feature intensity**: Run `.correctless/hooks/workflow-advance.sh status` and look for the `Intensity:` line. If the Intensity line is absent in the status output (feature_intensity is absent), use the project intensity alone.
-3. **Compute effective intensity**: Take the max of project_intensity and feature_intensity.
-
-**Fallback chain**: feature_intensity -> workflow.intensity -> standard. If both feature_intensity and `workflow.intensity` are absent, the effective intensity defaults to `standard`. If there is no active workflow state (no state file), effective intensity falls back to `workflow.intensity` from config, then to `standard`. The review still runs — it does not require active workflow state.
+Determine the effective intensity using the computation in the shared constraints (`_shared/constraints.md`).
 
 ## Progress Visibility (MANDATORY)
 
@@ -232,8 +228,6 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
 
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
-
 ## If Something Goes Wrong
 
 - **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
@@ -247,4 +241,3 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 - **Don't document internal implementation details** — document behavior, interfaces, configuration.
 - **Present changes for human approval** before writing. Documentation is the project's external face.
 - **Keep .correctless/AGENT_CONTEXT.md under 1500 words.** It's a briefing, not a novel.
-- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

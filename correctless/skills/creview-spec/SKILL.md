@@ -7,13 +7,11 @@ context: fork
 
 # /creview-spec — Multi-Agent Adversarial Spec Review
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 ## Intensity Gate
 
-This skill requires effective intensity `high` or above. Compute effective intensity as `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. Read `workflow.intensity` from `.correctless/config/workflow-config.json` (project_intensity). If absent, default to `standard`.
-2. Run `.correctless/hooks/workflow-advance.sh status` and read the `Intensity:` line (feature_intensity). If absent, use project_intensity alone.
-3. Effective intensity = `max(project_intensity, feature_intensity)`.
+This skill requires effective intensity `high` or above. Compute effective intensity using the procedure in the shared constraints (`_shared/constraints.md`).
 
 **Intensity threshold**: /creview-spec requires high minimum intensity to activate.
 
@@ -261,20 +259,10 @@ See "Progress Visibility" section above — task creation and agent announcement
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
-
-```json
-{
-  "skill": "creview-spec",
-  "phase": "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|external-{model}}",
-  "agent_role": "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|external-{model}}",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "creview-spec"
+- `phase`: "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|external-{model}}"
+- `agent_role`: "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|external-{model}}"
 
 ### Context Enforcement
 **Context enforcement (mandatory):** Before spawning the agent team, check context usage. If above 70%: the agents run forked (clean context) but the orchestrator needs to synthesize findings. Warn: "Context at {N}%. Run `/compact` before I spawn the review team — synthesis quality degrades with full context." If above 85%: stop and require /compact.
@@ -302,8 +290,6 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
 
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
-
 ## If Something Goes Wrong
 
 - **Agent crashes or context overflow**: The workflow state still shows `review-spec` phase. Re-run `/creview-spec` — all agents will be re-spawned from scratch (completed agent work is NOT preserved across re-runs).
@@ -317,5 +303,3 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 - Do NOT approve the spec uncritically. Your job is to find problems.
 - Preserve the spec author's intent — challenge weak invariants, don't redesign the feature.
 - Each team member receives: spec, .correctless/ARCHITECTURE.md, .correctless/AGENT_CONTEXT.md, antipatterns, and the self-assessment.
-- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to synthesize findings correctly.
-- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

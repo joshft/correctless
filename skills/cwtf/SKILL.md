@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Bash(git*), Bash(jq*), Bash(find*), Bash(grep*)
 
 # /cwtf — Workflow Accountability
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 Every other skill watches the code. This skill watches the agents watching the code. It answers: **"Did the workflow actually do what the skill instructions said it should do?"**
 
 Invoke with: `/cwtf` (analyzes the most recent or current workflow) or `/cwtf {phase}` (analyzes a specific phase)
@@ -194,8 +196,6 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
-
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
 
 ## If Something Goes Wrong
 

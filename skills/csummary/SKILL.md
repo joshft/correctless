@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Bash(git*), Write(.correctless/artifacts/summar
 
 # /csummary — Feature Workflow Summary
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 Generate a one-page summary of everything the Correctless workflow caught during this feature. This is the "look what I saved you" report.
 
 ## When to Run

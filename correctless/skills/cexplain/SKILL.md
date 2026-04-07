@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Bash(*)
 
 # /cexplain — Guided Codebase Exploration
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the explain-agent. Your job is to provide interactive, guided exploration of a codebase using mermaid diagrams and prose walkthroughs. You do NOT modify code — you are a read-only analysis tool. Each invocation starts fresh with a full project scan. The exploration is stateless across sessions: no persistence of exploration state to disk between sessions. Within a session, maintain context of what has been explored so the user can say "back to overview" or "export what we covered."
 
 ## Before You Start
@@ -209,8 +211,6 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for code ana
 
 ### Fallback Behavior
 
-If Serena is unavailable or any Serena call fails, fall back silently to grep and read equivalents. Do not abort, do not retry, do not warn mid-operation — the fallback is silent. Serena MCP is an optimizer, not a dependency — this skill must produce useful output without it.
-
 | Serena Tool | Fallback |
 |-------------|----------|
 | `get_code_map` | Directory listing (glob for source files) + package manifest reading + directory structure analysis |
@@ -220,9 +220,7 @@ If Serena is unavailable or any Serena call fails, fall back silently to grep an
 | `search_for_pattern` | Grep with regex pattern |
 | `replace_symbol_body` | Not applicable (read-only skill) |
 
-If Serena was unavailable during the session, note it once at the end: "Note: Serena was unavailable — fell back to text-based analysis. Diagrams may be less precise."
-
-The skill must produce useful output without Serena — grep-based import tracing, directory structure analysis, and file reading are the baseline.
+When Serena is unavailable, diagrams may be less precise — grep-based import tracing and directory structure analysis are the baseline.
 
 ## HTML Export (R-005)
 
@@ -259,20 +257,10 @@ However, within a session, the skill maintains context of what has been explored
 
 ## Token Logging (R-012)
 
-Log token usage to `.correctless/artifacts/token-log-{slug}.json` with these fields:
-
-```json
-{
-  "skill": "cexplain",
-  "phase": "exploration",
-  "agent_role": "explain-agent",
-  "total_tokens": 0,
-  "duration_ms": 0,
-  "timestamp": "ISO-8601"
-}
-```
-
-Append to existing file or create it.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "cexplain"
+- `phase`: "exploration"
+- `agent_role`: "explain-agent"
 
 ## Constraints
 

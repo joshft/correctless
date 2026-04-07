@@ -7,6 +7,8 @@ context: fork
 
 # /creview — Skeptical Spec Review
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 **When to use:** After `/cspec` produces a spec. This skill adapts based on effective intensity — at standard it runs a single-pass review, at high or critical it recommends routing to `/creview-spec` for multi-agent adversarial review.
 
 You are the review agent. You did NOT write this spec. Your job is to read it cold and find what the spec author missed. Your lens: **"this spec is incomplete — what's missing?"**
@@ -20,17 +22,9 @@ You are a separate agent from the spec author. Do not assume the spec is correct
 | Agents | 1 + security checklist | Routes to /creview-spec (4-agent adversarial) | Routes to /creview-spec + external model |
 | Finding threshold | Disposition required | All addressed | Zero unresolved |
 
-<!-- Canonical: this Effective Intensity section is the source of truth. Verbatim copies exist in cspec, ctdd, cverify, cdocs, cstatus. R-022 enforces identity. -->
-
 ## Effective Intensity
 
-Determine the effective intensity before starting the review. The effective intensity is `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. **Read project intensity**: Read `workflow.intensity` from `.correctless/config/workflow-config.json`. If the field is absent, default to `standard`.
-2. **Read feature intensity**: Run `.correctless/hooks/workflow-advance.sh status` and look for the `Intensity:` line. If the Intensity line is absent in the status output (feature_intensity is absent), use the project intensity alone.
-3. **Compute effective intensity**: Take the max of project_intensity and feature_intensity.
-
-**Fallback chain**: feature_intensity -> workflow.intensity -> standard. If both feature_intensity and `workflow.intensity` are absent, the effective intensity defaults to `standard`. If there is no active workflow state (no state file), effective intensity falls back to `workflow.intensity` from config, then to `standard`. The review still runs — it does not require active workflow state.
+Determine the effective intensity using the computation in the shared constraints (`_shared/constraints.md`).
 
 ## Intensity-Aware Behavior
 
@@ -344,20 +338,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the review agent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
-
-```json
-{
-  "skill": "creview",
-  "phase": "review",
-  "agent_role": "review-agent",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "creview"
+- `phase`: "review"
+- `agent_role`: "review-agent"
 
 ### /btw
 When presenting findings, mention: "Use /btw if you need to check something about the codebase without interrupting this review."
@@ -385,16 +369,12 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
 
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
-
 ### Context7 — Library Documentation
 
 If `mcp.context7` is `true` in `workflow-config.json`, use Context7 to verify library-related claims in the spec (e.g., "bcrypt cost 12 is recommended", "use Zod for validation"):
 
 - Use `resolve-library-id` to find the library, then `get-library-docs` to fetch current docs
 - Compare the spec's claims against actual current documentation
-
-When Context7 is unavailable, fall back to web search. If Context7 was unavailable during this run, notify the user once at the end.
 
 ## If Something Goes Wrong
 
@@ -410,4 +390,3 @@ When Context7 is unavailable, fall back to web search. If Context7 was unavailab
 - **Preserve the spec author's intent.** Challenge weak rules, don't rewrite the feature.
 - **This step is NEVER skipped.** The state machine enforces this. Even for small features, review always finds unstated assumptions or untestable rules.
 - **Security checklist fires automatically.** Don't ask the developer if they want security review. If the spec touches auth, user data, payments, or APIs, check it. Most developers who need this most will never ask for it.
-- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

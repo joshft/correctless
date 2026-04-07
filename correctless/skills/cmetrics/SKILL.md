@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Bash(git*), Bash(wc*), Bash(find*), Bash(cat*),
 
 # /cmetrics — Workflow Metrics Dashboard
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 Aggregate all accumulated workflow data into a project health dashboard. Shows the value the workflow has delivered over time.
 
 ## When to Run

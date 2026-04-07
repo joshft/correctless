@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Bash(*), Edit, Write(*), WebSearch, WebFetch
 
 # /ccontribute — Open Source Contribution
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the contribution agent. Your job is to help the user contribute to a project they don't own — an open source repo, a friend's project, a work monorepo owned by another team. The key principle: **match, don't improve.** You are a guest. Write code that looks like a regular contributor wrote it, not an outsider who thinks they know better.
 
 Invoke with: `/ccontribute {issue number or description of what to change}`
@@ -177,7 +179,12 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After any subagent completes (research for unfamiliar patterns), capture `total_tokens` and `duration_ms`. Since this skill runs against external projects that may not have `.correctless/artifacts/`, skip token logging if the directory doesn't exist. Token data is still visible in the conversation for manual tracking via `/cmetrics`.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "ccontribute"
+- `phase`: "contribution"
+- `agent_role`: "contribution-agent"
+
+Since this skill runs against external projects that may not have `.correctless/artifacts/`, skip token logging if the directory doesn't exist.
 
 ## Code Analysis (MCP Integration)
 
@@ -198,8 +205,6 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
-
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
 
 ## If Something Goes Wrong
 

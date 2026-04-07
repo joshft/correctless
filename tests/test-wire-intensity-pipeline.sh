@@ -178,33 +178,38 @@ test_r002_cspec_effective_intensity() {
   echo "=== R-002: /cspec SKILL.md has verbatim Effective Intensity section ==="
 
   local skill_file="$REPO_DIR/skills/cspec/SKILL.md"
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
 
-  # R-002: section header exists
+  # R-002: section header exists in SKILL.md
   file_contains "$skill_file" "## Effective Intensity" \
     "R-002: cspec SKILL.md has '## Effective Intensity' section"
 
-  # R-002: max computation
-  file_contains "$skill_file" "max(project_intensity, feature_intensity)" \
-    "R-002: documents max(project_intensity, feature_intensity)"
+  # R-002: SKILL.md references shared constraints
+  file_contains "$skill_file" "_shared/constraints.md" \
+    "R-002: cspec SKILL.md references shared constraints"
 
-  # R-002: ordering
-  file_contains "$skill_file" "standard < high < critical" \
-    "R-002: documents ordering standard < high < critical"
+  # R-002: shared constraints has max computation
+  file_contains "$shared" "max(project_intensity, feature_intensity)" \
+    "R-002: shared constraints documents max(project_intensity, feature_intensity)"
 
-  # R-002: 3-step process
-  file_contains "$skill_file" "Read project intensity" \
+  # R-002: shared constraints has ordering
+  file_contains "$shared" "standard < high < critical" \
+    "R-002: shared constraints documents ordering standard < high < critical"
+
+  # R-002: shared constraints has 3-step process
+  file_contains "$shared" "Read project intensity" \
     "R-002: step 1 — Read project intensity"
-  file_contains "$skill_file" "Read feature intensity" \
+  file_contains "$shared" "Read feature intensity" \
     "R-002: step 2 — Read feature intensity"
-  file_contains "$skill_file" "Compute effective intensity" \
+  file_contains "$shared" "Compute effective intensity" \
     "R-002: step 3 — Compute effective intensity"
 
-  # R-002: fallback chain
-  file_contains "$skill_file" "feature_intensity -> workflow.intensity -> standard" \
+  # R-002: shared constraints has fallback chain
+  file_contains "$shared" "feature_intensity -> workflow.intensity -> standard" \
     "R-002: fallback chain documented"
 
-  # R-002: no-active-workflow handling
-  file_contains_i "$skill_file" "no active workflow state\|no state file" \
+  # R-002: shared constraints handles no-active-workflow
+  file_contains_i "$shared" "no active workflow state\|no state file" \
     "R-002: handles no active workflow state"
 }
 
@@ -343,25 +348,30 @@ test_r006_ctdd_effective_intensity() {
   echo "=== R-006: /ctdd SKILL.md has verbatim Effective Intensity section ==="
 
   local skill_file="$REPO_DIR/skills/ctdd/SKILL.md"
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
 
-  # R-006: section header exists
+  # R-006: section header exists in SKILL.md
   file_contains "$skill_file" "## Effective Intensity" \
     "R-006: ctdd SKILL.md has '## Effective Intensity' section"
 
-  # R-006: max computation
-  file_contains "$skill_file" "max(project_intensity, feature_intensity)" \
-    "R-006: documents max(project_intensity, feature_intensity)"
+  # R-006: SKILL.md references shared constraints
+  file_contains "$skill_file" "_shared/constraints.md" \
+    "R-006: ctdd SKILL.md references shared constraints"
 
-  # R-006: ordering
-  file_contains "$skill_file" "standard < high < critical" \
-    "R-006: documents ordering standard < high < critical"
+  # R-006: shared constraints has max computation
+  file_contains "$shared" "max(project_intensity, feature_intensity)" \
+    "R-006: shared constraints documents max(project_intensity, feature_intensity)"
 
-  # R-006: fallback chain
-  file_contains "$skill_file" "feature_intensity -> workflow.intensity -> standard" \
+  # R-006: shared constraints has ordering
+  file_contains "$shared" "standard < high < critical" \
+    "R-006: shared constraints documents ordering standard < high < critical"
+
+  # R-006: shared constraints has fallback chain
+  file_contains "$shared" "feature_intensity -> workflow.intensity -> standard" \
     "R-006: fallback chain documented"
 
-  # R-006: no-active-workflow handling
-  file_contains_i "$skill_file" "no active workflow state\|no state file" \
+  # R-006: shared constraints handles no-active-workflow
+  file_contains_i "$shared" "no active workflow state\|no state file" \
     "R-006: handles no active workflow state"
 }
 
@@ -481,25 +491,30 @@ test_r010_cverify_effective_intensity() {
   echo "=== R-010: /cverify SKILL.md has verbatim Effective Intensity section ==="
 
   local skill_file="$REPO_DIR/skills/cverify/SKILL.md"
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
 
-  # R-010: section header exists
+  # R-010: section header exists in SKILL.md
   file_contains "$skill_file" "## Effective Intensity" \
     "R-010: cverify SKILL.md has '## Effective Intensity' section"
 
-  # R-010: max computation
-  file_contains "$skill_file" "max(project_intensity, feature_intensity)" \
-    "R-010: documents max(project_intensity, feature_intensity)"
+  # R-010: SKILL.md references shared constraints
+  file_contains "$skill_file" "_shared/constraints.md" \
+    "R-010: cverify SKILL.md references shared constraints"
 
-  # R-010: ordering
-  file_contains "$skill_file" "standard < high < critical" \
-    "R-010: documents ordering standard < high < critical"
+  # R-010: shared constraints has max computation
+  file_contains "$shared" "max(project_intensity, feature_intensity)" \
+    "R-010: shared constraints documents max(project_intensity, feature_intensity)"
 
-  # R-010: fallback chain
-  file_contains "$skill_file" "feature_intensity -> workflow.intensity -> standard" \
+  # R-010: shared constraints has ordering
+  file_contains "$shared" "standard < high < critical" \
+    "R-010: shared constraints documents ordering standard < high < critical"
+
+  # R-010: shared constraints has fallback chain
+  file_contains "$shared" "feature_intensity -> workflow.intensity -> standard" \
     "R-010: fallback chain documented"
 
-  # R-010: no-active-workflow handling
-  file_contains_i "$skill_file" "no active workflow state\|no state file" \
+  # R-010: shared constraints handles no-active-workflow
+  file_contains_i "$shared" "no active workflow state\|no state file" \
     "R-010: handles no active workflow state"
 }
 
@@ -607,25 +622,30 @@ test_r014_cdocs_effective_intensity() {
   echo "=== R-014: /cdocs SKILL.md has verbatim Effective Intensity section ==="
 
   local skill_file="$REPO_DIR/skills/cdocs/SKILL.md"
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
 
-  # R-014: section header exists
+  # R-014: section header exists in SKILL.md
   file_contains "$skill_file" "## Effective Intensity" \
     "R-014: cdocs SKILL.md has '## Effective Intensity' section"
 
-  # R-014: max computation
-  file_contains "$skill_file" "max(project_intensity, feature_intensity)" \
-    "R-014: documents max(project_intensity, feature_intensity)"
+  # R-014: SKILL.md references shared constraints
+  file_contains "$skill_file" "_shared/constraints.md" \
+    "R-014: cdocs SKILL.md references shared constraints"
 
-  # R-014: ordering
-  file_contains "$skill_file" "standard < high < critical" \
-    "R-014: documents ordering standard < high < critical"
+  # R-014: shared constraints has max computation
+  file_contains "$shared" "max(project_intensity, feature_intensity)" \
+    "R-014: shared constraints documents max(project_intensity, feature_intensity)"
 
-  # R-014: fallback chain
-  file_contains "$skill_file" "feature_intensity -> workflow.intensity -> standard" \
+  # R-014: shared constraints has ordering
+  file_contains "$shared" "standard < high < critical" \
+    "R-014: shared constraints documents ordering standard < high < critical"
+
+  # R-014: shared constraints has fallback chain
+  file_contains "$shared" "feature_intensity -> workflow.intensity -> standard" \
     "R-014: fallback chain documented"
 
-  # R-014: no-active-workflow handling
-  file_contains_i "$skill_file" "no active workflow state\|no state file" \
+  # R-014: shared constraints handles no-active-workflow
+  file_contains_i "$shared" "no active workflow state\|no state file" \
     "R-014: handles no active workflow state"
 }
 
@@ -723,25 +743,30 @@ test_r018_cstatus_effective_intensity() {
   echo "=== R-018: /cstatus SKILL.md has verbatim Effective Intensity section ==="
 
   local skill_file="$REPO_DIR/skills/cstatus/SKILL.md"
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
 
-  # R-018: section header exists
+  # R-018: section header exists in SKILL.md
   file_contains "$skill_file" "## Effective Intensity" \
     "R-018: cstatus SKILL.md has '## Effective Intensity' section"
 
-  # R-018: max computation
-  file_contains "$skill_file" "max(project_intensity, feature_intensity)" \
-    "R-018: documents max(project_intensity, feature_intensity)"
+  # R-018: SKILL.md references shared constraints
+  file_contains "$skill_file" "_shared/constraints.md" \
+    "R-018: cstatus SKILL.md references shared constraints"
 
-  # R-018: ordering
-  file_contains "$skill_file" "standard < high < critical" \
-    "R-018: documents ordering standard < high < critical"
+  # R-018: shared constraints has max computation
+  file_contains "$shared" "max(project_intensity, feature_intensity)" \
+    "R-018: shared constraints documents max(project_intensity, feature_intensity)"
 
-  # R-018: fallback chain
-  file_contains "$skill_file" "feature_intensity -> workflow.intensity -> standard" \
+  # R-018: shared constraints has ordering
+  file_contains "$shared" "standard < high < critical" \
+    "R-018: shared constraints documents ordering standard < high < critical"
+
+  # R-018: shared constraints has fallback chain
+  file_contains "$shared" "feature_intensity -> workflow.intensity -> standard" \
     "R-018: fallback chain documented"
 
-  # R-018: no-active-workflow handling
-  file_contains_i "$skill_file" "no active workflow state\|no state file" \
+  # R-018: shared constraints handles no-active-workflow
+  file_contains_i "$shared" "no active workflow state\|no state file" \
     "R-018: handles no active workflow state"
 }
 
@@ -801,6 +826,14 @@ test_r021_cross_cutting_consistency() {
   echo ""
   echo "=== R-021: All 6 pipeline skills have max() and ordering ==="
 
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+
+  # R-021: shared constraints contains the computation and ordering (check once)
+  file_contains "$shared" "max(project_intensity, feature_intensity)" \
+    "R-021: shared constraints contains max(project_intensity, feature_intensity)"
+  file_contains "$shared" "standard < high < critical" \
+    "R-021: shared constraints contains ordering standard < high < critical"
+
   local pipeline_skills=(
     "$REPO_DIR/skills/cspec/SKILL.md"
     "$REPO_DIR/skills/ctdd/SKILL.md"
@@ -814,13 +847,9 @@ test_r021_cross_cutting_consistency() {
     local skill_name
     skill_name="$(basename "$(dirname "$skill_file")")"
 
-    # R-021: each skill contains max(project_intensity, feature_intensity)
-    file_contains "$skill_file" "max(project_intensity, feature_intensity)" \
-      "R-021: $skill_name contains max(project_intensity, feature_intensity)"
-
-    # R-021: each skill contains ordering standard < high < critical
-    file_contains "$skill_file" "standard < high < critical" \
-      "R-021: $skill_name contains ordering standard < high < critical"
+    # R-021: each skill references shared constraints
+    file_contains "$skill_file" "_shared/constraints.md" \
+      "R-021: $skill_name references shared constraints"
   done
 }
 

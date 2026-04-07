@@ -505,15 +505,16 @@ test_r006_serena_mcp() {
     && local has_searchpat="true" || local has_searchpat="false"
   assert_eq "R-006: SKILL.md mentions search_for_pattern" "true" "$has_searchpat"
 
-  # A-4 fix: silent fallback behavior
-  file_contains "$skill" "[Ss]ilent\|[Dd]o not warn\|[Dd]o not abort" \
+  # A-4 fix: silent fallback behavior (now in shared constraints)
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+  file_contains "$shared" "[Ss]ilent\|[Dd]o not warn\|[Dd]o not abort" \
     && local has_silent="true" || local has_silent="false"
-  assert_eq "R-006: SKILL.md specifies silent fallback (no warnings mid-operation)" "true" "$has_silent"
+  assert_eq "R-006: shared constraints specifies silent fallback (no warnings mid-operation)" "true" "$has_silent"
 
-  # QA-003 fix: do not retry instruction
-  file_contains "$skill" "do not retry" \
+  # QA-003 fix: do not retry instruction (now in shared constraints)
+  file_contains "$shared" "do not retry" \
     && local has_no_retry="true" || local has_no_retry="false"
-  assert_eq "R-006: SKILL.md specifies do not retry on Serena failure" "true" "$has_no_retry"
+  assert_eq "R-006: shared constraints specifies do not retry on Serena failure" "true" "$has_no_retry"
 }
 
 # ---------------------------------------------------------------------------
@@ -680,10 +681,11 @@ test_r012_token_logging() {
 
   local skill="$REPO_DIR/skills/cexplain/SKILL.md"
 
-  # Tests R-012 [unit]: token log path
-  file_contains "$skill" "\.correctless/artifacts/token-log" \
+  # Tests R-012 [unit]: token log path (now in shared constraints)
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+  file_contains "$shared" "\.correctless/artifacts/token-log" \
     && local has_path="true" || local has_path="false"
-  assert_eq "R-012: SKILL.md mentions .correctless/artifacts/token-log path" "true" "$has_path"
+  assert_eq "R-012: shared constraints mentions .correctless/artifacts/token-log path" "true" "$has_path"
 
   # Tests R-012: skill field set to cexplain
   file_contains "$skill" '"cexplain"\|skill.*cexplain\|cexplain.*skill' \
@@ -700,20 +702,20 @@ test_r012_token_logging() {
     && local has_role="true" || local has_role="false"
   assert_eq "R-012: SKILL.md specifies agent_role: explain-agent" "true" "$has_role"
 
-  # Tests R-012: total_tokens field
-  file_contains "$skill" "total_tokens" \
+  # Tests R-012: total_tokens field (now in shared constraints)
+  file_contains "$shared" "total_tokens" \
     && local has_tokens="true" || local has_tokens="false"
-  assert_eq "R-012: SKILL.md specifies total_tokens field" "true" "$has_tokens"
+  assert_eq "R-012: shared constraints specifies total_tokens field" "true" "$has_tokens"
 
-  # Tests R-012: duration_ms field
-  file_contains "$skill" "duration_ms" \
+  # Tests R-012: duration_ms field (now in shared constraints)
+  file_contains "$shared" "duration_ms" \
     && local has_duration="true" || local has_duration="false"
-  assert_eq "R-012: SKILL.md specifies duration_ms field" "true" "$has_duration"
+  assert_eq "R-012: shared constraints specifies duration_ms field" "true" "$has_duration"
 
-  # Tests R-012: timestamp field
-  file_contains "$skill" "timestamp" \
+  # Tests R-012: timestamp field (now in shared constraints)
+  file_contains "$shared" "timestamp" \
     && local has_timestamp="true" || local has_timestamp="false"
-  assert_eq "R-012: SKILL.md specifies timestamp field" "true" "$has_timestamp"
+  assert_eq "R-012: shared constraints specifies timestamp field" "true" "$has_timestamp"
 }
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Edit, Write, Bash(*)
 
 # /crelease — Version Bump, Changelog, and Release Tag
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the release agent. Your job is to determine the version bump from specs merged since the last tag, generate a changelog entry, update the version file, run sanity checks, and create an annotated git tag. You do NOT deploy — you version, document, and tag.
 
 ## Before You Start
@@ -185,15 +187,10 @@ If `gh` CLI is available, also offer to create a GitHub release from the tag usi
 
 ## Token Logging (R-016)
 
-Log token usage to `.correctless/artifacts/token-log-{slug}.json` with these fields:
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
 - `skill`: "crelease"
 - `phase`: "release"
 - `agent_role`: "release-agent"
-- `total_tokens`: estimated token count
-- `duration_ms`: elapsed time in milliseconds
-- `timestamp`: ISO 8601 timestamp
-
-Append to existing file or create it.
 
 ## Decision Points
 
