@@ -7,6 +7,8 @@ context: fork
 
 # /ctdd — Enforced Test-Driven Development
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the TDD orchestrator. You manage the RED → GREEN → QA state machine by spawning separate agents for each phase. **You do not write tests or code yourself.**
 
 ## Intensity Configuration
@@ -20,13 +22,7 @@ You are the TDD orchestrator. You manage the RED → GREEN → QA state machine 
 
 ## Effective Intensity
 
-Determine the effective intensity before starting the review. The effective intensity is `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. **Read project intensity**: Read `workflow.intensity` from `.correctless/config/workflow-config.json`. If the field is absent, default to `standard`.
-2. **Read feature intensity**: Run `.correctless/hooks/workflow-advance.sh status` and look for the `Intensity:` line. If the Intensity line is absent in the status output (feature_intensity is absent), use the project intensity alone.
-3. **Compute effective intensity**: Take the max of project_intensity and feature_intensity.
-
-**Fallback chain**: feature_intensity -> workflow.intensity -> standard. If both feature_intensity and `workflow.intensity` are absent, the effective intensity defaults to `standard`. If there is no active workflow state (no state file), effective intensity falls back to `workflow.intensity` from config, then to `standard`. The review still runs — it does not require active workflow state.
+Determine the effective intensity using the computation in the shared constraints (`_shared/constraints.md`).
 
 ## Philosophy
 
@@ -505,20 +501,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the workflow state or spec file):
-
-```json
-{
-  "skill": "ctdd",
-  "phase": "{red|test-audit|green|qa|fix-round-N}",
-  "agent_role": "{test-writer|test-auditor|implementation|qa-agent|fix-agent}",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "ctdd"
+- `phase`: "{red|test-audit|green|qa|fix-round-N}"
+- `agent_role`: "{test-writer|test-auditor|implementation|qa-agent|fix-agent}"
 
 ### /btw Reminder
 When presenting QA findings for the human to review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."
@@ -546,16 +532,12 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
 
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
-
 ### Context7 — Library Documentation
 
 If `mcp.context7` is `true` in `workflow-config.json`, the test agent (RED phase) can use Context7 to understand a library's test utilities and assertion patterns:
 
 - Use `resolve-library-id` + `get-library-docs` to fetch testing docs for the libraries under test
 - Useful when the test agent needs to know how a library's test helpers work (e.g., testing hooks in React, test fixtures in pytest)
-
-When Context7 is unavailable, fall back to web search. If Context7 was unavailable during this run, notify the user once at the end.
 
 ## If Something Goes Wrong
 
@@ -573,6 +555,3 @@ When Context7 is unavailable, fall back to web search. If Context7 was unavailab
 - **If `workflow-advance.sh` fails**, read the error message and present it to the human. Common causes: wrong phase, missing precondition, not on a feature branch.
 - **All files created by any agent must be inside the project directory.** Never write to /tmp or external paths.
 - **Never skip workflow steps.** The full pipeline is: RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge. Every step runs, every time. No exceptions. "This feature is small" is not a reason to skip. Time is not the constraint — correctness is.
-- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to manage remaining phases correctly.
-- **Evidence before claims.** Never say "tests pass" or "checks out" without running the command fresh in this message and showing the output. "Should pass" is not evidence.
-- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

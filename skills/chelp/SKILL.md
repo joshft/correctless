@@ -6,6 +6,8 @@ allowed-tools: Read, Bash(*)
 
 # /chelp — Correctless Quick Help
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 Show the user the workflow pipeline, available commands, and current status. Keep output under 50 lines.
 
 ## Behavior

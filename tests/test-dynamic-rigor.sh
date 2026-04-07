@@ -106,7 +106,7 @@ test_r001_sync_single_dist() {
   # R-001: correctless/ must have all 26 skills
   local skill_count=0
   if [ -d "$REPO_DIR/correctless/skills" ]; then
-    skill_count="$(ls -d "$REPO_DIR/correctless/skills/"*/ 2>/dev/null | wc -l)"
+    skill_count="$(find "$REPO_DIR/correctless/skills" -name "SKILL.md" | wc -l)"
   fi
   assert_eq "R-001: correctless/ has 26 skills" "26" "$skill_count"
 
@@ -350,6 +350,13 @@ test_r006_intensity_gates() {
   echo ""
   echo "=== R-006: Full-only skills contain intensity gate ==="
 
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+
+  # R-006: shared constraints defaults to standard when intensity is absent (check once)
+  file_contains_i "$shared" "default.*standard\|absent.*standard\|not set.*standard\|missing.*standard" \
+    && local shared_has_default="true" || local shared_has_default="false"
+  assert_eq "R-006: shared constraints defaults to standard when intensity absent" "true" "$shared_has_default"
+
   local full_only_skills="caudit cmodel creview-spec cupdate-arch cpostmortem cdevadv credteam"
 
   for skill in $full_only_skills; do
@@ -370,10 +377,10 @@ test_r006_intensity_gates() {
         && local has_gate="true" || local has_gate="false"
       assert_eq "R-006: $skill has intensity gate language" "true" "$has_gate"
 
-      # R-006: gate defaults to standard when intensity is absent
-      file_contains_i "$skill_file" "default.*standard\|absent.*standard\|not set.*standard\|missing.*standard" \
-        && local has_default="true" || local has_default="false"
-      assert_eq "R-006: $skill defaults to standard when intensity absent" "true" "$has_default"
+      # R-006: skill references shared constraints (where default-to-standard lives)
+      file_contains "$skill_file" "_shared/constraints.md" \
+        && local has_shared_ref="true" || local has_shared_ref="false"
+      assert_eq "R-006: $skill references shared constraints" "true" "$has_shared_ref"
 
       # R-006: Intensity Gate section uses full config path
       # Extract lines around "Intensity Gate" and check for full path
@@ -449,8 +456,8 @@ test_r008_below_threshold_message() {
       && local has_required="true" || local has_required="false"
     assert_eq "R-008: $skill gate mentions required intensity" "true" "$has_required"
 
-    # R-008: gate message includes current intensity
-    file_contains_i "$skill_file" "current.*intensity\|project.*intensity\|configured.*intensity" \
+    # R-008: gate message includes effective/current intensity
+    file_contains_i "$skill_file" "current.*intensity\|project.*intensity\|configured.*intensity\|effective intensity" \
       && local has_current="true" || local has_current="false"
     assert_eq "R-008: $skill gate mentions current intensity" "true" "$has_current"
 

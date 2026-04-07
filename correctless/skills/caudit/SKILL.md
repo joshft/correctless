@@ -7,13 +7,11 @@ context: fork
 
 # /caudit — Olympics Audit System
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 ## Intensity Gate
 
-This skill requires effective intensity `high` or above. Compute effective intensity as `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. Read `workflow.intensity` from `.correctless/config/workflow-config.json` (project_intensity). If absent, default to `standard`.
-2. Run `.correctless/hooks/workflow-advance.sh status` and read the `Intensity:` line (feature_intensity). If absent, use project_intensity alone.
-3. Effective intensity = `max(project_intensity, feature_intensity)`.
+This skill requires effective intensity `high` or above. Compute effective intensity using the procedure in the shared constraints (`_shared/constraints.md`).
 
 **Intensity threshold**: /caudit requires high minimum intensity to activate.
 
@@ -464,20 +462,10 @@ See "Progress Visibility" section above — task creation and round-by-round nar
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the preset and date):
-
-```json
-{
-  "skill": "caudit",
-  "phase": "{round-N-{agent-role}|round-N-triage}",
-  "agent_role": "{specialist-role|triage}",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "caudit"
+- `phase`: "{round-N-{agent-role}|round-N-triage}"
+- `agent_role`: "{specialist-role|triage}"
 
 After each round's agents complete and triage finishes, print: "Round {N} complete. {M} findings. Running token cost: ~{total}k tokens. Continue to round {N+1}?" This gives the user cost visibility to decide whether to continue.
 
@@ -508,8 +496,6 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
 
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
-
 ## If Something Goes Wrong
 
 - **Agent crashes mid-round**: Re-run `/caudit`. Prior round findings are persisted in `.correctless/artifacts/findings/` and provide context, but the skill restarts from Round 1. It will re-read prior findings and avoid re-reporting already-fixed issues, but there is no automatic round-level resume.
@@ -524,6 +510,5 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 - **Every finding needs instance fix AND class fix.**
 - **Post-convergence regression tests are mandatory.**
 - **All files inside the project directory.** Never /tmp.
-- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to manage remaining rounds correctly.
 - **Cost visibility every round.** Human can stop the loop.
 - **Redact if sharing.** If this output will be shared externally, apply redaction rules from `templates/redaction-rules.md` first.

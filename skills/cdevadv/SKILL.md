@@ -7,13 +7,11 @@ context: fork
 
 # /cdevadv — Devil's Advocate (10th Man Rule)
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 ## Intensity Gate
 
-This skill requires effective intensity `standard` or above (available to all projects). Compute effective intensity as `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. Read `workflow.intensity` from `.correctless/config/workflow-config.json` (project_intensity). If absent, default to `standard`.
-2. Run `.correctless/hooks/workflow-advance.sh status` and read the `Intensity:` line (feature_intensity). If absent, use project_intensity alone.
-3. Effective intensity = `max(project_intensity, feature_intensity)`.
+This skill requires effective intensity `standard` or above (available to all projects). Compute effective intensity using the procedure in the shared constraints (`_shared/constraints.md`).
 
 **Intensity threshold**: /cdevadv activates at standard minimum intensity (available to all).
 
@@ -252,20 +250,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the explorer subagent completes (signals mode only), capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the report date):
-
-```json
-{
-  "skill": "cdevadv",
-  "phase": "explorer",
-  "agent_role": "explorer-agent",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Token logging applies to signals mode only (Layers mode does not spawn subagents). Skill-specific values:
+- `skill`: "cdevadv"
+- `phase`: "explorer"
+- `agent_role`: "explorer-agent"
 
 ### /context
 Check context usage before starting. Layers mode is context-efficient (cheap passes first). Signals mode loads more data. If context is above 50% before starting, suggest compacting first.

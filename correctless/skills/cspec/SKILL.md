@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Edit, Bash(git log*), Bash(git diff*), Bash(git
 
 # /cspec — Write a Feature Specification
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the spec agent. Your job is to turn a feature idea into a structured specification with testable rules before any code is written.
 
 ## Intensity Configuration
@@ -19,13 +21,7 @@ You are the spec agent. Your job is to turn a feature idea into a structured spe
 
 ## Effective Intensity
 
-Determine the effective intensity before starting the review. The effective intensity is `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. **Read project intensity**: Read `workflow.intensity` from `.correctless/config/workflow-config.json`. If the field is absent, default to `standard`.
-2. **Read feature intensity**: Run `.correctless/hooks/workflow-advance.sh status` and look for the `Intensity:` line. If the Intensity line is absent in the status output (feature_intensity is absent), use the project intensity alone.
-3. **Compute effective intensity**: Take the max of project_intensity and feature_intensity.
-
-**Fallback chain**: feature_intensity -> workflow.intensity -> standard. If both feature_intensity and `workflow.intensity` are absent, the effective intensity defaults to `standard`. If there is no active workflow state (no state file), effective intensity falls back to `workflow.intensity` from config, then to `standard`. The review still runs — it does not require active workflow state.
+Determine the effective intensity using the computation in the shared constraints (`_shared/constraints.md`).
 
 ## Progress Visibility (MANDATORY)
 
@@ -426,20 +422,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the research subagent completes (when triggered), capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the task slug):
-
-```json
-{
-  "skill": "cspec",
-  "phase": "research",
-  "agent_role": "research-agent",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed. Only logged when the research subagent is triggered.
+Log token usage following the shared constraints (`_shared/constraints.md`). Only logged when the research subagent is triggered. Skill-specific values:
+- `skill`: "cspec"
+- `phase`: "research"
+- `agent_role`: "research-agent"
 
 ### /btw
 When presenting the spec for review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."
@@ -469,16 +455,12 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
 
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
-
 ### Context7 — Library Documentation
 
 If `mcp.context7` is `true` in `workflow-config.json`, use Context7 for the research subagent's library documentation lookups:
 
 - Use `resolve-library-id` to find the canonical ID for a library before fetching docs
 - Use `get-library-docs` to retrieve current documentation and API references
-
-When Context7 is unavailable, fall back to web search for library documentation. If Context7 was unavailable during this run, notify the user once at the end: "Note: Context7 was unavailable — fell back to web search for library docs."
 
 ## Intensity Detection
 
@@ -609,4 +591,3 @@ If `workflow.allow_intensity_downgrade` is `false`, omit the "lower" option and 
 - **At high+ intensity**: NEVER skip STRIDE for features touching trust boundaries (unless `require_stride` is false).
 - **NEVER skip the Socratic Brainstorm (Step 0).** Even experienced developers benefit from 2-3 reframing questions. The brainstorm is sequential and not subject to question batching.
 - **NEVER skip review.** Do not advance directly to tests. Do not suggest skipping review because the feature is small. The review step is enforced by the state machine and always produces value.
-- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

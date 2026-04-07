@@ -627,15 +627,16 @@ test_r016_skill_content() {
 
   local skill="$REPO_DIR/skills/crelease/SKILL.md"
 
-  # Tests R-016 [unit]: logs token usage to token-log-{slug}.json
-  file_contains "$skill" "token.*log\|token-log" \
+  # Tests R-016 [unit]: logs token usage (references shared constraints)
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+  file_contains "$skill" "token.*log\|token-log\|shared constraints\|Token Logging" \
     && local has_token_log="true" || local has_token_log="false"
   assert_eq "R-016: SKILL.md mentions token logging" "true" "$has_token_log"
 
-  # Tests R-016: correct artifact path
-  file_contains "$skill" "\.correctless/artifacts/token-log" \
+  # Tests R-016: correct artifact path (now in shared constraints)
+  file_contains "$shared" "\.correctless/artifacts/token-log" \
     && local has_path="true" || local has_path="false"
-  assert_eq "R-016: SKILL.md specifies .correctless/artifacts/ token log path" "true" "$has_path"
+  assert_eq "R-016: shared constraints specifies .correctless/artifacts/ token log path" "true" "$has_path"
 
   # Tests R-016: skill field is crelease
   file_contains "$skill" '"crelease"\|skill.*crelease\|crelease.*skill' \
@@ -651,17 +652,17 @@ test_r016_skill_content() {
     && local has_role="true" || local has_role="false"
   assert_eq "R-016: SKILL.md specifies agent_role field" "true" "$has_role"
 
-  file_contains "$skill" "total_tokens" \
+  file_contains "$shared" "total_tokens" \
     && local has_tokens="true" || local has_tokens="false"
-  assert_eq "R-016: SKILL.md specifies total_tokens field" "true" "$has_tokens"
+  assert_eq "R-016: shared constraints specifies total_tokens field" "true" "$has_tokens"
 
-  file_contains "$skill" "duration_ms" \
+  file_contains "$shared" "duration_ms" \
     && local has_duration="true" || local has_duration="false"
-  assert_eq "R-016: SKILL.md specifies duration_ms field" "true" "$has_duration"
+  assert_eq "R-016: shared constraints specifies duration_ms field" "true" "$has_duration"
 
-  file_contains "$skill" "timestamp" \
+  file_contains "$shared" "timestamp" \
     && local has_timestamp="true" || local has_timestamp="false"
-  assert_eq "R-016: SKILL.md specifies timestamp field" "true" "$has_timestamp"
+  assert_eq "R-016: shared constraints specifies timestamp field" "true" "$has_timestamp"
 }
 
 # ---------------------------------------------------------------------------

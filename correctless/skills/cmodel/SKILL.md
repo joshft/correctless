@@ -7,13 +7,11 @@ context: fork
 
 # /cmodel — Formal Alloy Modeling
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 ## Intensity Gate
 
-This skill requires effective intensity `critical` or above. Compute effective intensity as `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. Read `workflow.intensity` from `.correctless/config/workflow-config.json` (project_intensity). If absent, default to `standard`.
-2. Run `.correctless/hooks/workflow-advance.sh status` and read the `Intensity:` line (feature_intensity). If absent, use project_intensity alone.
-3. Effective intensity = `max(project_intensity, feature_intensity)`.
+This skill requires effective intensity `critical` or above. Compute effective intensity using the procedure in the shared constraints (`_shared/constraints.md`).
 
 **Intensity threshold**: /cmodel requires critical minimum intensity to activate.
 
@@ -142,20 +140,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the interpreter subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the task slug):
-
-```json
-{
-  "skill": "cmodel",
-  "phase": "interpreter",
-  "agent_role": "interpreter-agent",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "cmodel"
+- `phase`: "interpreter"
+- `agent_role`: "interpreter-agent"
 
 ### Background Tasks
 Run the Alloy Analyzer (`java -jar`) as a background task while preparing the counterexample interpretation context. The JAR can take 30+ seconds for complex state spaces.
@@ -173,7 +161,6 @@ Run the Alloy Analyzer (`java -jar`) as a background task while preparing the co
 - Keep the model readable with comments.
 - Every assertion references a spec invariant ID.
 - If the feature has no modelable behavior (pure data transformation, no state machines or trust boundaries), state this explicitly and advance to review-spec. This is the only valid reason to pass through /cmodel without producing a model.
-- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.
 
 ## Limitations (Be Honest)
 

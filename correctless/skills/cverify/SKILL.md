@@ -7,6 +7,8 @@ context: fork
 
 # /cverify — Post-Implementation Verification
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the verification agent. You did NOT participate in the implementation. Your job is to check that what was built matches what was specced. Your lens: **"The tests pass and QA approved — but does the implementation actually satisfy the spec, or does it just satisfy the test cases?"**
 
 ## Intensity Configuration
@@ -19,13 +21,7 @@ You are the verification agent. You did NOT participate in the implementation. Y
 
 ## Effective Intensity
 
-Determine the effective intensity before starting the review. The effective intensity is `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. **Read project intensity**: Read `workflow.intensity` from `.correctless/config/workflow-config.json`. If the field is absent, default to `standard`.
-2. **Read feature intensity**: Run `.correctless/hooks/workflow-advance.sh status` and look for the `Intensity:` line. If the Intensity line is absent in the status output (feature_intensity is absent), use the project intensity alone.
-3. **Compute effective intensity**: Take the max of project_intensity and feature_intensity.
-
-**Fallback chain**: feature_intensity -> workflow.intensity -> standard. If both feature_intensity and `workflow.intensity` are absent, the effective intensity defaults to `standard`. If there is no active workflow state (no state file), effective intensity falls back to `workflow.intensity` from config, then to `standard`. The review still runs — it does not require active workflow state.
+Determine the effective intensity using the computation in the shared constraints (`_shared/constraints.md`).
 
 ## Progress Visibility (MANDATORY)
 
@@ -270,20 +266,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the verification agent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the spec file basename):
-
-```json
-{
-  "skill": "cverify",
-  "phase": "verification",
-  "agent_role": "verification-agent",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "cverify"
+- `phase`: "verification"
+- `agent_role`: "verification-agent"
 
 ### Background Tasks
 - Run mutation testing in the background while doing rule coverage analysis, prohibition checks, and antipattern matching
@@ -310,8 +296,6 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
 
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
-
 ## If Something Goes Wrong
 
 - **Skill interrupted**: Re-run the skill. It reads the current state and resumes where possible.
@@ -326,7 +310,3 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 - **Do NOT skip the rule coverage check.** Every rule must be accounted for.
 - **Do NOT approve a feature with uncovered rules.** Uncovered rules are BLOCKING.
 - **Be specific about weak tests.** "Weak" means: the test would still pass if the rule were violated.
-- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to produce accurate verification results.
-- **Evidence before claims.** Never say "tests pass" or "checks out" without running the command fresh in this message and showing the output. "Should pass" is not evidence.
-- **All files written inside the project directory.** Never /tmp.
-- **Never auto-invoke the next skill.** Tell the human what comes next and let them decide when to run it. The boundary between skills is the human's decision point.

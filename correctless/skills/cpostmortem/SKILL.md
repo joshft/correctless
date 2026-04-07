@@ -7,13 +7,11 @@ context: fork
 
 # /cpostmortem — Post-Merge Bug Analysis
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 ## Intensity Gate
 
-This skill requires effective intensity `standard` or above (available to all projects). Compute effective intensity as `max(project_intensity, feature_intensity)` using the ordering `standard < high < critical`.
-
-1. Read `workflow.intensity` from `.correctless/config/workflow-config.json` (project_intensity). If absent, default to `standard`.
-2. Run `.correctless/hooks/workflow-advance.sh status` and read the `Intensity:` line (feature_intensity). If absent, use project_intensity alone.
-3. Effective intensity = `max(project_intensity, feature_intensity)`.
+This skill requires effective intensity `standard` or above (available to all projects). Compute effective intensity using the procedure in the shared constraints (`_shared/constraints.md`).
 
 **Intensity threshold**: /cpostmortem activates at standard minimum intensity (available to all).
 
@@ -147,20 +145,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After the analysis subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the feature slug):
-
-```json
-{
-  "skill": "cpostmortem",
-  "phase": "analysis",
-  "agent_role": "analysis-agent",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "cpostmortem"
+- `phase`: "analysis"
+- `agent_role`: "analysis-agent"
 
 ### /export
 After postmortem completes: "Export this postmortem conversation: `/export .correctless/decisions/{task-slug}-postmortem.md` — captures the full analysis of why the workflow missed this bug."

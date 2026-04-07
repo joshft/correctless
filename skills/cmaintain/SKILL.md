@@ -7,6 +7,8 @@ context: fork
 
 # /cmaintain — Maintainer Contribution Review
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the maintainer review agent. Your job is NOT to ask "is this code good?" — `/cpr-review` does that. Your job is to ask **"should I merge this?"** That's a different question. It includes: does the scope match the issue, does it follow our conventions, will it create maintenance burden, and is it worth the long-term commitment of merging someone else's code into our project.
 
 Invoke with: `/cmaintain {PR number}`
@@ -224,9 +226,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After any subagent completes, capture `total_tokens` and `duration_ms`. Append to `.correctless/artifacts/token-log-{slug}.json`. If `.correctless/artifacts/` doesn't exist, create it with `mkdir -p .correctless/artifacts/` first.
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). If `.correctless/artifacts/` doesn't exist, create it with `mkdir -p .correctless/artifacts/` first. Skill-specific values:
+- `skill`: "cmaintain"
+- `phase`: "review"
+- `agent_role`: "maintainer-agent"
 
 ## Code Analysis (MCP Integration)
 
@@ -247,8 +250,6 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
-
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
 
 ## If Something Goes Wrong
 

@@ -7,6 +7,8 @@ context: fork
 
 # /crefactor — Structured Refactoring
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the refactor orchestrator. Refactoring has a fundamentally different risk model than new features. The spec isn't "build X" — it's "same behavior, different structure." The test suite IS the spec. If tests pass before and after, the refactor is correct. If a test had to change, that's a behavioral change disguised as a refactor — flag it.
 
 ## Philosophy
@@ -293,20 +295,10 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the refactor intent filename):
-
-```json
-{
-  "skill": "crefactor",
-  "phase": "{characterization-tests|phase-N-refactor|phase-N-verify|qa}",
-  "agent_role": "{test-agent|refactor-agent|verification-agent|qa-agent}",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "crefactor"
+- `phase`: "{characterization-tests|phase-N-refactor|phase-N-verify|qa}"
+- `agent_role`: "{test-agent|refactor-agent|verification-agent|qa-agent}"
 
 ### Background Tasks
 - Run coverage analysis in the background while the refactor agent works
@@ -332,16 +324,12 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
 
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
-
 ### Context7 — Library Documentation
 
 If `mcp.context7` is `true` in `workflow-config.json`, use Context7 when checking whether a dependency migration path exists during refactoring:
 
 - Use `resolve-library-id` + `get-library-docs` to check if the target library version has a migration guide
 - Useful when refactoring involves upgrading a dependency (e.g., "does library-x v3 have a codemod for v2 → v3?")
-
-When Context7 is unavailable, fall back to web search. If Context7 was unavailable during this run, notify the user once at the end.
 
 ## If Something Goes Wrong
 
@@ -357,6 +345,3 @@ When Context7 is unavailable, fall back to web search. If Context7 was unavailab
 - **Characterization tests capture reality, not intent.** A characterization test that asserts a bug is still correct — it tells you the refactor changed behavior.
 - **Phase by phase.** Large refactors must be broken into phases that leave tests passing. No "I'll fix the tests after I'm done restructuring."
 - **Agent separation is mandatory.** The refactor agent does not verify. The verification agent did not refactor. Same principle as RED/GREEN in TDD.
-- **Context is a reliability constraint.** Above 70%, warn and recommend /compact. Above 85%, stop — instruction adherence degrades and the orchestrator cannot be trusted to manage remaining phases correctly.
-- **Evidence before claims.** Never say "tests pass" or "checks out" without running the command fresh in this message and showing the output. "Should pass" is not evidence.
-- **All files inside the project directory.** Never /tmp.

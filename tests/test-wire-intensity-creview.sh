@@ -190,38 +190,43 @@ test_r002_effective_intensity_section() {
   echo "=== R-002: /creview SKILL.md has Effective Intensity section ==="
 
   local skill_file="$REPO_DIR/skills/creview/SKILL.md"
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
 
-  # R-002: section header exists
+  # R-002: section header exists in SKILL.md
   file_contains "$skill_file" "## Effective Intensity" \
     "R-002: creview SKILL.md has '## Effective Intensity' section"
 
-  # R-002: max computation documented
-  file_contains "$skill_file" "max(project_intensity, feature_intensity)" \
-    "R-002: documents max(project_intensity, feature_intensity) computation"
+  # R-002: SKILL.md references shared constraints
+  file_contains "$skill_file" "_shared/constraints.md" \
+    "R-002: creview SKILL.md references shared constraints"
 
-  # R-002: ordering documented
-  file_contains "$skill_file" "standard < high < critical" \
-    "R-002: documents ordering standard < high < critical"
+  # R-002: shared constraints has max computation
+  file_contains "$shared" "max(project_intensity, feature_intensity)" \
+    "R-002: shared constraints documents max(project_intensity, feature_intensity) computation"
 
-  # R-002: references workflow.intensity from config
-  file_contains "$skill_file" "workflow.intensity" \
-    "R-002: references workflow.intensity from config"
+  # R-002: shared constraints has ordering
+  file_contains "$shared" "standard < high < critical" \
+    "R-002: shared constraints documents ordering standard < high < critical"
 
-  # R-002: references reading project intensity from workflow-config.json
-  file_contains_i "$skill_file" "workflow.intensity.*workflow-config.json\|workflow-config.json.*workflow.intensity\|project.*intensity.*config" \
-    "R-002: references reading project intensity from workflow-config.json"
+  # R-002: shared constraints references workflow.intensity from config
+  file_contains "$shared" "workflow.intensity" \
+    "R-002: shared constraints references workflow.intensity from config"
 
-  # R-002: references feature_intensity from workflow state
-  file_contains "$skill_file" "feature_intensity" \
-    "R-002: references feature_intensity"
+  # R-002: shared constraints references reading project intensity from workflow-config.json
+  file_contains_i "$shared" "workflow.intensity.*workflow-config.json\|workflow-config.json.*workflow.intensity\|project.*intensity.*config" \
+    "R-002: shared constraints references reading project intensity from workflow-config.json"
 
-  # R-002: references workflow-advance.sh status as the interface
-  file_contains "$skill_file" "workflow-advance.sh status" \
-    "R-002: instructs reading via workflow-advance.sh status"
+  # R-002: shared constraints references feature_intensity
+  file_contains "$shared" "feature_intensity" \
+    "R-002: shared constraints references feature_intensity"
 
-  # R-002: absent feature_intensity defaults to project intensity alone
-  file_contains_i "$skill_file" "feature_intensity.*absent.*project\|absent.*feature_intensity.*project\|feature_intensity is absent" \
-    "R-002: absent feature_intensity falls back to project intensity"
+  # R-002: shared constraints references workflow-advance.sh status as the interface
+  file_contains "$shared" "workflow-advance.sh status" \
+    "R-002: shared constraints instructs reading via workflow-advance.sh status"
+
+  # R-002: shared constraints handles absent feature_intensity
+  file_contains_i "$shared" "feature_intensity.*absent\|absent.*feature_intensity\|feature_intensity is absent" \
+    "R-002: shared constraints handles absent feature_intensity"
 }
 
 # ============================================
@@ -385,20 +390,20 @@ test_r006_status_outputs_feature_intensity() {
 
   cleanup
 
-  # R-006 [unit]: SKILL.md instructs reading from status output
+  # R-006 [unit]: shared constraints instruct reading from status output
   local skill_file="$REPO_DIR/skills/creview/SKILL.md"
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
 
-  file_contains "$skill_file" "workflow-advance.sh status" \
-    "R-006: SKILL.md instructs reading feature_intensity from status output"
+  file_contains "$shared" "workflow-advance.sh status" \
+    "R-006: shared constraints instructs reading feature_intensity from status output"
 
-  # R-006: SKILL.md instructs NOT parsing state file directly
-  # (the instruction should reference status, not direct JSON parsing)
-  file_not_contains "$skill_file" "workflow-state-.*json" \
-    "R-006: SKILL.md does not instruct parsing state file directly"
+  # R-006: shared constraints instructs NOT parsing state file directly
+  file_not_contains "$shared" "workflow-state-.*json" \
+    "R-006: shared constraints does not instruct parsing state file directly"
 
-  # R-006: SKILL.md handles absent Intensity line gracefully
-  file_contains_i "$skill_file" "no.*Intensity line\|Intensity.*absent\|absent.*feature_intensity\|Intensity line.*absent" \
-    "R-006: SKILL.md handles absent Intensity line in status output"
+  # R-006: shared constraints handles absent Intensity line gracefully
+  file_contains_i "$shared" "no.*Intensity line\|Intensity.*absent\|absent.*feature_intensity\|Intensity line.*absent" \
+    "R-006: shared constraints handles absent Intensity line in status output"
 }
 
 # ============================================
@@ -440,6 +445,14 @@ test_r008_gated_skills_effective_intensity() {
   echo ""
   echo "=== R-008: All 7 gated skills use effective intensity ==="
 
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+
+  # R-008: shared constraints has max computation and both intensity sources
+  file_contains "$shared" "max(project_intensity, feature_intensity)" \
+    "R-008: shared constraints has max(project_intensity, feature_intensity)"
+  file_contains "$shared" "feature_intensity" \
+    "R-008: shared constraints references feature_intensity"
+
   local gated_skills=(
     "$REPO_DIR/skills/caudit/SKILL.md"
     "$REPO_DIR/skills/cdevadv/SKILL.md"
@@ -454,15 +467,13 @@ test_r008_gated_skills_effective_intensity() {
     local skill_name
     skill_name="$(basename "$(dirname "$skill_file")")"
 
-    # R-008: each gated skill references max(project_intensity, feature_intensity)
-    file_contains "$skill_file" "max(project_intensity, feature_intensity)" \
-      "R-008: $skill_name references max(project_intensity, feature_intensity)"
+    # R-008: each gated skill references shared constraints
+    file_contains "$skill_file" "_shared/constraints.md" \
+      "R-008: $skill_name references shared constraints"
 
-    # R-008: each gated skill references both workflow.intensity AND feature_intensity
+    # R-008: each gated skill still references workflow.intensity (in override instructions)
     file_contains "$skill_file" "workflow.intensity" \
       "R-008: $skill_name references workflow.intensity"
-    file_contains "$skill_file" "feature_intensity" \
-      "R-008: $skill_name references feature_intensity"
   done
 }
 
@@ -474,6 +485,14 @@ test_r008_gated_skills_effective_intensity() {
 test_r009_consistent_max_computation() {
   echo ""
   echo "=== R-009: Consistent max(project_intensity, feature_intensity) across all skills ==="
+
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+
+  # R-009: shared constraints contains the max computation and ordering (check once)
+  file_contains "$shared" "max(project_intensity, feature_intensity)" \
+    "R-009: shared constraints contains max(project_intensity, feature_intensity)"
+  file_contains "$shared" "standard < high < critical" \
+    "R-009: shared constraints contains ordering standard < high < critical"
 
   local all_skills=(
     "$REPO_DIR/skills/creview/SKILL.md"
@@ -490,13 +509,9 @@ test_r009_consistent_max_computation() {
     local skill_name
     skill_name="$(basename "$(dirname "$skill_file")")"
 
-    # R-009: each skill contains the max computation string
-    file_contains "$skill_file" "max(project_intensity, feature_intensity)" \
-      "R-009: $skill_name contains max(project_intensity, feature_intensity)"
-
-    # R-009: each skill contains the ordering string
-    file_contains "$skill_file" "standard < high < critical" \
-      "R-009: $skill_name contains ordering standard < high < critical"
+    # R-009: each skill references shared constraints
+    file_contains "$skill_file" "_shared/constraints.md" \
+      "R-009: $skill_name references shared constraints"
   done
 
   # R-009: max computation is NOT in workflow-advance.sh (LLM instruction only)
@@ -543,22 +558,23 @@ test_r011_fallback_chain() {
   echo "=== R-011: Fallback chain documented ==="
 
   local skill_file="$REPO_DIR/skills/creview/SKILL.md"
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
 
-  # R-011: fallback chain documented
-  file_contains_i "$skill_file" "feature_intensity.*workflow.intensity.*standard\|fallback.*chain\|falls back" \
-    "R-011: documents fallback chain"
+  # R-011: shared constraints documents fallback chain
+  file_contains_i "$shared" "feature_intensity.*workflow.intensity.*standard\|fallback.*chain\|falls back" \
+    "R-011: shared constraints documents fallback chain"
 
-  # R-011: default is standard when both absent
-  file_contains_i "$skill_file" "default.*standard\|defaults to.*standard" \
-    "R-011: defaults to standard when config absent"
+  # R-011: shared constraints defaults to standard when both absent
+  file_contains_i "$shared" "default.*standard\|defaults to.*standard" \
+    "R-011: shared constraints defaults to standard when config absent"
 
-  # R-011: no active workflow handled gracefully — review still runs
-  file_contains_i "$skill_file" "no active workflow\|no.*state file\|no.*workflow state" \
-    "R-011: handles no active workflow gracefully"
+  # R-011: shared constraints handles no active workflow gracefully
+  file_contains_i "$shared" "no active workflow\|no.*state file\|no.*workflow state" \
+    "R-011: shared constraints handles no active workflow gracefully"
 
-  # R-011: review still runs without active workflow state
-  file_contains_i "$skill_file" "review still runs\|still runs\|does not require.*workflow" \
-    "R-011: review still runs without active workflow state"
+  # R-011: shared constraints says skill still runs without active workflow state
+  file_contains_i "$shared" "still runs\|does not require.*workflow" \
+    "R-011: shared constraints says skill still runs without active workflow state"
 
   # R-011 [integration]: test that status with no feature_intensity omits the line
   setup_test_project

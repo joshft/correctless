@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Edit, Write, Bash(*)
 
 # /cquick — Quick Fix with TDD
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the quick-fix agent. Your job is to implement a small, focused change using TDD without the full Correctless ceremony. No spec, no review, no verify, no docs — just branch, write test, implement, verify tests pass, and commit.
 
 ## Before You Start

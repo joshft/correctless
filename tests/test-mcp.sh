@@ -311,11 +311,17 @@ test_r014() {
   echo ""
   echo "=== R-014: Silent fallback on Serena failure ==="
 
+  # Degradation instruction now lives in shared constraints
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+  file_contains_i "$shared" "serena.*fall.back\|fall.back.*text-based" && local shared_found="true" || local shared_found="false"
+  assert_eq "R-014: shared constraints has Serena fallback instruction" "true" "$shared_found"
+
+  # Each Serena skill must reference the shared constraints
   for skill in $SERENA_SKILLS; do
     local skill_file="$REPO_DIR/skills/$skill/SKILL.md"
     if [ -f "$skill_file" ]; then
-      file_contains_i "$skill_file" "serena.*fall.back\|serena.*fallback\|fall.back.*serena\|fallback.*grep\|fall back.*text-based" && local found="true" || local found="false"
-      assert_eq "R-014: $skill has Serena fallback instruction" "true" "$found"
+      file_contains "$skill_file" "_shared/constraints.md" && local found="true" || local found="false"
+      assert_eq "R-014: $skill references shared constraints" "true" "$found"
     fi
   done
 }
@@ -328,11 +334,17 @@ test_r015() {
   echo ""
   echo "=== R-015: End-of-run Serena failure notification ==="
 
+  # End-of-run notification now lives in shared constraints
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+  file_contains_i "$shared" "serena was unavailable\|notify.*once.*end" && local shared_found="true" || local shared_found="false"
+  assert_eq "R-015: shared constraints has end-of-run notification" "true" "$shared_found"
+
+  # Each Serena skill must reference the shared constraints
   for skill in $SERENA_SKILLS; do
     local skill_file="$REPO_DIR/skills/$skill/SKILL.md"
     if [ -f "$skill_file" ]; then
-      file_contains_i "$skill_file" "serena was unavailable\|end.*of.*run.*notif\|notify.*once.*end\|single.*notification.*end" && local found="true" || local found="false"
-      assert_eq "R-015: $skill has end-of-run notification" "true" "$found"
+      file_contains "$skill_file" "_shared/constraints.md" && local found="true" || local found="false"
+      assert_eq "R-015: $skill references shared constraints" "true" "$found"
     fi
   done
 }
@@ -345,12 +357,17 @@ test_r016() {
   echo ""
   echo "=== R-016: Context7 failure fallback pattern ==="
 
+  # Context7 degradation instruction now lives in shared constraints
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+  file_contains_i "$shared" "context7.*unavailable\|context7.*fall.back.*web.*search" && local shared_found="true" || local shared_found="false"
+  assert_eq "R-016: shared constraints has Context7 fallback instruction" "true" "$shared_found"
+
+  # Each Context7 skill must reference the shared constraints
   for skill in $CONTEXT7_SKILLS; do
     local skill_file="$REPO_DIR/skills/$skill/SKILL.md"
     if [ -f "$skill_file" ]; then
-      # Context7 fallback to web search
-      file_contains_i "$skill_file" "context7.*fallback\|context7.*web.*search\|web.*search.*context7\|context7.*unavailable" && local found="true" || local found="false"
-      assert_eq "R-016: $skill has Context7 fallback instruction" "true" "$found"
+      file_contains "$skill_file" "_shared/constraints.md" && local found="true" || local found="false"
+      assert_eq "R-016: $skill references shared constraints" "true" "$found"
     fi
   done
 }
@@ -363,11 +380,17 @@ test_r017() {
   echo ""
   echo "=== R-017: MCP servers are optimizers, not dependencies ==="
 
+  # Optimizer-not-dependency instruction now lives in shared constraints
+  local shared="$REPO_DIR/skills/_shared/constraints.md"
+  file_contains_i "$shared" "optimizer.*not.*dependenc\|not.*dependenc.*MCP" && local shared_found="true" || local shared_found="false"
+  assert_eq "R-017: shared constraints has optimizer-not-dependency instruction" "true" "$shared_found"
+
+  # Each Serena skill must reference the shared constraints
   for skill in $SERENA_SKILLS; do
     local skill_file="$REPO_DIR/skills/$skill/SKILL.md"
     if [ -f "$skill_file" ]; then
-      file_contains_i "$skill_file" "MCP.*not.*dependenc\|serena.*not.*dependenc\|optimizer.*not.*dependenc\|not.*dependenc.*MCP\|MCP.*optimizer" && local found="true" || local found="false"
-      assert_eq "R-017: $skill treats MCP as optimizer not dependency" "true" "$found"
+      file_contains "$skill_file" "_shared/constraints.md" && local found="true" || local found="false"
+      assert_eq "R-017: $skill references shared constraints" "true" "$found"
     fi
   done
 }

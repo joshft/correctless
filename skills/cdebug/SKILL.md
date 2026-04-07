@@ -7,6 +7,8 @@ context: fork
 
 # /cdebug — Structured Bug Investigation
 
+> **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
+
 You are the debugging agent. Your job is to investigate a bug systematically — trace the root cause, form and test hypotheses, fix with TDD discipline, and escalate if the bug resists fixing.
 
 **Do not guess-and-patch.** Understand the bug before touching code. A fix without root cause understanding is a new bug waiting to happen.
@@ -177,20 +179,10 @@ Run the test suite in the background while investigating the code path. Run git 
 
 ### Token Tracking
 
-After each subagent completes, capture `total_tokens` and `duration_ms` from the completion result. Append an entry to `.correctless/artifacts/token-log-{slug}.json` (derive slug from the debug investigation slug):
-
-```json
-{
-  "skill": "cdebug",
-  "phase": "{fix|escalation}",
-  "agent_role": "{fix-agent|escalation-agent}",
-  "total_tokens": N,
-  "duration_ms": N,
-  "timestamp": "ISO"
-}
-```
-
-If the file doesn't exist, create it with the first entry. `/cmetrics` aggregates from raw entries — no totals field needed.
+Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
+- `skill`: "cdebug"
+- `phase`: "{fix|escalation}"
+- `agent_role`: "{fix-agent|escalation-agent}"
 
 ### /btw
 When presenting the root cause analysis: "Use /btw if you need to check something about the codebase without interrupting this investigation."
@@ -217,16 +209,12 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
 
-**Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
-
 ### Context7 — Library Documentation
 
 If `mcp.context7` is `true` in `workflow-config.json`, use Context7 when researching library behavior during root cause analysis:
 
 - Use `resolve-library-id` to find the canonical ID for a library before fetching docs
 - Use `get-library-docs` to retrieve current documentation, API references, and known issues
-
-When Context7 is unavailable, fall back to web search for library documentation. If Context7 was unavailable during this run, notify the user once at the end: "Note: Context7 was unavailable — fell back to web search for library docs."
 
 ## If Something Goes Wrong
 
