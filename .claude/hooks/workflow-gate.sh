@@ -47,7 +47,9 @@ case "$TOOL_NAME" in
     # Detect write/destructive patterns — tokenize to catch chained commands
     _has_write_pattern() {
       local cmd="$1"
-      # Check redirect operators (single combined grep)
+      # Check redirect operators (single combined grep).
+      # Known limitation: matches '>' inside quoted strings (e.g., echo "x > y").
+      # False positives are fail-safe — read-only commands get phase-gated, not bypassed.
       echo "$cmd" | grep -qE '>>|[0-9]*>' && return 0
       # Tokenize on shell metacharacters and check each token
       # shellcheck disable=SC2141
@@ -65,6 +67,9 @@ case "$TOOL_NAME" in
     if ! _has_write_pattern "$COMMAND"; then
       exit 0
     fi
+    # R-024: workflow-advance.sh invocations always allowed (after write detection
+    # to avoid bypassing the gate for commands that merely mention the script name)
+    [[ "$COMMAND" == *"workflow-advance.sh"* ]] && exit 0
     # Fall through to phase checking with the command as context
     ;;
   *)
@@ -76,16 +81,19 @@ esac
 # Read state
 # ---------------------------------------------------------------------------
 
-branch_slug() {
-  local branch
-  branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
-  [ -n "$branch" ] || { exit 0; }  # detached HEAD: no workflow, allow all
-  local slug raw_hash
-  slug="${branch//[^a-zA-Z0-9]/-}"
-  slug="${slug:0:80}"
-  raw_hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5))"
-  echo "${slug}-${raw_hash:0:6}"
-}
+# Source shared library for branch_slug() (ABS-001: single definition in lib.sh)
+_GATE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
+if [ -n "$_GATE_LIB_DIR" ] && [ -f "$_GATE_LIB_DIR/lib.sh" ]; then
+  # shellcheck source=../scripts/lib.sh
+  source "$_GATE_LIB_DIR/lib.sh"
+elif [ -f "$REPO_ROOT/scripts/lib.sh" ]; then
+  source "$REPO_ROOT/scripts/lib.sh"
+fi
+unset _GATE_LIB_DIR
+# If lib.sh wasn't found, branch_slug won't be available — can't determine state.
+# Deliberate fail-open: lib.sh absence means a broken installation. Exit 0 prevents
+# false blocking. Previously had an inline fallback; removed in hook-config-consolidation.
+command -v branch_slug >/dev/null 2>&1 || exit 0
 
 _gate_branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
 [ -n "$_gate_branch" ] || exit 0  # detached HEAD: no workflow, allow all
@@ -179,7 +187,10 @@ if [ ! -f "$STATE_FILE" ]; then
   exit 0
 fi
 
-# Bulk-read state file: phase + override fields in one jq call
+# Bulk-read state file: phase + override fields in one jq call.
+# Initialize before eval — jq failure on corrupt files produces empty output,
+# eval "" returns 0, so the || handler won't fire without pre-initialization.
+PHASE="" OVERRIDE_ACTIVE="false" OVERRIDE_REMAINING="0"
 eval "$(jq -r '
   @sh "PHASE=\(.phase // "")",
   @sh "OVERRIDE_ACTIVE=\(.override.active // false)",
@@ -188,6 +199,11 @@ eval "$(jq -r '
   echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
   exit 2
 }
+# Post-eval validation: if PHASE is still empty, jq produced no output (corrupt file)
+if [ -z "$PHASE" ]; then
+  echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
+  exit 2
+fi
 
 # Validate phase is a known value
 case "$PHASE" in
@@ -207,20 +223,15 @@ esac
 # Check for active override
 # ---------------------------------------------------------------------------
 
-if [ "$OVERRIDE_ACTIVE" = "true" ]; then
-  REMAINING="$OVERRIDE_REMAINING"
-  if [ "$REMAINING" -gt 0 ]; then
-    # Atomic read-modify-write: decrement and deactivate in a single jq call
-    trap 'rm -f "$STATE_FILE.$$"' EXIT
-    jq 'if .override.remaining_calls > 0 then
-          .override.remaining_calls -= 1
-          | if .override.remaining_calls <= 0 then .override.active = false else . end
-        else . end' "$STATE_FILE" > "$STATE_FILE.$$" \
-      && mv "$STATE_FILE.$$" "$STATE_FILE" \
-      || { rm -f "$STATE_FILE.$$"; exit 2; }
-    trap - EXIT
-    exit 0
-  fi
+if [ "$OVERRIDE_ACTIVE" = "true" ] && [ "$OVERRIDE_REMAINING" -gt 0 ]; then
+  # Decrement atomically under lock. The jq filter re-checks remaining_calls > 0
+  # inside the lock to handle the stale-read case (IBT-004).
+  locked_update_state "$STATE_FILE" \
+    'if .override.remaining_calls > 0 then
+       .override.remaining_calls -= 1
+       | if .override.remaining_calls <= 0 then .override.active = false else . end
+     else error("override_expired") end' || exit 2
+  exit 0
 fi
 
 # ---------------------------------------------------------------------------
@@ -267,6 +278,41 @@ done <<< "$TARGET_FILES"
 
 # No target files identified → allow
 if [ -z "$TARGET_FILES" ]; then
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Path exceptions — allow writes to workflow infrastructure paths
+# ---------------------------------------------------------------------------
+
+_check_path_exceptions() {
+  local tf="$1"
+  local rel="${tf#$REPO_ROOT/}"
+  rel="${rel#./}"
+  # Reject paths with traversal components to prevent allowlist bypass
+  case "$rel" in *../*) return 1 ;; esac
+
+  # R-023: .correctless/artifacts/ always writable (non-protected files)
+  case "$rel" in .correctless/artifacts/*) return 0 ;; esac
+
+  # R-022: spec phase allows .correctless/specs/ writes
+  if [ "$PHASE" = "spec" ]; then
+    case "$rel" in .correctless/specs/*) return 0 ;; esac
+  fi
+
+  return 1
+}
+
+# Check all target files for path exceptions
+_all_excepted=true
+while IFS= read -r _pe_file; do
+  [ -z "$_pe_file" ] && continue
+  if ! _check_path_exceptions "$_pe_file"; then
+    _all_excepted=false
+    break
+  fi
+done <<< "$TARGET_FILES"
+if [ "$_all_excepted" = "true" ]; then
   exit 0
 fi
 
@@ -364,60 +410,8 @@ if [ -z "$SOURCE_PATTERN" ] && [ -z "$TEST_PATTERN" ]; then
   exit 2
 fi
 
-classify_file() {
-  local file="$1"
-  # Normalize case — patterns are lowercase, filenames may not be (bash 4+ builtin)
-  file="${file,,}"
-  local bname
-  bname="${file##*/}"
-
-  # Check test patterns (pipe-delimited globs like "*.test.ts|*.spec.ts|tests/*.rs")
-  if [ -n "$TEST_PATTERN" ]; then
-    local oldifs="$IFS"
-    IFS='|'
-    for pat in $TEST_PATTERN; do
-      IFS="$oldifs"
-      # Patterns containing "/" need to match against the full relative path
-      case "$pat" in
-        */*)
-          case "$file" in
-            $pat) echo "test"; return ;;
-          esac
-          ;;
-        *)
-          case "$bname" in
-            $pat) echo "test"; return ;;
-          esac
-          ;;
-      esac
-    done
-    IFS="$oldifs"
-  fi
-
-  # Check source patterns
-  if [ -n "$SOURCE_PATTERN" ]; then
-    local oldifs="$IFS"
-    IFS='|'
-    for pat in $SOURCE_PATTERN; do
-      IFS="$oldifs"
-      case "$pat" in
-        */*)
-          case "$file" in
-            $pat) echo "source"; return ;;
-          esac
-          ;;
-        *)
-          case "$bname" in
-            $pat) echo "source"; return ;;
-          esac
-          ;;
-      esac
-    done
-    IFS="$oldifs"
-  fi
-
-  echo "other"
-}
+# classify_file() is provided by lib.sh (ABS-001: single definition)
+# Requires TEST_PATTERN and SOURCE_PATTERN globals set above.
 
 # For MultiEdit, find the most restrictive classification across all files.
 # Collect ALL source files (needed for per-file STUB:TDD checks in RED phase).
@@ -427,6 +421,9 @@ while IFS= read -r _check_file; do
   [ -z "$_check_file" ] && continue
   _rel="${_check_file#$REPO_ROOT/}"
   _rel="${_rel#./}"
+  # Skip files covered by path exceptions — prevents excepted files from
+  # poisoning MOST_RESTRICTIVE classification in MultiEdit mixed-path scenarios
+  _check_path_exceptions "$_check_file" && continue
   _cls="$(classify_file "$_rel")"
   if [ "$_cls" = "source" ]; then
     MOST_RESTRICTIVE="source"

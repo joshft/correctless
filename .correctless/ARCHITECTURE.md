@@ -36,11 +36,11 @@
 ## Abstractions
 
 ### ABS-001: Shared script library (scripts/lib.sh)
-- **What**: Shared bash utilities sourced by hooks and phase-transition scripts. Currently provides branch_slug().
+- **What**: Shared bash utilities sourced by hooks and phase-transition scripts. Provides path helpers (branch_slug, repo_root, config_file, artifacts_dir), file classification (classify_file, read_patterns, read_intensity), and state file locking (ABS-003).
 - **Invariant**: Functions in lib.sh have a single definition. Scripts must source lib.sh rather than duplicating functions locally.
-- **Enforced at**: scripts/lib.sh (source), hooks/workflow-advance.sh (consumer), scripts/antipattern-scan.sh (consumer)
-- **Violated when**: A hook or script defines branch_slug() or any other lib.sh function locally instead of sourcing the library
-- **Test**: R-019e in antipattern-scan tests (verifies workflow-advance.sh does not define branch_slug locally)
+- **Enforced at**: scripts/lib.sh (source), hooks/workflow-advance.sh (consumer), hooks/workflow-gate.sh (consumer), scripts/antipattern-scan.sh (consumer)
+- **Violated when**: A hook or script defines branch_slug(), classify_file(), _acquire_state_lock(), or any other lib.sh function locally instead of sourcing the library
+- **Test**: R-019e in antipattern-scan tests (verifies workflow-advance.sh does not define branch_slug locally), R-021 in test-lib-locking.sh (no flock dependency)
 
 ### ABS-002: Ephemeral in-context classification (shift-left review)
 - **What**: Historical findings are classified into pattern classes by the LLM during review. Classifications exist only in the review agent's context — not persisted, not stable across invocations, not accessible to other agents.
@@ -48,6 +48,13 @@
 - **Enforced at**: skills/creview/SKILL.md, skills/creview-spec/SKILL.md (R-003 instructions)
 - **Violated when**: A skill reads "pattern classes" from a prior review session, or assumes the same findings produce the same classifications
 - **Test**: None (enforced by documentation, not runtime)
+
+### ABS-003: State file locking (scripts/lib.sh)
+- **What**: mkdir-based advisory locking for state file read-modify-write operations. Uses PID-based stale detection and atomic mv-based lock breaking. Defense-in-depth — Claude Code likely serializes hook calls, but locking protects against manual CLI invocations.
+- **Invariant**: All state file modifications must go through write_state() (workflow-advance.sh) or locked_update_state() (lib.sh). No hook or script may modify state files via raw jq-to-file without holding the lock.
+- **Enforced at**: scripts/lib.sh (_acquire_state_lock, _release_state_lock, locked_update_state), hooks/workflow-advance.sh (write_state), hooks/workflow-gate.sh (override decrement)
+- **Violated when**: A hook or script modifies a workflow-state-*.json file without calling _acquire_state_lock first
+- **Test**: R-015d/e in test-lib-locking.sh (static analysis verifying write_state and gate reference locking functions), R-020d/e in test-gate-path-exceptions.sh
 
 ## Patterns
 

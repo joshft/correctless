@@ -125,3 +125,78 @@ read_intensity() {
   val="$(jq -r '.workflow.intensity // "standard"' "$cf" 2>/dev/null)" || val="standard"
   echo "$val"
 }
+
+# ---------------------------------------------------------------------------
+# State file locking — atomic mkdir + PID-based stale detection
+# ---------------------------------------------------------------------------
+# Uses mkdir for portability (no flock dependency — works on macOS).
+# Lock directory: ${state_file}.lock with a pid file inside.
+
+# _acquire_state_lock — acquire a lock for the given state file
+_acquire_state_lock() {
+  local state_file="$1"
+  [ -n "$state_file" ] || { echo "ERROR: _acquire_state_lock called with empty path" >&2; return 1; }
+  local lock_dir="${state_file}.lock"
+  local timeout="${CORRECTLESS_LOCK_TIMEOUT:-5}"
+  [[ "$timeout" =~ ^[0-9]+$ ]] || timeout=5
+  local deadline=$((SECONDS + timeout))
+
+  while true; do
+    if mkdir "$lock_dir" 2>/dev/null; then
+      echo "$$" > "$lock_dir/pid" || { rm -rf "$lock_dir"; return 1; }
+      return 0
+    fi
+
+    # Lock exists — check if holder is alive
+    if [ -f "$lock_dir/pid" ]; then
+      local holder_pid
+      holder_pid="$(cat "$lock_dir/pid" 2>/dev/null)" || holder_pid=""
+      if [ -n "$holder_pid" ] && ! kill -0 "$holder_pid" 2>/dev/null; then
+        # Holder is dead — atomically claim stale lock via mv.
+        # Only one process's mv succeeds; losers retry from the top.
+        local break_dir="${lock_dir}.breaking.$$"
+        if mv "$lock_dir" "$break_dir" 2>/dev/null; then
+          rm -rf "$break_dir"
+        fi
+        continue
+      fi
+    fi
+
+    # Holder is alive or PID unknown — wait and retry
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "ERROR: Lock acquisition timeout after ${timeout}s for $state_file" >&2
+      return 1
+    fi
+    sleep 0.1
+  done
+}
+
+# _release_state_lock — release the lock for the given state file
+_release_state_lock() {
+  local state_file="$1"
+  local lock_dir="${state_file}.lock"
+  # Only release if we are the holder — prevents EXIT trap from deleting another process's lock
+  if [ -f "$lock_dir/pid" ] && [ "$(cat "$lock_dir/pid" 2>/dev/null)" = "$$" ]; then
+    rm -rf "$lock_dir"
+  fi
+}
+
+# locked_update_state — read-modify-write a state file under lock
+locked_update_state() {
+  local state_file="$1"
+  local jq_filter="$2"
+  local rc=0
+
+  _acquire_state_lock "$state_file" || return 1
+
+  local tmp_file="${state_file}.$$.tmp"
+  if jq "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
+    mv "$tmp_file" "$state_file" || { rm -f "$tmp_file"; rc=1; }
+  else
+    rm -f "$tmp_file"
+    rc=1
+  fi
+
+  _release_state_lock "$state_file"
+  return "$rc"
+}
