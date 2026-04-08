@@ -26,6 +26,7 @@
     "auto_update_antipatterns": true,
     "git_trailers": false,
     "git_notes": false,
+    "intensity_calibration_mode": "passive",
     "compliance_checks": []
   },
   "mcp": {

@@ -42,6 +42,7 @@
     "drift_debt_age_threshold_days": 90,
     "git_trailers": false,
     "git_notes": false,
+    "intensity_calibration_mode": "passive",
     "compliance_checks": []
   },
   "mcp": {

@@ -52,6 +52,7 @@ jobs:
           bash tests/test-token-tracking-setup.sh
           bash tests/test-workflow-gate.sh
           bash tests/test-ci-hook-wiring.sh
+          bash tests/test-intensity-calibration.sh
 
       - name: Verify sync
         run: |

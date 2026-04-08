@@ -1,7 +1,7 @@
 ---
 name: cverify
 description: Verify implementation matches spec. Check rule coverage, undocumented dependencies, architecture compliance. Writes verification report and drift debt. Run after /ctdd completes.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/artifacts/*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/meta/intensity-calibration.json), Write(.correctless/artifacts/*)
 context: fork
 ---
 
@@ -232,6 +232,40 @@ git notes add -f -m "Verified by /cverify: {N}/{M} rules covered, {K} drift item
 ```
 
 Reviewers can see this with `git notes show HEAD` or `git log --notes`.
+
+### Write Calibration Entry
+
+Before advancing the workflow state, write a calibration entry to `.correctless/meta/intensity-calibration.json`. This records outcome data that `/cspec` reads to improve future intensity recommendations.
+
+If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`). If the file does not exist, create it with an empty `calibration_entries` array. Append a new entry to the `calibration_entries` array with this schema:
+
+```json
+{
+  "calibration_entries": [
+    {
+      "feature_slug": "task-slug from spec/workflow state",
+      "recommended_intensity": "standard|high|critical — read from the spec's Recommended-intensity metadata field (the system's pre-override suggestion)",
+      "actual_intensity": "standard|high|critical — read from the spec's Intensity metadata field (the approved post-override level)",
+      "actual_qa_rounds": "number — read from the workflow state file (qa_rounds field)",
+      "actual_findings_count": "number — count of BLOCKING findings only from qa-findings-{slug}.json (not MEDIUM/LOW)",
+      "actual_spec_updates": "number — read from the workflow state file (spec_updates field)",
+      "file_paths_touched": ["array of file paths from git diff against the default branch"],
+      "timestamp": "ISO 8601 string"
+    }
+  ]
+}
+```
+
+**Field sources:**
+- `recommended_intensity`: Read from the spec's `Recommended-intensity` metadata field. This is the pre-override system suggestion written by `/cspec`.
+- `actual_intensity`: Read from the spec's `Intensity` metadata field. This is the approved post-override level.
+- `actual_qa_rounds`: Read from the workflow state file (`qa_rounds` field).
+- `actual_spec_updates`: Read from the workflow state file (`spec_updates` field).
+- `actual_findings_count`: Count only BLOCKING findings from `qa-findings-{slug}.json`. MEDIUM and LOW findings indicate thorough QA, not insufficient intensity.
+- `file_paths_touched`: Collect from `git diff {default_branch}...HEAD --name-only`.
+- `timestamp`: Current ISO 8601 timestamp.
+
+Write this calibration entry before advancing the workflow state — calibration data must be persisted even if the advance step fails.
 
 Advance the state machine:
 ```bash

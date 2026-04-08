@@ -63,6 +63,13 @@
 - **Violated when**: A new hook is added to hooks/ without both metadata headers, or a header value is malformed
 - **Test**: INV-002 in test-ci-hook-wiring.sh (header format validation), INV-004 (register_hooks reads headers)
 
+### ABS-005: Cross-skill calibration data (.correctless/meta/)
+- **What**: Outcome data written by one skill (cverify) and read by another (cspec) across sessions. Lives in `.correctless/meta/intensity-calibration.json`, not in workflow state files (which are per-branch and ephemeral).
+- **Invariant**: cverify is the sole writer. cspec is read-only — it never writes, modifies, or deletes calibration entries. Recency window (50 entries) caps read size.
+- **Enforced at**: skills/cverify/SKILL.md (write instructions), skills/cspec/SKILL.md (read-only instructions), tests/test-intensity-calibration.sh (INV-007, PRH-001)
+- **Violated when**: A skill other than cverify writes to intensity-calibration.json, or calibration data appears in workflow state files
+- **Test**: grep cspec SKILL.md for write/append/create referencing calibration (must find none); grep workflow-advance.sh for calibration fields (must find none)
+
 ## Patterns
 
 ### PAT-001: PreToolUse hook conventions
