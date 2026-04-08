@@ -79,7 +79,7 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 - Every PostToolUse hook must: (1) NO `set -euo pipefail` (fail-open, not fail-closed), (2) `command -v jq` with `exit 0` if missing (NOT exit 2), (3) bulk-parse stdin with `eval` + `jq -r @sh`, (4) fast-path `exit 0` for non-relevant tools BEFORE any I/O, (5) guard each operation with `|| exit 0`, (6) ALWAYS exit 0 — advisory, never gating. Contrast with PAT-001 (PreToolUse: fail-closed, exit 2 to block). See PAT-005 in .correctless/ARCHITECTURE.md.
 - Source: /cdocs after token-tracking
 
-### 2026-04-05 — Audit pattern: Hook allowlist/extension drift
-- Recurs across 3 audit runs (QA 2026-04-03, Hacker 2026-04-04, QA 2026-04-05) — always check all hooks when adding commands or extensions to any one hook
-- Write-command lists (_has_write_pattern), file extension regexes (get_target_file), and case normalization must stay synchronized across workflow-gate.sh, sensitive-file-guard.sh, and audit-trail.sh
-- Source: /caudit qa
+### 2026-04-05 — Audit pattern: Hook allowlist/extension drift (RESOLVED)
+- **Structurally resolved** by feature/hook-sync-enforcement (2026-04-08): `_has_write_pattern()` and `get_target_file()` extracted into scripts/lib.sh (ABS-001). All consuming hooks source the shared functions — drift is structurally impossible.
+- Original issue: write-command lists and file extension regexes duplicated across workflow-gate.sh, sensitive-file-guard.sh, and audit-trail.sh. Caught by 3 consecutive audits.
+- Source: /caudit qa, resolved by /cdocs after hook-sync-enforcement

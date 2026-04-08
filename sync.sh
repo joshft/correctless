@@ -47,8 +47,9 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 # --- Hooks ---
-for hook in workflow-gate.sh workflow-advance.sh statusline.sh audit-trail.sh sensitive-file-guard.sh token-tracking.sh; do
-  sync_file "hooks/$hook" "correctless/hooks/$hook"
+for hook in hooks/*.sh; do
+  [ -f "$hook" ] || continue
+  sync_file "$hook" "correctless/hooks/$(basename "$hook")"
 done
 [ "$CHECK_ONLY" = false ] && info "Hooks → correctless/"
 
@@ -70,8 +71,9 @@ sync_dir "templates/invariants" "correctless/templates/invariants"
 if [ "$CHECK_ONLY" = false ]; then
   mkdir -p "correctless/scripts"
 fi
-for script in lib.sh antipattern-scan.sh; do
-  sync_file "scripts/$script" "correctless/scripts/$script"
+for script in scripts/*.sh; do
+  [ -f "$script" ] || continue
+  sync_file "$script" "correctless/scripts/$(basename "$script")"
 done
 [ "$CHECK_ONLY" = false ] && info "Scripts → correctless/"
 
@@ -96,22 +98,32 @@ done
 [ "$CHECK_ONLY" = false ] && info "All skills (26) → correctless/"
 
 if [ "$CHECK_ONLY" = true ]; then
-  # Check for stale skill directories in correctless/skills/ not present in source
+  # Skills: check for stale directories and count mismatch
   if [ -d "correctless/skills" ]; then
     for dist_skill_dir in correctless/skills/*/; do
       [ -d "$dist_skill_dir" ] || continue
-      local_skill="$(basename "$dist_skill_dir")"
-      if [ ! -d "skills/$local_skill" ]; then
+      if [ ! -d "skills/$(basename "$dist_skill_dir")" ]; then
         DIRTY=true
       fi
     done
-    # Check skill count matches
     src_count="$(ls -d skills/*/ 2>/dev/null | wc -l)"
     dist_count="$(ls -d correctless/skills/*/ 2>/dev/null | wc -l)"
     if [ "$src_count" != "$dist_count" ]; then
       DIRTY=true
     fi
   fi
+
+  # Hooks and scripts: check for stale .sh files
+  for dir in hooks scripts; do
+    if [ -d "correctless/$dir" ]; then
+      for dist_file in "correctless/$dir"/*.sh; do
+        [ -f "$dist_file" ] || continue
+        if [ ! -f "$dir/$(basename "$dist_file")" ]; then
+          DIRTY=true
+        fi
+      done
+    fi
+  done
 
   # Check for stale top-level items in correctless/ not present in source
   for dist_item in correctless/*/; do

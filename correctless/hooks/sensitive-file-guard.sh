@@ -58,46 +58,36 @@ case "$TOOL_NAME" in
 esac
 
 # ============================================
-# STEP 4: For Bash, detect write patterns (INV-002)
+# STEP 4: Source shared library and detect write patterns (INV-002, ABS-001)
 # ============================================
+# QA-002: lib.sh is required for Bash (fail-closed: write-pattern detection needed).
+# For non-Bash tools (Edit/Write/MultiEdit), lib.sh is optional — config_file
+# has its own fallback, and these tools don't need write-pattern detection.
 
+_source_lib_sh() {
+  local _LIB_DIR
+  _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
+  if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
+    # shellcheck source=../scripts/lib.sh
+    source "$_LIB_DIR/lib.sh"
+  elif [ -f "scripts/lib.sh" ]; then
+    source "scripts/lib.sh"
+  else
+    return 1
+  fi
+}
+
+# For Bash, skip non-write commands (INV-003)
 if [ "$TOOL_NAME" = "Bash" ]; then
   COMMAND="$TOOL_INPUT_COMMAND"
-
-  _has_write_pattern() {
-    local cmd="$1"
-    # Check redirect operators (handle > at start of command too — QA-003)
-    echo "$cmd" | grep -qE '>>|[0-9]*>' && return 0
-    # Tokenize on shell metacharacters and check each token
-    # shellcheck disable=SC2141
-    local IFS=$' \t\n;|&()`'
-    for tok in $cmd; do
-      case "$tok" in
-        cp|mv|tee|install|rm|rmdir|unlink|dd|rsync|patch|truncate|shred|curl|wget|ln|python|python3|node|ruby) return 0 ;;
-        sed) [[ "$cmd" =~ sed[[:space:]]+-i ]] && return 0 ;;
-        perl) [[ "$cmd" =~ perl[[:space:]]+-i ]] && return 0 ;;
-      esac
-    done
-    return 1
-  }
-
+  _source_lib_sh || { echo "BLOCKED: lib.sh not found — required for write detection" >&2; exit 2; }
   if ! _has_write_pattern "$COMMAND"; then
     exit 0
   fi
+else
+  # Non-Bash write tools: source lib.sh for config_file() but don't block if missing
+  _source_lib_sh || true
 fi
-
-# ============================================
-# STEP 4b: Source shared library (after fast-path bails)
-# ============================================
-
-_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
-if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
-  # shellcheck source=../scripts/lib.sh
-  source "$_LIB_DIR/lib.sh"
-elif [ -f "scripts/lib.sh" ]; then
-  source "scripts/lib.sh"
-fi
-unset _LIB_DIR
 
 # ============================================
 # STEP 5: Collect file targets to check

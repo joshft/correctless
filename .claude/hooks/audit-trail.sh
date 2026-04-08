@@ -21,11 +21,24 @@ eval "$(echo "$INPUT" | jq -r '
 # Fast-path bail: no tool name = malformed input
 [ -n "$TOOL_NAME" ] || exit 0
 
+# Source shared library for branch_slug() and get_target_file() (ABS-001: single definition)
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
+if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
+  # shellcheck source=../scripts/lib.sh
+  source "$_LIB_DIR/lib.sh"
+elif [ -f "scripts/lib.sh" ]; then
+  source "scripts/lib.sh"
+fi
+unset _LIB_DIR
+
 # Extract target file(s) from pre-parsed fields
 FILES=""
 case "$TOOL_NAME" in
   Bash)
-    FILES="$(echo "$TOOL_INPUT_COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)' | head -1)" || true
+    # Use shared get_target_file from lib.sh (INV-004, INV-005)
+    if command -v get_target_file >/dev/null 2>&1; then
+      FILES="$(get_target_file "$TOOL_INPUT_COMMAND" | head -1)" || true
+    fi
     ;;
   MultiEdit)
     FILES="$TOOL_INPUT_EDITS"
@@ -37,16 +50,6 @@ esac
 
 # Fast-path bail: no files identified = nothing to audit
 [ -n "$FILES" ] || exit 0
-
-# Source shared library for branch_slug() (ABS-001: single definition)
-_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
-if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
-  # shellcheck source=../scripts/lib.sh
-  source "$_LIB_DIR/lib.sh"
-elif [ -f "scripts/lib.sh" ]; then
-  source "scripts/lib.sh"
-fi
-unset _LIB_DIR
 
 # Compute state file path using shared branch_slug (ABS-001: single definition in lib.sh)
 if command -v branch_slug >/dev/null 2>&1; then

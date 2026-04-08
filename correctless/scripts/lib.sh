@@ -200,3 +200,40 @@ locked_update_state() {
   _release_state_lock "$state_file"
   return "$rc"
 }
+
+# ---------------------------------------------------------------------------
+# _has_write_pattern — detect write/destructive shell command patterns
+# ---------------------------------------------------------------------------
+# Returns 0 if the command contains a write pattern, 1 otherwise.
+# Union of all write-command tokens from workflow-gate.sh and
+# sensitive-file-guard.sh: redirect regex, token list, sed -i, perl -i.
+
+_has_write_pattern() {
+  local cmd="$1"
+  # Check redirect operators (single combined grep).
+  # Known limitation: matches '>' inside quoted strings (e.g., echo "x > y").
+  # False positives are fail-safe — read-only commands get phase-gated, not bypassed.
+  echo "$cmd" | grep -qE '>>|[0-9]*>' && return 0
+  # Tokenize on shell metacharacters and check each token
+  # shellcheck disable=SC2141
+  local IFS=$' \t\n;|&()`'
+  for tok in $cmd; do
+    case "$tok" in
+      cp|mv|tee|install|rm|rmdir|unlink|dd|curl|wget|rsync|patch|truncate|shred|ln|python|python3|node|ruby) return 0 ;;
+      sed) [[ "$cmd" =~ sed[[:space:]]+-i ]] && return 0 ;;
+      perl) [[ "$cmd" =~ perl[[:space:]]+-i ]] && return 0 ;;
+    esac
+  done
+  return 1
+}
+
+# ---------------------------------------------------------------------------
+# get_target_file — extract file paths with known extensions from a command
+# ---------------------------------------------------------------------------
+# Wraps the grep -oE call with the 25-extension regex pattern.
+# Usage: FILES="$(get_target_file "$COMMAND")"
+
+get_target_file() {
+  local cmd="$1"
+  echo "$cmd" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)'
+}
