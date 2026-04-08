@@ -22,6 +22,21 @@ CONFIG_FILE="$REPO_ROOT/.correctless/config/workflow-config.json"
 ARTIFACTS_DIR="$REPO_ROOT/.correctless/artifacts"
 TEST_EDIT_LOG="$ARTIFACTS_DIR/tdd-test-edits.log"
 
+# Source shared library (idempotent — safe to call from multiple code paths)
+_source_lib() {
+  command -v branch_slug >/dev/null 2>&1 && return 0
+  local lib_dir
+  lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
+  if [ -n "$lib_dir" ] && [ -f "$lib_dir/lib.sh" ]; then
+    # shellcheck source=../scripts/lib.sh
+    source "$lib_dir/lib.sh"
+  elif [ -f "$REPO_ROOT/scripts/lib.sh" ]; then
+    source "$REPO_ROOT/scripts/lib.sh"
+  else
+    return 1
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Read hook input (single jq parse for all fields)
 # ---------------------------------------------------------------------------
@@ -44,26 +59,7 @@ case "$TOOL_NAME" in
   Bash)
     if [ -z "$TOOL_INPUT_COMMAND" ]; then exit 0; fi
     COMMAND="$TOOL_INPUT_COMMAND"
-    # Detect write/destructive patterns — tokenize to catch chained commands
-    _has_write_pattern() {
-      local cmd="$1"
-      # Check redirect operators (single combined grep).
-      # Known limitation: matches '>' inside quoted strings (e.g., echo "x > y").
-      # False positives are fail-safe — read-only commands get phase-gated, not bypassed.
-      echo "$cmd" | grep -qE '>>|[0-9]*>' && return 0
-      # Tokenize on shell metacharacters and check each token
-      # shellcheck disable=SC2141
-      local IFS=$' \t\n;|&()`'
-      for tok in $cmd; do
-        case "$tok" in
-          cp|mv|tee|install|rm|rmdir|unlink|dd|curl|wget|rsync|patch|truncate|shred|ln) return 0 ;;
-          sed) [[ "$cmd" =~ sed[[:space:]]+-i ]] && return 0 ;;
-          perl) [[ "$cmd" =~ perl[[:space:]]+-i ]] && return 0 ;;
-          python|python3|node|ruby) return 0 ;;
-        esac
-      done
-      return 1
-    }
+    _source_lib || { echo "BLOCKED: lib.sh not found — required for write detection" >&2; exit 2; }
     if ! _has_write_pattern "$COMMAND"; then
       exit 0
     fi
@@ -81,19 +77,9 @@ esac
 # Read state
 # ---------------------------------------------------------------------------
 
-# Source shared library for branch_slug() (ABS-001: single definition in lib.sh)
-_GATE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
-if [ -n "$_GATE_LIB_DIR" ] && [ -f "$_GATE_LIB_DIR/lib.sh" ]; then
-  # shellcheck source=../scripts/lib.sh
-  source "$_GATE_LIB_DIR/lib.sh"
-elif [ -f "$REPO_ROOT/scripts/lib.sh" ]; then
-  source "$REPO_ROOT/scripts/lib.sh"
-fi
-unset _GATE_LIB_DIR
-# If lib.sh wasn't found, branch_slug won't be available — can't determine state.
 # Deliberate fail-open: lib.sh absence means a broken installation. Exit 0 prevents
 # false blocking. Previously had an inline fallback; removed in hook-config-consolidation.
-command -v branch_slug >/dev/null 2>&1 || exit 0
+_source_lib || exit 0
 
 _gate_branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
 [ -n "$_gate_branch" ] || exit 0  # detached HEAD: no workflow, allow all
@@ -159,7 +145,7 @@ if [ ! -f "$STATE_FILE" ]; then
       done <<< "$TOOL_INPUT_EDITS"
     fi
     if [ -z "$TARGET_FILE_CHECK" ] && [ -z "$TOOL_INPUT_EDITS" ] && [ "$TOOL_NAME" = "Bash" ] && [ -n "$TOOL_INPUT_COMMAND" ]; then
-      TARGET_FILE_CHECK="$(echo "$TOOL_INPUT_COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)' | head -1)" || true
+      TARGET_FILE_CHECK="$(get_target_file "$TOOL_INPUT_COMMAND" | head -1)" || true
       if [ -n "$TARGET_FILE_CHECK" ]; then
         SOURCE_PAT="$FC_SOURCE_PAT"
         if [ -n "$SOURCE_PAT" ]; then
@@ -230,7 +216,7 @@ if [ "$OVERRIDE_ACTIVE" = "true" ] && [ "$OVERRIDE_REMAINING" -gt 0 ]; then
     'if .override.remaining_calls > 0 then
        .override.remaining_calls -= 1
        | if .override.remaining_calls <= 0 then .override.active = false else . end
-     else error("override_expired") end' || exit 2
+     else error("override_expired") end' || { echo "BLOCKED: Failed to update override counter. Run: hooks/workflow-advance.sh status" >&2; exit 2; }
   exit 0
 fi
 
@@ -238,10 +224,11 @@ fi
 # Block direct edits to state files
 # ---------------------------------------------------------------------------
 
-get_target_file() {
+_gate_get_target_files() {
   if [ "$TOOL_NAME" = "Bash" ]; then
-    # Extract file targets from shell command — includes all common extensions
-    echo "$COMMAND" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)' | head -5 || true
+    # Extract file targets from shell command via shared function (INV-004, INV-005)
+    # Return up to 5 files for multi-file commands (QA-001: original used head -5)
+    get_target_file "$COMMAND" | head -5 || true
     return
   fi
   # Use pre-parsed fields from bulk jq at top
@@ -253,7 +240,7 @@ get_target_file() {
   fi
 }
 
-TARGET_FILES="$(get_target_file)"
+TARGET_FILES="$(_gate_get_target_files)"
 
 # Check each target file for protected files (state files, config during TDD)
 check_protected_file() {
