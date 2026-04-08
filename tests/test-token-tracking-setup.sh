@@ -286,10 +286,10 @@ EOF
   audit_count="$(echo "$settings" | jq '[.hooks.PostToolUse[] | select(.hooks[]?.command | test("audit-trail"))] | length' 2>/dev/null || echo "0")"
   assert_eq "R-012c: exactly 1 audit-trail entry (not duplicated)" "1" "$audit_count"
 
-  # Total PostToolUse entries should be exactly 2 (audit-trail + token-tracking)
+  # Total PostToolUse entries should be exactly 3 (audit-trail + token-tracking + auto-format)
   local total_post
   total_post="$(echo "$settings" | jq '.hooks.PostToolUse | length' 2>/dev/null || echo "0")"
-  assert_eq "R-012d: total PostToolUse entries is 2" "2" "$total_post"
+  assert_eq "R-012d: total PostToolUse entries is 3" "3" "$total_post"
 }
 
 # ============================================================================

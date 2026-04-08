@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2254  # Unquoted $pat in case is intentional — we need glob matching
+# HOOK_TYPE: PostToolUse
+# HOOK_MATCHER: Edit|Write|MultiEdit|CreateFile|Bash
 # Correctless — PostToolUse audit trail + adherence feedback
 # Records every file modification with workflow phase context.
 # Lite mode: phase-violation alerts to stderr

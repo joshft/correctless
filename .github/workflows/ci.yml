@@ -19,6 +19,11 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.email "ci@correctless.dev"
+          git config --global user.name "CI"
+
       - name: Run tests
         run: |
           bash tests/test.sh
@@ -27,6 +32,26 @@ jobs:
           bash tests/test-qol.sh
           bash tests/test-decisions.sh
           bash tests/test-statusline.sh
+          bash tests/test-consolidation.sh
+          bash tests/test-crelease.sh
+          bash tests/test-calm-resets.sh
+          bash tests/test-dynamic-rigor.sh
+          bash tests/test-intensity-detection.sh
+          bash tests/test-wire-intensity-creview.sh
+          bash tests/test-wire-intensity-pipeline.sh
+          bash tests/test-cexplain.sh
+          bash tests/test-auto-format.sh
+          bash tests/test-sensitive-file-guard.sh
+          bash tests/test-antipattern-scan.sh
+          bash tests/test-lib.sh
+          bash tests/test-lib-locking.sh
+          bash tests/test-gate-path-exceptions.sh
+          bash tests/test-hook-sync.sh
+          bash tests/test-shift-left-review.sh
+          bash tests/test-token-tracking.sh
+          bash tests/test-token-tracking-setup.sh
+          bash tests/test-workflow-gate.sh
+          bash tests/test-ci-hook-wiring.sh
 
       - name: Verify sync
         run: |
@@ -43,5 +68,5 @@ jobs:
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
         with:
           scandir: ./hooks
-          additional_files: sync.sh setup
+          additional_files: sync.sh setup scripts/lib.sh scripts/antipattern-scan.sh
           severity: warning

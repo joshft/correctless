@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HOOK_TYPE: PostToolUse
+# HOOK_MATCHER: Agent
 # Correctless — PostToolUse hook for Agent tool token tracking
 # Appends one JSONL entry per Agent completion to token-log-{branch-slug}.jsonl
 #
@@ -20,11 +22,12 @@
 # POSIX-quoted strings that neutralize shell metacharacters.
 
 # ============================================
-# Parse stdin (1 of 2)
+# Parse stdin JSON (single jq bulk call)
 # ============================================
 
 INPUT="$(cat)" || exit 0
 
+# Fail-open: jq required for JSON parsing (PAT-005: PostToolUse exits 0, never blocks)
 command -v jq >/dev/null 2>&1 || exit 0; eval "$(echo "$INPUT" | jq -r '
   @sh "TOOL_NAME=\(.tool_name // "")",
   @sh "INPUT_TOKENS=\(.tool_response.usage.input_tokens // 0)",
@@ -78,7 +81,7 @@ TIMESTAMP="$(date -u +%FT%TZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)" || tru
 
 mkdir -p "$_artifacts" 2>/dev/null || exit 0
 
-# Read state file + construct JSON output (2 of 2)
+# Read state file and construct JSONL entry
 (cat "$STATE_FILE" 2>/dev/null || echo '{}') | jq -c \
   --arg ts "$TIMESTAMP" \
   --arg branch "$_slug" \

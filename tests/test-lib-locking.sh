@@ -151,36 +151,19 @@ test_write_state_lockfile() {
   # Write new state using the function
   local new_state='{"phase": "tdd-qa", "override": {"active": false, "remaining_calls": 0}}'
 
-  # To observe the lock DURING the write, we use a background approach:
-  # Fork a subshell that polls for the lock directory while write_state runs.
+  # Observe the lock deterministically: acquire, check it exists, then release.
+  # No background polling needed — we hold the lock and inspect.
   local lock_seen="no"
-  local poll_pid
 
-  # Start a background poller that checks for the lock dir
-  (
-    for _i in $(seq 1 100); do
-      if [ -d "$LOCK_DIR" ]; then
-        echo "lock_seen" > "$TEST_DIR/.lock_observed"
-        break
-      fi
-      sleep 0.01
-    done
-  ) &
-  poll_pid=$!
-
-  # Run locking functions to test the lock contract directly
   _acquire_state_lock "$STATE_FILE" 2>/dev/null && {
+    # Lock is held — verify the lock directory exists NOW
+    if [ -d "$LOCK_DIR" ]; then
+      lock_seen="yes"
+    fi
     echo "$new_state" | jq '.' > "${STATE_FILE}.$$" && mv "${STATE_FILE}.$$" "$STATE_FILE"
     _release_state_lock "$STATE_FILE"
   }
 
-  # Wait for poller
-  wait "$poll_pid" 2>/dev/null || true
-
-  # Check if the lock was observed during the write
-  if [ -f "$TEST_DIR/.lock_observed" ]; then
-    lock_seen="yes"
-  fi
   assert_eq "R-015a: lockfile existed during write" "yes" "$lock_seen"
 
   # After write completes, the lock must not exist

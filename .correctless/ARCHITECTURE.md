@@ -56,6 +56,13 @@
 - **Violated when**: A hook or script modifies a workflow-state-*.json file without calling _acquire_state_lock first
 - **Test**: R-015d/e in test-lib-locking.sh (static analysis verifying write_state and gate reference locking functions), R-020d/e in test-gate-path-exceptions.sh
 
+### ABS-004: Hook metadata headers for auto-registration
+- **What**: Comment-based metadata headers (`# HOOK_TYPE:` and `# HOOK_MATCHER:`) in the first 10 lines of hook files. Setup's `register_hooks()` reads these headers to auto-generate settings.json entries. Files without headers are installed but not registered (INV-006).
+- **Invariant**: Every PreToolUse/PostToolUse hook in `hooks/` must have both headers. HOOK_TYPE is exactly `PreToolUse` or `PostToolUse`. HOOK_MATCHER is a pipe-separated tool list. Timeout is derived from HOOK_TYPE (PreToolUse=5000ms, PostToolUse=1000ms).
+- **Enforced at**: setup (register_hooks reads headers), hooks/*.sh (headers present)
+- **Violated when**: A new hook is added to hooks/ without both metadata headers, or a header value is malformed
+- **Test**: INV-002 in test-ci-hook-wiring.sh (header format validation), INV-004 (register_hooks reads headers)
+
 ## Patterns
 
 ### PAT-001: PreToolUse hook conventions
@@ -87,6 +94,12 @@
 - **Rule**: Every PostToolUse hook must: (1) NO `set -euo pipefail` (would cause early abort, violating fail-open), (2) `command -v jq` check with `exit 0` if missing (fail-open, NOT exit 2 like PreToolUse), (3) bulk-parse stdin with single `eval` + `jq -r @sh`, (4) fast-path `exit 0` for non-relevant tools BEFORE any I/O, (5) guard each operation with `|| exit 0` or `|| true`, (6) must ALWAYS exit 0 — PostToolUse hooks are advisory, never gating
 - **Violated when**: A PostToolUse hook uses `set -e`, exits non-zero, or fails to guard an operation with `|| exit 0`
 - **Test**: R-009 in token-tracking tests (6 static assertions), R-010 (5 fail-open runtime assertions)
+
+### PAT-006: Hook self-description via metadata headers
+- **Pattern**: Compile-time hook metadata convention
+- **Rule**: Every hook in `hooks/` that should be auto-registered as a PreToolUse or PostToolUse hook must contain `# HOOK_TYPE: {PreToolUse|PostToolUse}` and `# HOOK_MATCHER: {pipe-separated tool list}` in the first 10 lines. Files without these headers (workflow-advance.sh, statusline.sh) are excluded from auto-registration and handled as hardcoded special cases. Adding a new hook requires only: (1) create the .sh file with headers, (2) no setup code change needed.
+- **Violated when**: A new hook is added to hooks/ without metadata headers and is silently not registered, or an existing hook's HOOK_MATCHER drifts from the desired matcher
+- **Test**: INV-002 in test-ci-hook-wiring.sh (format validation), QA-002 (matcher drift detection)
 
 ## Environment Assumptions
 

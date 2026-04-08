@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2254
+# HOOK_TYPE: PreToolUse
+# HOOK_MATCHER: Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash
 # Correctless — PreToolUse sensitive file protection hook
 # Blocks the agent from modifying sensitive files (.env, credentials, keys, etc.)
 # Independent of workflow state — no overrides, no phase exceptions.
@@ -409,7 +411,6 @@ while IFS= read -r target; do
   matched_pattern="$(_check_file_against_patterns "$target")" || true
 
   if [ -n "$matched_pattern" ]; then
-    # STEP 8: Exit 2 with BLOCKED message (INV-008)
     echo "BLOCKED [sensitive-file]: $target matches protected pattern '$matched_pattern'. Edit sensitive files manually." >&2
     exit 2
   fi

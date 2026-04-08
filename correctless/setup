@@ -247,13 +247,16 @@ install_hooks() {
   local hook_dest="$REPO_ROOT/.correctless/hooks"
   mkdir -p "$hook_dest"
 
-  # Only install hooks that don't already exist (preserves migrated hooks)
-  for hook in workflow-gate.sh workflow-advance.sh statusline.sh audit-trail.sh token-tracking.sh sensitive-file-guard.sh; do
-    if [ ! -f "$hook_dest/$hook" ] && [ -f "$SCRIPT_DIR/hooks/$hook" ]; then
-      cp "$SCRIPT_DIR/hooks/$hook" "$hook_dest/$hook"
+  # Auto-discover hooks via glob — adding a new .sh file to hooks/ requires no code change
+  for hook in "$SCRIPT_DIR"/hooks/*.sh; do
+    [ -f "$hook" ] || continue
+    local basename_hook
+    basename_hook="$(basename "$hook")"
+    if [ ! -f "$hook_dest/$basename_hook" ]; then
+      cp "$hook" "$hook_dest/$basename_hook"
     fi
+    chmod +x "$hook_dest/$basename_hook" 2>/dev/null || true
   done
-  chmod +x "$hook_dest/workflow-gate.sh" "$hook_dest/workflow-advance.sh" "$hook_dest/statusline.sh" "$hook_dest/audit-trail.sh" "$hook_dest/token-tracking.sh" "$hook_dest/sensitive-file-guard.sh" 2>/dev/null || true
   ok "Installed hooks to .correctless/hooks/"
 
   # Install phase-transition scripts (sourced by hooks and invoked by skills)
@@ -275,151 +278,221 @@ install_hooks() {
 
 register_hooks() {
   local settings="$REPO_ROOT/.claude/settings.json"
-  local hook_path=".correctless/hooks/workflow-gate.sh"
   local advance_path=".correctless/hooks/workflow-advance.sh"
+  local statusline_path=".correctless/hooks/statusline.sh"
 
   mkdir -p "$(dirname "$settings")"
 
-  local statusline_path=".correctless/hooks/statusline.sh"
-  local audit_path=".correctless/hooks/audit-trail.sh"
-  local token_tracking_path=".correctless/hooks/token-tracking.sh"
+  if ! command -v jq >/dev/null 2>&1; then
+    warn "Cannot auto-register hooks (jq not found). Add manually to $settings"
+    return
+  fi
+
+  # ============================================
+  # Auto-discover hooks via metadata headers (INV-004)
+  # Reads HOOK_TYPE and HOOK_MATCHER from each hook's first 10 lines.
+  # Files without HOOK_TYPE are skipped (INV-006).
+  # Timeout convention: PreToolUse=5000ms, PostToolUse=1000ms.
+  # ============================================
+
+  # Build arrays of hook entries from metadata headers
+  local -a pre_hooks=()
+  local -a post_hooks=()
+
+  for hook in "$SCRIPT_DIR"/hooks/*.sh; do
+    [ -f "$hook" ] || continue
+    local basename_hook
+    basename_hook="$(basename "$hook")"
+    local hook_cmd=".correctless/hooks/$basename_hook"
+
+    # Read metadata from first 10 lines
+    local first10
+    first10="$(head -10 "$hook")"
+
+    local hook_type hook_matcher
+    hook_type="$(echo "$first10" | sed -n 's/^# HOOK_TYPE:[[:space:]]*\([^ ]*\).*/\1/p' | head -1)"
+    hook_matcher="$(echo "$first10" | sed -n '/^# HOOK_MATCHER:/{s/^# HOOK_MATCHER:[[:space:]]*//;s/[[:space:]]*$//;p;}' | head -1 | tr -d ' ')"
+
+    # Skip files without HOOK_TYPE header (INV-006)
+    [ -n "$hook_type" ] || continue
+    [ -n "$hook_matcher" ] || continue
+
+    case "$hook_type" in
+      PreToolUse)
+        pre_hooks+=("$hook_cmd|$hook_matcher")
+        ;;
+      PostToolUse)
+        post_hooks+=("$hook_cmd|$hook_matcher")
+        ;;
+    esac
+  done
 
   if [ ! -f "$settings" ]; then
-    cat > "$settings" <<HEOF
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$hook_path",
-            "timeout_ms": 5000
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit|CreateFile|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$audit_path",
-            "timeout_ms": 1000
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$token_tracking_path",
-            "timeout_ms": 1000
-          }
-        ]
-      }
-    ]
-  },
-  "statusLine": {
-    "command": "$statusline_path"
-  },
-  "permissions": {
-    "allow": [
-      "Bash($advance_path *)"
-    ]
-  }
-}
-HEOF
+    # ============================================
+    # Fresh install — generate settings.json from discovered hooks
+    # ============================================
+
+    # Build PreToolUse JSON array
+    local pre_json="[]"
+    for entry in "${pre_hooks[@]}"; do
+      local cmd="${entry%%|*}"
+      local matcher="${entry#*|}"
+      pre_json="$(echo "$pre_json" | jq --arg cmd "$cmd" --arg matcher "$matcher" \
+        '. + [{ matcher: $matcher, hooks: [{ type: "command", command: $cmd, timeout_ms: 5000 }] }]')"
+    done
+
+    # Build PostToolUse JSON array
+    local post_json="[]"
+    for entry in "${post_hooks[@]}"; do
+      local cmd="${entry%%|*}"
+      local matcher="${entry#*|}"
+      post_json="$(echo "$post_json" | jq --arg cmd "$cmd" --arg matcher "$matcher" \
+        '. + [{ matcher: $matcher, hooks: [{ type: "command", command: $cmd, timeout_ms: 1000 }] }]')"
+    done
+
+    # Assemble the full settings.json
+    jq -n --argjson pre "$pre_json" --argjson post "$post_json" \
+      --arg sl "$statusline_path" --arg adv "$advance_path" \
+      '{
+        hooks: { PreToolUse: $pre, PostToolUse: $post },
+        statusLine: { command: $sl },
+        permissions: { allow: [ "Bash(\($adv) *)" ] }
+      }' > "$settings"
+
     ok "Created $settings with hooks"
     return
   fi
 
-  # Check if all components are registered — only skip if ALL are present
-  local has_gate has_audit has_perms has_statusline has_token_tracking
-  has_gate=$(grep -q "workflow-gate" "$settings" 2>/dev/null && echo "y" || echo "n")
-  has_audit=$(grep -q "audit-trail" "$settings" 2>/dev/null && echo "y" || echo "n")
-  has_perms=$(grep -q "workflow-advance" "$settings" 2>/dev/null && echo "y" || echo "n")
-  has_statusline=$(grep -q "statusLine" "$settings" 2>/dev/null && echo "y" || echo "n")
-  has_token_tracking=$(grep -q "token-tracking" "$settings" 2>/dev/null && echo "y" || echo "n")
+  # ============================================
+  # Existing settings.json — check and append missing hooks
+  # ============================================
 
-  if [ "$has_gate" = "y" ] && [ "$has_audit" = "y" ] && [ "$has_perms" = "y" ] && [ "$has_statusline" = "y" ] && [ "$has_token_tracking" = "y" ]; then
+  # Validate settings.json is valid JSON before processing (F1: prevents set -e crash)
+  if [ ! -s "$settings" ] || ! jq empty "$settings" 2>/dev/null; then
+    warn "settings.json contains invalid JSON — regenerating hook configuration"
+    rm -f "$settings"
+    # Fall through to fresh-install path by re-calling ourselves
+    register_hooks
+    return
+  fi
+
+  local needs_update="false"
+
+  # Check if all discovered hooks are registered (F2: use jq instead of grep for structural check)
+  local settings_json
+  settings_json="$(cat "$settings")"
+  for entry in "${pre_hooks[@]}"; do
+    local cmd="${entry%%|*}"
+    if ! echo "$settings_json" | jq -e --arg cmd "$cmd" '(.hooks.PreToolUse // [] | any(.hooks[]?.command == $cmd))' >/dev/null 2>&1; then
+      needs_update="true"
+      break
+    fi
+  done
+  if [ "$needs_update" = "false" ]; then
+    for entry in "${post_hooks[@]}"; do
+      local cmd="${entry%%|*}"
+      if ! echo "$settings_json" | jq -e --arg cmd "$cmd" '(.hooks.PostToolUse // [] | any(.hooks[]?.command == $cmd))' >/dev/null 2>&1; then
+        needs_update="true"
+        break
+      fi
+    done
+  fi
+
+  # Check for matcher drift — matchers are authoritative from HOOK_MATCHER headers (INV-004)
+  if [ "$needs_update" = "false" ]; then
+    for entry in "${pre_hooks[@]}"; do
+      local cmd="${entry%%|*}" matcher="${entry#*|}"
+      local current
+      current="$(jq -r --arg cmd "$cmd" '(.hooks.PreToolUse // [] | .[] | select(.hooks[]?.command == $cmd) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
+      if [ -n "$current" ] && [ "$current" != "$matcher" ]; then
+        needs_update="true"
+        break
+      fi
+    done
+  fi
+  if [ "$needs_update" = "false" ]; then
+    for entry in "${post_hooks[@]}"; do
+      local cmd="${entry%%|*}" matcher="${entry#*|}"
+      local current
+      current="$(jq -r --arg cmd "$cmd" '(.hooks.PostToolUse // [] | .[] | select(.hooks[]?.command == $cmd) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
+      if [ -n "$current" ] && [ "$current" != "$matcher" ]; then
+        needs_update="true"
+        break
+      fi
+    done
+  fi
+
+  # Also check hardcoded entries (INV-007)
+  if ! grep -q "workflow-advance" "$settings" 2>/dev/null; then
+    needs_update="true"
+  fi
+  if ! grep -q "statusLine" "$settings" 2>/dev/null; then
+    needs_update="true"
+  fi
+
+  if [ "$needs_update" = "false" ]; then
     skip "Hooks already registered in settings.json"
-  elif command -v jq >/dev/null 2>&1; then
-    # Append missing hook entries — only add entries not already present
-    local tmp="$settings.$$"
-    if jq --arg cmd "$hook_path" --arg adv "$advance_path" --arg audit "$audit_path" --arg sl "$statusline_path" --arg tt "$token_tracking_path" '
+    return
+  fi
+
+  # Append missing hook entries
+  local tmp="$settings.$$"
+  local result
+  result="$(cat "$settings")"
+
+  # Add or update PreToolUse hooks — matchers are authoritative from HOOK_MATCHER headers
+  for entry in "${pre_hooks[@]}"; do
+    local cmd="${entry%%|*}"
+    local matcher="${entry#*|}"
+    result="$(echo "$result" | jq --arg cmd "$cmd" --arg matcher "$matcher" '
       .hooks.PreToolUse = (
         if (.hooks.PreToolUse // [] | any(.hooks[]?.command == $cmd)) then
-          .hooks.PreToolUse
+          [.hooks.PreToolUse[] | if any(.hooks[]?.command; . == $cmd) then .matcher = $matcher else . end]
         else
           (.hooks.PreToolUse // []) + [{
-            matcher: "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash",
+            matcher: $matcher,
             hooks: [{type: "command", command: $cmd, timeout_ms: 5000}]
           }]
         end
       )
-      | .hooks.PostToolUse = (
-        if (.hooks.PostToolUse // [] | any(.hooks[]?.command == $audit)) then
-          .hooks.PostToolUse
+    ')"
+  done
+
+  # Add or update PostToolUse hooks — matchers are authoritative from HOOK_MATCHER headers
+  for entry in "${post_hooks[@]}"; do
+    local cmd="${entry%%|*}"
+    local matcher="${entry#*|}"
+    result="$(echo "$result" | jq --arg cmd "$cmd" --arg matcher "$matcher" '
+      .hooks.PostToolUse = (
+        if (.hooks.PostToolUse // [] | any(.hooks[]?.command == $cmd)) then
+          [.hooks.PostToolUse[] | if any(.hooks[]?.command; . == $cmd) then .matcher = $matcher else . end]
         else
           (.hooks.PostToolUse // []) + [{
-            matcher: "Edit|Write|MultiEdit|CreateFile|Bash",
-            hooks: [{type: "command", command: $audit, timeout_ms: 1000}]
+            matcher: $matcher,
+            hooks: [{type: "command", command: $cmd, timeout_ms: 1000}]
           }]
         end
       )
-      | .hooks.PostToolUse = (
-        if (.hooks.PostToolUse // [] | any(.hooks[]?.command == $tt)) then
-          .hooks.PostToolUse
-        else
-          (.hooks.PostToolUse // []) + [{
-            matcher: "Agent",
-            hooks: [{type: "command", command: $tt, timeout_ms: 1000}]
-          }]
-        end
-      )
-      | .statusLine = {command: $sl}
-      | .permissions.allow = (
+    ')"
+  done
+
+  # Ensure hardcoded entries (INV-007)
+  result="$(echo "$result" | jq --arg sl "$statusline_path" --arg adv "$advance_path" '
+    .statusLine.command = $sl
+    | .permissions.allow = (
         if (.permissions.allow // [] | any(. == "Bash(\($adv) *)")) then
           .permissions.allow
         else
           (.permissions.allow // []) + ["Bash(\($adv) *)"]
         end
       )
-    ' "$settings" > "$tmp" 2>/dev/null && mv "$tmp" "$settings"; then
-      ok "Registered hooks in existing settings.json"
-    else
-      rm -f "$tmp"
-      warn "settings.json may contain invalid JSON — hooks not auto-registered. Add manually to $settings"
-    fi
+  ')"
+
+  if echo "$result" > "$tmp" 2>/dev/null && mv "$tmp" "$settings"; then
+    ok "Registered hooks in existing settings.json"
   else
-    warn "Cannot auto-register hooks (jq not found). Add manually to $settings"
-  fi
-
-  # Ensure matchers are current — runs after both the all-present and append paths
-  # Migration may leave old narrow matchers; this unconditionally converges them
-  if command -v jq >/dev/null 2>&1 && [ -f "$settings" ]; then
-    local expected_pre="Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash"
-    local expected_post="Edit|Write|MultiEdit|CreateFile|Bash"
-    local current_pre current_post
-    current_pre="$(jq -r '(.hooks.PreToolUse // [] | .[] | select(.hooks[]?.command | test("workflow-gate")) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
-    current_post="$(jq -r '(.hooks.PostToolUse // [] | .[] | select(.hooks[]?.command | test("audit-trail")) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
-
-    if [ "$current_pre" != "$expected_pre" ] || [ "$current_post" != "$expected_post" ]; then
-      local tmp="$settings.$$"
-      if jq --arg pre "$expected_pre" --arg post "$expected_post" '
-        .hooks.PreToolUse = [.hooks.PreToolUse[]? | if (.hooks[]?.command | test("workflow-gate")) then .matcher = $pre else . end] |
-        .hooks.PostToolUse = [.hooks.PostToolUse[]? | if (.hooks[]?.command | test("audit-trail")) then .matcher = $post else . end]
-      ' "$settings" > "$tmp" 2>/dev/null && mv "$tmp" "$settings"; then
-        ok "Updated hook matchers to current version"
-      else
-        rm -f "$tmp"
-        warn "settings.json may contain invalid JSON — matchers not updated"
-      fi
-    fi
+    rm -f "$tmp"
+    warn "settings.json may contain invalid JSON — hooks not auto-registered. Add manually to $settings"
   fi
 }
 
@@ -758,12 +831,17 @@ migrate_old_artifacts() {
     fi
   fi
 
-  # Migrate hooks to .correctless/hooks/
+  # Migrate hooks to .correctless/hooks/ — only migrate hooks that exist in the
+  # source distribution ($SCRIPT_DIR/hooks/). Custom user hooks are left in place.
   if [ -d "$REPO_ROOT/${_c}/hooks" ]; then
     mkdir -p "$REPO_ROOT/.correctless/hooks"
-    for hook in workflow-gate.sh workflow-advance.sh audit-trail.sh statusline.sh; do
-      if [ -f "$REPO_ROOT/${_c}/hooks/$hook" ] && [ ! -f "$REPO_ROOT/.correctless/hooks/$hook" ]; then
-        mv "$REPO_ROOT/${_c}/hooks/$hook" "$REPO_ROOT/.correctless/hooks/$hook"
+    for hook in "$REPO_ROOT/${_c}/hooks"/*.sh; do
+      [ -f "$hook" ] || continue
+      local bname_hook
+      bname_hook="$(basename "$hook")"
+      # Only migrate if this hook exists in the source distribution
+      if [ -f "$SCRIPT_DIR/hooks/$bname_hook" ] && [ ! -f "$REPO_ROOT/.correctless/hooks/$bname_hook" ]; then
+        mv "$hook" "$REPO_ROOT/.correctless/hooks/$bname_hook"
       fi
     done
     ok "Migrated Correctless hooks to .correctless/hooks/"
@@ -785,11 +863,7 @@ migrate_old_artifacts() {
   if [ -f "$REPO_ROOT/${_c}/settings.json" ]; then
     if grep -q "${_c}/hooks/" "$REPO_ROOT/${_c}/settings.json" 2>/dev/null; then
       local tmp_settings="$REPO_ROOT/${_c}/settings.json.$$"
-      sed \
-        -e "s|${_c}/hooks/workflow-gate\.sh|.correctless/hooks/workflow-gate.sh|g" \
-        -e "s|${_c}/hooks/workflow-advance\.sh|.correctless/hooks/workflow-advance.sh|g" \
-        -e "s|${_c}/hooks/audit-trail\.sh|.correctless/hooks/audit-trail.sh|g" \
-        -e "s|${_c}/hooks/statusline\.sh|.correctless/hooks/statusline.sh|g" \
+      sed -e "s|${_c}/hooks/|.correctless/hooks/|g" \
         "$REPO_ROOT/${_c}/settings.json" > "$tmp_settings" \
         && mv "$tmp_settings" "$REPO_ROOT/${_c}/settings.json"
       ok "Updated settings.json hook paths to .correctless/hooks/"
