@@ -228,6 +228,7 @@ Write the spec to `.correctless/specs/{task-slug}.md`.
 - **Branch**: feature branch name
 - **Research**: (path to research brief if research was conducted, null otherwise)
 - **Intensity**: (standard|high|critical)
+- **Recommended-intensity**: (standard|high|critical)
 - **Intensity reason**: (triggering signals or "user override")
 - **Override**: (none|raised|lowered)
 
@@ -289,6 +290,7 @@ What this covers and — critically — what it does NOT.
 (keep in sync with templates/spec-lite.md and templates/spec-full.md)
 - **Task**: {feature name}
 - **Intensity**: {standard|high|critical}
+- **Recommended-intensity**: {standard|high|critical}
 - **Intensity reason**: {triggering signals or "user override"}
 - **Override**: {none|raised|lowered}
 
@@ -377,9 +379,51 @@ Before presenting the spec, run the Intensity Detection process described below.
 
 See the **Intensity Detection** section below for the full signal definitions, mapping rules, and configuration options.
 
+### Step 7b: Intensity Calibration (Post-Signal Modifier)
+
+After the 4-signal highest-wins evaluation in Step 7, apply the intensity calibration modifier. Calibration is NOT a 5th signal and is not an additional signal in the signal hierarchy — it is a post-signal modifier that runs after the signal evaluation completes. Calibration can only raise the result; it never lowers the result below what the 4 signals produced.
+
+**Read calibration data (read-only):** Read `.correctless/meta/intensity-calibration.json` if it exists. This file is read-only for `/cspec` — never write, modify, or delete calibration entries. Only `/cverify` writes calibration entries.
+
+**Graceful handling:** If the calibration file does not exist or contains zero entries, the calibration signal is dormant — proceed without calibration input. No error, no warning, no change to the recommendation. This follows the same dormant signal pattern as antipattern/QA history signals. Skip calibration and proceed normally.
+
+**Recency window:** Read at most the 50 most recent entries (sorted by timestamp, newest first). Entries beyond 50 are ignored — this caps file read size and naturally de-escalates as recent features at elevated intensity run clean. Ignore older entries beyond the limit of 50.
+
+**File path overlap:** For each file path in the current feature's scope, find calibration entries whose `file_paths_touched` have any overlap (at least one file path in common). In active mode, filter overlapping entries to those whose `recommended_intensity` matches the current feature's recommended intensity — evaluate thresholds against what the system suggested at the same level. In passive mode, include all overlapping entries regardless of `recommended_intensity`. Compute the arithmetic mean of `actual_qa_rounds` and `actual_findings_count` across the resulting entries.
+
+**Read calibration mode:** Read `intensity_calibration_mode` from `workflow-config.json` (under `workflow`). If absent from config, default to `passive`.
+
+**Mode behaviors:**
+
+- **Passive mode:** Show advisory text with full calibration arithmetic during Step 8 presentation. List the overlapping entries with their feature slugs and values, show the sum, count, and average for QA rounds and BLOCKING findings, and state the threshold comparison (threshold: 3 QA rounds or 8 BLOCKING findings). Include override context: "In {K} of {N} cases, the user overrode the recommendation." The user sees the math, not just the conclusion — show the intermediate calculation. No automatic adjustment.
+
+- **Active mode:** If overlapping calibration entries show average QA rounds >= 3 or average BLOCKING findings >= 8, auto-raise the recommendation by one level (standard to high, high to critical). In active mode, evaluate at the `recommended_intensity` (not `actual_intensity`) — learn from what the system suggested, not what was used after override. Show the same calibration arithmetic as passive mode but note "auto-raised from {old} to {new} based on calibration data." Calibration can only raise, never lower.
+
+- **Hybrid mode:** Behave as passive until 5+ total calibration entries exist (global count of all entries, not per-path), then switch to active behavior.
+
+**Calibration arithmetic display (INV-012):** When calibration data produces advisory text (passive) or an auto-raise (active), show the intermediate calculation so the user can see the math:
+1. List overlapping entries with feature slugs and values
+2. Show the sum, count, and average for QA rounds and BLOCKING findings
+3. State the threshold comparison (>= 3 rounds or >= 8 findings)
+4. Show the number of overlapping entries and their average calibration values
+
+Example passive advisory:
+```
+Calibration: 3 prior features touching these paths averaged 3.7 QA rounds and 6 BLOCKING findings at recommended_intensity=standard.
+  - feature-a: 4 rounds, 8 findings
+  - feature-b: 3 rounds, 5 findings
+  - feature-c: 4 rounds, 5 findings
+Sum: 11 rounds, 18 findings. Count: 3 entries. Average: 3.7 rounds, 6.0 findings.
+Threshold: 3 rounds or 8 findings. Average rounds (3.7) exceeds threshold (3).
+In 1 of 3 cases, the user overrode the recommendation.
+Consider high intensity.
+```
+
 ### Step 8: Present to Human
 
 Walk through the rules/invariants with the human. Present them in small groups, ask for confirmation or correction. Open questions must be resolved before moving forward.
+
+**Recommended-intensity field (Step 8):** During Step 8, write the `Recommended-intensity` field to the spec's `## Metadata` section. The `Recommended-intensity` field stores the pre-override system recommendation — the level that intensity detection (Step 7 + calibration) produced before the user sees override options. The `Intensity` field continues to store the post-override (approved) level. Both fields appear in the Metadata section: `Recommended-intensity` records what the system suggested, `Intensity` records what was approved after the user's decision. This distinction enables the calibration loop — `/cverify` reads both fields to measure recommendation accuracy.
 
 ### Step 9: Advance State
 
