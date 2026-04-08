@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HOOK_TYPE: PostToolUse
+# HOOK_MATCHER: Edit|Write|MultiEdit
 # Correctless — PostToolUse auto-format hook
 # Runs the project's configured formatter after Edit/Write/MultiEdit.
 # MUST exit 0 always. Formatting is advisory, never gating.
@@ -6,6 +8,9 @@
 # ============================================
 # STEP 1: Parse stdin JSON (single jq bulk call)
 # ============================================
+
+# Fail-open: jq required for JSON parsing (PAT-005: PostToolUse exits 0, never blocks)
+command -v jq >/dev/null 2>&1 || exit 0
 
 INPUT="$(cat)"
 eval "$(echo "$INPUT" | jq -r '

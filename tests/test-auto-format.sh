@@ -61,7 +61,7 @@ run_hook_capture() {
   local stderr_output
   local exit_code
 
-  stderr_output="$("$REPO_DIR/.claude/hooks/auto-format.sh" <<< "$json_input" 2>&1 >/dev/null)"
+  stderr_output="$("$REPO_DIR/hooks/auto-format.sh" <<< "$json_input" 2>&1 >/dev/null)"
   exit_code=$?
 
   echo "$exit_code:$stderr_output"
@@ -895,7 +895,7 @@ test_prh004_no_eval_or_interpolation() {
   # This is a code audit test, not an execution test
   # Check that the hook script doesn't contain eval or unquoted variable expansion in formatter execution
 
-  local hook_script="$REPO_DIR/.claude/hooks/auto-format.sh"
+  local hook_script="$REPO_DIR/hooks/auto-format.sh"
 
   # Check for eval in the execution path (allow eval for jq parsing)
   if grep -q 'eval.*\$command' "$hook_script" 2>/dev/null; then

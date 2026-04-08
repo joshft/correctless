@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2254
+# HOOK_TYPE: PreToolUse
+# HOOK_MATCHER: Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash
 # Correctless — PreToolUse gate hook (supports both Lite and Full modes)
 # Blocks file operations that violate the current workflow phase.
 #
