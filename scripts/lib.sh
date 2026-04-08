@@ -213,7 +213,7 @@ _has_write_pattern() {
   # Check redirect operators (single combined grep).
   # Known limitation: matches '>' inside quoted strings (e.g., echo "x > y").
   # False positives are fail-safe — read-only commands get phase-gated, not bypassed.
-  echo "$cmd" | grep -qE '>>|[0-9]*>' && return 0
+  echo "$cmd" | grep -qE '>>|[0-9]*>[^&]' && return 0
   # Tokenize on shell metacharacters and check each token
   # shellcheck disable=SC2141
   local IFS=$' \t\n;|&()`'
@@ -235,5 +235,5 @@ _has_write_pattern() {
 
 get_target_file() {
   local cmd="$1"
-  echo "$cmd" | grep -oE '[^ ]+\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)'
+  echo "$cmd" | tr ' ' '\n' | grep -E '\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)$'
 }

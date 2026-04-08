@@ -385,6 +385,20 @@ test_inv004_get_target_file() {
   line_count="${line_count// /}"
   assert_eq "INV-004: single-file — returns 1 line" "1" "$line_count"
 
+  # --- Negative cases: extensions that are superstrings of valid ones (QA-A01) ---
+
+  result="$(get_target_file "cp data.jsonl dst/")" || true
+  assert_eq "INV-004: .jsonl not matched (superset of .json)" "" "$result"
+
+  result="$(get_target_file "gcc main.cc")" || true
+  assert_eq "INV-004: .cc not matched (superset of .c)" "" "$result"
+
+  result="$(get_target_file "cat page.mdx")" || true
+  assert_eq "INV-004: .mdx not matched (superset of .md)" "" "$result"
+
+  result="$(get_target_file "cat app.tsbuildinfo")" || true
+  assert_eq "INV-004: .tsbuildinfo not matched (superset of .ts)" "" "$result"
+
   # --- Verify the function returns the file PATH, not just the extension ---
 
   result="$(get_target_file "cp src/deep/nested/app.ts dst/")"

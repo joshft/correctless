@@ -9,6 +9,9 @@
 # Fast-path bail: if no .correctless/artifacts/ directory, exit immediately.
 [ -d ".correctless/artifacts" ] || exit 0
 
+# Fail-open: jq required for JSON parsing (PAT-005: PostToolUse exits 0, never blocks)
+command -v jq >/dev/null 2>&1 || exit 0
+
 # Bulk-parse all needed fields from stdin in one jq call (R2-PERF-001)
 INPUT="$(cat)"
 eval "$(echo "$INPUT" | jq -r '
@@ -112,6 +115,7 @@ fi
 
 # classify_file() is provided by lib.sh (ABS-001: single definition)
 # Requires TEST_PATTERN and SOURCE_PATTERN globals set above.
+command -v classify_file >/dev/null 2>&1 || exit 0
 
 # --- Lite mode: phase-violation alerts ---
 

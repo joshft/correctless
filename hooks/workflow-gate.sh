@@ -216,7 +216,7 @@ if [ "$OVERRIDE_ACTIVE" = "true" ] && [ "$OVERRIDE_REMAINING" -gt 0 ]; then
     'if .override.remaining_calls > 0 then
        .override.remaining_calls -= 1
        | if .override.remaining_calls <= 0 then .override.active = false else . end
-     else error("override_expired") end' || exit 2
+     else error("override_expired") end' || { echo "BLOCKED: Failed to update override counter. Run: hooks/workflow-advance.sh status" >&2; exit 2; }
   exit 0
 fi
 
