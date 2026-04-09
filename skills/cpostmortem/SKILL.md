@@ -1,7 +1,7 @@
 ---
 name: cpostmortem
 description: Post-merge bug analysis. Use when a bug escapes to production. Traces which phase missed it and strengthens the workflow.
-allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.correctless/meta/*), Write(.correctless/antipatterns.md), Write(.claude/templates/invariants/*), Write(.correctless/artifacts/token-log-*), Write(CLAUDE.md)
+allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.correctless/meta/*), Write(.correctless/antipatterns.md), Write(.claude/templates/invariants/*), Write(.correctless/artifacts/token-log-*), Write(CLAUDE.md), Write(.correctless/ARCHITECTURE.md)
 context: fork
 ---
 
@@ -87,6 +87,30 @@ For each miss, propose one or more of:
 **Spec update**: if the original spec should have had an invariant for this, draft it as a reference for future specs.
 
 **Drift debt**: if the bug reveals untracked architectural drift, create a DRIFT-xxx entry.
+
+#### Antipattern Promotion Check
+
+After creating or updating an AP-xxx entry, check whether the antipattern's Frequency field now indicates 3 or more features (parsed from "N findings across M features" format). If an entry has a missing Frequency field or malformed Frequency value, skip the promotion check — no error.
+
+Prefer entries that have just crossed the threshold (frequency newly meets the 3-feature mark due to this postmortem) over entries that already met the threshold before this postmortem. This cross-threshold preference ensures promotion fires at the most relevant moment.
+
+If the frequency meets the threshold and the AP-xxx is NOT already referenced in `.correctless/ARCHITECTURE.md` (promotion deduplication — search for the literal `AP-xxx` string in `.correctless/ARCHITECTURE.md`; if found, skip), draft a promotion suggestion:
+
+- Draft a PAT-xxx or ABS-xxx skeleton (PAT-xxx for process patterns, ABS-xxx for code invariants)
+- Use "How to catch it" from the antipattern to pre-populate the Rule/Invariant field
+- Use "What went wrong" from the antipattern to inform the Violated-when field
+- Include a `Guards against: AP-xxx` field referencing the antipattern ID
+- Include a Test field describing how the architectural entry would be verified
+
+Present the promotion suggestion as a structured decision:
+1. Add to `.correctless/ARCHITECTURE.md` (recommended) — write the drafted PAT-xxx or ABS-xxx entry
+2. Skip — this antipattern doesn't warrant an architecture entry
+3. Modify the draft before adding
+4. Defer to a future feature
+
+Or type your own: ___ (promotion decisions require explicit human input)
+
+The human must approve before writing to `.correctless/ARCHITECTURE.md` — never auto-write.
 
 ### Step 4: Write the PMB Entry
 

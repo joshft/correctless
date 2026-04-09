@@ -362,6 +362,32 @@ Walk through applicable template items with the human. Relevant items become dra
 
 For each AP-xxx entry in `.correctless/antipatterns.md`, ask: does this feature risk repeating this bug class? If yes, add a rule/invariant that prevents it (with `guards_against: AP-xxx` at high+ intensity).
 
+### Step 5b: Antipattern Promotion Check
+
+After the relevance check above, run the promotion check as a separate concern. The promotion check fires regardless of relevance to the current feature — an antipattern that appeared across 5 features but is irrelevant to the current feature still qualifies for promotion to `.correctless/ARCHITECTURE.md`.
+
+For each AP-xxx entry, parse the Frequency field (format: "N findings across M features"). If the frequency indicates 3 or more features, and the AP-xxx is NOT already referenced in `.correctless/ARCHITECTURE.md` (deduplication — search for the literal `AP-xxx` string in `.correctless/ARCHITECTURE.md`), suggest promotion to a `.correctless/ARCHITECTURE.md` entry.
+
+**Draft the promotion entry:** Draft a PAT-xxx or ABS-xxx skeleton (choose PAT-xxx for process/convention patterns, ABS-xxx for code-level invariants). The draft must include:
+- Use "How to catch it" from the antipattern to pre-populate the Rule/Invariant field
+- Use "What went wrong" from the antipattern to inform the Violated-when field
+- The promotion draft must include a `Guards against: AP-xxx` field referencing the antipattern ID
+- Include a Test field describing how the architectural entry would be verified
+
+**Cap:** Present at most 2 promotion suggestions per invocation. After the 2nd suggestion, stop evaluating further antipatterns for promotion — defer all remaining qualifying candidates to the next run.
+
+**Graceful handling:** If an entry has a missing Frequency field or malformed Frequency value (not matching "N findings across M features"), skip that entry — no promotion suggestion, no error.
+
+**Structured promotion decision:** Present each promotion suggestion with numbered options:
+1. Add to `.correctless/ARCHITECTURE.md` (recommended) — write the drafted PAT-xxx or ABS-xxx entry
+2. Skip — this antipattern doesn't warrant an architecture entry
+3. Modify the draft before adding
+4. Defer to a future feature
+
+Or type your own: ___ (promotion decisions require explicit human input)
+
+The human must approve before writing to `.correctless/ARCHITECTURE.md` — never auto-write.
+
 ### Step 6: Check Drift Debt (Full Mode)
 
 Read `.correctless/meta/drift-debt.json`. If any open drift items involve files or abstractions this feature touches, surface them to the human.
