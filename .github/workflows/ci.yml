@@ -53,6 +53,7 @@ jobs:
           bash tests/test-workflow-gate.sh
           bash tests/test-ci-hook-wiring.sh
           bash tests/test-intensity-calibration.sh
+          bash tests/test-auto-recurring-patterns.sh
 
       - name: Verify sync
         run: |
