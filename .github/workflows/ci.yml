@@ -55,6 +55,7 @@ jobs:
           bash tests/test-intensity-calibration.sh
           bash tests/test-auto-recurring-patterns.sh
           bash tests/test-token-aware-intensity.sh
+          bash tests/test-allowed-tools-check.sh
 
       - name: Verify sync
         run: |

@@ -362,6 +362,20 @@ Walk through applicable template items with the human. Relevant items become dra
 
 For each AP-xxx entry in `.correctless/antipatterns.md`, ask: does this feature risk repeating this bug class? If yes, add a rule/invariant that prevents it (with `guards_against: AP-xxx` at high+ intensity).
 
+### Step 5a: Allowed-Tools Cross-Check (AP-008)
+
+After drafting the spec, cross-check every file write and shell command the spec instructs a skill to perform against that skill's `allowed-tools` frontmatter. This is a mechanical check, not a judgment call.
+
+For each invariant or instruction in the spec that says a skill should write to a path or run a command:
+1. Identify the target skill (e.g., "cverify writes to `.correctless/meta/intensity-calibration.json`" → skill is cverify)
+2. Read the target skill's SKILL.md frontmatter (`allowed-tools` line)
+3. For file writes: verify a matching `Write(path)` entry exists (glob matching — `Write(.correctless/artifacts/*)` covers `Write(.correctless/artifacts/foo.json)`)
+4. For shell commands: verify a matching `Bash(pattern)` entry exists (glob matching — `Bash(jq*)` covers `jq -R ...`)
+
+If a match is missing, add it to the spec as a prerequisite: "Prerequisite: add `Write(path)` to {skill}'s allowed-tools frontmatter" or "Prerequisite: add `Bash(pattern)` to {skill}'s allowed-tools." This ensures the implementation agent knows to update the frontmatter.
+
+Skip this check for skills with `Bash(*)` or `Write(*)` (unrestricted permissions) — they can do anything.
+
 ### Step 5b: Antipattern Promotion Check
 
 After the relevance check above, run the promotion check as a separate concern. The promotion check fires regardless of relevance to the current feature — an antipattern that appeared across 5 features but is irrelevant to the current feature still qualifies for promotion to `.correctless/ARCHITECTURE.md`.
