@@ -56,6 +56,7 @@ jobs:
           bash tests/test-auto-recurring-patterns.sh
           bash tests/test-token-aware-intensity.sh
           bash tests/test-allowed-tools-check.sh
+          bash tests/test-token-tracking-skill-field.sh
 
       - name: Verify sync
         run: |

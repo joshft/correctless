@@ -367,7 +367,7 @@ For each AP-xxx entry in `.correctless/antipatterns.md`, ask: does this feature 
 After drafting the spec, cross-check every file write and shell command the spec instructs a skill to perform against that skill's `allowed-tools` frontmatter. This is a mechanical check, not a judgment call.
 
 For each invariant or instruction in the spec that says a skill should write to a path or run a command:
-1. Identify the target skill (e.g., "cverify writes to `.correctless/meta/intensity-calibration.json`" → skill is cverify)
+1. Identify the target skill (e.g., "cverify outputs to `.correctless/meta/calibration.json`" → skill is cverify)
 2. Read the target skill's SKILL.md frontmatter (`allowed-tools` line)
 3. For file writes: verify a matching `Write(path)` entry exists (glob matching — `Write(.correctless/artifacts/*)` covers `Write(.correctless/artifacts/foo.json)`)
 4. For shell commands: verify a matching `Bash(pattern)` entry exists (glob matching — `Bash(jq*)` covers `jq -R ...`)
