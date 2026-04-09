@@ -66,9 +66,9 @@ Agent: Spawning test-writing agent — reading spec (5 rules),
 | | `.correctless/artifacts/checkpoint-ctdd-{slug}.json` |
 | | `.correctless/artifacts/token-log-{slug}.json` |
 
-## Lite vs Full
+## Intensity Levels
 
-Both modes run the full RED → test audit → GREEN → QA pipeline with agent separation. Full mode adds git commit trailers (`Spec:`, `Rules-covered:`, `Phase:`) for traceability, and transitions to a verify phase before marking done.
+Same at all intensity levels for the RED → test audit → GREEN → QA pipeline with agent separation. At high/critical intensity, git commit trailers (`Spec:`, `Rules-covered:`, `Phase:`) are added for traceability, and the workflow transitions to a verify phase before marking done.
 
 ## Common Issues
 

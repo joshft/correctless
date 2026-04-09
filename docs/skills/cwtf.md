@@ -79,10 +79,10 @@ or shortcuts detected.
 | `~/.claude/usage-data/session-meta/*.json` | |
 | Conversation JSONL (targeted queries only) | |
 
-## Lite vs Full
+## Intensity Levels
 
-- **Lite**: Checks the Lite phase sequence (spec, review, tdd-tests, tdd-impl, tdd-qa, done, verified, documented).
-- **Full**: Checks the Full phase sequence (adds model, review-spec, tdd-verify) and includes additional checks for those phases.
+- **Standard intensity**: Checks the standard phase sequence (spec, review, tdd-tests, tdd-impl, tdd-qa, done, verified, documented).
+- **High/critical intensity**: Checks the extended phase sequence (adds model, review-spec, tdd-verify) and includes additional checks for those phases.
 
 ## Common Issues
 

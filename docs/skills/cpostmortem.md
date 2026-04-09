@@ -13,7 +13,7 @@
 
 Runs outside the normal pipeline, triggered by a production bug or post-merge discovery. Does not touch code. Analyzes the gap in the process (spec, review, TDD, QA, audit) and produces class-level corrective actions that prevent the entire category of bug from recurring. Feeds learnings back into CLAUDE.md so every future agent session benefits.
 
-**Full mode only.** This skill is not available in Lite mode.
+**Requires high intensity or above.**
 
 ## What It Does
 
@@ -59,9 +59,9 @@ The PMB entry is written, phase effectiveness counters are updated (review-spec 
 | Invariant template update | Adds a rule to spec templates so future specs include it | The spec domain template should have required this invariant |
 | Drift debt (DRIFT-xxx) | Tracks unresolved architectural drift | The bug reveals a gap between docs and reality |
 
-## Lite vs Full
+## Intensity Levels
 
-This skill is **Full mode only**. In Lite mode, post-merge bug analysis is done manually. The structured tracing across workflow phases and automatic learning propagation require the full agent pipeline.
+This skill **requires high intensity or above**. At standard intensity, post-merge bug analysis is done manually. The structured tracing across workflow phases and automatic learning propagation require the extended agent pipeline.
 
 ## Common Issues
 

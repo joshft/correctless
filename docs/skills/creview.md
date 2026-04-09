@@ -4,8 +4,8 @@
 
 ## When to Use
 
-- After `/cspec` produces an approved spec — this is the mandatory next step in Lite mode
-- In Full mode, for a quick single-pass review on low-risk features (use `/creview-spec` for the full 4-agent adversarial review)
+- After `/cspec` produces an approved spec — this is the mandatory next step at standard intensity
+- At high/critical intensity, for a quick single-pass review on low-risk features (use `/creview-spec` for the full 4-agent adversarial review)
 - **Not for:** reviewing code or pull requests (use `/cpr-review`), reviewing implementation after TDD (use `/cverify`)
 
 ## How It Fits in the Workflow
@@ -56,15 +56,15 @@ Agent: Assumptions check complete — found 2 unstated assumptions.
 | `AGENT_CONTEXT.md` | `.correctless/artifacts/reviews/{slug}-review.md` |
 | `ARCHITECTURE.md` | `.correctless/artifacts/token-log-{slug}.json` |
 | `.correctless/antipatterns.md` | Workflow state (advances to tests phase) |
-| `.correctless/meta/workflow-effectiveness.json` (Full) | |
+| `.correctless/meta/workflow-effectiveness.json` (high+ intensity) | |
 | `.correctless/artifacts/qa-findings-*.json` | |
 | Relevant source code | |
 
-## Lite vs Full
+## Intensity Levels
 
-In **Lite** mode, `/creview` is the standard review — a single-agent skeptical pass covering assumptions, testability, edge cases, antipatterns, integration test levels, and security. This is what most projects use.
+At **standard** intensity, `/creview` is the standard review — a single-agent skeptical pass covering assumptions, testability, edge cases, antipatterns, integration test levels, and security. This is what most projects use.
 
-In **Full** mode, `/creview` is available as a quick 3-minute review for low-risk features. For higher-risk features, use `/creview-spec` instead, which runs a 4-agent adversarial review team. Full mode users can choose either based on the feature's risk profile.
+At **high/critical** intensity, `/creview` is available as a quick 3-minute review for low-risk features. For higher-risk features, use `/creview-spec` instead, which runs a 4-agent adversarial review team. Users at high/critical intensity can choose either based on the feature's risk profile.
 
 ## Common Issues
 

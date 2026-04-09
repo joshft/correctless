@@ -18,7 +18,7 @@
 1. **Socratic brainstorm** — challenges your assumptions with targeted questions: "What problem does this solve? Not the feature — the problem." Scales depth to your confidence level.
 2. **Reads project context** — ARCHITECTURE.md, antipatterns, drift debt, QA history, and recent git log to ground the spec in your codebase's reality
 3. **Researches current best practices** (when needed) — spawns a research subagent for topics where training data may be stale (new library versions, security protocols, rapidly-evolving APIs). Saves findings to an artifact.
-4. **Drafts the spec** — Lite mode produces Rules (R-001, R-002...) with test levels. Full mode produces Invariants, Prohibitions, Boundary Conditions, and optionally STRIDE analysis.
+4. **Drafts the spec** — at standard intensity, produces Rules (R-001, R-002...) with test levels. At high/critical intensity, produces Invariants, Prohibitions, Boundary Conditions, and optionally STRIDE analysis.
 5. **Walks you through the spec** — presents rules in small groups for approval, resolves open questions, checks against known antipatterns, and advances the workflow state when approved
 
 ## Example
@@ -67,15 +67,15 @@ Agent: Based on our discussion, here's what I understand: rate limiting on
 | `AGENT_CONTEXT.md` | `.correctless/specs/{task-slug}.md` |
 | `ARCHITECTURE.md` | `.correctless/artifacts/research/{slug}-research.md` (if research triggered) |
 | `.correctless/antipatterns.md` | `.correctless/artifacts/token-log-{slug}.json` |
-| `.correctless/meta/drift-debt.json` (Full) | Workflow state (advances to review phase) |
+| `.correctless/meta/drift-debt.json` (high+ intensity) | Workflow state (advances to review phase) |
 | `.correctless/artifacts/qa-findings-*.json` | |
 | Git log (recent 20 commits) | |
 
-## Lite vs Full
+## Intensity Levels
 
-**Lite** produces 5 sections: What, Rules (R-xxx with test levels), Won't Do, Risks, Open Questions. Simple and fast.
+**Standard intensity** produces 5 sections: What, Rules (R-xxx with test levels), Won't Do, Risks, Open Questions. Simple and fast.
 
-**Full** scales artifact weight by intensity level. Standard adds Boundary Conditions and Complexity Budget. High/critical adds STRIDE analysis, Environment Assumptions, and Design Decisions. Full mode also checks drift debt and recommends an intensity level based on trust boundaries touched.
+**High/critical intensity** scales artifact weight by intensity level. High adds Boundary Conditions and Complexity Budget. Critical adds STRIDE analysis, Environment Assumptions, and Design Decisions. At high/critical intensity, the skill also checks drift debt and recommends an intensity level based on trust boundaries touched.
 
 ## Common Issues
 

@@ -4,7 +4,7 @@
 
 ## When to Use
 
-- After `/cspec` or `/cmodel` on any feature going through the Full pipeline
+- After `/cspec` or `/cmodel` on any feature going through the high+ intensity pipeline
 - When a spec has security-relevant invariants, trust boundaries, or cross-cutting concerns
 - **Not for:** quick, low-risk features — use `/creview` (single-pass, 3 min) instead
 
@@ -12,7 +12,7 @@
 
 Sits between spec/model and TDD. This is the last gate before code gets written. Four hostile reviewers examine the spec simultaneously, each looking through a different lens. The goal is to find problems in the design, not in code that does not exist yet.
 
-**Full mode only.** This skill is not available in Lite mode.
+**Requires high intensity or above.**
 
 ## What It Does
 

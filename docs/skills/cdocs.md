@@ -59,9 +59,9 @@ Agent: Diff analysis complete — 1 new feature (login rate limiting),
 | Git diff against main | `CLAUDE.md` (convention learning, if 3+ features share a pattern) |
 | | Workflow state (advances to documented) |
 
-## Lite vs Full
+## Intensity Levels
 
-Both modes run the same documentation checks. Full mode includes convention learning — if the same architectural pattern has appeared in 3+ features, it appends a "Convention confirmed" entry to `CLAUDE.md` so future agents treat it as an established project convention.
+Same at all intensity levels for documentation checks. At high/critical intensity, convention learning is included — if the same architectural pattern has appeared in 3+ features, it appends a "Convention confirmed" entry to `CLAUDE.md` so future agents treat it as an established project convention.
 
 ## Common Issues
 

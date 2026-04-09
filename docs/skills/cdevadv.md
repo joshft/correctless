@@ -15,7 +15,7 @@
 
 Runs periodically, not per-feature. Every other agent in the pipeline (spec author, reviewer, test writer, QA, auditor) operates within the frame of "this project's design is fundamentally sound." The devil's advocate questions whether the frame itself is correct. It checks whether the spec is pointing in the wrong direction, not whether the code matches the spec.
 
-**Full mode only.** This skill is not available in Lite mode.
+**Requires high intensity or above.**
 
 ## What It Does
 

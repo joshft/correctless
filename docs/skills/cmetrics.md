@@ -6,7 +6,7 @@
 
 - Monthly, to track how the workflow is performing over time.
 - Before presenting to stakeholders, to justify the workflow investment with data.
-- When deciding whether to upgrade from Lite to Full mode.
+- When deciding whether to increase workflow intensity.
 - When something feels off — metrics reveal which phases are pulling weight and which are not.
 - **Not for:** Single-feature summaries (use `/csummary`), or checking current workflow state (use `/cstatus`).
 
@@ -81,10 +81,10 @@ User: /cmetrics
 | `docs/decisions/*.md` | |
 | Git log | |
 
-## Lite vs Full
+## Intensity Levels
 
-- **Lite mode**: Omits Olympics convergence analysis and Olympics history table (those features are Full-only).
-- **Full mode**: Adds Olympics history, convergence speed analysis, and audit-specific metrics.
+- **Standard intensity**: Omits Olympics convergence analysis and Olympics history table (those features require high+ intensity).
+- **High/critical intensity**: Adds Olympics history, convergence speed analysis, and audit-specific metrics.
 
 ## Common Issues
 

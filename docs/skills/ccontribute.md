@@ -65,9 +65,9 @@ User: They prefer small PRs, one concern each.
 | 5 recently merged PRs (for calibration) | |
 | Linked issue (via `gh issue view`) | |
 
-## Lite vs Full
+## Intensity Levels
 
-Same in both modes. This skill operates on the target project's conventions, not the Correctless workflow intensity.
+Same at all intensity levels. This skill operates on the target project's conventions, not the Correctless workflow intensity.
 
 ## Common Issues
 

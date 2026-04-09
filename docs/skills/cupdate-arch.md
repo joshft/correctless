@@ -13,7 +13,7 @@
 
 Runs after features are merged and documented. Keeps the living architecture document accurate so that future `/cspec`, `/creview-spec`, and `/caudit` runs have correct context. Stale architecture docs cause every downstream skill to make wrong assumptions.
 
-**Full mode only.** This skill is not available in Lite mode.
+**Requires high intensity or above.**
 
 ## What It Does
 
@@ -57,9 +57,9 @@ Each entry follows a structured format with required fields:
 | Pattern | PAT-xxx | Rule, violated-when, test |
 | Environment Assumption | ENV-xxx | Runtime assumption, invariant, violated-when |
 
-## Lite vs Full
+## Intensity Levels
 
-This skill is **Full mode only**. In Lite mode, architecture documentation is maintained manually. The structured scanning and entry drafting require the full agent pipeline for context.
+This skill **requires high intensity or above**. At standard intensity, architecture documentation is maintained manually. The structured scanning and entry drafting require the extended agent pipeline for context.
 
 ## Common Issues
 

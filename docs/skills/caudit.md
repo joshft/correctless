@@ -14,7 +14,7 @@
 
 Runs independently of the main spec-to-merge pipeline. The TDD cycle catches "does this feature work?" bugs. The Olympics catch "how does this feature break everything else?" and "how does an attacker abuse this feature?" bugs. Operates on a dedicated audit branch; fixes never go directly to main.
 
-**Full mode only.** This skill is not available in Lite mode.
+**Requires high intensity or above.**
 
 ## What It Does
 

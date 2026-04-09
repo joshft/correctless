@@ -10,13 +10,13 @@
 
 ## How It Fits in the Workflow
 
-This skill can be invoked at any time. It is a read-only reference card that detects whether you are in Lite or Full mode and shows the relevant commands.
+This skill can be invoked at any time. It is a read-only reference card that detects the current intensity level and shows the relevant commands.
 
 ## What It Does
 
-- Detects the current mode (not set up / Lite / Full) from `.correctless/config/workflow-config.json`.
+- Detects the current intensity level (not set up / standard / high / critical) from `.correctless/config/workflow-config.json`.
 - Prints the pipeline diagram for your mode.
-- Lists all available commands grouped by category (feature workflow, standalone tools, Full-mode additions).
+- Lists all available commands grouped by category (feature workflow, standalone tools, high+ intensity additions).
 - Shows a quick-reference table mapping common tasks to commands.
 
 ## Example
@@ -24,7 +24,7 @@ This skill can be invoked at any time. It is a read-only reference card that det
 ```
 User: /chelp
 
-Correctless Lite — Workflow Pipeline:
+Correctless — Workflow Pipeline:
   /cspec -> /creview -> /ctdd [RED -> test audit -> GREEN -> /simplify -> QA] -> /cverify -> /cdocs -> merge
 
 Feature workflow:
@@ -55,7 +55,7 @@ No active workflow. Start one: git checkout -b feature/my-feature then /cspec
 | `.correctless/config/workflow-config.json` | Nothing (read-only) |
 | `.correctless/hooks/workflow-advance.sh` (status output) | |
 
-## Lite vs Full
+## Intensity Levels
 
-- **Lite mode**: Shows the Lite pipeline and Lite commands only.
-- **Full mode**: Adds the Full pipeline diagram and Full-only commands (`/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`).
+- **Standard intensity**: Shows the standard pipeline and standard commands only.
+- **High/critical intensity**: Adds the extended pipeline diagram and high+ intensity commands (`/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`).

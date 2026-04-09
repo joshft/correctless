@@ -69,9 +69,9 @@ Agent: [sequenceDiagram showing request flow]
        4. Export to HTML
 ```
 
-## Lite vs Full
+## Intensity Levels
 
-`/cexplain` works the same in both Lite and Full. When Serena MCP is available (Full mode with MCP configured), symbol tracing is more precise. Without Serena, the skill uses grep-based analysis.
+`/cexplain` works the same at all intensity levels. When Serena MCP is available (with MCP configured), symbol tracing is more precise. Without Serena, the skill uses grep-based analysis.
 
 ## Common Issues
 
