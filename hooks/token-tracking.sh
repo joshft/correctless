@@ -76,15 +76,43 @@ TOKEN_LOG="${_artifacts}/token-log-${_slug}.jsonl"
 TIMESTAMP="$(date -u +%FT%TZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)" || true
 
 # ============================================
+# Read state file and extract phase for skill mapping
+# ============================================
+
+_STATE_CONTENT="$(cat "$STATE_FILE" 2>/dev/null || echo '{}')" || _STATE_CONTENT='{}'
+
+# Extract phase without an additional jq call (keeps total at 2 per R-007).
+# Uses bash builtins on our own well-formed state JSON. Falls back to "none".
+_PHASE="none"
+[[ "$_STATE_CONTENT" =~ \"phase\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]] && _PHASE="${BASH_REMATCH[1]}" || true
+
+# ============================================
+# Phase-to-skill mapping (R-001, R-003)
+# Hook-private: not in lib.sh per ABS-001 single-consumer exception.
+# ============================================
+
+case "$_PHASE" in
+  spec)                                          SKILL_VAL="cspec"    ;;
+  model)                                         SKILL_VAL="cmodel"   ;;
+  review|review-spec)                            SKILL_VAL="creview"  ;;
+  tdd-tests|tdd-impl|tdd-qa|tdd-verify)          SKILL_VAL="ctdd"    ;;
+  done|verified)                                 SKILL_VAL="cverify"  ;;
+  documented)                                    SKILL_VAL="cdocs"    ;;
+  audit)                                         SKILL_VAL="caudit"   ;;
+  *)                                             SKILL_VAL="unknown"  ;;
+esac
+
+# ============================================
 # Append JSONL entry (R-005)
 # ============================================
 
 mkdir -p "$_artifacts" 2>/dev/null || exit 0
 
-# Read state file and construct JSONL entry
-(cat "$STATE_FILE" 2>/dev/null || echo '{}') | jq -c \
+# Construct JSONL entry with skill field (R-002: passed via --arg)
+echo "$_STATE_CONTENT" | jq -c \
   --arg ts "$TIMESTAMP" \
   --arg branch "$_slug" \
+  --arg skill "$SKILL_VAL" \
   --arg desc "$AGENT_DESCRIPTION" \
   --arg type "$AGENT_TYPE" \
   --argjson in "$INPUT_TOKENS" \
@@ -96,6 +124,7 @@ mkdir -p "$_artifacts" 2>/dev/null || exit 0
     branch: $branch,
     phase: (.phase // "none"),
     feature: (.task // "unknown"),
+    skill: $skill,
     agent_description: $desc,
     agent_type: $type,
     input_tokens: $in,

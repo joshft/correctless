@@ -630,6 +630,8 @@ test_r007_structural_constraints() {
     | grep -vE '^\s*--arg(json)?\b' \
     | grep -vE "^\s*['\"\{]" \
     | grep -vE '^\s*\w+:' \
+    | grep -vE '^\s*[a-z|*-]+\)' \
+    | grep -vE '^\s*[A-Z_]+="[^"]*"\s*;;' \
     || echo "")"
   # This is advisory — we just log what we find for manual review
   if [ -z "$disallowed_cmds" ]; then
