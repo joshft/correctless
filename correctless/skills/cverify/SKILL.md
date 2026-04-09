@@ -1,7 +1,7 @@
 ---
 name: cverify
 description: Verify implementation matches spec. Check rule coverage, undocumented dependencies, architecture compliance. Writes verification report and drift debt. Run after /ctdd completes.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/meta/intensity-calibration.json), Write(.correctless/artifacts/*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(jq*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/meta/intensity-calibration.json), Write(.correctless/artifacts/*)
 context: fork
 ---
 
@@ -248,6 +248,7 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
       "actual_intensity": "standard|high|critical — read from the spec's Intensity metadata field (the approved post-override level)",
       "actual_qa_rounds": "number — read from the workflow state file (qa_rounds field)",
       "actual_findings_count": "number — count of BLOCKING findings only from qa-findings-{slug}.json (not MEDIUM/LOW)",
+      "actual_tokens": "integer — sum of total_tokens from the token log JSONL file (see below)",
       "actual_spec_updates": "number — read from the workflow state file (spec_updates field)",
       "file_paths_touched": ["array of file paths from git diff against the default branch"],
       "timestamp": "ISO 8601 string"
@@ -262,8 +263,25 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
 - `actual_qa_rounds`: Read from the workflow state file (`qa_rounds` field).
 - `actual_spec_updates`: Read from the workflow state file (`spec_updates` field).
 - `actual_findings_count`: Count only BLOCKING findings from `qa-findings-{slug}.json`. MEDIUM and LOW findings indicate thorough QA, not insufficient intensity.
+- `actual_tokens`: Sum of `total_tokens` from the token log JSONL file for this branch. See "Token Summation for actual_tokens" below.
 - `file_paths_touched`: Collect from `git diff {default_branch}...HEAD --name-only`.
 - `timestamp`: Current ISO 8601 timestamp.
+
+#### Token Summation for actual_tokens
+
+The `actual_tokens` field in the calibration entry is an integer representing total token usage for this feature. Read the branch name from the workflow state file's `.branch` field, then derive the branch_slug using the `branch_slug()` function in scripts/lib.sh (which replaces `/` with `-` and appends a short hash). Use the resulting slug to locate the token log file at `.correctless/artifacts/token-log-{branch-slug}.jsonl`.
+
+**Use a deterministic jq command** to sum `total_tokens` across all valid lines — do NOT use LLM arithmetic. The command must skip malformed JSONL lines (truncated, invalid JSON) rather than failing the entire summation. Example:
+
+```bash
+jq -R 'try (fromjson | .total_tokens // 0) catch 0' .correctless/artifacts/token-log-{branch-slug}.jsonl | jq -s 'add // 0'
+```
+
+This reads each line as raw text (`-R`), attempts to parse it as JSON (`fromjson`), extracts `total_tokens` (defaulting to 0), and catches parse errors on malformed lines (outputting 0). The second jq sums all values.
+
+**Missing or empty token log:** If the token log file does not exist or is empty, set `actual_tokens` to 0.
+
+Write `actual_tokens` as an integer in the calibration entry alongside the other fields.
 
 Write this calibration entry before advancing the workflow state — calibration data must be persisted even if the advance step fails.
 
