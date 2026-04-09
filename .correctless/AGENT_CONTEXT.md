@@ -11,12 +11,12 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | Skills | `skills/*/SKILL.md` | 26 skill definitions. Each is a slash command with frontmatter contract. |
-| Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, token-tracking.sh (PostToolUse token logging) |
+| Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, token-tracking.sh (PostToolUse token logging with phase-to-skill mapping) |
 | Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs |
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 26-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 29 test files (~2,740 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, shift-left-review, lib, lib-locking, gate-path-exceptions, token-tracking, token-tracking-setup, ci-hook-wiring, workflow-gate, intensity-calibration, auto-recurring-patterns, token-aware-intensity |
+| Tests | `tests/test*.sh` | 31 test files (~2,810 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, shift-left-review, lib, lib-locking, gate-path-exceptions, token-tracking, token-tracking-setup, ci-hook-wiring, workflow-gate, intensity-calibration, auto-recurring-patterns, token-aware-intensity, allowed-tools-check, token-tracking-skill-field |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns

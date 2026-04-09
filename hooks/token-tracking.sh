@@ -91,8 +91,16 @@ _PHASE="none"
 # Hook-private: not in lib.sh per ABS-001 single-consumer exception.
 # ============================================
 
-# spec->cspec model->cmodel review/review-spec->creview tdd-*->ctdd done/verified->cverify documented->cdocs audit->caudit *->unknown
-case "$_PHASE" in spec) SKILL_VAL="cspec" ;; model) SKILL_VAL="cmodel" ;; review|review-spec) SKILL_VAL="creview" ;; tdd-tests|tdd-impl|tdd-qa|tdd-verify) SKILL_VAL="ctdd" ;; done|verified) SKILL_VAL="cverify" ;; documented) SKILL_VAL="cdocs" ;; audit) SKILL_VAL="caudit" ;; *) SKILL_VAL="unknown" ;; esac
+case "$_PHASE" in
+  spec)                                          SKILL_VAL="cspec"    ;;
+  model)                                         SKILL_VAL="cmodel"   ;;
+  review|review-spec)                            SKILL_VAL="creview"  ;;
+  tdd-tests|tdd-impl|tdd-qa|tdd-verify)          SKILL_VAL="ctdd"    ;;
+  done|verified)                                 SKILL_VAL="cverify"  ;;
+  documented)                                    SKILL_VAL="cdocs"    ;;
+  audit)                                         SKILL_VAL="caudit"   ;;
+  *)                                             SKILL_VAL="unknown"  ;;
+esac
 
 # ============================================
 # Append JSONL entry (R-005)
