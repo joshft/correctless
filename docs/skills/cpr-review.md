@@ -18,7 +18,7 @@ This skill is standalone — it does not require an active Correctless workflow.
 - Fetches PR info and diff via `gh` (GitHub) or `glab` (GitLab). Falls back to manual diff paste if neither CLI is available.
 - **Auto-detects dependency bump PRs** by checking the PR author (Dependabot, Renovate, etc.), changed files, and title patterns. When detected, it switches to a dependency-specific lens: runs the test suite, analyzes project usage of the bumped package, fetches changelog/release notes, checks CVEs, and assesses breaking changes.
 - For code PRs, runs focused checks in sequence: architecture compliance, security checklist, test coverage analysis, antipattern scan, convention compliance, and spec alignment (if a spec is linked).
-- In Full mode, adds concurrency analysis, trust boundary checks, cross-spec impact, drift detection, performance implications, and dependency risk.
+- At high/critical intensity, adds concurrency analysis, trust boundary checks, cross-spec impact, drift detection, performance implications, and dependency risk.
 - Groups all findings by severity (CRITICAL / HIGH / MEDIUM / LOW) with file:line references, explanations, and suggested fixes. Always includes a "What Looks Good" section.
 
 ## Example
@@ -58,10 +58,10 @@ User: /cpr-review 42
 | `.correctless/config/workflow-config.json` | |
 | `.correctless/specs/*.md` (if referenced) | |
 
-## Lite vs Full
+## Intensity Levels
 
-- **Lite mode**: Runs architecture, security, test coverage, antipattern, convention, and spec alignment checks.
-- **Full mode** (any `workflow.intensity` set): Adds concurrency analysis, trust boundary analysis, cross-spec impact, drift detection, performance implications, and dependency risk assessment.
+- **Standard intensity**: Runs architecture, security, test coverage, antipattern, convention, and spec alignment checks.
+- **High/critical intensity** (any `workflow.intensity` set): Adds concurrency analysis, trust boundary analysis, cross-spec impact, drift detection, performance implications, and dependency risk assessment.
 
 ## Common Issues
 

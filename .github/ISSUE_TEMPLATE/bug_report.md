@@ -20,10 +20,11 @@ assignees: ''
 
 <!-- e.g., /ctdd, /cverify, workflow-gate.sh, statusline -->
 
-## Mode
+## Intensity Level
 
-- [ ] Lite
-- [ ] Full
+- [ ] Standard
+- [ ] High
+- [ ] Critical
 
 ## Environment
 

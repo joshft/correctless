@@ -17,7 +17,7 @@ This skill can be invoked at any point. It reads the current workflow state and 
 
 - Verifies Correctless is configured in the project (checks for `workflow-config.json`, hooks, and `ARCHITECTURE.md`).
 - Reads the current workflow phase and shows phase-specific guidance (e.g., "RED phase — writing tests. Source files are blocked.").
-- Lists all available commands for the current mode (Lite or Full).
+- Lists all available commands for the current intensity level.
 - **Detects problems proactively**:
   - **Stale workflows**: If a phase has been active for more than 24 hours, warns and suggests re-running the phase skill or using an override.
   - **Empty docs**: If `ARCHITECTURE.md` or `AGENT_CONTEXT.md` still contains placeholder markers (`{PROJECT_NAME}`), recommends running `/csetup`.
@@ -29,7 +29,7 @@ This skill can be invoked at any point. It reads the current workflow state and 
 ```
 User: /cstatus
 
-Correctless Lite — active workflow on `feature/rate-limiting`
+Correctless — active workflow on `feature/rate-limiting`
 
 Phase: tdd-impl (GREEN)
 Entered: 3 hours ago
@@ -55,10 +55,10 @@ No problems detected.
 | `AGENT_CONTEXT.md` | |
 | Workflow state file | |
 
-## Lite vs Full
+## Intensity Levels
 
-- **Lite mode**: Shows the Lite pipeline and Lite commands.
-- **Full mode**: Also shows Full-only commands (`/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`) and Full-specific phases.
+- **Standard intensity**: Shows the standard pipeline and standard commands.
+- **High/critical intensity**: Also shows high+ intensity commands (`/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`) and extended phases.
 
 ## Common Issues
 

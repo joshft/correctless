@@ -129,7 +129,7 @@ Agent: Project Health Check — recipe-api (TypeScript/Express)
 | | PR template (if accepted) |
 | | `.claude/settings.json` (Claude Code hook registration) |
 
-## Lite vs Full
+## Intensity Levels
 
 The adaptive flow and health check run at all intensity levels. At high+ intensity, the setup additionally surfaces the workflow intensity setting (standard/high/critical) during config confirmation. Intensity configures STRIDE analysis, formal modeling, and stricter QA rounds.
 

@@ -78,9 +78,9 @@ Agent: Approved. Resuming...
 | `.correctless/config/workflow-config.json` | Characterization test files (if needed) |
 | | `ARCHITECTURE.md` (if patterns changed, with approval) |
 
-## Lite vs Full
+## Intensity Levels
 
-Both modes run the full behavioral equivalence pipeline with agent separation and test-change gating. Full mode adds mutation testing on refactored code, cross-spec impact analysis (checks whether structural changes affect other features' invariants), and drift debt updates.
+Same at all intensity levels for the behavioral equivalence pipeline with agent separation and test-change gating. At high/critical intensity, mutation testing on refactored code, cross-spec impact analysis (checks whether structural changes affect other features' invariants), and drift debt updates are added.
 
 ## Common Issues
 

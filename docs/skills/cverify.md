@@ -64,9 +64,9 @@ Agent: Rule coverage complete — 5/5 rules covered, 1 weak.
 | `.correctless/meta/workflow-effectiveness.json` | |
 | Package manifests (diff against base branch) | |
 
-## Lite vs Full
+## Intensity Levels
 
-Both modes run rule coverage, dependency checks, architecture compliance, and drift detection. Full mode adds mutation testing, cross-spec impact analysis, and checks whether structural changes affect other features' invariants.
+Same at all intensity levels for rule coverage, dependency checks, architecture compliance, and drift detection. At high/critical intensity, mutation testing, cross-spec impact analysis, and checks whether structural changes affect other features' invariants are added.
 
 ## Common Issues
 

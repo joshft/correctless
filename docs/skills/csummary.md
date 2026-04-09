@@ -68,9 +68,9 @@ Spec: .correctless/specs/rate-limiting.md
 | Workflow state file | |
 | Git log (branch duration, commit count) | |
 
-## Lite vs Full
+## Intensity Levels
 
-Same in both modes. The summary reports whatever phases actually ran. Full mode features that ran (model, audit) will appear in the summary if their artifacts exist.
+Same at all intensity levels. The summary reports whatever phases actually ran. High+ intensity features that ran (model, audit) will appear in the summary if their artifacts exist.
 
 ## Common Issues
 

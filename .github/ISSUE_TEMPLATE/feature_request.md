@@ -18,11 +18,12 @@ assignees: ''
 
 <!-- Did you consider other approaches? Why is this one better? -->
 
-## Which version?
+## Which intensity level?
 
-- [ ] Lite (everyday development)
-- [ ] Full (security-critical)
-- [ ] Both
+- [ ] Standard (everyday development)
+- [ ] High (complex/security-sensitive)
+- [ ] Critical (highest rigor)
+- [ ] All levels
 
 ## Additional context
 

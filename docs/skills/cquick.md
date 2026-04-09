@@ -38,9 +38,9 @@ Agent: Checking branch... on fix/typo-in-readme. Good.
        Committed: "Fix typo in configuration example"
 ```
 
-## Lite vs Full
+## Intensity Levels
 
-`/cquick` works the same in both modes. It deliberately skips all ceremony — that's the point.
+`/cquick` works the same at all intensity levels. It deliberately skips all ceremony — that's the point.
 
 ## Common Issues
 

@@ -78,9 +78,9 @@ Agent: Bisect found commit `a3f2c91`: "refactor: reorganize middleware"
 | `.correctless/meta/drift-debt.json` | Test and source files (fix) |
 | Git history and blame | |
 
-## Lite vs Full
+## Intensity Levels
 
-Both modes run the same investigation workflow. There is no difference in `/cdebug` behavior between Lite and Full — bug investigation follows the same systematic process regardless of workflow intensity.
+Same at all intensity levels. There is no difference in `/cdebug` behavior — bug investigation follows the same systematic process regardless of intensity.
 
 ## Common Issues
 

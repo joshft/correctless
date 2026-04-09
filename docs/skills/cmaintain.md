@@ -73,9 +73,9 @@ Recommendation: ask contributor to split the refactor into a separate PR.
 | Contributor's merged PR history | |
 | Linked issue | |
 
-## Lite vs Full
+## Intensity Levels
 
-Same in both modes. The maintainer review applies regardless of workflow intensity.
+Same at all intensity levels. The maintainer review applies regardless of intensity.
 
 ## Common Issues
 

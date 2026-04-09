@@ -53,9 +53,9 @@ Agent: Checking working tree... clean.
        Push? (1) Tag + commit (2) Tag only (3) Don't push
 ```
 
-## Lite vs Full
+## Intensity Levels
 
-`/crelease` works the same in both modes. It reads specs from `.correctless/specs/` regardless of mode.
+`/crelease` works the same at all intensity levels. It reads specs from `.correctless/specs/` regardless of intensity.
 
 ## Common Issues
 

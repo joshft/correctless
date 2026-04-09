@@ -13,7 +13,7 @@
 
 Runs after Hacker Olympics fixes are applied. The recommended sequence is: Hacker Olympics (static, finds code-level flaws) then Red Team (live, proves exploitability) then Devil's Advocate (periodic, challenges the security approach itself). The red team finds integration gaps, runtime behavior, and defense chain failures that no amount of code reading can surface.
 
-**Full mode only.** This skill is not available in Lite mode.
+**Requires high intensity or above.**
 
 ## What It Does
 

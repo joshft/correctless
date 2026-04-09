@@ -13,7 +13,7 @@
 
 Runs after `/cspec` (spec phase) and before `/creview-spec`. The modeling phase sits between "what should the system do" and "is the spec actually correct." Finds design bugs while they are still cheap to fix.
 
-**Full mode only.** This skill is not available in Lite mode.
+**Requires high intensity or above.**
 
 ## What It Does
 
@@ -48,9 +48,9 @@ You revise the spec to require atomic check-and-consume, then advance to `/crevi
 - **Temporal operators.** Claude's reliability with `always`, `after`, and `until` in Alloy is inconsistent for complex formulas. Review temporal assertions carefully.
 - **Wrong model, correct analysis.** A correct analysis of a wrong model creates false confidence. The human review step is load-bearing — always verify the model represents the real system.
 
-## Lite vs Full
+## Intensity Levels
 
-This skill is **Full mode only**. In Lite mode, formal modeling is skipped entirely. Features go directly from `/cspec` to `/creview` (the single-pass review). If your feature involves state machines or trust boundaries and you are in Lite mode, consider upgrading to Full for this feature.
+This skill **requires high intensity or above**. At standard intensity, formal modeling is skipped entirely. Features go directly from `/cspec` to `/creview` (the single-pass review). If your feature involves state machines or trust boundaries and you are at standard intensity, consider increasing workflow intensity for this feature.
 
 ## Limitations
 
