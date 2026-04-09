@@ -16,7 +16,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 26-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 28 test files (~2,680 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, shift-left-review, lib, lib-locking, gate-path-exceptions, token-tracking, token-tracking-setup, ci-hook-wiring, workflow-gate, intensity-calibration, auto-recurring-patterns |
+| Tests | `tests/test*.sh` | 29 test files (~2,740 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, shift-left-review, lib, lib-locking, gate-path-exceptions, token-tracking, token-tracking-setup, ci-hook-wiring, workflow-gate, intensity-calibration, auto-recurring-patterns, token-aware-intensity |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns
@@ -27,7 +27,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 - **Branch-scoped state** (PAT-004): state lives in `.correctless/artifacts/workflow-state-{branch-slug}.json` — `workflow-advance.sh` is the only writer
 - **Effective intensity** (PAT-005): each pipeline skill and gated skill computes `max(project_intensity, feature_intensity)` using ordering `standard < high < critical`. Project intensity from `workflow.intensity` in config, feature intensity from `workflow-advance.sh status`. Fallback: feature_intensity → workflow.intensity → standard
 - **Shift-left review** (PAT-006): `/creview` and `/creview-spec` read historical findings (QA, Olympics audits, Devil's Advocate reports) to detect recurring patterns. Classification is ephemeral — see ABS-002 in ARCHITECTURE.md. 10-file budget (PAT-004)
-- **Cross-skill calibration** (ABS-005): `/cverify` writes outcome data to `.correctless/meta/intensity-calibration.json`, `/cspec` reads it during intensity detection as a post-signal modifier. cspec is read-only — only cverify writes. 50-entry recency window. Configurable modes: passive (advisory), active (auto-raise), hybrid (passive→active after 5 entries)
+- **Cross-skill calibration** (ABS-005): `/cverify` writes outcome data (QA rounds, BLOCKING findings, actual_tokens) to `.correctless/meta/intensity-calibration.json`, `/cspec` reads it during intensity detection as a post-signal modifier. Token data (ABS-006) enriches calibration — features exceeding 200K tokens trigger auto-raise alongside QA rounds >= 3 and findings >= 8. cspec is read-only — only cverify writes. 50-entry recency window. Configurable modes: passive (advisory), active (auto-raise), hybrid (passive→active after 5 entries)
 - **MCP integration** (optional): Serena for symbol-level code analysis, Context7 for library docs — check `mcp.serena` and `mcp.context7` in workflow-config.json. Falls back to grep/read silently when unavailable
 
 ## Common Pitfalls

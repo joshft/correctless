@@ -228,7 +228,7 @@ This shows where the budget goes. If 65% goes to TDD and TDD catches 60% of bugs
 
 **6. Olympics efficiency** (high+ intensity): Tokens per finding per round. "Round 1: {N} findings at {T} tokens. Round {M}: {N} findings at {T} tokens." Shows diminishing returns.
 
-**7. Token trend**: Compare with previous metrics. "Token cost per feature: {stable/growing/shrinking}. Cost per bug: {improving/degrading}."
+**7. Token trend**: Split completed features chronologically into two halves (first N/2 vs second N/2; for odd counts, the middle feature goes to the first half). Compute the average tokens per feature for each half. If the second half average exceeds the first half average by more than 20%, the trend is "growing". If the second half average is more than 20% lower than the first half average, the trend is "shrinking". Otherwise the trend is "stable" (within 20% threshold). If fewer than 4 features have token data, the trend is "insufficient data". Report: "Token cost per feature: {growing/shrinking/stable/insufficient data}. First half average: {N}. Second half average: {N}. Cost per bug: {improving/degrading}."
 
 **8. Tool call distribution per phase**: From audit trail JSONL files, count tool invocations grouped by phase. Shows where tool activity concentrates — if 80% of Edit calls happen in tdd-impl (GREEN), the implementation phase is the most write-heavy.
 
@@ -253,6 +253,27 @@ Add to the dashboard after the existing ROI Estimate section:
 | Audit (caudit) | {N} | {%} | {N} | {N} |
 | Other (cspec, cdebug, crefactor, cmodel, credteam, cdevadv, cpostmortem) | {N} | {%} | {N} | {N} |
 
+### Per-Feature Token Cost
+
+Read all `token-log-*.jsonl` files from `.correctless/artifacts/`. Produce a per-feature token cost table alongside the Phase Distribution table. Each row represents one feature. Extract the feature slug from the JSONL filename (the portion between `token-log-` and `.jsonl`).
+
+Columns: feature slug, total tokens, tokens by skill category (TDD, Review, Verification, Audit, Other), and QA rounds.
+
+Use the JSONL `skill` field for category mapping:
+- ctdd maps to TDD
+- creview/creview-spec maps to Review
+- cverify maps to Verification
+- caudit maps to Audit
+- all others map to Other
+
+Read QA rounds from the workflow state file (`.correctless/artifacts/workflow-state-{slug}.json`, field `qa_rounds`) for each feature. If no workflow state file exists for a feature, show "–" in the QA Rounds column. If a JSONL entry lacks a `skill` field, infer the category from the `phase` field using the same mapping.
+
+The table is sorted by total tokens descending. If no token log files exist, skip this section with a note: "No token log data available."
+
+| Feature Slug | Total Tokens | TDD | Review | Verification | Audit | Other | QA Rounds |
+|-------------|-------------|-----|--------|-------------|-------|-------|-----------|
+| {slug} | {N} | {N} | {N} | {N} | {N} | {N} | {N} |
+
 ### Bug Escape Rate
 - **Pre-merge bugs caught:** {N}
 - **Post-merge bugs escaped:** {M}
@@ -264,7 +285,7 @@ Add to the dashboard after the existing ROI Estimate section:
 - **Olympics efficiency (high+ intensity):** Round 1: {N} findings at {T}k tokens → Round {M}: {N} findings at {T}k tokens
 
 ### Token Trend
-- Token cost per feature: {stable/growing/shrinking}
+- Token cost per feature: {growing/shrinking/stable/insufficient data} (first half average vs second half average, 20% threshold)
 - Cost per bug caught: {improving/degrading}
 ```
 

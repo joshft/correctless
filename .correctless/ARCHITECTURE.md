@@ -70,6 +70,13 @@
 - **Violated when**: A skill other than cverify writes to intensity-calibration.json, or calibration data appears in workflow state files
 - **Test**: grep cspec SKILL.md for write/append/create referencing calibration (must find none); grep workflow-advance.sh for calibration fields (must find none)
 
+### ABS-006: Token-log JSONL contract (.correctless/artifacts/)
+- **What**: Per-branch JSONL files at `.correctless/artifacts/token-log-{branch-slug}.jsonl` recording token usage. One producer (hooks/token-tracking.sh PostToolUse hook) writes mechanically on every Agent tool completion. Two consumers: cverify (sums total_tokens for calibration entries via deterministic jq) and cmetrics (aggregates per-feature cost tables and trend analysis).
+- **Invariant**: The hook is the sole mechanical producer. Skills may also append entries with a `skill` field for category attribution. Consumers must handle malformed lines (skip, not fail) and missing files (default to 0). The `total_tokens` field is the canonical cost metric — consumers sum this field, never compute from input_tokens + output_tokens independently.
+- **Enforced at**: hooks/token-tracking.sh (producer), skills/cverify/SKILL.md (consumer — jq -R try/catch), skills/cmetrics/SKILL.md (consumer — per-feature table)
+- **Violated when**: A consumer modifies or deletes token-log files, a consumer fails on malformed JSONL instead of skipping, or total_tokens is recomputed from sub-fields
+- **Test**: PRH-001 in token-aware-intensity tests (hook unchanged); INV-001d (jq summation); INV-001e (malformed skip)
+
 ## Patterns
 
 ### PAT-001: PreToolUse hook conventions

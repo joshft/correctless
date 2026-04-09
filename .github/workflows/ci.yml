@@ -54,6 +54,7 @@ jobs:
           bash tests/test-ci-hook-wiring.sh
           bash tests/test-intensity-calibration.sh
           bash tests/test-auto-recurring-patterns.sh
+          bash tests/test-token-aware-intensity.sh
 
       - name: Verify sync
         run: |
