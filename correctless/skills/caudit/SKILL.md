@@ -109,6 +109,16 @@ Clean up the checkpoint file when the audit converges and completes successfully
    - Non-trivial: TDD (tests first, separate impl agent)
    - Trivial one-liners: apply directly
 6. Commit fixes
+6a. FIX VERIFICATION — MANDATORY before spawning next round (AP-012)
+    - Run full test suite (`commands.test` from workflow-config.json).
+      Test failures become BLOCKING findings for the current round —
+      do not advance until the test suite passes cleanly.
+    - Spawn a fix-diff review subagent scoped to the fix commit diff
+      (see "Fix-Diff Review Agent" below). Its sole job is to find
+      new bugs introduced by the fix commits. Blocking findings from
+      this agent are added to the current round immediately, NOT
+      deferred to the next round's specialist respawn.
+    - Only advance to step 7 once both checks pass.
 7. Spawn FRESH agents for next round (new context, no memory)
    - Tell them: "The previous round was sloppy and missed things.
      The agents were overconfident and under-thorough. Do better."
@@ -117,6 +127,52 @@ Clean up the checkpoint file when the audit converges and completes successfully
 9. Post-convergence: write mandatory regression tests
 10. Merge audit branch to main
 ```
+
+### Why fix verification is mandatory (AP-012 / PMB-002)
+
+The QA Olympics audit on 2026-04-09 produced a 3-round convergence where every
+fix round introduced at least one new regression. R1's 19 fixes caused 3 R2
+regressions; R2's 7 fixes caused 1 R3 regression; R3's 1 fix caused a CI
+failure on jq 1.7 that no local test caught. The convergence loop works
+eventually, but it wastes rounds. Each round means ~6 specialist agents + triage
++ human review — cheap when there's no regression, expensive when there is.
+
+The root cause: fix commits are treated as "closing the finding" rather than
+"new code that needs scrutiny". Fix rounds bypass the TDD discipline that the
+main workflow enforces on feature code. Running the test suite and a
+diff-focused review after each fix commit catches regressions cheaply, before
+they propagate to the next round.
+
+### Fix-Diff Review Agent
+
+After committing each round's fixes, spawn a single subagent with this framing:
+
+> You are the fix-diff reviewer for the audit round just completed.
+>
+> Your sole job is to find new bugs introduced by the fix commits — not to
+> re-find the original findings, and not to audit the unchanged codebase.
+> Your scope is the diff of the fix commit(s) from this round.
+>
+> Run: `git diff HEAD~1..HEAD` (or the range covering this round's fixes)
+> to see what changed.
+>
+> For each changed file, answer:
+> 1. Does the change actually address the finding it claims to fix?
+> 2. Does the change touch anything outside the minimum scope of the fix?
+>    If so, why? Is that additional change correct?
+> 3. Could this change break another part of the system that the test suite
+>    doesn't cover? (e.g., environment-version drift, undocumented API contracts,
+>    side effects)
+> 4. Does the change introduce any patterns from .correctless/antipatterns.md?
+>    Especially AP-011 (tooling version drift) and AP-012 (fix rounds untested).
+>
+> Return BLOCKING findings only when you have a concrete new bug with evidence.
+> Style concerns and suggestions are out of scope — this agent catches bugs,
+> not taste.
+
+Blocking findings from this agent are added to the current round's findings
+list. Re-run step 5 (human triage) to decide fix/defer/dispute for each, then
+re-commit, re-run step 6a. Loop until the fix-diff review is clean.
 
 ## Convergence
 

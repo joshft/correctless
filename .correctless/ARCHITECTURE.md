@@ -176,10 +176,10 @@
 - **Consequence if wrong**: Silent failures — `${var,,}` produces empty string on Bash 3.x
 - **Test**: Not runtime-checked. macOS ships Bash 3.2 by default; users must install Bash 4+ via Homebrew.
 
-### ENV-002: jq required
-- **Assumption**: `jq` is available on PATH for JSON parsing of hook stdin and config files.
-- **Consequence if wrong**: workflow-gate.sh and sensitive-file-guard.sh exit 2 (fail-closed). auto-format.sh exits 0 (advisory).
-- **Test**: Each hook checks `command -v jq` at startup.
+### ENV-002: jq 1.7+ required
+- **Assumption**: `jq` version 1.7 or later is available on PATH for JSON parsing of hook stdin and config files. jq 1.6 has known incompatibilities (setup and many hooks fail) and is not supported.
+- **Consequence if wrong**: workflow-gate.sh and sensitive-file-guard.sh exit 2 (fail-closed). auto-format.sh exits 0 (advisory). On jq 1.6, setup itself fails to configure the project.
+- **Test**: Each hook checks `command -v jq` at startup. CI tests against jq 1.7.1 and jq 1.8.1 via matrix (AP-011) to catch version-portability bugs. Note: jq 1.8 silently fixed operator precedence for `as $var` bindings after arithmetic — see PAT-010.
 
 ### ENV-003: Filesystem modification timestamps unreliable for recency
 - **Assumption**: File modification times may not reflect authoring order after git clone, checkout, or rebase. Budget selection (PAT-004) uses filename sort (which embeds the feature slug) rather than mtime.
