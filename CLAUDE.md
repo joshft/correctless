@@ -83,3 +83,11 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 - **Structurally resolved** by feature/hook-sync-enforcement (2026-04-08): `_has_write_pattern()` and `get_target_file()` extracted into scripts/lib.sh (ABS-001). All consuming hooks source the shared functions — drift is structurally impossible.
 - Original issue: write-command lists and file extension regexes duplicated across workflow-gate.sh, sensitive-file-guard.sh, and audit-trail.sh. Caught by 3 consecutive audits.
 - Source: /caudit qa, resolved by /cdocs after hook-sync-enforcement
+
+### 2026-04-10 — Postmortem: jq 1.7 vs 1.8 operator precedence for `as` bindings
+- jq 1.8 silently fixed `(EXPR // 0) + 1 as $count | rest` precedence; jq 1.7 still parses it as `0 + (1 as $count | rest)` and fails at runtime. Local dev (jq 1.8) passes, CI (Ubuntu 24.04, jq 1.7) fails. When writing jq filters, always wrap the expression being bound in explicit parens: `((EXPR OP VAL)) as $var | rest`. See PAT-010 in .correctless/ARCHITECTURE.md and AP-011 in antipatterns.md. Fix: CI matrix across jq versions.
+- Source: PMB-001
+
+### 2026-04-10 — Postmortem: Audit fix rounds are untested code
+- QA Olympics audit ran 3 rounds where each round introduced at least one regression that the next round had to catch. Fix commits bypass the TDD discipline of the main workflow — they're batched into one commit per round without test suite verification or diff-focused review. The convergence loop works eventually but wastes rounds. Class fix: /caudit must run the full test suite and spawn a fix-diff review agent after each fix round commit, before advancing. See AP-012.
+- Source: PMB-002
