@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2254  # Unquoted $pat in case is intentional — we need glob matching
 # HOOK_TYPE: PostToolUse
-# HOOK_MATCHER: Edit|Write|MultiEdit|CreateFile|Bash
+# HOOK_MATCHER: Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash|Read|Grep
 # Correctless — PostToolUse audit trail + adherence feedback
 # Records every file modification with workflow phase context.
 # Lite mode: phase-violation alerts to stderr
@@ -19,6 +19,7 @@ INPUT="$(cat)"
 eval "$(echo "$INPUT" | jq -r '
   @sh "TOOL_NAME=\(.tool_name // "")",
   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
+  @sh "TOOL_INPUT_PATH=\(.tool_input.path // "")",
   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
   @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))"
 ' 2>/dev/null)" || exit 0
@@ -48,6 +49,10 @@ case "$TOOL_NAME" in
   MultiEdit)
     FILES="$TOOL_INPUT_EDITS"
     ;;
+  Grep)
+    # QA-R2-002: Grep uses .tool_input.path, not .tool_input.file_path
+    FILES="$TOOL_INPUT_PATH"
+    ;;
   *)
     FILES="$TOOL_INPUT_FILE"
     ;;
@@ -70,7 +75,9 @@ STATE_FILE=".correctless/artifacts/workflow-state-${_slug}.json"
 [ -f "$STATE_FILE" ] || exit 0
 
 # Read phase and config
-PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)"
+# QA-R1-015: Default to "unknown" if jq fails on corrupted state file
+PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)" || true
+[ -n "$PHASE" ] || PHASE="unknown"
 CONFIG_FILE="$(config_file 2>/dev/null)" || CONFIG_FILE=".correctless/config/workflow-config.json"
 
 # --- Audit trail logging (batch all files in single jq call) ---
@@ -111,13 +118,17 @@ if [ -f "$CONFIG_FILE" ]; then
   eval "$(jq -r '
     @sh "TEST_PATTERN=\(.patterns.test_file // "")",
     @sh "SOURCE_PATTERN=\(.patterns.source_file // "")",
-    @sh "IS_FULL=\(if (.workflow.intensity // "") | IN("high","critical") then "true" else "false" end)"
+    @sh "IS_FULL=\(if (.workflow.intensity // "" | ascii_downcase) | IN("high","critical") then "true" else "false" end)"
   ' "$CONFIG_FILE" 2>/dev/null)" || true
 fi
 
 # classify_file() is provided by lib.sh (ABS-001: single definition)
 # Requires TEST_PATTERN and SOURCE_PATTERN globals set above.
 command -v classify_file >/dev/null 2>&1 || exit 0
+
+# QA-R1-006: Disable glob expansion — patterns like *.ts must not expand to filenames
+# (workflow-gate.sh and sensitive-file-guard.sh both have this; audit-trail was missing it)
+set -f
 
 # --- Lite mode: phase-violation alerts ---
 
@@ -128,22 +139,23 @@ while IFS= read -r f; do
   case "$PHASE" in
     tdd-qa|tdd-verify)
       # QA/verify phases should be read-only for source and test files
-      if [ "$fclass" = "source" ] && [ "$TOOL_NAME" != "Read" ]; then
+      # QA-R2-001: Exclude read-only tools (Read, Grep) from "modified" warnings
+      if [ "$fclass" = "source" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
         echo "⚠ $PHASE: Source file modified — ${f##*/} (this phase should be read-only)" >&2
       fi
-      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
+      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
         echo "⚠ $PHASE: Test file modified — ${f##*/} (this phase should be read-only)" >&2
       fi
       ;;
     tdd-impl)
       # GREEN phase: test edits should be logged
-      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
+      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
         echo "📝 GREEN: Test file edited — ${f##*/} (should be logged in test-edit-log)" >&2
       fi
       ;;
     spec|review|review-spec|model)
-      # Spec/review phases: no source or test edits
-      if [ "$fclass" = "source" ] || [ "$fclass" = "test" ]; then
+      # Spec/review phases: no source or test edits (reads are fine)
+      if { [ "$fclass" = "source" ] || [ "$fclass" = "test" ]; } && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
         echo "⚠ $PHASE: Code file modified — ${f##*/} (spec/review phases are docs-only)" >&2
       fi
       ;;
