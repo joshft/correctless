@@ -190,9 +190,13 @@ _release_state_lock() {
 }
 
 # locked_update_state — read-modify-write a state file under lock
+# Usage: locked_update_state STATE_FILE JQ_FILTER [--arg key val ...]
+# QA-R3-001: Extra arguments after the filter are passed through to jq,
+# enabling safe parameterization via --arg instead of string interpolation.
 locked_update_state() {
   local state_file="$1"
   local jq_filter="$2"
+  shift 2
   local rc=0
 
   _acquire_state_lock "$state_file" || return 1
@@ -202,7 +206,7 @@ locked_update_state() {
   trap "$(printf '_release_state_lock %q; rm -f %q' "$state_file" "${state_file}.$$.tmp")" EXIT
 
   local tmp_file="${state_file}.$$.tmp"
-  if jq "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
+  if jq "$jq_filter" "$@" "$state_file" > "$tmp_file" 2>/dev/null; then
     mv "$tmp_file" "$state_file" || { rm -f "$tmp_file"; rc=1; }
   else
     rm -f "$tmp_file"

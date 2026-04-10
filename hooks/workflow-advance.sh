@@ -785,11 +785,13 @@ cmd_spec_update() {
   local sf ts
   sf="$(state_file)"
   ts="$(now_iso)"
+  # QA-R3-001: Use --arg for user-supplied $reason to prevent jq injection
   locked_update_state "$sf" \
-    "(.spec_updates // 0) + 1 as \$count |
-     .spec_updates = \$count |
-     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: \"$reason\", timestamp: \"$ts\"}] |
-     .phase = \"spec\" | .phase_entered_at = \"$ts\"" \
+    '(.spec_updates // 0) + 1 as $count |
+     .spec_updates = $count |
+     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: $reason, timestamp: $ts}] |
+     .phase = "spec" | .phase_entered_at = $ts' \
+    --arg reason "$reason" --arg ts "$ts" \
     || die "Failed to update state for spec-update"
   info "Phase: spec"
 
@@ -861,10 +863,10 @@ cmd_override() {
   fi
 
   # QA-R2-004: Use locked_update_state for atomic read-modify-write
-  local sf
-  sf="$(state_file)"
+  # QA-R3-001: Use --arg for user-supplied $reason to prevent jq injection
   locked_update_state "$sf" \
-    ".override = {active: true, reason: \"$reason\", started_at: \"$ts\", remaining_calls: 10} | .override_count = (.override_count // 0) + 1" \
+    '.override = {active: true, reason: $reason, started_at: $ts, remaining_calls: 10} | .override_count = (.override_count // 0) + 1' \
+    --arg reason "$reason" --arg ts "$ts" \
     || die "Failed to write override state"
 
   # Append to override log
