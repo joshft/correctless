@@ -132,7 +132,9 @@ read_config_field() {
 is_full_mode() {
   [ -f "$CONFIG_FILE" ] || return 1
   local intensity
-  intensity="$(jq -r '.workflow.intensity // empty' "$CONFIG_FILE")"
+  intensity="$(jq -r '.workflow.intensity // empty' "$CONFIG_FILE" 2>/dev/null)" || true
+  # Normalize case — handle user-edited configs with "High" or "CRITICAL"
+  intensity="${intensity,,}"
 
   # Also check feature_intensity from the state file (PAT-005: effective intensity)
   local STATE_FILE
@@ -140,6 +142,8 @@ is_full_mode() {
   if [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ]; then
     local feature_intensity
     feature_intensity="$(jq -r '.feature_intensity // empty' "$STATE_FILE" 2>/dev/null)" || true
+    # Normalize case
+    feature_intensity="${feature_intensity,,}"
     # Compute effective intensity as max(project, feature) using ordering standard < high < critical
     if [ -n "$feature_intensity" ]; then
       case "$feature_intensity" in
@@ -1108,7 +1112,7 @@ case "$cmd" in
     echo "  status             Print current workflow state"
     echo "  status-all         Print all active workflows across branches"
     echo ""
-    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /crefactor /cpr-review /ccontribute /cmaintain /cstatus /csummary /cmetrics /cdebug /chelp /cwtf /cquick /crelease /cexplain"
+    echo "Skills: /csetup /cspec /creview /ctdd /cverify /cdocs /crefactor /cpr-review /ccontribute /cmaintain /cstatus /csummary /cmetrics /cdebug /chelp /cwtf /cquick /crelease /cexplain /cauto"
     echo "High+:  /cmodel /creview-spec /caudit /cupdate-arch /cpostmortem /cdevadv /credteam"
     exit 1
     ;;

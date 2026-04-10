@@ -110,8 +110,8 @@ test_r001_sync_single_dist() {
   fi
   assert_eq "R-001: correctless/ has 27 skills" "27" "$skill_count"
 
-  # R-001: verify each of the 26 skills exists in correctless/
-  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain; do
+  # R-001: verify each of the 27 skills exists in correctless/
+  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto; do
     assert_eq "R-001: correctless/skills/$skill/SKILL.md exists" "true" \
       "$([ -f "$REPO_DIR/correctless/skills/$skill/SKILL.md" ] && echo true || echo false)"
   done
@@ -554,9 +554,9 @@ test_r011_chelp_all_skills() {
 
   local chelp="$REPO_DIR/skills/chelp/SKILL.md"
 
-  # R-011: chelp lists all 26 skills
+  # R-011: chelp lists all 27 skills
   # Check for each skill command name
-  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain; do
+  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto; do
     file_contains "$chelp" "/$skill" \
       && local found="true" || local found="false"
     assert_eq "R-011: chelp mentions /$skill" "true" "$found"

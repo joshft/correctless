@@ -135,6 +135,7 @@ Available commands:
   /cquick         Lightweight TDD — quick-start without full spec
   /crelease       Versioning and changelog management
   /cexplain       Guided codebase exploration
+  /cauto          Semi-auto pipeline — orchestrates ctdd through PR
 
 State management:
   .correctless/hooks/workflow-advance.sh status      Current phase

@@ -22,7 +22,7 @@ All notable changes to Correctless are documented here.
 - Verbatim Effective Intensity section (R-022) across all pipeline skills
 
 ### Added — Infrastructure
-- 17 test files with ~1,900 assertions (up from 57 in v2.0.0)
+- 32 test files with ~2,000 assertions (up from 57 in v2.0.0)
 - Calm reset prompts in /ctdd and /caudit orchestrators
 - Spec template files (spec-lite.md, spec-full.md) for intensity-aware spec generation
 
