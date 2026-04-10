@@ -38,6 +38,8 @@ Built-in defaults when preferences.md is missing:
 - Escalation sensitivity: escalate on any architectural decision
 - PR creation: `gh` (create PR via `gh pr create`)
 
+Log a `preference_applied` audit event for each non-default preference loaded from `preferences.md`. If all preferences match the built-in defaults (or the file is absent), no `preference_applied` events are logged.
+
 ## Resumption Check (R-016)
 
 On invocation, check for an existing escalation file at `.correctless/artifacts/escalation-{branch_slug}.md`. If present:
@@ -62,6 +64,8 @@ The effective intensity computation from shared constraints determines which ski
 - At **high** or **critical** intensity: run the full pipeline including `/cupdate-arch`.
 
 `cupdate-arch` has an independent intensity gate in its own SKILL.md — it will refuse to run at standard intensity regardless of whether `/cauto` invokes it.
+
+When `/cupdate-arch` is skipped due to standard intensity, log a `preference_applied` audit event with the reason "cupdate-arch skipped: standard intensity".
 
 ### Workflow State Machine Transitions (R-010)
 
@@ -125,6 +129,8 @@ At high or critical intensity, spawn a sub-agent to execute `/cupdate-arch`. Ski
 
 Spawn a sub-agent to execute `/cdocs`. Log `skill_started` before, `skill_completed` after.
 
+After `/cdocs` completes, run `git diff --name-only HEAD` and check if CLAUDE.md appears in the changed files. If it does, trigger R-006(e) escalation — CLAUDE.md changes require human approval. Write the escalation file and halt the pipeline; do not proceed to PR creation until the human approves the CLAUDE.md changes.
+
 ### Step 8: Create PR (R-008)
 
 Create a PR according to the `pr_creation` preference from `preferences.md`:
@@ -136,6 +142,8 @@ Create a PR according to the `pr_creation` preference from `preferences.md`:
   - **Verification status**: pass/fail from `/cverify`
 - **`skip`**: Skip PR creation, just report pipeline completion.
 - **Custom command**: Execute the specified custom PR command via shell (TB-001b: custom PR commands follow the same trust model as TB-001a test runner commands — the file is local, under the project owner's control, and protected by the sensitive-file-guard).
+
+Log a `preference_applied` audit event with the selected PR creation mode (e.g., "pr_creation: gh", "pr_creation: skip", or "pr_creation: custom").
 
 Log `pipeline_completed` in the audit trail.
 

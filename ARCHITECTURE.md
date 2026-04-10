@@ -8,11 +8,11 @@
 | Hooks | `hooks/` | 4 bash scripts: workflow gate (PreToolUse), state machine (workflow-advance), statusline, audit trail. These enforce the workflow. |
 | Templates | `templates/` | Scaffolding templates for ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, invariant templates (high+ intensity), spec templates, workflow configs. |
 | Helpers | `helpers/` | Property-based testing guides per language (Go, Python, TypeScript, Rust). High+ intensity. |
-| Distribution | `correctless/` | Single 26-skill distribution. Intensity gates control which skills activate at each level. |
+| Distribution | `correctless/` | Single 27-skill distribution. Intensity gates control which skills activate at each level. |
 | Docs | `docs/` | Per-skill user-facing documentation and feature docs. |
 | Design Specs | `docs/design/correctless.md` | Design specification covering all intensity levels. |
 | Setup | `setup` | Bash script: detects stack, scaffolds config/hooks/templates, registers Claude Code hooks. Idempotent. |
-| Tests | `tests/test*.sh` | 17 test files covering setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan. |
+| Tests | `tests/test*.sh` | 32 test files covering setup, state machine, gate, full mode, MCP, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, hook-sync, lib, lib-locking, token-tracking, token-tracking-setup, token-tracking-skill-field, allowed-tools-check, gate-path-exceptions, intensity-calibration, auto-recurring-patterns, shift-left-review, ci-hook-wiring, token-aware-intensity, semi-auto-mode. |
 | Sync | `sync.sh` | Copies source files into the `correctless/` distribution target. |
 
 ## Design Patterns

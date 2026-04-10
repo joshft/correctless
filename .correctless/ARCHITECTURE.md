@@ -101,7 +101,7 @@
 ### ABS-008: preferences.md contract (.correctless/)
 - **What**: Project-level preference file at `.correctless/preferences.md`. Scaffolded by `/csetup` from `templates/preferences.md`. Read by `/cauto` and all pipeline skills. Edited by the human. Contains codified judgment calls: QA finding triage, documentation scope, commit granularity, escalation sensitivity, PR creation mode.
 - **Invariant**: `/csetup` scaffolds the file (idempotent — never overwrites). `/cauto` and pipeline skills read preferences. The human is the sole editor. Falls back to built-in defaults when missing.
-- **Enforced at**: setup (scaffolding), skills/cauto/SKILL.md (reader), hooks/sensitive-file-guard.sh (protection)
+- **Enforced at**: setup (scaffolding), skills/cauto/SKILL.md (reader), hooks/sensitive-file-guard.sh (protection), skills/_shared/constraints.md (reader instruction for all skills)
 - **Violated when**: A skill writes to preferences.md, or the pipeline fails when preferences.md is absent
 - **Test**: R-004 in semi-auto-mode tests (template categories), R-013 (setup scaffolding), R-019 (sensitive-file-guard protection)
 

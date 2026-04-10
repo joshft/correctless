@@ -94,6 +94,7 @@ Other:
   /cwtf          Audit the workflow — did agents follow instructions?
   /crelease      Version bumping, changelog, release tagging
   /cexplain      Guided codebase exploration with diagrams
+  /cauto         Semi-auto pipeline — orchestrates ctdd through PR   [standard+]
 ```
 
 ### 4. Show Current Status

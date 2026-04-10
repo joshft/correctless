@@ -482,7 +482,7 @@ test_r010_workflow_transitions() {
   pos_tdd_tests="$(echo "$skill_content" | grep -n "tdd-tests" | head -1 | cut -d: -f1)"
   pos_tdd_impl="$(echo "$skill_content" | grep -n "tdd-impl" | head -1 | cut -d: -f1)"
   pos_tdd_qa="$(echo "$skill_content" | grep -n "tdd-qa" | head -1 | cut -d: -f1)"
-  pos_done="$(echo "$skill_content" | grep -n '\bdone\b' | head -1 | cut -d: -f1)"
+  pos_done="$(echo "$skill_content" | grep -nw 'done' | head -1 | cut -d: -f1)"
   pos_verified="$(echo "$skill_content" | grep -n "verified" | head -1 | cut -d: -f1)"
   pos_documented="$(echo "$skill_content" | grep -n "documented" | head -1 | cut -d: -f1)"
 
@@ -801,11 +801,11 @@ test_r019_preferences_in_sensitive_guard() {
 
   local hook="$REPO_DIR/hooks/sensitive-file-guard.sh"
 
-  # R-019: sensitive-file-guard must list preferences.md in protected patterns
-  file_contains_i "$hook" "preferences.md" \
-    "R-019: sensitive-file-guard lists preferences.md in protected patterns"
+  # R-019: sensitive-file-guard must list .correctless/preferences.md in protected patterns
+  file_contains_i "$hook" ".correctless/preferences.md" \
+    "R-019: sensitive-file-guard lists .correctless/preferences.md in protected patterns"
 
-  # R-019: Integration test — hook blocks Write to preferences.md
+  # R-019: Integration test — hook blocks Write to .correctless/preferences.md
   local test_dir="$REPO_DIR/tests/tmp/semi-auto-r019-$$"
   rm -rf "$test_dir"
   mkdir -p "$test_dir/.correctless/config"
@@ -817,15 +817,19 @@ test_r019_preferences_in_sensitive_guard() {
 
   local result
   result="$(run_sfg_hook '{"tool_name":"Write","tool_input":{"file_path":".correctless/preferences.md","content":"test"}}')"
-  assert_eq "R-019: Write to preferences.md is blocked" "2" "$result"
+  assert_eq "R-019: Write to .correctless/preferences.md is blocked" "2" "$result"
 
-  # R-019: hook blocks Edit to preferences.md
+  # R-019: hook blocks Edit to .correctless/preferences.md
   result="$(run_sfg_hook '{"tool_name":"Edit","tool_input":{"file_path":".correctless/preferences.md","old_string":"a","new_string":"b"}}')"
-  assert_eq "R-019: Edit to preferences.md is blocked" "2" "$result"
+  assert_eq "R-019: Edit to .correctless/preferences.md is blocked" "2" "$result"
 
-  # R-019: hook blocks Bash writes to preferences.md
+  # R-019: hook blocks Bash writes to .correctless/preferences.md
   result="$(run_sfg_hook '{"tool_name":"Bash","tool_input":{"command":"cat data > .correctless/preferences.md"}}')"
-  assert_eq "R-019: Bash redirect to preferences.md is blocked" "2" "$result"
+  assert_eq "R-019: Bash redirect to .correctless/preferences.md is blocked" "2" "$result"
+
+  # R-019: negative test — docs/preferences.md should NOT be blocked (path-qualified pattern)
+  result="$(run_sfg_hook '{"tool_name":"Write","tool_input":{"file_path":"docs/preferences.md","content":"test"}}')"
+  assert_eq "R-019: Write to docs/preferences.md is NOT blocked" "0" "$result"
 
   cd "$REPO_DIR" || return
   rm -rf "$test_dir"
@@ -963,11 +967,11 @@ test_pre006_preferences_in_guard_defaults() {
 
   local hook="$REPO_DIR/hooks/sensitive-file-guard.sh"
 
-  # PRE-006: preferences.md must be in the DEFAULTS section (hardcoded built-in list)
+  # PRE-006: .correctless/preferences.md must be in the DEFAULTS section (hardcoded built-in list)
   # Extract the DEFAULTS block and check
   local defaults_block
   defaults_block="$(sed -n '/^DEFAULTS=/,/^"/p' "$hook" 2>/dev/null)"
-  assert_contains "PRE-006: preferences.md in DEFAULTS built-in list" "preferences.md" "$defaults_block"
+  assert_contains "PRE-006: .correctless/preferences.md in DEFAULTS built-in list" ".correctless/preferences.md" "$defaults_block"
 }
 
 # ============================================
@@ -1002,7 +1006,7 @@ test_qa001_skill_count_matches_docs() {
   done
 
   local doc_count
-  doc_count="$(grep -oP '\b\d+ skill' "$REPO_DIR/.correctless/AGENT_CONTEXT.md" | head -1 | grep -oP '\d+')"
+  doc_count="$(grep -Eo '[0-9]+ skill' "$REPO_DIR/.correctless/AGENT_CONTEXT.md" | head -1 | grep -Eo '[0-9]+')"
 
   assert_eq "QA-001: actual skill count ($actual_count) matches AGENT_CONTEXT.md ($doc_count)" "$actual_count" "$doc_count"
 }
