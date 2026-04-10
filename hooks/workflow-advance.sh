@@ -786,11 +786,12 @@ cmd_spec_update() {
   sf="$(state_file)"
   ts="$(now_iso)"
   # QA-R3-001: Use --arg for user-supplied $reason to prevent jq injection
+  # Note: avoid `X + 1 as $c` — jq 1.7 parses this as `X + (1 as $c)` (CI regression)
   locked_update_state "$sf" \
-    '(.spec_updates // 0) + 1 as $count |
-     .spec_updates = $count |
-     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: $reason, timestamp: $ts}] |
-     .phase = "spec" | .phase_entered_at = $ts' \
+    '.spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: $reason, timestamp: $ts}]
+     | .spec_updates = ((.spec_updates // 0) + 1)
+     | .phase = "spec"
+     | .phase_entered_at = $ts' \
     --arg reason "$reason" --arg ts "$ts" \
     || die "Failed to update state for spec-update"
   info "Phase: spec"
