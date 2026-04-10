@@ -171,17 +171,18 @@ This ensures future spec and review agents know about established conventions wi
 
 ### Back-fill Deferred Meta Fields
 
-Before advancing the state machine, scan `.correctless/meta/*.json` for any file containing a `created_at_commit` field set to `null`. For each such file, fill the field with the current `HEAD` commit SHA (`git rev-parse HEAD`) — this is the merge commit that created the feature on the feature branch, which is the correct reference point for post-merge measurement gates.
+Before advancing the state machine, scan `.correctless/meta/*.json` for any file containing a `created_at_commit` field set to `null`. For each null field, fill it with `git merge-base main HEAD` — the commit the feature branched from on main, which is the pre-feature baseline for post-merge measurement gates that count "PRs landed since feature X merged". If `.correctless/meta/*.json` already has a non-null `created_at_commit`, leave it alone — the value was pre-set during GREEN or an earlier /cdocs run and overriding it would corrupt the baseline.
 
-Specifically, `.correctless/meta/pat001-measurement-due.json` is created by the path-scoped-rules-pat001-migration feature (GREEN phase) with `created_at_commit: null` and must be back-filled at merge time. If it is still null when /cdocs runs, the MG-003 measurement gate in `skills/cstatus/SKILL.md` will emit a "null created_at_commit" advisory instead of the real measurement warning — meaning the dogfood experiment never actually measures anything.
+Specifically, `.correctless/meta/pat001-measurement-due.json` is created by the path-scoped-rules-pat001-migration feature with a baseline SHA that `/cstatus` uses to count hook-touching PRs landed after merge. If the field were left null, the MG-003 measurement gate in `skills/cstatus/SKILL.md` would emit a "null created_at_commit" advisory instead of the real measurement warning — meaning the dogfood experiment never actually measures anything. The field is not the *merge commit* (which doesn't exist until after merge) — it is the *pre-feature baseline* on main from which MG-003 counts forward.
 
 Procedure (for each matching file):
-1. Read the file and confirm `created_at_commit` is the string `null`.
-2. Read `git rev-parse HEAD` for the current commit SHA.
-3. Edit the file to replace `"created_at_commit": null` with `"created_at_commit": "<sha>"`.
-4. Do NOT create the file if it does not exist. Only back-fill existing files.
+1. Read the file and check whether `created_at_commit` is the literal JSON value `null`.
+2. If non-null, skip this file — do not overwrite.
+3. If null, read `git merge-base main HEAD` for the pre-feature baseline SHA.
+4. Edit the file to replace `"created_at_commit": null` with `"created_at_commit": "<sha>"`.
+5. Do NOT create the file if it does not exist. Only back-fill existing files.
 
-This is a small step but it is the only mechanism that converts the merge commit into the measurement gate's anchor. Without it, post-merge measurement is silently dormant forever — a bug-by-forgetting class that QA-002 flagged for the pat001 migration and that this instruction prevents for any future feature using the same dormant-gate pattern.
+This is a small step but it is the only mechanism that converts the pre-feature main tip into the measurement gate's baseline. Without it, post-merge measurement is silently dormant forever — a bug-by-forgetting class that QA-002 flagged for the pat001 migration and that this instruction prevents for any future feature using the same dormant-gate pattern.
 
 ### Advance Workflow
 

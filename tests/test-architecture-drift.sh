@@ -970,8 +970,12 @@ check_inv010_self_scan() {
   local lib_funcs
   lib_funcs="repo_root branch_slug classify_file config_file artifacts_dir read_patterns read_intensity _has_write_pattern get_target_file locked_update_state _acquire_state_lock _release_state_lock"
   for fn in $lib_funcs; do
-    # Match `funcname() {` or `funcname () {` at start of line (no leading #)
-    if echo "$stripped" | grep -qE "^${fn}[[:space:]]*\\(\\)[[:space:]]*\\{"; then
+    # L5 fix: match both POSIX-style `funcname() {` / `funcname () {` AND
+    # the bash-keyword form `function funcname {` / `function funcname() {`
+    # at start of line. Project convention uses the POSIX form exclusively
+    # but the check should not miss a future deviation.
+    if echo "$stripped" | grep -qE "^${fn}[[:space:]]*\\(\\)[[:space:]]*\\{" \
+       || echo "$stripped" | grep -qE "^function[[:space:]]+${fn}([[:space:]]*\\(\\))?[[:space:]]*\\{"; then
       fail "INV-020" "self-scan: forbidden local re-definition of lib.sh function: $fn"
       bad=1
     fi
@@ -1322,7 +1326,13 @@ check_inv018() {
   # Exclude this test file itself — it is the enforcer, not a consumer.
   # Its diagnostic messages and comment headers intentionally contain the
   # grep target substring.
-  self="tests/$(basename "${BASH_SOURCE[0]}")"
+  # L6 fix: derive self-path dynamically from BASH_SOURCE relative to the
+  # repo root. Do not hardcode `tests/` — if the drift test is ever moved
+  # (e.g., to tests/drift/), the self-exclusion would break silently and
+  # the test file's own diagnostic strings would match as stale refs.
+  local self_abs
+  self_abs="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  self="${self_abs#"$REPO_ROOT"/}"
   # A-005 fix: a broader pattern catches any line that co-mentions PAT-001
   # AND .correctless/ARCHITECTURE.md together (any phrasing), not just the
   # narrow "PAT-001 in ..." form.
@@ -1713,14 +1723,30 @@ check_qa_002_class() {
     fail "QA-002-CLASS" "skills/cdocs/SKILL.md not found"
     return
   fi
+  # L4 fix: extract the "Back-fill Deferred Meta Fields" section body
+  # (from its `### ` heading to the next `### `/`## `/EOF), then require
+  # all three anchors to appear inside that specific section. Prevents a
+  # stray comment elsewhere in SKILL.md from making the check pass by
+  # coincidence.
+  local section
+  section="$(awk '
+    /^### Back-fill Deferred Meta Fields[[:space:]]*$/ { in_sec = 1; next }
+    in_sec && /^### [^#]/ { exit }
+    in_sec && /^## [^#]/ { exit }
+    in_sec { print }
+  ' "$cdocs_skill")"
+  if [ -z "$section" ]; then
+    fail "QA-002-CLASS" "skills/cdocs/SKILL.md missing '### Back-fill Deferred Meta Fields' section"
+    return
+  fi
   local have_meta_path=0 have_field=0 have_backfill=0
-  grep -qF ".correctless/meta/" "$cdocs_skill" && have_meta_path=1
-  grep -qF "created_at_commit" "$cdocs_skill" && have_field=1
-  grep -qiF "back-fill" "$cdocs_skill" && have_backfill=1
+  printf '%s\n' "$section" | grep -qF ".correctless/meta/" && have_meta_path=1
+  printf '%s\n' "$section" | grep -qF "created_at_commit" && have_field=1
+  printf '%s\n' "$section" | grep -qiF "back-fill" && have_backfill=1
   if [ $have_meta_path -eq 1 ] && [ $have_field -eq 1 ] && [ $have_backfill -eq 1 ]; then
-    pass "QA-002-CLASS" "skills/cdocs/SKILL.md has back-fill instruction for .correctless/meta/*.json"
+    pass "QA-002-CLASS" "skills/cdocs/SKILL.md 'Back-fill Deferred Meta Fields' section contains all required anchors"
   else
-    fail "QA-002-CLASS" "skills/cdocs/SKILL.md missing back-fill instruction (need references to .correctless/meta/, created_at_commit, back-fill)"
+    fail "QA-002-CLASS" "'Back-fill Deferred Meta Fields' section missing anchors (meta_path=$have_meta_path created_at_commit=$have_field back-fill=$have_backfill)"
   fi
 }
 

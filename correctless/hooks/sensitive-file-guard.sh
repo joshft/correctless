@@ -2,7 +2,6 @@
 # shellcheck disable=SC2254
 # HOOK_TYPE: PreToolUse
 # HOOK_MATCHER: Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash
-# Rule: .claude/rules/hooks-pretooluse.md (PAT-001 — fail-closed posture)
 # Correctless — PreToolUse sensitive file protection hook
 # Blocks the agent from modifying sensitive files (.env, credentials, keys, etc.)
 # Independent of workflow state — no overrides, no phase exceptions.
