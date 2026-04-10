@@ -1,0 +1,27 @@
+{
+  "preset": "qa",
+  "date": "2026-04-09",
+  "round": 1,
+  "findings": [
+    {"id": "QA-R1-001", "severity": "high", "tier": "confirmed", "agent": "regression-hunter", "title": "Stale hook copies in .claude/hooks/ and .correctless/hooks/", "status": "fixed"},
+    {"id": "QA-R1-002", "severity": "high", "tier": "confirmed", "agent": "input-boundary-tester", "title": "workflow-gate.sh bypass via substring match on workflow-advance.sh", "status": "fixed"},
+    {"id": "QA-R1-003", "severity": "high", "tier": "probable", "agent": "api-contract-checker", "title": "Shared constraints JSONL schema omits skill field", "status": "fixed"},
+    {"id": "QA-R1-004", "severity": "medium", "tier": "probable", "agent": "error-handling-auditor", "title": "Corrupted config silently degrades fail-closed to fail-open", "status": "fixed"},
+    {"id": "QA-R1-005", "severity": "medium", "tier": "confirmed", "agent": "input-boundary-tester", "title": "workflow-gate.sh fails open on malformed stdin JSON", "status": "fixed"},
+    {"id": "QA-R1-006", "severity": "medium", "tier": "confirmed", "agent": "input-boundary-tester", "title": "audit-trail.sh missing set -f for classify_file", "status": "fixed"},
+    {"id": "QA-R1-007", "severity": "medium", "tier": "confirmed", "agent": "api-contract-checker", "title": "audit-trail.sh HOOK_MATCHER excludes Read/Grep", "status": "fixed"},
+    {"id": "QA-R1-008", "severity": "medium", "tier": "confirmed", "agent": "api-contract-checker", "title": "audit-trail.sh HOOK_MATCHER missing NotebookEdit", "status": "fixed"},
+    {"id": "QA-R1-009", "severity": "medium", "tier": "confirmed", "agent": "regression-hunter", "title": "setup uses \\s GNU grep extension in version detection", "status": "fixed"},
+    {"id": "QA-R1-010", "severity": "medium", "tier": "confirmed", "agent": "regression-hunter", "title": "test-consolidation.sh uses grep -P", "status": "fixed"},
+    {"id": "QA-R1-011", "severity": "medium", "tier": "probable", "agent": "regression-hunter", "title": "audit-trail.sh IS_FULL case-sensitive", "status": "fixed"},
+    {"id": "QA-R1-012", "severity": "medium", "tier": "probable", "agent": "concurrency-specialist", "title": "update_phase TOCTOU — lock covers only write", "status": "fixed"},
+    {"id": "QA-R1-013", "severity": "medium", "tier": "probable", "agent": "resource-lifecycle-tracker", "title": "locked_update_state missing EXIT trap", "status": "fixed"},
+    {"id": "QA-R1-014", "severity": "low", "tier": "probable", "agent": "error-handling-auditor", "title": "cmd_init spec stub orphaned on write failure", "status": "fixed"},
+    {"id": "QA-R1-015", "severity": "low", "tier": "probable", "agent": "error-handling-auditor", "title": "audit-trail.sh empty phase on state corruption", "status": "fixed"},
+    {"id": "QA-R1-016", "severity": "low", "tier": "probable", "agent": "error-handling-auditor", "title": "statusline.sh missing jq availability check", "status": "fixed"},
+    {"id": "QA-R1-017", "severity": "low", "tier": "probable", "agent": "input-boundary-tester", "title": "Inconsistent trap quoting in workflow-advance.sh", "status": "fixed"},
+    {"id": "QA-R1-018", "severity": "low", "tier": "probable", "agent": "resource-lifecycle-tracker", "title": "_acquire_state_lock spins on empty lock dir", "status": "fixed"},
+    {"id": "QA-R1-019", "severity": "low", "tier": "probable", "agent": "api-contract-checker", "title": "cmd_verified misleading error on null spec_file", "status": "fixed"}
+  ],
+  "rejected": []
+}

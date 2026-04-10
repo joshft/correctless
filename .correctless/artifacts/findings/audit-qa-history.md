@@ -130,10 +130,63 @@ Zero findings from Regression Hunter. **Converged.**
 - QA-R1-015: pkg-cache cleanup for non-monorepo — cleanup happens on reset
 - QA-R2-013: Redirect regex [0-9]*> false positives — pre-check only, not blocking decisions
 
+## Run: 2026-04-09
+### Round 1
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| QA-R1-001 | high | confirmed | Stale hook copies (.claude/hooks/, .correctless/hooks/) — 3rd recurrence | fixed | 9d61920 |
+| QA-R1-002 | high | confirmed | workflow-gate.sh bypass via substring match (comment injection) | fixed | 9d61920 |
+| QA-R1-003 | high | probable | Shared constraints JSONL schema omits skill field | fixed | 9d61920 |
+| QA-R1-004 | medium | probable | Corrupted config silently degrades fail-closed to fail-open | fixed | 9d61920 |
+| QA-R1-005 | medium | confirmed | workflow-gate.sh fails open on malformed stdin JSON | fixed | 9d61920 |
+| QA-R1-006 | medium | confirmed | audit-trail.sh missing set -f for classify_file | fixed | 9d61920 |
+| QA-R1-007 | medium | confirmed | audit-trail.sh HOOK_MATCHER excludes Read/Grep | fixed | 9d61920 |
+| QA-R1-008 | medium | confirmed | audit-trail.sh HOOK_MATCHER missing NotebookEdit | fixed | 9d61920 |
+| QA-R1-009 | medium | confirmed | setup uses \\s GNU grep extension (AP-001) | fixed | 9d61920 |
+| QA-R1-010 | medium | confirmed | test-consolidation.sh uses grep -P (AP-001) | fixed | 9d61920 |
+| QA-R1-011 | medium | probable | audit-trail.sh IS_FULL case-sensitive | fixed | 9d61920 |
+| QA-R1-012 | medium | probable | update_phase TOCTOU — lock covers only write | fixed | 9d61920 |
+| QA-R1-013 | medium | probable | locked_update_state missing EXIT trap | fixed | 9d61920 |
+| QA-R1-014 | low | probable | cmd_init spec stub orphaned on write failure | fixed | 9d61920 |
+| QA-R1-015 | low | probable | audit-trail.sh empty phase on state corruption | fixed | 9d61920 |
+| QA-R1-016 | low | probable | statusline.sh missing jq check | fixed | 9d61920 |
+| QA-R1-017 | low | probable | Inconsistent trap quoting | fixed | 9d61920 |
+| QA-R1-018 | low | probable | _acquire_state_lock spins on empty lock dir | fixed | 9d61920 |
+| QA-R1-019 | low | probable | cmd_verified misleading error on null spec_file | fixed | 9d61920 |
+
+### Round 2
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| QA-R2-001 | high | confirmed | Read events trigger false "modified" warnings (R1 regression) | fixed | 2824387 |
+| QA-R2-002 | high | confirmed | Grep tool field mismatch — FILES always empty (R1 regression) | fixed | 2824387 |
+| QA-R2-003 | high | confirmed | scripts/lib.sh not overwritten by setup (R1 fix incomplete) | fixed | 2824387 |
+| QA-R2-004 | medium | probable | TOCTOU in cmd_qa/cmd_override/cmd_set_intensity/cmd_spec_update | fixed | 2824387 |
+| QA-R2-006 | medium | probable | cmd_resolve_drift reports success after failed write | fixed | 2824387 |
+| QA-R2-007 | medium | probable | Override log entry silently dropped on corrupt log | fixed | 2824387 |
+
+### Round 3
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| QA-R3-001 | high | confirmed | jq injection via unescaped $reason (R2 regression) | fixed | 6c0d919 |
+
+Zero new findings from Regression Hunter. **Converged.**
+
+### Regression tests added
+- R1: Comment-stripping in workflow-gate.sh verified by existing gate tests (86 pass)
+- R1: audit-trail HOOK_MATCHER change verified by ci-hook-wiring assertion update
+- R3: locked_update_state --arg passthrough verified by manual test with special characters
+
+### Deferred for human review
+- QA-R2-005: EXIT trap clobbering in locked_update_state — latent, no current nesting
+- QA-R3-002: Override limit TOCTOU — low practical risk, requires architectural change
+- QA-R3-003: Grep without explicit path invisible to audit trail — acceptable limitation
+
 ## Recurring Patterns
 - **Stale path references after migration**: .claude/ → .correctless/ migration left references in 20+ files. Future migrations should include a grep sweep as part of the migration checklist.
 - **Skill registration drift**: 3 skills (cquick, crelease, cexplain) were added without updating 5 registration points. CONTRIBUTING.md checklist now includes ARCHITECTURE.md, AGENT_CONTEXT.md, CHANGELOG.md.
 - **"low" intensity ghost**: Retired intensity level persisted in 4 files after the standard/high/critical system was established. All references cleaned.
 - **Hook allowlist/extension drift**: Write-command lists and extension regexes drift between hooks (workflow-gate, sensitive-file-guard, audit-trail). When adding a command or extension to one hook, grep all hooks for the same pattern. (2026-04-03, 2026-04-05)
 - **Case normalization gaps**: Pattern matching in new code paths (fail-closed, classify, diagnose) frequently misses ${var,,} lowercasing that the main code path has. Every path that does case-insensitive matching must normalize. (2026-04-05)
-- **.claude/hooks/ stale copies**: sync.sh syncs to correctless/hooks/ but not .claude/hooks/. The installed hooks drift from source. (2026-04-03, 2026-04-05)
+- **.claude/hooks/ stale copies**: sync.sh syncs to correctless/hooks/ but not .claude/hooks/. The installed hooks drift from source. (2026-04-03, 2026-04-05, 2026-04-09). Root cause fixed in 2026-04-09: install_hooks() now always overwrites.
+- **HOOK_MATCHER expansion without body update**: Adding tools to HOOK_MATCHER without updating the hook body's tool-specific logic (field extraction, warning exclusions). (2026-04-09)
+- **locked_update_state string interpolation**: User-supplied values embedded in jq filter strings via bash interpolation instead of jq --arg. Same class as QA-007 (2026-04-03). Fixed by extending locked_update_state to accept --arg passthrough. (2026-04-09)
