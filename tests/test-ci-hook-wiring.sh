@@ -593,7 +593,7 @@ test_inv009_existing_behavior_preserved() {
 
   local audit_matcher
   audit_matcher="$(echo "$audit_entry" | jq -r '.matcher // ""' 2>/dev/null || echo "")"
-  assert_eq "INV-009: audit-trail matcher" "Edit|Write|MultiEdit|CreateFile|Bash" "$audit_matcher"
+  assert_eq "INV-009: audit-trail matcher" "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash|Read|Grep" "$audit_matcher"
 
   local audit_timeout
   audit_timeout="$(echo "$audit_entry" | jq -r '.hooks[0].timeout_ms // 0' 2>/dev/null || echo "0")"

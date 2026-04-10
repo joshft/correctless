@@ -1,0 +1,19 @@
+{
+  "preset": "qa",
+  "date": "2026-04-09",
+  "round": 2,
+  "findings": [
+    {"id": "QA-R2-001", "severity": "high", "tier": "confirmed", "agent": "regression-hunter", "title": "Read events trigger false modified warnings (R1 regression)", "status": "fixed"},
+    {"id": "QA-R2-002", "severity": "high", "tier": "confirmed", "agent": "api-contract-checker", "title": "Grep tool field mismatch — FILES always empty", "status": "fixed"},
+    {"id": "QA-R2-003", "severity": "high", "tier": "confirmed", "agent": "api-contract-checker", "title": "scripts/lib.sh not overwritten by setup", "status": "fixed"},
+    {"id": "QA-R2-004", "severity": "medium", "tier": "probable", "agent": "concurrency-specialist", "title": "TOCTOU in cmd_qa/cmd_override/cmd_set_intensity/cmd_spec_update", "status": "fixed"},
+    {"id": "QA-R2-006", "severity": "medium", "tier": "probable", "agent": "error-handling-auditor", "title": "cmd_resolve_drift reports success after failed write", "status": "fixed"},
+    {"id": "QA-R2-007", "severity": "medium", "tier": "probable", "agent": "error-handling-auditor", "title": "Override log entry silently dropped on corrupt log", "status": "fixed"}
+  ],
+  "rejected": [],
+  "deferred": [
+    {"id": "QA-R2-005", "reason": "EXIT trap clobbering — latent, no current call path nests traps"},
+    {"id": "QA-R2-008", "reason": "update_phase string interpolation safe — all callers use hardcoded literals"},
+    {"id": "QA-R2-009", "reason": "_acquire_state_lock tight-loop on failed mv — bounded by timeout"}
+  ]
+}

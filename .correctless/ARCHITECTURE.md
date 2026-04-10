@@ -162,6 +162,13 @@
 - **Violated when**: An orchestrator modifies shared constraints, invokes skills without fork isolation, or lacks an escalation mechanism
 - **Test**: R-007 in semi-auto-mode tests (constraint preservation), R-001 (fork isolation), R-005 (escalation)
 
+### PAT-010: jq `as $var` bindings must be explicitly parenthesized
+- **Pattern**: Operator precedence of `as` bindings differs between jq versions
+- **Rule**: When binding with `as $var` after any operator (`+`, `-`, `//`, etc.), always wrap the expression in explicit parens: `(EXPR OP VAL) as $var | rest`. Never write `EXPR OP VAL as $var | rest` without parens.
+- **Why**: jq 1.8+ parses `(.spec_updates // 0) + 1 as $count | rest` as `((.spec_updates // 0) + 1) as $count | rest`. jq 1.7 (Ubuntu 24.04 default) parses it as `(.spec_updates // 0) + (1 as $count | rest)` — binding `as` to the right-hand operand only. The resulting `0 + object` evaluates at runtime and crashes. Local development with jq 1.8 passes; CI with jq 1.7 fails silently (hook returns non-zero, state unchanged, no visible error).
+- **Violated when**: A jq filter contains `EXPR OP VALUE as $var` without surrounding parens on the expression being bound
+- **Test**: Static grep check — any `) + ` or `) // ` followed by ` as \$` on the same or next line without enclosing parens is suspect. Runtime: CI runs on jq 1.7 (Ubuntu 24.04), so precedence bugs surface as test failures.
+
 ## Environment Assumptions
 
 ### ENV-001: Bash 4+ required

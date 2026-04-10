@@ -337,7 +337,8 @@ id_rsa.*
 id_ed25519
 id_ed25519.*
 *.keystore
-*.jks"
+*.jks
+.correctless/preferences.md"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)

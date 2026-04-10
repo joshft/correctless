@@ -9,6 +9,9 @@
 
 input=$(cat)
 
+# QA-R1-016: Check jq availability (consistent with other hooks)
+command -v jq >/dev/null 2>&1 || { echo ""; exit 0; }
+
 # Colors (all use \033 format for source consistency)
 ORANGE='\033[38;5;214m'
 GRAY='\033[2m'

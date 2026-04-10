@@ -160,6 +160,14 @@ _acquire_state_lock() {
         fi
         continue
       fi
+    elif [ -d "$lock_dir" ]; then
+      # QA-R1-018: No pid file — lock was interrupted between mkdir and pid write.
+      # Treat as stale and break it to prevent 5s timeout deadlock.
+      local break_dir="${lock_dir}.breaking.$$"
+      if mv "$lock_dir" "$break_dir" 2>/dev/null; then
+        rm -rf "$break_dir"
+      fi
+      continue
     fi
 
     # Holder is alive or PID unknown — wait and retry
@@ -182,15 +190,24 @@ _release_state_lock() {
 }
 
 # locked_update_state — read-modify-write a state file under lock
+# Usage: locked_update_state STATE_FILE JQ_FILTER [--arg key val ...]
+# QA-R3-001: Extra arguments after the filter are passed through to jq,
+# enabling safe parameterization via --arg instead of string interpolation.
 locked_update_state() {
   local state_file="$1"
   local jq_filter="$2"
+  shift 2
   local rc=0
 
   _acquire_state_lock "$state_file" || return 1
+  # QA-R1-013: EXIT trap ensures lock is released on abnormal termination
+  # (e.g., hook runner kills the process at timeout between acquire and release)
+  # shellcheck disable=SC2064
+  trap "$(printf '_release_state_lock %q; rm -f %q' "$state_file" "${state_file}.$$.tmp")" EXIT
 
   local tmp_file="${state_file}.$$.tmp"
-  if jq "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
+  # Extra args (e.g., --arg key val) must come BEFORE the filter for older jq (1.6)
+  if jq "$@" "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
     mv "$tmp_file" "$state_file" || { rm -f "$tmp_file"; rc=1; }
   else
     rm -f "$tmp_file"
@@ -198,6 +215,7 @@ locked_update_state() {
   fi
 
   _release_state_lock "$state_file"
+  trap - EXIT
   return "$rc"
 }
 

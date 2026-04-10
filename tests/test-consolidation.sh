@@ -447,17 +447,19 @@ test_r008() {
     fi
 
     # B-04: Should not reference bare ARCHITECTURE.md (without .correctless/ prefix)
-    # Match "ARCHITECTURE.md" not preceded by ".correctless/" or "/"
-    if grep -P '(?<!\.correctless/)(?<!/)ARCHITECTURE\.md' "$skill_file" 2>/dev/null | \
-       grep -v '\.correctless/ARCHITECTURE\.md' >/dev/null 2>&1; then
+    # QA-R1-010: Use POSIX-portable grep instead of grep -P (AP-001)
+    if grep 'ARCHITECTURE\.md' "$skill_file" 2>/dev/null | \
+       grep -v '\.correctless/ARCHITECTURE\.md' | \
+       grep -v '/ARCHITECTURE\.md' >/dev/null 2>&1; then
       echo "  FAIL: R-008: $skill_name/SKILL.md references bare ARCHITECTURE.md"
       FAIL=$((FAIL + 1))
       fail_count_local=$((fail_count_local + 1))
     fi
 
     # B-04: Should not reference bare AGENT_CONTEXT.md (without .correctless/ prefix)
-    if grep -P '(?<!\.correctless/)(?<!/)AGENT_CONTEXT\.md' "$skill_file" 2>/dev/null | \
-       grep -v '\.correctless/AGENT_CONTEXT\.md' >/dev/null 2>&1; then
+    if grep 'AGENT_CONTEXT\.md' "$skill_file" 2>/dev/null | \
+       grep -v '\.correctless/AGENT_CONTEXT\.md' | \
+       grep -v '/AGENT_CONTEXT\.md' >/dev/null 2>&1; then
       echo "  FAIL: R-008: $skill_name/SKILL.md references bare AGENT_CONTEXT.md"
       FAIL=$((FAIL + 1))
       fail_count_local=$((fail_count_local + 1))
@@ -675,13 +677,13 @@ test_r010() {
     FAIL=$((FAIL + 1))
   fi
 
-  # B-05: Verify hook file content preserved
+  # B-05: Verify hook file exists after install (QA-R1-001: hooks are always overwritten)
   if [ -f .correctless/hooks/workflow-gate.sh ]; then
-    file_contains ".correctless/hooks/workflow-gate.sh" "#!/bin/bash" \
+    file_contains ".correctless/hooks/workflow-gate.sh" "workflow" \
       && local hook_ok="true" || local hook_ok="false"
-    assert_eq "R-010: migrated hook content preserved" "true" "$hook_ok"
+    assert_eq "R-010: hook file installed" "true" "$hook_ok"
   else
-    echo "  FAIL: R-010: workflow-gate hook not found for content preservation check"
+    echo "  FAIL: R-010: workflow-gate hook not found after install"
     FAIL=$((FAIL + 1))
   fi
 

@@ -1,0 +1,13 @@
+{
+  "preset": "qa",
+  "date": "2026-04-09",
+  "round": 3,
+  "findings": [
+    {"id": "QA-R3-001", "severity": "high", "tier": "confirmed", "agent": "regression-hunter", "title": "jq injection via unescaped $reason in cmd_spec_update/cmd_override (R2 regression)", "status": "fixed"}
+  ],
+  "rejected": [],
+  "deferred": [
+    {"id": "QA-R3-002", "reason": "Override limit TOCTOU — low practical risk, requires architectural change"},
+    {"id": "QA-R3-003", "reason": "Grep without explicit path invisible to audit trail — acceptable limitation"}
+  ]
+}

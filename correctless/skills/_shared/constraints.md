@@ -34,6 +34,7 @@ After each subagent completes, capture `total_tokens` and `duration_ms` from the
   "timestamp": "ISO",
   "branch": "{branch-slug}",
   "phase": "{phase}",
+  "skill": "{skill-name}",
   "feature": "{feature-name}",
   "agent_description": "{agent-description}",
   "agent_type": "{agent-type}",
