@@ -530,12 +530,13 @@ cmd_qa() {
     eval "$cov_cmd" > "$ARTIFACTS_DIR/coverage-baseline-$(branch_slug).out" 2>&1 || true
   fi
 
-  # Increment QA round counter and transition phase in a single write
-  local state
-  state="$(read_state)"
-  state="$(echo "$state" | jq --arg t "$(date -u +%FT%TZ)" \
-    '.qa_rounds += 1 | .phase = "tdd-qa" | .phase_entered_at = $t')"
-  write_state "$state"
+  # QA-R2-004: Use locked_update_state for atomic read-modify-write
+  local sf ts
+  sf="$(state_file)"
+  ts="$(date -u +%FT%TZ)"
+  locked_update_state "$sf" \
+    ".qa_rounds += 1 | .phase = \"tdd-qa\" | .phase_entered_at = \"$ts\"" \
+    || die "Failed to update state for QA phase"
   info "Phase: tdd-qa"
   info "Next: QA review (edits blocked)"
 }
@@ -727,10 +728,13 @@ cmd_set_intensity() {
   # Phase guard: set-intensity only valid during spec-related phases
   require_phase_oneof "spec" "review" "review-spec"
 
-  local state
-  state="$(read_state)" || die "No state file — run 'init' first"
-  state="$(echo "$state" | jq --arg level "$level" '.feature_intensity = $level')"
-  write_state "$state"
+  # QA-R2-004: Use locked_update_state for atomic read-modify-write
+  local sf
+  sf="$(state_file)"
+  [ -f "$sf" ] || die "No state file — run 'init' first"
+  locked_update_state "$sf" \
+    ".feature_intensity = \"$level\"" \
+    || die "Failed to set feature intensity"
   info "Feature intensity set to: $level"
 }
 
@@ -755,9 +759,14 @@ cmd_resolve_drift() {
 
   # shellcheck disable=SC2064
   trap "$(printf 'rm -f %q' "$DRIFT_DEBT_FILE.$$")" EXIT
-  jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
+  # QA-R2-006: Check return code — don't report success if write failed
+  if ! (jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
-    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
+    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"); then
+    rm -f "$DRIFT_DEBT_FILE.$$"
+    trap - EXIT
+    die "Failed to write drift debt file"
+  fi
   trap - EXIT
 
   info "Drift item $drift_id marked as resolved: $reason"
@@ -768,24 +777,25 @@ cmd_spec_update() {
   check_branch_match
   require_phase_oneof "tdd-tests" "tdd-impl" "tdd-qa"
 
-  local state from_phase
-  state="$(read_state)"
-  from_phase="$(echo "$state" | jq -r '.phase')"
+  # Read phase for logging (pre-read is fine — only used for info messages)
+  local from_phase
+  from_phase="$(read_phase)"
 
-  # Track spec update in state
-  local update_count
-  update_count="$(echo "$state" | jq -r '.spec_updates // 0')"
-  update_count=$((update_count + 1))
-
-  state="$(echo "$state" | jq \
-    --arg reason "$reason" \
-    --arg from "$from_phase" \
-    --arg ts "$(now_iso)" \
-    --argjson count "$update_count" \
-    '.spec_updates = $count | .spec_update_history = (.spec_update_history // []) + [{from_phase: $from, reason: $reason, timestamp: $ts}] | .phase = "spec" | .phase_entered_at = $ts')"
-  write_state "$state"
+  # QA-R2-004: Use locked_update_state for atomic read-modify-write
+  local sf ts
+  sf="$(state_file)"
+  ts="$(now_iso)"
+  locked_update_state "$sf" \
+    "(.spec_updates // 0) + 1 as \$count |
+     .spec_updates = \$count |
+     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: \"$reason\", timestamp: \"$ts\"}] |
+     .phase = \"spec\" | .phase_entered_at = \"$ts\"" \
+    || die "Failed to update state for spec-update"
   info "Phase: spec"
 
+  # Re-read update_count for the warning check
+  local update_count
+  update_count="$(read_state | jq -r '.spec_updates // 0')"
   if [ "$update_count" -ge 3 ]; then
     info "WARNING: This spec has been revised $update_count times during implementation."
     info "Consider whether the feature is under-specified or the approach is fundamentally wrong."
@@ -850,18 +860,17 @@ cmd_override() {
     die "An override is already active ($remaining calls remaining). It must expire before requesting another."
   fi
 
-  # Write override marker into state
-  state="$(echo "$state" | jq \
-    --arg reason "$reason" \
-    --arg ts "$ts" \
-    --argjson remaining 10 \
-    --argjson count "$((override_count + 1))" \
-    '.override = {active: true, reason: $reason, started_at: $ts, remaining_calls: $remaining} | .override_count = $count')"
-  write_state "$state"
+  # QA-R2-004: Use locked_update_state for atomic read-modify-write
+  local sf
+  sf="$(state_file)"
+  locked_update_state "$sf" \
+    ".override = {active: true, reason: \"$reason\", started_at: \"$ts\", remaining_calls: 10} | .override_count = (.override_count // 0) + 1" \
+    || die "Failed to write override state"
 
   # Append to override log
   mkdir -p "$(dirname "$OVERRIDE_LOG")"
-  if [ ! -f "$OVERRIDE_LOG" ]; then
+  # QA-R2-007: Validate or recreate override log if corrupted
+  if [ ! -f "$OVERRIDE_LOG" ] || ! jq empty "$OVERRIDE_LOG" 2>/dev/null; then
     echo '[]' > "$OVERRIDE_LOG"
   fi
   local entry

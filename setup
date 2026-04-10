@@ -263,8 +263,9 @@ install_hooks() {
   if [ -d "$SCRIPT_DIR/scripts" ]; then
     local script_dest="$REPO_ROOT/scripts"
     mkdir -p "$script_dest"
+    # QA-R2-003: Always copy scripts (same as hooks — generated code, not user-edited)
     for script in lib.sh antipattern-scan.sh; do
-      if [ -f "$SCRIPT_DIR/scripts/$script" ] && [ ! -f "$script_dest/$script" ]; then
+      if [ -f "$SCRIPT_DIR/scripts/$script" ]; then
         cp "$SCRIPT_DIR/scripts/$script" "$script_dest/$script"
       fi
     done

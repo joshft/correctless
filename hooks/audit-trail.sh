@@ -19,6 +19,7 @@ INPUT="$(cat)"
 eval "$(echo "$INPUT" | jq -r '
   @sh "TOOL_NAME=\(.tool_name // "")",
   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
+  @sh "TOOL_INPUT_PATH=\(.tool_input.path // "")",
   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
   @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))"
 ' 2>/dev/null)" || exit 0
@@ -47,6 +48,10 @@ case "$TOOL_NAME" in
     ;;
   MultiEdit)
     FILES="$TOOL_INPUT_EDITS"
+    ;;
+  Grep)
+    # QA-R2-002: Grep uses .tool_input.path, not .tool_input.file_path
+    FILES="$TOOL_INPUT_PATH"
     ;;
   *)
     FILES="$TOOL_INPUT_FILE"
@@ -134,22 +139,23 @@ while IFS= read -r f; do
   case "$PHASE" in
     tdd-qa|tdd-verify)
       # QA/verify phases should be read-only for source and test files
-      if [ "$fclass" = "source" ] && [ "$TOOL_NAME" != "Read" ]; then
+      # QA-R2-001: Exclude read-only tools (Read, Grep) from "modified" warnings
+      if [ "$fclass" = "source" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
         echo "⚠ $PHASE: Source file modified — ${f##*/} (this phase should be read-only)" >&2
       fi
-      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
+      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
         echo "⚠ $PHASE: Test file modified — ${f##*/} (this phase should be read-only)" >&2
       fi
       ;;
     tdd-impl)
       # GREEN phase: test edits should be logged
-      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
+      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
         echo "📝 GREEN: Test file edited — ${f##*/} (should be logged in test-edit-log)" >&2
       fi
       ;;
     spec|review|review-spec|model)
-      # Spec/review phases: no source or test edits
-      if [ "$fclass" = "source" ] || [ "$fclass" = "test" ]; then
+      # Spec/review phases: no source or test edits (reads are fine)
+      if { [ "$fclass" = "source" ] || [ "$fclass" = "test" ]; } && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
         echo "⚠ $PHASE: Code file modified — ${f##*/} (spec/review phases are docs-only)" >&2
       fi
       ;;
