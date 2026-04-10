@@ -2,6 +2,7 @@
 name: cupdate-arch
 description: Update .correctless/ARCHITECTURE.md after features land. Use after /cdocs or when the codebase structure has changed.
 allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.correctless/ARCHITECTURE.md), Write(docs/architecture/*)
+context: fork
 ---
 
 # /cupdate-arch — Maintain Architecture Documentation

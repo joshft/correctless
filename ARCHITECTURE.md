@@ -4,7 +4,7 @@
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Skills | `skills/*/SKILL.md` | 26 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
+| Skills | `skills/*/SKILL.md` | 27 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
 | Hooks | `hooks/` | 4 bash scripts: workflow gate (PreToolUse), state machine (workflow-advance), statusline, audit trail. These enforce the workflow. |
 | Templates | `templates/` | Scaffolding templates for ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, invariant templates (high+ intensity), spec templates, workflow configs. |
 | Helpers | `helpers/` | Property-based testing guides per language (Go, Python, TypeScript, Rust). High+ intensity. |
@@ -20,7 +20,7 @@
 ### PAT-001: Source → Distribution Sync
 - All development happens in root-level `skills/`, `hooks/`, `templates/`, `helpers/`
 - `sync.sh` copies to `correctless/` — this directory is never edited directly
-- All 26 skills are included; intensity gates control which activate at each level
+- All 27 skills are included; intensity gates control which activate at each level
 
 ### PAT-002: Agent Separation (The Lens Principle)
 - Never let an agent grade its own work

@@ -128,11 +128,32 @@ read_config_field() {
   jq -r "$field" "$CONFIG_FILE"
 }
 
-# Full mode detection — checks for intensity field in config
+# Full mode detection — checks effective intensity (max of project config and feature_intensity)
 is_full_mode() {
   [ -f "$CONFIG_FILE" ] || return 1
   local intensity
   intensity="$(jq -r '.workflow.intensity // empty' "$CONFIG_FILE")"
+
+  # Also check feature_intensity from the state file (PAT-005: effective intensity)
+  local STATE_FILE
+  STATE_FILE="$(state_file 2>/dev/null)" || true
+  if [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ]; then
+    local feature_intensity
+    feature_intensity="$(jq -r '.feature_intensity // empty' "$STATE_FILE" 2>/dev/null)" || true
+    # Compute effective intensity as max(project, feature) using ordering standard < high < critical
+    if [ -n "$feature_intensity" ]; then
+      case "$feature_intensity" in
+        critical) intensity="critical" ;;
+        high)
+          case "$intensity" in
+            critical) ;; # project is already higher
+            *) intensity="high" ;;
+          esac
+          ;;
+      esac
+    fi
+  fi
+
   case "$intensity" in
     high|critical) return 0 ;;
     *) return 1 ;;

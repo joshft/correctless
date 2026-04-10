@@ -963,6 +963,9 @@ create_if_missing "$REPO_ROOT/.correctless/AGENT_CONTEXT.md" "$SCRIPT_DIR/templa
 # Create antipatterns.md at .correctless/ (R-005)
 create_if_missing "$REPO_ROOT/.correctless/antipatterns.md" "$SCRIPT_DIR/templates/antipatterns.md" "antipatterns.md"
 
+# Create preferences.md at .correctless/ (R-013 — semi-auto mode preferences)
+create_if_missing "$REPO_ROOT/.correctless/preferences.md" "$SCRIPT_DIR/templates/preferences.md" "preferences.md"
+
 # Record file state for the skill agent (template, existing, or missing→template)
 ARCH_STATE="$(detect_file_state "$REPO_ROOT/.correctless/ARCHITECTURE.md")"
 AGENT_STATE="$(detect_file_state "$REPO_ROOT/.correctless/AGENT_CONTEXT.md")"

@@ -57,6 +57,7 @@ jobs:
           bash tests/test-token-aware-intensity.sh
           bash tests/test-allowed-tools-check.sh
           bash tests/test-token-tracking-skill-field.sh
+          bash tests/test-semi-auto-mode.sh
 
       - name: Verify sync
         run: |

@@ -468,7 +468,7 @@ test_r020() {
   # Assert absolute skill count in distribution
   local dist_total
   dist_total=$(find "$REPO_DIR/correctless/skills" -name "SKILL.md" | wc -l)
-  assert_eq "R-020: correctless has 26 skills total" "26" "$dist_total"
+  assert_eq "R-020: correctless has 27 skills total" "27" "$dist_total"
 }
 
 # ---------------------------------------------------------------------------
