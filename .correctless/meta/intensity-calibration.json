@@ -1,0 +1,33 @@
+{
+  "calibration_entries": [
+    {
+      "feature_slug": "semi-auto-mode",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 2,
+      "actual_findings_count": 3,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/config/workflow-config.json",
+        ".github/workflows/ci.yml",
+        "hooks/sensitive-file-guard.sh",
+        "hooks/workflow-advance.sh",
+        "setup",
+        "skills/_shared/constraints.md",
+        "skills/cauto/SKILL.md",
+        "skills/cdocs/SKILL.md",
+        "skills/cupdate-arch/SKILL.md",
+        "sync.sh",
+        "templates/preferences.md",
+        "tests/test-consolidation.sh",
+        "tests/test-dynamic-rigor.sh",
+        "tests/test-mcp.sh",
+        "tests/test-semi-auto-mode.sh"
+      ],
+      "timestamp": "2026-04-09T23:45:00Z"
+    }
+  ]
+}

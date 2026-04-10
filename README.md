@@ -70,7 +70,7 @@ Then restart Claude Code. Git clone users: `cd .claude/skills/workflow && git pu
 
 ## One Plugin, Three Intensity Levels
 
-Correctless ships as a single plugin with 26 skills. You choose the intensity that matches your project's risk profile. Seven skills are gated behind intensity thresholds — they check your project's `workflow.intensity` setting and warn if invoked below their minimum.
+Correctless ships as a single plugin with 27 skills. You choose the intensity that matches your project's risk profile. Seven skills are gated behind intensity thresholds — they check your project's `workflow.intensity` setting and warn if invoked below their minimum.
 
 | Intensity | Overhead | What You Get | Best For |
 |-----------|----------|--------------|----------|
@@ -404,7 +404,7 @@ Optional (high+/critical):
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 26 skills, 3 intensity levels, ~1,900 automated tests, 4 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 27 skills, 3 intensity levels, ~1,900 automated tests, 4 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 

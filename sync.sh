@@ -61,7 +61,7 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 # --- All templates (common + high-intensity) ---
-for tmpl in ARCHITECTURE.md AGENT_CONTEXT.md antipatterns.md workflow-config.json redaction-rules.md workflow-config-full.json workflow-effectiveness.json drift-debt.json external-review-history.json spec-lite.md spec-full.md; do
+for tmpl in ARCHITECTURE.md AGENT_CONTEXT.md antipatterns.md workflow-config.json redaction-rules.md workflow-config-full.json workflow-effectiveness.json drift-debt.json external-review-history.json spec-lite.md spec-full.md preferences.md; do
   sync_file "templates/$tmpl" "correctless/templates/$tmpl"
 done
 sync_dir "templates/invariants" "correctless/templates/invariants"
@@ -88,14 +88,14 @@ fi
 sync_file "skills/_shared/constraints.md" "correctless/skills/_shared/constraints.md"
 [ "$CHECK_ONLY" = false ] && info "Shared constraints → correctless/"
 
-# --- All 26 skills ---
-for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain; do
+# --- All 27 skills ---
+for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto; do
   if [ "$CHECK_ONLY" = false ]; then
     mkdir -p "correctless/skills/$skill"
   fi
   sync_file "skills/$skill/SKILL.md" "correctless/skills/$skill/SKILL.md"
 done
-[ "$CHECK_ONLY" = false ] && info "All skills (26) → correctless/"
+[ "$CHECK_ONLY" = false ] && info "All skills (27) → correctless/"
 
 if [ "$CHECK_ONLY" = true ]; then
   # Skills: check for stale directories and count mismatch

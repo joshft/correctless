@@ -51,6 +51,10 @@ If the file doesn't exist, create it with the first entry. `/cmetrics` aggregate
 
 **Graceful degradation**: If a Serena tool call fails, fall back to the text-based equivalent silently. Do not abort, do not retry, do not warn the user mid-operation. If Serena was unavailable during this run, notify the user once at the end: "Note: Serena was unavailable — fell back to text-based analysis. If this persists, check that the Serena MCP server is running (`uvx serena-mcp-server`)." Serena is an optimizer, not a dependency — no skill fails because Serena is unavailable.
 
+## Project Preferences
+
+If `.correctless/preferences.md` exists, read it and apply project preferences. This file contains codified judgment calls for autonomous decisions (QA finding triage, documentation scope, commit granularity, escalation sensitivity, PR creation mode). When the file is absent, use built-in defaults. Preferences from `.correctless/preferences.md` apply to all pipeline skills — each skill should check for and respect these preferences where relevant.
+
 ## MCP Degradation (Context7)
 
 When Context7 is unavailable, fall back to web search. If Context7 was unavailable during this run, notify the user once at the end.

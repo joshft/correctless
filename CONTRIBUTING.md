@@ -23,7 +23,7 @@ helpers/              # PBT guides per language (high+ intensity)
 tests/                # 17 test files (~1,900 assertions)
 setup                 # Install script
 sync.sh               # Copies source → correctless/ distribution
-correctless/          # Single distribution (26 skills, intensity-gated)
+correctless/          # Single distribution (27 skills, intensity-gated)
 docs/skills/          # Per-skill documentation pages
 docs/design/          # Design specification
 ```

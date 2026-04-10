@@ -4,13 +4,13 @@
 
 ## What This Project Does
 
-Claude Code plugin framework that enforces a correctness-oriented development workflow. Ships as a single `correctless/` distribution with 26 skills and configurable intensity levels (standard, high, critical). Standard intensity (~10-15 min/feature) covers core TDD workflow; high/critical intensity (~1-2 hr/feature) adds formal modeling, adversarial review, and convergence auditing. The core principle: never let an agent grade its own work — each workflow phase uses a separate agent with a different lens.
+Claude Code plugin framework that enforces a correctness-oriented development workflow. Ships as a single `correctless/` distribution with 27 skills and configurable intensity levels (standard, high, critical). Standard intensity (~10-15 min/feature) covers core TDD workflow; high/critical intensity (~1-2 hr/feature) adds formal modeling, adversarial review, and convergence auditing. The core principle: never let an agent grade its own work — each workflow phase uses a separate agent with a different lens.
 
 ## Key Components
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Skills | `skills/*/SKILL.md` | 26 skill definitions. Each is a slash command with frontmatter contract. |
+| Skills | `skills/*/SKILL.md` | 27 skill definitions. Each is a slash command with frontmatter contract. |
 | Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, token-tracking.sh (PostToolUse token logging) |
 | Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs |
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
