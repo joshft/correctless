@@ -1,2 +1,7 @@
 # Workflow history is append-only — use union merge to avoid conflicts
 docs/workflow-history.md merge=union
+
+# Path-scoped rules and ARCHITECTURE.md use LF only — CRLF breaks the drift
+# test parser (see BND-003, EA-005 in path-scoped-rules-pat001 spec).
+.claude/rules/*.md text eol=lf
+.correctless/ARCHITECTURE.md text eol=lf

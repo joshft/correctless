@@ -1,7 +1,7 @@
 ---
 name: cdocs
 description: Update project documentation after a feature lands. Updates README, .correctless/AGENT_CONTEXT.md, .correctless/ARCHITECTURE.md, and feature docs. Run before merging.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md), Write(.claude/rules/*.md)
 context: fork
 ---
 
@@ -168,6 +168,20 @@ If this is the 3rd or more feature where the same architectural pattern has appe
 Before appending, read the existing Correctless Learnings section. Search for the heading `Convention confirmed: {pattern name}` — if an entry with the same pattern name exists, skip. If the `## Correctless Learnings` section doesn't exist in CLAUDE.md, create it with the header before appending.
 
 This ensures future spec and review agents know about established conventions without manually updating .correctless/ARCHITECTURE.md.
+
+### Back-fill Deferred Meta Fields
+
+Before advancing the state machine, scan `.correctless/meta/*.json` for any file containing a `created_at_commit` field set to `null`. For each such file, fill the field with the current `HEAD` commit SHA (`git rev-parse HEAD`) — this is the merge commit that created the feature on the feature branch, which is the correct reference point for post-merge measurement gates.
+
+Specifically, `.correctless/meta/pat001-measurement-due.json` is created by the path-scoped-rules-pat001-migration feature (GREEN phase) with `created_at_commit: null` and must be back-filled at merge time. If it is still null when /cdocs runs, the MG-003 measurement gate in `skills/cstatus/SKILL.md` will emit a "null created_at_commit" advisory instead of the real measurement warning — meaning the dogfood experiment never actually measures anything.
+
+Procedure (for each matching file):
+1. Read the file and confirm `created_at_commit` is the string `null`.
+2. Read `git rev-parse HEAD` for the current commit SHA.
+3. Edit the file to replace `"created_at_commit": null` with `"created_at_commit": "<sha>"`.
+4. Do NOT create the file if it does not exist. Only back-fill existing files.
+
+This is a small step but it is the only mechanism that converts the merge commit into the measurement gate's anchor. Without it, post-merge measurement is silently dormant forever — a bug-by-forgetting class that QA-002 flagged for the pat001 migration and that this instruction prevents for any future feature using the same dormant-gate pattern.
 
 ### Advance Workflow
 

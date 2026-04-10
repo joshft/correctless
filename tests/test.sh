@@ -506,6 +506,13 @@ echo "======================"
 echo "Results: $PASS passed, $FAIL failed"
 echo ""
 
+# ============================================================================
+# Architecture drift test — dogfood for the rules-canonical / ARCHITECTURE.md
+# index pattern (path-scoped-rules-pat001). Wired into the local aggregator
+# per INV-007 so contributors catch drift before CI.
+# ============================================================================
+(cd "$REPO_DIR" && bash tests/test-architecture-drift.sh) || FAIL=$((FAIL + 1))
+
 if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
