@@ -206,7 +206,8 @@ locked_update_state() {
   trap "$(printf '_release_state_lock %q; rm -f %q' "$state_file" "${state_file}.$$.tmp")" EXIT
 
   local tmp_file="${state_file}.$$.tmp"
-  if jq "$jq_filter" "$@" "$state_file" > "$tmp_file" 2>/dev/null; then
+  # Extra args (e.g., --arg key val) must come BEFORE the filter for older jq (1.6)
+  if jq "$@" "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
     mv "$tmp_file" "$state_file" || { rm -f "$tmp_file"; rc=1; }
   else
     rm -f "$tmp_file"
