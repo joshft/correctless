@@ -1084,7 +1084,7 @@ case "$cmd" in
   *)
     echo "Usage: workflow-advance.sh <command> [args]"
     echo ""
-    echo "Phase transitions (Lite):"
+    echo "Phase transitions:"
     echo "  init \"task\"       Create workflow state (must be on a feature branch)"
     echo "  review             spec → review (requires spec file exists)"
     echo "  tests              review|review-spec|spec(update) → tdd-tests"

@@ -111,7 +111,7 @@ fi
 echo "--- R-005: cquick in sync.sh skill list ---"
 SYNC="$REPO_DIR/sync.sh"
 
-# Check the skill list (single for-loop listing all 26 skills)
+# Check the skill list (single for-loop listing all 27 skills)
 skill_line=$(grep "^for skill in" "$SYNC" | head -1)
 if echo "$skill_line" | grep -q "cquick"; then
   assert_eq "R-005a: cquick in skill list" "yes" "yes"

@@ -5,7 +5,7 @@ All notable changes to Correctless are documented here.
 ## [3.0.0] - 2026-04-04
 
 ### Changed — Single Distribution with Dynamic Rigor
-- Merged Lite and Full distributions into a single 26-skill plugin
+- Merged Lite and Full distributions into a single 27-skill plugin
 - Retired "Lite mode" / "Full mode" terminology in favor of intensity levels (standard, high, critical)
 - Intensity gates control which features activate — standard (~10-15 min/feature), high/critical (~1-2 hr/feature)
 - Per-feature intensity override via `workflow-advance.sh set-intensity`
