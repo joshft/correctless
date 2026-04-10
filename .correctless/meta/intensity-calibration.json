@@ -28,6 +28,37 @@
         "tests/test-semi-auto-mode.sh"
       ],
       "timestamp": "2026-04-09T23:45:00Z"
+    },
+    {
+      "feature_slug": "path-scoped-rules-pat001-migration",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 2,
+      "actual_findings_count": 0,
+      "actual_tokens": 737957,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/config/workflow-config.json",
+        ".gitattributes",
+        ".github/workflows/ci.yml",
+        "CLAUDE.md",
+        "README.md",
+        "hooks/sensitive-file-guard.sh",
+        "hooks/workflow-gate.sh",
+        "skills/cdocs/SKILL.md",
+        "skills/cspec/SKILL.md",
+        "skills/cstatus/SKILL.md",
+        "skills/cupdate-arch/SKILL.md",
+        "tests/test.sh",
+        ".claude/rules/hooks-pretooluse.md",
+        "tests/test-architecture-drift.sh",
+        ".correctless/meta/pat001-measurement-due.json",
+        ".correctless/verification/path-scoped-rules-pat001-canary.md",
+        ".correctless/verification/path-scoped-rules-pat001-verification.md",
+        ".correctless/specs/path-scoped-rules-pat001.md"
+      ],
+      "timestamp": "2026-04-10T19:38:45Z"
     }
   ]
 }

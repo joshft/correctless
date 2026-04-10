@@ -47,9 +47,22 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 # --- Hooks ---
+# Hooks are copied with one transformation: lines starting with `# Rule: `
+# are stripped. These are dogfood rule-pointer comments (INV-021) that
+# source-file agents use to find the canonical rule body, but user
+# distributions installed from correctless/ must not ship dangling
+# references to upstream-only paths. The pattern intentionally does NOT
+# mention the upstream rule path literally — INV-024 forbids any .claude/
+# reference in sync.sh. Matching `# Rule: ` is narrow enough: no other
+# hook has a line starting with that prefix.
 for hook in hooks/*.sh; do
   [ -f "$hook" ] || continue
-  sync_file "$hook" "correctless/hooks/$(basename "$hook")"
+  dst="correctless/hooks/$(basename "$hook")"
+  if [ "$CHECK_ONLY" = true ]; then
+    diff -q <(sed '/^# Rule: /d' "$hook") "$dst" >/dev/null 2>&1 || DIRTY=true
+  else
+    sed '/^# Rule: /d' "$hook" > "$dst"
+  fi
 done
 [ "$CHECK_ONLY" = false ] && info "Hooks → correctless/"
 

@@ -154,22 +154,24 @@ graph LR
 
 ### Defense in Depth
 
-Prompt-level instructions fade as context fills — enforcement that depends on the model is a suggestion. Correctless uses three independent layers:
+Prompt-level instructions fade as context fills — enforcement that depends on the model is a suggestion. Correctless uses four independent layers:
 
 ```mermaid
 graph TD
-    A["Agent wants to<br/>edit source file<br/>during QA phase"] --> B{"Layer 1: Gate<br/>(PreToolUse hook)"}
+    A["Agent wants to<br/>edit source file<br/>during QA phase"] --> B["Layer 1: Gate<br/>PreToolUse hook"]
     B -->|"BLOCK"| C["Edit prevented<br/>Model can't bypass bash"]
     B -->|"ALLOW<br/>(Bash slip-through)"| D["File modified"]
-    D --> E{"Layer 2: Audit Trail<br/>(PostToolUse hook)"}
+    D --> E["Layer 2: Audit Trail<br/>PostToolUse hook"]
     E --> F["Logged with phase context<br/>Alert shown to user"]
     F --> G["/cwtf reads trail<br/>reports deviations"]
 
-    H["Layer 3: Skill Instructions<br/>(prompt-level, advisory)"] -.->|"Subject to<br/>context fade"| A
+    P["Layer 3: Path-scoped rules<br/>(higher-adherence advisory)"] -.->|"Loaded when a<br/>scoped file is opened"| A
+    H["Layer 4: Skill Instructions<br/>(prompt-level, advisory)"] -.->|"Subject to<br/>context fade"| A
 
     style B fill:#ff6b6b,color:#fff
     style C fill:#ff6b6b,color:#fff
     style E fill:#ffd43b,color:#000
+    style P fill:#ffa94d,color:#000
     style H fill:#dee2e6,color:#000
 ```
 

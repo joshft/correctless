@@ -105,13 +105,19 @@
 - **Violated when**: A skill writes to preferences.md, or the pipeline fails when preferences.md is absent
 - **Test**: R-004 in semi-auto-mode tests (template categories), R-013 (setup scaffolding), R-019 (sensitive-file-guard protection)
 
+### ABS-009: Path-scoped rule files (.claude/rules/)
+- **What**: Canonical location for path-scoped rule content at `.claude/rules/*.md` with YAML `paths:` frontmatter. Claude Code loads a rule file's body into the agent's editing context whenever the agent opens a file that matches one of the `paths:` entries. Migrated PAT entries live here as full-body rules; `.correctless/ARCHITECTURE.md` retains only a 2-line index entry (heading + See-link) for each migrated PAT.
+- **Invariant**: For any migrated PAT entry, the rule text lives in exactly one location — `.claude/rules/{file}.md`. ARCHITECTURE.md contains only the index entry (heading + See-link, nothing else). Duplication between ARCHITECTURE.md and a rule file is prohibited (PRH-001). Every rule file has YAML frontmatter with a `paths:` key, and the set of `paths:` entries for `hooks-pretooluse.md` is set-equal to the set of PreToolUse hooks discovered via `HOOK_TYPE: PreToolUse` headers (INV-017 / ABS-004).
+- **Enforced at**: `tests/test-architecture-drift.sh`, `.claude/rules/hooks-pretooluse.md`, `.correctless/ARCHITECTURE.md` (index entries), `hooks/workflow-gate.sh` + `hooks/sensitive-file-guard.sh` (in-file rule pointer comments per INV-021)
+- **Violated when**: the rule text is duplicated between ARCHITECTURE.md and a rule file, a rule file lacks `paths:` frontmatter, a See-link points at a missing file, the `paths:` list drifts from the discovered PreToolUse hook set, or the in-file pointer comment is missing from a scoped hook
+- **Test**: INV-001, INV-003, INV-004, INV-005, INV-017, INV-019, INV-021, INV-027 in `tests/test-architecture-drift.sh`
+
 ## Patterns
 
+> **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.
+
 ### PAT-001: PreToolUse hook conventions
-- **Pattern**: Standard structure for all PreToolUse hooks
-- **Rule**: Every PreToolUse hook must: (1) `set -euo pipefail` + `set -f`, (2) check `command -v jq` with fail-closed exit 2, (3) bulk-parse stdin with single `eval` + `jq -r @sh`, (4) fast-path `exit 0` for non-relevant tools BEFORE loading config, (5) exit 0 to allow, exit 2 to block
-- **Violated when**: A hook loads config before checking tool_name, uses multiple jq calls for stdin parsing, or exits non-0/non-2
-- **Test**: INV-010 in sensitive-file-guard (corrupted config proves fast-path), workflow-gate.sh follows same structure
+See `.claude/rules/hooks-pretooluse.md`.
 
 ### PAT-002: Separate concerns in hooks
 - **Pattern**: One hook per concern
@@ -190,3 +196,13 @@
 - **Assumption**: `gh` (GitHub CLI) is available on PATH when `pr_creation: gh` (the default) is configured in preferences.md.
 - **Consequence if wrong**: Pipeline completes all implementation, verification, and documentation phases successfully, but PR creation fails at the final step. R-018 mitigates this with an upfront `command -v gh` check at pipeline startup — failing fast before any skill invocation.
 - **Test**: R-018 in semi-auto-mode tests (upfront gh availability check)
+
+### ENV-005: Claude Code path-scoped rule loading
+- **Assumption**: Claude Code loads rule content from `.claude/rules/*.md` files whose YAML `paths:` frontmatter matches a file being opened (read, edited, or written) in the session. The matched rule body is injected into the agent's editing context. Exact-path matches (e.g., `hooks/workflow-gate.sh`) are supported; glob semantics are not assumed by Feature A and are out of scope.
+- **Consequence if wrong**: the rule file becomes inert documentation — agents editing scoped hook files would not see the rule in context, and PAT-001's migration from ARCHITECTURE.md to `.claude/rules/hooks-pretooluse.md` would silently remove the rule from agent awareness. The feature must be rolled back per PRH-002 in the path-scoped-rules-pat001 spec.
+- **Test**: verified manually pre-merge via the INV-015 canary procedure (create a canary rule file with a unique UUID marker, open a scoped hook in a fresh session, verify the UUID is observable in the agent's context). Evidence recorded in `.correctless/verification/path-scoped-rules-pat001-canary.md`.
+
+### ENV-006: POSIX-portable external tools (grep, sed, awk)
+- **Assumption**: All hook code, phase-transition scripts, and tests use `grep`, `sed`, and `awk` in POSIX-compatible mode only. No GNU-only extensions: no `grep -P` (Perl regex), no `\b` / `\s` outside bracket expressions, no `sed -i` without a backup argument (BSD requires `sed -i ''` or explicit backup), no `gawk` extensions (`gensub`, `PROCINFO`, `length(array)`). Bash 4+ constructs (EA-001 / ENV-001) are permitted as a separate assumption.
+- **Consequence if wrong**: silent test failures on macOS BSD tools — GNU extensions that pass on Linux CI fail with cryptic error messages or produce subtly wrong results on developer macOS machines. The drift test's own self-scan (INV-010) catches this class inside `tests/test-architecture-drift.sh`; the broader rule is enforced by code review and by `tests/test-antipattern-scan.sh`.
+- **Test**: INV-010 in `tests/test-architecture-drift.sh` (self-scan); `tests/test-antipattern-scan.sh` for broader coverage.

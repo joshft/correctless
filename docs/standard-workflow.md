@@ -136,7 +136,7 @@ Five hooks run on every tool call:
 | **auto-format.sh** | PostToolUse | Runs the project's formatter on edited files. Allowlist-validated, array-based execution. |
 | **statusline.sh** | Statusline | Shows branch, phase, QA round, cost, context %, lines delta. |
 
-All hooks follow [PAT-001](https://github.com/joshft/correctless/blob/main/.correctless/ARCHITECTURE.md): `set -euo pipefail` + `set -f`, jq check, bulk `eval`+`jq @sh` stdin parse, fast-path exit 0 before loading config.
+All PreToolUse hooks follow [PAT-001](https://github.com/joshft/correctless/blob/main/.claude/rules/hooks-pretooluse.md): `set -euo pipefail` + `set -f`, jq check, bulk `eval`+`jq @sh` stdin parse, fast-path exit 0 before loading config.
 
 ---
 
