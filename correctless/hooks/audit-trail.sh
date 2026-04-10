@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2254  # Unquoted $pat in case is intentional — we need glob matching
 # HOOK_TYPE: PostToolUse
-# HOOK_MATCHER: Edit|Write|MultiEdit|CreateFile|Bash
+# HOOK_MATCHER: Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash|Read|Grep
 # Correctless — PostToolUse audit trail + adherence feedback
 # Records every file modification with workflow phase context.
 # Lite mode: phase-violation alerts to stderr
@@ -70,7 +70,9 @@ STATE_FILE=".correctless/artifacts/workflow-state-${_slug}.json"
 [ -f "$STATE_FILE" ] || exit 0
 
 # Read phase and config
-PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)"
+# QA-R1-015: Default to "unknown" if jq fails on corrupted state file
+PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)" || true
+[ -n "$PHASE" ] || PHASE="unknown"
 CONFIG_FILE="$(config_file 2>/dev/null)" || CONFIG_FILE=".correctless/config/workflow-config.json"
 
 # --- Audit trail logging (batch all files in single jq call) ---
@@ -111,13 +113,17 @@ if [ -f "$CONFIG_FILE" ]; then
   eval "$(jq -r '
     @sh "TEST_PATTERN=\(.patterns.test_file // "")",
     @sh "SOURCE_PATTERN=\(.patterns.source_file // "")",
-    @sh "IS_FULL=\(if (.workflow.intensity // "") | IN("high","critical") then "true" else "false" end)"
+    @sh "IS_FULL=\(if (.workflow.intensity // "" | ascii_downcase) | IN("high","critical") then "true" else "false" end)"
   ' "$CONFIG_FILE" 2>/dev/null)" || true
 fi
 
 # classify_file() is provided by lib.sh (ABS-001: single definition)
 # Requires TEST_PATTERN and SOURCE_PATTERN globals set above.
 command -v classify_file >/dev/null 2>&1 || exit 0
+
+# QA-R1-006: Disable glob expansion — patterns like *.ts must not expand to filenames
+# (workflow-gate.sh and sensitive-file-guard.sh both have this; audit-trail was missing it)
+set -f
 
 # --- Lite mode: phase-violation alerts ---
 

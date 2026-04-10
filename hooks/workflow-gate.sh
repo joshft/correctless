@@ -46,14 +46,20 @@ _source_lib() {
 INPUT="$(cat)"
 # shellcheck disable=SC2034  # Variables assigned via eval+jq below, used later
 TOOL_NAME="" TOOL_INPUT_FILE="" TOOL_INPUT_COMMAND="" TOOL_INPUT_NEW="" TOOL_INPUT_EDITS="" TOOL_INPUT_EDITS_NEW=""
-eval "$(echo "$INPUT" | jq -r '
+# QA-R1-005: Fail-closed on malformed stdin JSON (PreToolUse must not degrade to fail-open)
+_PARSED="$(echo "$INPUT" | jq -r '
   @sh "TOOL_NAME=\(.tool_name // "")",
   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
   @sh "TOOL_INPUT_NEW=\(.tool_input.new_string // .tool_input.content // "")",
   @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))",
   @sh "TOOL_INPUT_EDITS_NEW=\([.tool_input.edits[]?.new_string // empty] | join("\n"))"
-' 2>/dev/null)" || exit 0
+' 2>/dev/null)" || true
+if [ -z "$_PARSED" ]; then
+  echo "BLOCKED [fail-closed]: failed to parse tool input JSON" >&2
+  exit 2
+fi
+eval "$_PARSED"
 
 # Only gate write operations
 case "$TOOL_NAME" in
@@ -67,7 +73,10 @@ case "$TOOL_NAME" in
     fi
     # R-024: workflow-advance.sh invocations always allowed (after write detection
     # to avoid bypassing the gate for commands that merely mention the script name)
-    [[ "$COMMAND" == *"workflow-advance.sh"* ]] && exit 0
+    # QA-R1-002: Strip shell comments before matching to prevent bypass via
+    # appending "# workflow-advance.sh" as a comment to arbitrary commands
+    _cmd_no_comment="${COMMAND%%#*}"
+    [[ "$_cmd_no_comment" == *"workflow-advance.sh"* ]] && exit 0
     # Fall through to phase checking with the command as context
     ;;
   *)
@@ -93,10 +102,19 @@ if [ ! -f "$STATE_FILE" ]; then
   FAIL_CLOSED="false"
   FC_SOURCE_PAT=""
   if [ -f "$CONFIG_FILE" ]; then
-    eval "$(jq -r '
+    # QA-R1-004: If config exists but jq fails (corrupted JSON), default to fail-closed
+    # to prevent silent degradation of fail-closed security posture
+    _fc_parsed="$(jq -r '
       @sh "FAIL_CLOSED=\(.workflow.fail_closed_when_no_state // false)",
       @sh "FC_SOURCE_PAT=\(.patterns.source_file // "")"
     ' "$CONFIG_FILE" 2>/dev/null)" || true
+    if [ -n "$_fc_parsed" ]; then
+      eval "$_fc_parsed"
+    elif jq '.' "$CONFIG_FILE" >/dev/null 2>&1; then
+      : # Valid JSON but no relevant fields — keep defaults
+    else
+      FAIL_CLOSED="true"  # Corrupted config → fail-closed
+    fi
   fi
   if [ "$FAIL_CLOSED" = "true" ]; then
     # Full mode fail-closed: block source edits when no state file exists

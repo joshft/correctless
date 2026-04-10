@@ -75,11 +75,16 @@ write_state() {
 
 update_phase() {
   local new_phase="$1"
-  local state
-  state="$(read_state)" || die "No state file — run 'init' first"
-  state="$(echo "$state" | jq --arg p "$new_phase" --arg t "$(date -u +%FT%TZ)" \
-    '.phase = $p | .phase_entered_at = $t')"
-  write_state "$state"
+  # QA-R1-012: Use locked_update_state for atomic read-modify-write
+  # (prevents TOCTOU race if two workflow-advance.sh invocations overlap)
+  local sf
+  sf="$(state_file)"
+  [ -f "$sf" ] || die "No state file — run 'init' first"
+  local ts
+  ts="$(date -u +%FT%TZ)"
+  locked_update_state "$sf" \
+    ".phase = \"$new_phase\" | .phase_entered_at = \"$ts\"" \
+    || die "Failed to update phase"
   info "Phase: $new_phase"
 }
 
@@ -409,11 +414,9 @@ cmd_init() {
   local spec_file=".correctless/specs/${slug}.md"
 
   mkdir -p "$ARTIFACTS_DIR"
-  # Create the spec file stub so the path exists for downstream tools
   mkdir -p "$REPO_ROOT/.correctless/specs"
-  if [ ! -f "$REPO_ROOT/$spec_file" ]; then
-    printf "# Spec: %s\n\n## Rules\n\n_(to be written)_\n" "$task" > "$REPO_ROOT/$spec_file"
-  fi
+  # QA-R1-014: Write state BEFORE creating spec stub — if write_state fails,
+  # no orphaned spec file is left behind. On retry, the same slug is available.
   write_state "$(jq -n \
     --arg phase "spec" \
     --arg task "$task" \
@@ -430,6 +433,10 @@ cmd_init() {
       branch: $branch,
       qa_rounds: 0
     }')"
+  # Create the spec file stub so the path exists for downstream tools
+  if [ ! -f "$REPO_ROOT/$spec_file" ]; then
+    printf "# Spec: %s\n\n## Rules\n\n_(to be written)_\n" "$task" > "$REPO_ROOT/$spec_file"
+  fi
 
   info "Workflow initialized on branch '$branch'"
   info "Phase: spec"
@@ -599,6 +606,12 @@ cmd_verified() {
   local state spec_file slug
   state="$(read_state)"
   spec_file="$(echo "$state" | jq -r '.spec_file')"
+
+  # QA-R1-019: Guard against null spec_file (e.g., on audit branches that transitioned to done)
+  if [ -z "$spec_file" ] || [ "$spec_file" = "null" ]; then
+    die "No spec file in workflow state — 'verified' is not applicable to audit workflows. Merge the audit branch directly."
+  fi
+
   slug="$(basename "$spec_file" .md)"
   local report="$REPO_ROOT/.correctless/verification/${slug}-verification.md"
 
@@ -741,7 +754,7 @@ cmd_resolve_drift() {
   fi
 
   # shellcheck disable=SC2064
-  trap "rm -f '$DRIFT_DEBT_FILE.$$'" EXIT
+  trap "$(printf 'rm -f %q' "$DRIFT_DEBT_FILE.$$")" EXIT
   jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
     "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
@@ -859,7 +872,7 @@ cmd_override() {
     --arg branch "$(current_branch)" \
     '{phase: $phase, reason: $reason, timestamp: $ts, branch: $branch}')"
   # shellcheck disable=SC2064
-  trap "rm -f '$OVERRIDE_LOG.$$'" EXIT
+  trap "$(printf 'rm -f %q' "$OVERRIDE_LOG.$$")" EXIT
   jq --argjson entry "$entry" '(. += [$entry]) | .[-100:]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
     && mv "$OVERRIDE_LOG.$$" "$OVERRIDE_LOG"
   trap - EXIT

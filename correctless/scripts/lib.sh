@@ -160,6 +160,14 @@ _acquire_state_lock() {
         fi
         continue
       fi
+    elif [ -d "$lock_dir" ]; then
+      # QA-R1-018: No pid file — lock was interrupted between mkdir and pid write.
+      # Treat as stale and break it to prevent 5s timeout deadlock.
+      local break_dir="${lock_dir}.breaking.$$"
+      if mv "$lock_dir" "$break_dir" 2>/dev/null; then
+        rm -rf "$break_dir"
+      fi
+      continue
     fi
 
     # Holder is alive or PID unknown — wait and retry
@@ -188,6 +196,10 @@ locked_update_state() {
   local rc=0
 
   _acquire_state_lock "$state_file" || return 1
+  # QA-R1-013: EXIT trap ensures lock is released on abnormal termination
+  # (e.g., hook runner kills the process at timeout between acquire and release)
+  # shellcheck disable=SC2064
+  trap "$(printf '_release_state_lock %q; rm -f %q' "$state_file" "${state_file}.$$.tmp")" EXIT
 
   local tmp_file="${state_file}.$$.tmp"
   if jq "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
@@ -198,6 +210,7 @@ locked_update_state() {
   fi
 
   _release_state_lock "$state_file"
+  trap - EXIT
   return "$rc"
 }
 

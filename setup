@@ -252,9 +252,9 @@ install_hooks() {
     [ -f "$hook" ] || continue
     local basename_hook
     basename_hook="$(basename "$hook")"
-    if [ ! -f "$hook_dest/$basename_hook" ]; then
-      cp "$hook" "$hook_dest/$basename_hook"
-    fi
+    # QA-R1-001: Always copy hooks — they are generated code, not user-edited.
+    # The [ ! -f ] guard prevented updates, causing stale hook drift.
+    cp "$hook" "$hook_dest/$basename_hook"
     chmod +x "$hook_dest/$basename_hook" 2>/dev/null || true
   done
   ok "Installed hooks to .correctless/hooks/"
@@ -690,22 +690,23 @@ detect_version_file() {
     version_file="package.json"
     version_pattern=".version"
   # Check Cargo.toml — section-aware: version must be under [package], not [workspace]
-  elif [ -f "$REPO_ROOT/Cargo.toml" ] && sed -n '/^\[package\]/,/^\[/p' "$REPO_ROOT/Cargo.toml" 2>/dev/null | grep -q '^version\s*='; then
+  # QA-R1-009: Use [[:space:]] instead of \s for POSIX portability (AP-001)
+  elif [ -f "$REPO_ROOT/Cargo.toml" ] && sed -n '/^\[package\]/,/^\[/p' "$REPO_ROOT/Cargo.toml" 2>/dev/null | grep -q '^version[[:space:]]*='; then
     version_file="Cargo.toml"
-    version_pattern='version\s*=\s*"[^"]*"'
+    version_pattern='version[[:space:]]*=[[:space:]]*"[^"]*"'
   # Check pyproject.toml — section-aware: version must be under [project]
-  elif [ -f "$REPO_ROOT/pyproject.toml" ] && sed -n '/^\[project\]/,/^\[/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | grep -q '^version\s*='; then
+  elif [ -f "$REPO_ROOT/pyproject.toml" ] && sed -n '/^\[project\]/,/^\[/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | grep -q '^version[[:space:]]*='; then
     version_file="pyproject.toml"
-    version_pattern='version\s*=\s*"[^"]*"'
+    version_pattern='version[[:space:]]*=[[:space:]]*"[^"]*"'
   # Check setup.cfg
-  elif [ -f "$REPO_ROOT/setup.cfg" ] && grep -q '^version\s*=' "$REPO_ROOT/setup.cfg" 2>/dev/null; then
+  elif [ -f "$REPO_ROOT/setup.cfg" ] && grep -q '^version[[:space:]]*=' "$REPO_ROOT/setup.cfg" 2>/dev/null; then
     version_file="setup.cfg"
-    version_pattern='version\s*=\s*[0-9]'
+    version_pattern='version[[:space:]]*=[[:space:]]*[0-9]'
   # Check Go version constants — capture find result once to avoid double traversal
-  elif go_file="$(find "$REPO_ROOT" -maxdepth 4 -name '*.go' -exec grep -l 'const Version\s*=\|var Version\s*=' {} + 2>/dev/null | head -1)" && [ -n "$go_file" ]; then
+  elif go_file="$(find "$REPO_ROOT" -maxdepth 4 -name '*.go' -exec grep -l 'const Version[[:space:]]*=\|var Version[[:space:]]*=' {} + 2>/dev/null | head -1)" && [ -n "$go_file" ]; then
     # Store relative path from repo root
     version_file="${go_file#"$REPO_ROOT/"}"
-    version_pattern='(const|var) Version\s*=\s*"[^"]*"'
+    version_pattern='(const|var) Version[[:space:]]*=[[:space:]]*"[^"]*"'
   # Check CHANGELOG.md heading as fallback
   elif [ -f "$REPO_ROOT/CHANGELOG.md" ] && grep -q '## \[[0-9]' "$REPO_ROOT/CHANGELOG.md" 2>/dev/null; then
     version_file="CHANGELOG.md"
