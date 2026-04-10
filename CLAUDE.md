@@ -71,12 +71,12 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 
 ### 2026-04-05 — Convention confirmed: PreToolUse hook structure
 - Observed in 3 features (workflow-gate.sh, sensitive-file-guard.sh, auto-format.sh uses PostToolUse variant) — treat as established project convention
-- Every PreToolUse hook must: (1) `set -euo pipefail` + `set -f`, (2) check `command -v jq` with fail-closed exit 2, (3) bulk-parse stdin with single `eval` + `jq -r @sh`, (4) fast-path `exit 0` for non-relevant tools BEFORE loading config, (5) exit 0 to allow, exit 2 to block. See PAT-001 in .correctless/ARCHITECTURE.md.
+- Every PreToolUse hook must: (1) `set -euo pipefail` + `set -f`, (2) check `command -v jq` with fail-closed exit 2, (3) bulk-parse stdin with single `eval` + `jq -r @sh`, (4) fast-path `exit 0` for non-relevant tools BEFORE loading config, (5) exit 0 to allow, exit 2 to block. See `.claude/rules/hooks-pretooluse.md`.
 - Source: /cdocs after sensitive-file-protection
 
 ### 2026-04-07 — Convention confirmed: PostToolUse hook structure (PAT-005)
 - Observed in 3 features (audit-trail.sh, auto-format.sh, token-tracking.sh) — treat as established project convention
-- Every PostToolUse hook must: (1) NO `set -euo pipefail` (fail-open, not fail-closed), (2) `command -v jq` with `exit 0` if missing (NOT exit 2), (3) bulk-parse stdin with `eval` + `jq -r @sh`, (4) fast-path `exit 0` for non-relevant tools BEFORE any I/O, (5) guard each operation with `|| exit 0`, (6) ALWAYS exit 0 — advisory, never gating. Contrast with PAT-001 (PreToolUse: fail-closed, exit 2 to block). See PAT-005 in .correctless/ARCHITECTURE.md.
+- Every PostToolUse hook must: (1) NO `set -euo pipefail` (fail-open, not fail-closed), (2) `command -v jq` with `exit 0` if missing (NOT exit 2), (3) bulk-parse stdin with `eval` + `jq -r @sh`, (4) fast-path `exit 0` for non-relevant tools BEFORE any I/O, (5) guard each operation with `|| exit 0`, (6) ALWAYS exit 0 — advisory, never gating. Contrast with PAT-001 (PreToolUse: fail-closed, exit 2 to block — See `.claude/rules/hooks-pretooluse.md`).
 - Source: /cdocs after token-tracking
 
 ### 2026-04-05 — Audit pattern: Hook allowlist/extension drift (RESOLVED)
@@ -91,3 +91,11 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 ### 2026-04-10 — Postmortem: Audit fix rounds are untested code
 - QA Olympics audit ran 3 rounds where each round introduced at least one regression that the next round had to catch. Fix commits bypass the TDD discipline of the main workflow — they're batched into one commit per round without test suite verification or diff-focused review. The convergence loop works eventually but wastes rounds. Class fix: /caudit must run the full test suite and spawn a fix-diff review agent after each fix round commit, before advancing. See AP-012.
 - Source: PMB-002
+
+### 2026-04-10 — Convention introduced: rules-canonical / ARCHITECTURE.md index
+- **Provisional convention under measurement.** First dogfood prototype: PAT-001 was migrated from its full-body form in the architecture doc to a path-scoped rule file at `.claude/rules/hooks-pretooluse.md`.
+- Post-migration, `.correctless/ARCHITECTURE.md` contains only a 2-line index entry (heading + See-link) for the migrated pattern. The rule body loads into agent context when Claude Code opens `hooks/workflow-gate.sh` or `hooks/sensitive-file-guard.sh`.
+- **Why**: duplication invites drift (AP-005 has recurred repeatedly); a single canonical location enforced by a structural drift test (`tests/test-architecture-drift.sh`) makes drift structurally impossible rather than merely unlikely. The migration is also a prevention bet — the rule body is now loaded into editing context for the exact files it governs, which should reduce the persistence window of fail-closed violations observed in the ≥7-PR baseline (QA-R1-004/005).
+- **Measurement gate**: this is an experiment, not a settled convention. The gate (MG-001 prevention signal + MG-002 safety-net persistence ceiling) evaluates after 3 hook-touching PRs via `.correctless/meta/pat001-measurement-due.json` and the dormant `/cstatus` check. If the gate fails, execute PRH-002 rollback (restore full PAT-001 body to ARCHITECTURE.md, delete rule file, revert CLAUDE.md/README changes, drop ABS-009/ENV-005/ENV-006, remove this learning entry) — leaving `tests/test-architecture-drift.sh` in place as inert infrastructure for a future retry.
+- **Scope discipline**: only PAT-001 was migrated in this feature. PAT-002..PAT-010 remain full-body in ARCHITECTURE.md (PRH-004). New PAT entries default to ARCHITECTURE.md full-body form until the measurement gate passes (see OQ-005 in the spec). Future PAT migrations (PAT-005 is the next candidate) reuse the drift test verbatim under FUTURE-002. The `InstructionsLoaded` hook that would give MG-001 a direct runtime signal is Feature B (FUTURE-001), deferred.
+- Source: /cspec after path-scoped-rules-pat001

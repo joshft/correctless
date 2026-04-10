@@ -501,6 +501,20 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+# ============================================================================
+# Architecture drift test — dogfood for the rules-canonical / ARCHITECTURE.md
+# index pattern (path-scoped-rules-pat001). Wired into the local aggregator
+# per INV-007 so contributors catch drift before CI. Runs before the summary
+# so its pass/fail feeds into the aggregate count.
+# ============================================================================
+if (cd "$REPO_DIR" && bash tests/test-architecture-drift.sh); then
+  echo "  PASS: architecture drift test (dogfood: rules-canonical pattern)"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: architecture drift test — see output above"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "======================"
 echo "Results: $PASS passed, $FAIL failed"

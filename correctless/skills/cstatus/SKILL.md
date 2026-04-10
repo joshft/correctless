@@ -156,6 +156,21 @@ After showing phase and commands, proactively check for issues:
 
 **Override usage**: Read `override_count` from the state file. If ≥2: "You've used {N} overrides on this workflow. If the gate keeps blocking legitimate edits, the workflow config or file patterns may need adjustment. Run `workflow-advance.sh diagnose 'yourfile.ts'` to understand why."
 
+**Measurement-overdue check (path-scoped-rules-pat001 dogfood, INV-016 / MG-003)**: If `.correctless/meta/pat001-measurement-due.json` exists, inspect it:
+
+1. Read `due_at_pr_count` (an integer, typically 3) and `created_at_commit` (a commit SHA or null).
+2. If `created_at_commit` is null, the feature has merged but the measurement baseline commit was never recorded — emit a one-line advisory: "pat001-measurement-due.json exists but `created_at_commit` is null; /cdocs or /cverify should fill it at merge time." Then stop this check.
+3. Otherwise, count hook-touching merged PRs since `created_at_commit`. A hook-touching PR is any PR whose merge commit modifies a file under `hooks/*.sh`. Use: `git log --merges --name-only "$created_at_commit"..HEAD -- 'hooks/*.sh' | grep -c '^hooks/' || true` — adapt if the local git log shape is different.
+4. If the hook-touching PR count is `>= due_at_pr_count` AND `.correctless/verification/path-scoped-rules-pat001-measurement.md` does NOT exist, emit a warning banner (prominently, above the standard status block):
+
+   > WARNING — Measurement overdue: path-scoped-rules-pat001 — run measurement gate per MG-003 or roll back per PRH-002.
+
+   Include a one-line pointer: "See `.correctless/specs/path-scoped-rules-pat001.md` MG-003 for the procedure, and PRH-002 for the rollback steps."
+5. If the measurement report already exists at `.correctless/verification/path-scoped-rules-pat001-measurement.md`, suppress the warning — the gate has been evaluated.
+6. If the meta file is missing, this check is a no-op. Do not create it.
+
+This check is dormant by design: it fires only when the post-merge measurement window has elapsed and the human has not yet run the gate. It is the only merge-time-enforceable signal for MG-003 (the measurement gate is evaluated post-merge via git archaeology, not at PR time).
+
 **No active workflow**: "No active workflow on this branch. You can edit freely — the gate only blocks during active workflows. To start a structured workflow: `git checkout -b feature/my-feature` then `/cspec`."
 
 ### 6. Health Check (if requested)
