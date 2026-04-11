@@ -107,10 +107,23 @@ EXPECTED_CANONICAL_MARKER='FAIL-CLOSED: Task failure aborts the current round'
 
 # Extract frontmatter block (between leading --- lines) from a markdown file.
 # Emits nothing and returns non-zero if frontmatter is absent or malformed.
+#
+# Result is memoized per-file — multiple check functions read the same
+# agent/skill frontmatter, and extraction + field-lookup were previously
+# forking awk ~13 times for the same content.
 extract_frontmatter() {
   local file="$1"
   [ -f "$file" ] || return 1
-  awk '
+  local cache_var
+  cache_var="_FM_CACHE_$(printf '%s' "$file" | tr -c 'a-zA-Z0-9' '_')"
+  # Indirect variable expansion is bash-specific but this test file is bash-only.
+  local cached="${!cache_var:-__UNSET__}"
+  if [ "$cached" != "__UNSET__" ]; then
+    printf '%s' "$cached"
+    [ -n "$cached" ] && return 0 || return 1
+  fi
+  local result
+  result="$(awk '
     BEGIN { state = 0 }
     NR == 1 {
       if ($0 == "---") { state = 1; next }
@@ -118,7 +131,10 @@ extract_frontmatter() {
     }
     state == 1 && $0 == "---" { exit 0 }
     state == 1 { print }
-  ' "$file"
+  ' "$file" 2>/dev/null || true)"
+  printf -v "$cache_var" '%s' "$result"
+  printf '%s' "$result"
+  [ -n "$result" ] && return 0 || return 1
 }
 
 # Extract a single scalar frontmatter field (key: value) from the agent file.
@@ -164,30 +180,48 @@ parse_tools_list() {
 # sentinel comments `<!-- STEP 6A BEGIN -->` and `<!-- STEP 6A END -->`
 # (required by INV-020). The sentinel lines themselves are NOT included
 # in the output. Returns empty if either sentinel is missing (RED state).
+#
+# Result is memoized per-file — caudit SKILL.md is immutable during a
+# test run, and ~10 check functions invoke this helper. Without caching
+# each invocation forks awk and re-parses the file.
 extract_step_6a_block() {
   local file="$1"
   [ -f "$file" ] || return 1
-  awk '
+  if [ -n "${_STEP_6A_CACHE_FILE:-}" ] && [ "$_STEP_6A_CACHE_FILE" = "$file" ]; then
+    printf '%s' "$_STEP_6A_CACHE"
+    [ -n "$_STEP_6A_CACHE" ] && return 0 || return 1
+  fi
+  _STEP_6A_CACHE_FILE="$file"
+  _STEP_6A_CACHE="$(awk '
     BEGIN { in_block = 0; found = 0 }
     /<!-- STEP 6A BEGIN -->/ { in_block = 1; found = 1; next }
     /<!-- STEP 6A END -->/ { in_block = 0; next }
     in_block { print }
     END { exit (found ? 0 : 1) }
-  ' "$file"
+  ' "$file" 2>/dev/null || true)"
+  printf '%s' "$_STEP_6A_CACHE"
+  [ -n "$_STEP_6A_CACHE" ] && return 0 || return 1
 }
 
 # Extract the entire caudit SKILL.md with the narrative
 # `### Why fix verification is mandatory` section removed. Used by B02
-# (belt-and-suspenders whole-file denylist checks).
+# (belt-and-suspenders whole-file denylist checks). Memoized like
+# extract_step_6a_block — 3 call sites, same file, same result.
 extract_caudit_minus_narrative() {
   local file="$1"
   [ -f "$file" ] || return 1
-  awk '
+  if [ -n "${_CAUDIT_MINUS_CACHE_FILE:-}" ] && [ "$_CAUDIT_MINUS_CACHE_FILE" = "$file" ]; then
+    printf '%s' "$_CAUDIT_MINUS_CACHE"
+    return 0
+  fi
+  _CAUDIT_MINUS_CACHE_FILE="$file"
+  _CAUDIT_MINUS_CACHE="$(awk '
     BEGIN { skip = 0 }
     /^### Why fix verification is mandatory/ { skip = 1; next }
     skip && (/^### / || /^## /) { skip = 0 }
     !skip { print }
-  ' "$file"
+  ' "$file" 2>/dev/null || true)"
+  printf '%s' "$_CAUDIT_MINUS_CACHE"
 }
 
 # Emit a warning (advisory) if the extracted 6a block is shorter than N lines.
@@ -751,10 +785,12 @@ check_inv008() {
   # (a) Top-level directory allowlist case statement includes `agents`.
   # Check within a narrow window around line 146: look at the stale-top-level-items
   # case statement body (5 lines after "# Expected top-level dirs").
+  # NOTE: uses index() rather than `\<agents\>` because mawk (Ubuntu default)
+  # parses \<...\> as literal `<agents>` rather than word boundaries.
   if awk '
     /Expected top-level dirs:/ { scan = 5; next }
     scan > 0 {
-      if ($0 ~ /\<agents\>/) { found = 1; exit }
+      if (index($0, "|agents)") > 0) { found = 1; exit }
       scan--
     }
     END { exit (found ? 0 : 1) }
@@ -766,10 +802,11 @@ check_inv008() {
 
   # (b) Stale-file detection loop covers `agents`.
   # Look for "for dir in ... agents" pattern in the stale-file loop area.
+  # Same mawk-portability note as (a): use index() not \<agents\>.
   if awk '
     /Hooks and scripts: check for stale/ { scan = 3; next }
     scan > 0 {
-      if ($0 ~ /for[[:space:]]+dir[[:space:]]+in[[:space:]]+.*\<agents\>/) { found = 1; exit }
+      if ($0 ~ /for[[:space:]]+dir[[:space:]]+in[[:space:]]/ && index($0, "agents") > 0) { found = 1; exit }
       scan--
     }
     END { exit (found ? 0 : 1) }

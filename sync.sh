@@ -179,7 +179,6 @@ if [ "$CHECK_ONLY" = true ]; then
     [ -d "$dist_item" ] || continue
     local_item="$(basename "$dist_item")"
     # Expected top-level dirs: skills hooks templates helpers scripts agents
-    # <agents> added for plugin sub-agents — see ABS-010
     case "$local_item" in
       skills|hooks|templates|helpers|scripts|agents) ;; # expected — already checked via sync_file/sync_dir
       *) DIRTY=true ;; # unexpected directory in distribution
