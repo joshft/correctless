@@ -803,6 +803,10 @@ check_inv008() {
   # (b) Stale-file detection loop covers `agents`.
   # Look for "for dir in ... agents" pattern in the stale-file loop area.
   # Same mawk-portability note as (a): use index() not \<agents\>.
+  #
+  # QA-004 class fix: primary-window miss emits a visible WARN to stderr
+  # before falling through to the looser whole-file fallback. Silent
+  # fall-through hides drift between test intent and effect.
   if awk '
     /Hooks and scripts: check for stale/ { scan = 3; next }
     scan > 0 {
@@ -813,10 +817,12 @@ check_inv008() {
   ' "$SYNC_SH"; then
     pass "INV-008(b)" "stale-file detection loop covers 'agents'"
   else
+    # Primary window missed — emit a WARN so the drift is visible.
+    echo "  ${YELLOW}NOTE${RESET}: INV-008(b): primary window check (3 lines after 'Hooks and scripts: check for stale') missed — falling back to file-wide scan" >&2
     # Fallback: search for any loop that pairs 'agents' with a .md glob.
     if grep -E "for[[:space:]]+(dir|f)[[:space:]]+in[[:space:]]+.*agents" "$SYNC_SH" >/dev/null 2>&1 \
        && grep -F '*.md' "$SYNC_SH" >/dev/null 2>&1; then
-      pass "INV-008(b)" "sync.sh has an agents loop and .md file glob"
+      pass "INV-008(b)" "sync.sh has an agents loop and .md file glob (fallback matched)"
     else
       fail "INV-008(b)" "stale-file detection loop does not cover 'agents' with .md glob"
     fi
@@ -1415,6 +1421,49 @@ check_inv017() {
 # INV-018: DD-008 rule-scan instructions in step 6a.
 # ============================================================================
 
+check_producer_consumer_closure() {
+  section "Producer-consumer closure: ROUND_START_SHA has an assignment before its read"
+
+  # QA-002 class fix: any variable consumed inside step 6a (ROUND_START_SHA,
+  # etc.) must be PRODUCED (assigned or git-ref'd into existence) somewhere
+  # earlier in caudit SKILL.md. Searches the whole file — the producer may
+  # live outside the step 6a sentinel block (e.g., at the top of The Loop).
+  # The test is: find at least one producer for `refs/audit-round-${ROUND_N}-start`
+  # (the ref the consumer reads via git rev-parse) OR a direct assignment
+  # of ROUND_START_SHA from a non-rev-parse source, AND that producer's line
+  # number must precede the consumer's line number.
+  if [ ! -f "$CAUDIT_SKILL" ]; then
+    fail "PRODUCER-CONSUMER" "$CAUDIT_SKILL does not exist"
+    return
+  fi
+
+  local producer_ln consumer_ln
+  # Producer forms (any of):
+  #   git update-ref "refs/audit-round-${ROUND_N}-start" HEAD
+  #   git update-ref refs/audit-round-${ROUND_N}-start HEAD
+  #   ROUND_START_SHA=$(...)  — non rev-parse assignment of the var
+  producer_ln="$(grep -nE 'git[[:space:]]+update-ref.*refs/audit-round-\$\{?ROUND_N\}?-start' "$CAUDIT_SKILL" | head -n 1 | cut -d: -f1)"
+  consumer_ln="$(grep -nE 'ROUND_START_SHA=.*git[[:space:]]+rev-parse.*refs/audit-round' "$CAUDIT_SKILL" | head -n 1 | cut -d: -f1)"
+
+  if [ -z "$producer_ln" ]; then
+    fail "PRODUCER-CONSUMER(a)" "no producer for 'refs/audit-round-\${ROUND_N}-start' found in $CAUDIT_SKILL (expected 'git update-ref refs/audit-round-\${ROUND_N}-start HEAD')"
+    return
+  fi
+  pass "PRODUCER-CONSUMER(a)" "producer 'git update-ref refs/audit-round-\${ROUND_N}-start' present at line $producer_ln"
+
+  if [ -z "$consumer_ln" ]; then
+    fail "PRODUCER-CONSUMER(b)" "no consumer 'ROUND_START_SHA=\$(git rev-parse refs/audit-round-...)' found"
+    return
+  fi
+  pass "PRODUCER-CONSUMER(b)" "consumer ROUND_START_SHA rev-parse present at line $consumer_ln"
+
+  if [ "$producer_ln" -lt "$consumer_ln" ]; then
+    pass "PRODUCER-CONSUMER(c)" "producer (line $producer_ln) precedes consumer (line $consumer_ln)"
+  else
+    fail "PRODUCER-CONSUMER(c)" "producer (line $producer_ln) does NOT precede consumer (line $consumer_ln)"
+  fi
+}
+
 check_inv018() {
   section "INV-018: DD-008 rule-scan instructions in step 6a"
 
@@ -1430,12 +1479,25 @@ check_inv018() {
   local block_no_bq
   block_no_bq="$(printf '%s\n' "$block" | awk '!/^>[[:space:]]/')"
 
+  # NOTE (QA-003 class fix): order-matters assertions use strict state
+  # machines (`idx == N-1`) not monotonic-advance (`idx < N`) to prevent
+  # pattern-4 being skipped when pattern-5 lines match first. With the
+  # weak `idx < N` form, a later pattern's line can advance the index
+  # past earlier patterns, falsely passing the ordering check even though
+  # earlier patterns never matched in-order.
+  #
+  # Canonical order for step 6a (mirrors the actual SKILL.md layout):
+  #   1. .claude/rules/      (rule enumeration directive)
+  #   2. paths:               (frontmatter field being parsed)
+  #   3. git show             (pre-diff state read)
+  #   4. Path-scoped rules applying to this diff  (fence section heading)
+  #   5. <UNTRUSTED_RULES>    (the fence itself)
   local patterns=(
     '.claude/rules/'
     'paths:'
     'git show'
-    '<UNTRUSTED_RULES>'
     'Path-scoped rules applying to this diff'
+    '<UNTRUSTED_RULES>'
   )
   local p
   for p in "${patterns[@]}"; do
@@ -1447,24 +1509,26 @@ check_inv018() {
   done
 
   # B11(2): pattern ordering — the 5 patterns must appear in sequence in the
-  # order listed. awk state machine.
+  # order listed. Strict-next-step state machine: each pattern N can only
+  # advance idx when idx is exactly N-1 (not "below N"). This prevents a
+  # later-listed pattern from skipping earlier ones.
   local ordering_ok
   ordering_ok="$(printf '%s\n' "$block_no_bq" | awk '
     BEGIN { idx = 0 }
     {
-      # Check each pattern in order starting from idx+1.
-      if (idx < 1 && index($0, ".claude/rules/") > 0) { idx = 1; next }
-      if (idx < 2 && index($0, "paths:") > 0) { idx = 2; next }
-      if (idx < 3 && index($0, "git show") > 0) { idx = 3; next }
-      if (idx < 4 && index($0, "<UNTRUSTED_RULES>") > 0) { idx = 4; next }
-      if (idx < 5 && index($0, "Path-scoped rules applying to this diff") > 0) { idx = 5; next }
+      # Strict next-step: each pattern only fires when idx == its position - 1.
+      if (idx == 0 && index($0, ".claude/rules/") > 0) { idx = 1; next }
+      if (idx == 1 && index($0, "paths:") > 0) { idx = 2; next }
+      if (idx == 2 && index($0, "git show") > 0) { idx = 3; next }
+      if (idx == 3 && index($0, "Path-scoped rules applying to this diff") > 0) { idx = 4; next }
+      if (idx == 4 && index($0, "<UNTRUSTED_RULES>") > 0) { idx = 5; next }
     }
     END { print idx }
   ')"
   if [ "${ordering_ok:-0}" -ge 5 ]; then
-    pass "INV-018(order)" "all 5 patterns appear in the required order"
+    pass "INV-018(order)" "all 5 patterns appear in the required order (strict state machine)"
   else
-    fail "INV-018(order)" "only $ordering_ok of 5 patterns matched in order (pattern sequence broken)"
+    fail "INV-018(order)" "only $ordering_ok of 5 patterns matched in strict order (pattern sequence broken)"
   fi
 
   # G07: a parser reference for the `paths:` frontmatter must appear.
@@ -1688,6 +1752,40 @@ check_bnd002() {
   else
     fail "BND-002(b)" "'audit.zero_findings_threshold' only appears as bare mention (no jq/json/config adjacency)"
   fi
+
+  # QA-001 class fix: BND-002 is a LINES-CHANGED threshold with default 50,
+  # not a findings-count threshold. Assert three things structurally:
+  #   (c) numeric `50` (or literal `// 50` jq default) within ~20 chars of
+  #       `audit.zero_findings_threshold`
+  #   (d) the word `lines` within 40 chars of the key (semantic binding —
+  #       rejects findings-count paraphrases)
+  #   (e) an artifact-write instruction referencing `audit-trail` and
+  #       `zero_findings_on_nontrivial_diff`
+
+  # (c) default value 50 within 20 chars of the key. Accept `// 50`,
+  # `default 50`, `50 lines`, etc.
+  if printf '%s\n' "$block" | grep -qE 'audit\.zero_findings_threshold.{0,20}(//[[:space:]]*)?50|50.{0,20}audit\.zero_findings_threshold'; then
+    pass "BND-002(c)" "default value '50' is within 20 chars of 'audit.zero_findings_threshold'"
+  else
+    fail "BND-002(c)" "default value '50' not adjacent (<=20 chars) to 'audit.zero_findings_threshold'"
+  fi
+
+  # (d) semantic binding to `lines` within 40 chars of the key. Rejects
+  # findings-count paraphrases like "how many new fix-diff findings".
+  if printf '%s\n' "$block" | grep -qE 'audit\.zero_findings_threshold.{0,40}lines|lines.{0,40}audit\.zero_findings_threshold'; then
+    pass "BND-002(d)" "'lines' appears within 40 chars of 'audit.zero_findings_threshold' (semantic binding)"
+  else
+    fail "BND-002(d)" "'lines' not adjacent (<=40 chars) to 'audit.zero_findings_threshold' — rejects findings-count paraphrases"
+  fi
+
+  # (e) forensic-logging block must reference audit-trail artifact AND the
+  # zero_findings_on_nontrivial_diff flag somewhere in step 6a.
+  if printf '%s\n' "$block" | grep -qF 'audit-trail' && \
+     printf '%s\n' "$block" | grep -qF 'zero_findings_on_nontrivial_diff'; then
+    pass "BND-002(e)" "forensic-logging block references 'audit-trail' and 'zero_findings_on_nontrivial_diff'"
+  else
+    fail "BND-002(e)" "step 6a missing audit-trail artifact write or 'zero_findings_on_nontrivial_diff' flag (forensic logging)"
+  fi
 }
 
 # ============================================================================
@@ -1842,6 +1940,27 @@ check_bnd004() {
   else
     fail "BND-004(b)" "cannot locate both '100 KB' and canonical marker lines (kb=$kb_ln marker=$marker_ln)"
   fi
+
+  # QA-006 class fix: a byte-counting operation (`wc -c`, `${#VAR}`,
+  # `wc --bytes`) MUST appear within 5 lines of the 100 KB mention. A
+  # budget with no concrete measurement is unenforceable — a sloppy
+  # orchestrator could skip the check entirely.
+  local measure_ln mdelta
+  measure_ln="$(printf '%s\n' "$block" | grep -nE 'wc[[:space:]]+-c|wc[[:space:]]+--bytes|\$\{#[A-Za-z_]' | head -n 1 | cut -d: -f1)"
+  if [ -n "$kb_ln" ] && [ -n "$measure_ln" ]; then
+    if [ "$measure_ln" -gt "$kb_ln" ]; then
+      mdelta=$((measure_ln - kb_ln))
+    else
+      mdelta=$((kb_ln - measure_ln))
+    fi
+    if [ "$mdelta" -le 5 ]; then
+      pass "BND-004(c)" "byte-counting operation is $mdelta lines from '100 KB' mention (<=5)"
+    else
+      fail "BND-004(c)" "byte-counting operation is $mdelta lines from '100 KB' mention (>5) — budget lacks concrete measurement"
+    fi
+  else
+    fail "BND-004(c)" "no byte-counting operation (wc -c, wc --bytes, \${#VAR}) found near '100 KB' mention"
+  fi
 }
 
 # ============================================================================
@@ -1990,6 +2109,7 @@ check_bnd003
 check_bnd004
 check_bnd005
 check_bnd006
+check_producer_consumer_closure
 check_gap002_dd009_metadata
 check_gap008_abs010_narrow_scope
 

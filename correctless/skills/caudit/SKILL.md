@@ -152,12 +152,30 @@ via a namespaced Task call. The agent itself has read-only tools only.
 **Step 1 — Pin the round-start SHA.**
 
 The round-start SHA is the git SHA immediately before the first fix commit of
-this round. The orchestrator pins it into a shell variable in its own
-execution context before any `git show` usage:
+this round. The orchestrator MUST pin this ref at the moment round N begins,
+BEFORE any fix commits land — otherwise `git rev-parse` in the read-back step
+will fail with "fatal: ambiguous argument" and `ROUND_START_SHA` will be
+empty, silently bypassing PRH-005's pre-diff git-state read.
+
+**Producer (pin at round start, before any fix commit for this round):**
+
+```sh
+# Run once at the top of each fix round, before committing any fixes:
+git update-ref "refs/audit-round-${ROUND_N}-start" HEAD
+```
+
+**Consumer (read back at fix-verification time, after fixes are committed):**
 
 ```sh
 ROUND_START_SHA="$(git rev-parse "refs/audit-round-${ROUND_N}-start")"
 ```
+
+On checkpoint resume (see "Checkpoint Resume" above), the orchestrator MUST
+verify `refs/audit-round-${ROUND_N}-start` exists for each resumed round. If
+missing, recompute it from the checkpoint's recorded HEAD at round start and
+re-pin via `git update-ref` before proceeding. Do NOT fall back to a
+relative range that counts commits from the tip — the number of fix commits
+per round varies (INV-004 prohibits any relative diff range).
 
 **Step 2 — Compute the fix-round diff.**
 
@@ -217,13 +235,16 @@ Then the diff itself is wrapped in an `<UNTRUSTED_DIFF>` fence:
 
 **Step 5 — Size budget and fail-closed invocation.**
 
-Before invoking the Task, measure the total byte length of the assembled
-prompt. The Task prompt budget is 100 KB. If the assembled prompt exceeds
-100 KB (rule bodies + diff + framing), abort the round immediately with a
-BLOCKING finding — do not truncate, do not retry with a smaller subset.
+Measure the assembled prompt and abort if over the 100 KB hard ceiling (DD-010). No truncation, no smaller-subset retry.
 FAIL-CLOSED: Task failure aborts the current round.
 
 ```sh
+PROMPT_BYTES=$(printf '%s' "$PROMPT_BODY" | wc -c)
+if [ "$PROMPT_BYTES" -gt 102400 ]; then
+  echo "PROMPT-BUDGET-EXCEEDED: assembled prompt is ${PROMPT_BYTES} bytes, exceeds 100 KB cap — aborting round ${ROUND_N}" >&2
+  exit 2
+fi
+
 Task(subagent_type="correctless:fix-diff-reviewer",
      description="Review fix-round diff",
      prompt="$PROMPT_BODY")
@@ -243,17 +264,59 @@ expression instead of the bare dot) are prohibited — the reviewer's contract
 is that the entire response body is a JSON array, and the identity parse is
 the round-abort gate when that contract is violated.
 
-**Step 7 — Threshold and promotion.**
+**Step 7 — Threshold, forensic logging, and promotion.**
 
-Read the configurable threshold from workflow-config.json via jq:
+Read the configurable threshold from workflow-config.json via jq. The key
+`audit.zero_findings_threshold` is a lines-changed threshold (default 50),
+NOT a findings-count threshold. It defines the diff size at which a
+zero-findings reviewer response becomes suspicious enough to warrant
+forensic logging. Default if unset, malformed, or `<1` is **50** lines:
 
 ```sh
-THRESHOLD="$(jq -r '.audit.zero_findings_threshold // 0' .correctless/config/workflow-config.json)"
+THRESHOLD="$(jq -r '.audit.zero_findings_threshold // 50' .correctless/config/workflow-config.json)"
+if ! [ "$THRESHOLD" -ge 1 ] 2>/dev/null; then THRESHOLD=50; fi
+LINES_CHANGED="$(git diff --numstat "${ROUND_START_SHA}..HEAD" | awk '{added+=$1; removed+=$2} END {print added+removed+0}')"
+FINDINGS_COUNT="$(jq 'length' /tmp/fd-findings-${ROUND_N}.json)"
 ```
 
-The key `audit.zero_findings_threshold` in `.correctless/config/workflow-config.json`
-(a json config file read via jq) controls how many new fix-diff findings are
-tolerated before the round must re-loop through step 5 (triage). Default is 0.
+**Forensic-logging block.** If the reviewer returns zero findings on a
+non-trivial diff — i.e. `FINDINGS_COUNT == 0` AND `LINES_CHANGED >= THRESHOLD`
+— append a record to `.correctless/artifacts/audit-trail-${BRANCH_SLUG}.jsonl`
+containing the full reviewer request/response transcript, the measured line
+count, the threshold used, the flag `zero_findings_on_nontrivial_diff: true`,
+and an ISO-8601 timestamp. This preserves forensic evidence for post-hoc
+audit of suspected suppression attempts (prompt injection, adversarial rule
+files). Zero findings on a trivial diff (below the lines-changed threshold)
+is treated as a clean pass and is not logged.
+
+```sh
+if [ "$FINDINGS_COUNT" -eq 0 ] && [ "$LINES_CHANGED" -ge "$THRESHOLD" ]; then
+  BRANCH_SLUG="$(git rev-parse --abbrev-ref HEAD | tr '/' '-')"
+  TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  jq -nc \
+    --arg ts "$TIMESTAMP" \
+    --arg branch "$BRANCH_SLUG" \
+    --argjson round "$ROUND_N" \
+    --argjson lines "$LINES_CHANGED" \
+    --argjson threshold "$THRESHOLD" \
+    --arg request "$PROMPT_BODY" \
+    --arg response "$TASK_RESPONSE" \
+    '{
+      timestamp: $ts,
+      branch_slug: $branch,
+      round: $round,
+      zero_findings_on_nontrivial_diff: true,
+      lines_changed: $lines,
+      threshold: $threshold,
+      reviewer_request: $request,
+      reviewer_response: $response
+    }' >> ".correctless/artifacts/audit-trail-${BRANCH_SLUG}.jsonl"
+fi
+```
+
+The round then advances (passthrough with forensic logging — BND-002's
+failure mode). A separate human review of the audit-trail jsonl catches
+suppression patterns across rounds without blocking forward progress.
 
 Promote every element of the returned JSON array into the current round's
 findings list by merging in the following orchestrator-added keys. The
