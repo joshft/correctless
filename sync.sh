@@ -94,6 +94,16 @@ done
 sync_dir "helpers" "correctless/helpers"
 [ "$CHECK_ONLY" = false ] && info "PBT helpers → correctless/"
 
+# --- Agents (plugin sub-agents) ---
+if [ "$CHECK_ONLY" = false ]; then
+  mkdir -p "correctless/agents"
+fi
+for agent in agents/*.md; do
+  [ -f "$agent" ] || continue
+  sync_file "$agent" "correctless/agents/$(basename "$agent")"
+done
+[ "$CHECK_ONLY" = false ] && info "Agents → correctless/"
+
 # --- Shared skill constraints ---
 if [ "$CHECK_ONLY" = false ]; then
   mkdir -p "correctless/skills/_shared"
@@ -138,13 +148,39 @@ if [ "$CHECK_ONLY" = true ]; then
     fi
   done
 
+  # Agents: check for stale .md files in both directions.
+  # Loop kept as 'for dir in agents' (single-item today) to keep the
+  # stale-file scan structure symmetric with the hooks/scripts loop above
+  # and to make it cheap to add a second agent directory later without
+  # restructuring — see INV-008(b) in tests/test-fix-diff-reviewer-agent.sh
+  # which expects a 'for dir in ... agents' shape here.
+  # shellcheck disable=SC2043
+  for dir in agents; do
+    if [ -d "correctless/$dir" ]; then
+      for dist_file in "correctless/$dir"/*.md; do
+        [ -f "$dist_file" ] || continue
+        if [ ! -f "$dir/$(basename "$dist_file")" ]; then
+          DIRTY=true
+        fi
+      done
+    fi
+    if [ -d "$dir" ]; then
+      for src_file in "$dir"/*.md; do
+        [ -f "$src_file" ] || continue
+        if [ ! -f "correctless/$dir/$(basename "$src_file")" ]; then
+          DIRTY=true
+        fi
+      done
+    fi
+  done
+
   # Check for stale top-level items in correctless/ not present in source
   for dist_item in correctless/*/; do
     [ -d "$dist_item" ] || continue
     local_item="$(basename "$dist_item")"
-    # Expected top-level dirs: skills, hooks, templates, helpers
+    # Expected top-level dirs: skills hooks templates helpers scripts agents
     case "$local_item" in
-      skills|hooks|templates|helpers|scripts) ;; # expected — already checked via sync_file/sync_dir
+      skills|hooks|templates|helpers|scripts|agents) ;; # expected — already checked via sync_file/sync_dir
       *) DIRTY=true ;; # unexpected directory in distribution
     esac
   done

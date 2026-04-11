@@ -1,0 +1,126 @@
+diff --git a/correctless/hooks/workflow-advance.sh b/correctless/hooks/workflow-advance.sh
+index 4a7b04a..f6485b7 100755
+--- a/correctless/hooks/workflow-advance.sh
++++ b/correctless/hooks/workflow-advance.sh
+@@ -785,11 +785,13 @@ cmd_spec_update() {
+   local sf ts
+   sf="$(state_file)"
+   ts="$(now_iso)"
++  # QA-R3-001: Use --arg for user-supplied $reason to prevent jq injection
+   locked_update_state "$sf" \
+-    "(.spec_updates // 0) + 1 as \$count |
+-     .spec_updates = \$count |
+-     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: \"$reason\", timestamp: \"$ts\"}] |
+-     .phase = \"spec\" | .phase_entered_at = \"$ts\"" \
++    '(.spec_updates // 0) + 1 as $count |
++     .spec_updates = $count |
++     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: $reason, timestamp: $ts}] |
++     .phase = "spec" | .phase_entered_at = $ts' \
++    --arg reason "$reason" --arg ts "$ts" \
+     || die "Failed to update state for spec-update"
+   info "Phase: spec"
+
+@@ -861,10 +863,10 @@ cmd_override() {
+   fi
+
+   # QA-R2-004: Use locked_update_state for atomic read-modify-write
+-  local sf
+-  sf="$(state_file)"
++  # QA-R3-001: Use --arg for user-supplied $reason to prevent jq injection
+   locked_update_state "$sf" \
+-    ".override = {active: true, reason: \"$reason\", started_at: \"$ts\", remaining_calls: 10} | .override_count = (.override_count // 0) + 1" \
++    '.override = {active: true, reason: $reason, started_at: $ts, remaining_calls: 10} | .override_count = (.override_count // 0) + 1' \
++    --arg reason "$reason" --arg ts "$ts" \
+     || die "Failed to write override state"
+
+   # Append to override log
+diff --git a/correctless/scripts/lib.sh b/correctless/scripts/lib.sh
+index 5e9b7cb..f9d5cae 100755
+--- a/correctless/scripts/lib.sh
++++ b/correctless/scripts/lib.sh
+@@ -190,9 +190,13 @@ _release_state_lock() {
+ }
+
+ # locked_update_state — read-modify-write a state file under lock
++# Usage: locked_update_state STATE_FILE JQ_FILTER [--arg key val ...]
++# QA-R3-001: Extra arguments after the filter are passed through to jq,
++# enabling safe parameterization via --arg instead of string interpolation.
+ locked_update_state() {
+   local state_file="$1"
+   local jq_filter="$2"
++  shift 2
+   local rc=0
+
+   _acquire_state_lock "$state_file" || return 1
+@@ -202,7 +206,7 @@ locked_update_state() {
+   trap "$(printf '_release_state_lock %q; rm -f %q' "$state_file" "${state_file}.$$.tmp")" EXIT
+
+   local tmp_file="${state_file}.$$.tmp"
+-  if jq "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
++  if jq "$jq_filter" "$@" "$state_file" > "$tmp_file" 2>/dev/null; then
+     mv "$tmp_file" "$state_file" || { rm -f "$tmp_file"; rc=1; }
+   else
+     rm -f "$tmp_file"
+diff --git a/hooks/workflow-advance.sh b/hooks/workflow-advance.sh
+index 4a7b04a..f6485b7 100755
+--- a/hooks/workflow-advance.sh
++++ b/hooks/workflow-advance.sh
+@@ -785,11 +785,13 @@ cmd_spec_update() {
+   local sf ts
+   sf="$(state_file)"
+   ts="$(now_iso)"
++  # QA-R3-001: Use --arg for user-supplied $reason to prevent jq injection
+   locked_update_state "$sf" \
+-    "(.spec_updates // 0) + 1 as \$count |
+-     .spec_updates = \$count |
+-     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: \"$reason\", timestamp: \"$ts\"}] |
+-     .phase = \"spec\" | .phase_entered_at = \"$ts\"" \
++    '(.spec_updates // 0) + 1 as $count |
++     .spec_updates = $count |
++     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: $reason, timestamp: $ts}] |
++     .phase = "spec" | .phase_entered_at = $ts' \
++    --arg reason "$reason" --arg ts "$ts" \
+     || die "Failed to update state for spec-update"
+   info "Phase: spec"
+
+@@ -861,10 +863,10 @@ cmd_override() {
+   fi
+
+   # QA-R2-004: Use locked_update_state for atomic read-modify-write
+-  local sf
+-  sf="$(state_file)"
++  # QA-R3-001: Use --arg for user-supplied $reason to prevent jq injection
+   locked_update_state "$sf" \
+-    ".override = {active: true, reason: \"$reason\", started_at: \"$ts\", remaining_calls: 10} | .override_count = (.override_count // 0) + 1" \
++    '.override = {active: true, reason: $reason, started_at: $ts, remaining_calls: 10} | .override_count = (.override_count // 0) + 1' \
++    --arg reason "$reason" --arg ts "$ts" \
+     || die "Failed to write override state"
+
+   # Append to override log
+diff --git a/scripts/lib.sh b/scripts/lib.sh
+index 5e9b7cb..f9d5cae 100755
+--- a/scripts/lib.sh
++++ b/scripts/lib.sh
+@@ -190,9 +190,13 @@ _release_state_lock() {
+ }
+
+ # locked_update_state — read-modify-write a state file under lock
++# Usage: locked_update_state STATE_FILE JQ_FILTER [--arg key val ...]
++# QA-R3-001: Extra arguments after the filter are passed through to jq,
++# enabling safe parameterization via --arg instead of string interpolation.
+ locked_update_state() {
+   local state_file="$1"
+   local jq_filter="$2"
++  shift 2
+   local rc=0
+
+   _acquire_state_lock "$state_file" || return 1
+@@ -202,7 +206,7 @@ locked_update_state() {
+   trap "$(printf '_release_state_lock %q; rm -f %q' "$state_file" "${state_file}.$$.tmp")" EXIT
+
+   local tmp_file="${state_file}.$$.tmp"
+-  if jq "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
++  if jq "$jq_filter" "$@" "$state_file" > "$tmp_file" 2>/dev/null; then
+     mv "$tmp_file" "$state_file" || { rm -f "$tmp_file"; rc=1; }
+   else
+     rm -f "$tmp_file"

@@ -1751,6 +1751,69 @@ check_qa_002_class() {
 }
 
 # ============================================================================
+# QA-011 CLASS FIX: inline branch-slug drift (AP-005 / ABS-001 regression).
+#
+# Source: QA-011 from round 2 of fix-diff-reviewer-migration. A fix round
+# hand-rolled `git rev-parse --abbrev-ref HEAD | tr '/' '-'` inside caudit
+# SKILL.md, diverging from the canonical `branch_slug()` helper in
+# scripts/lib.sh that was extracted specifically to eliminate this drift
+# class (2026-04-05 ABS-001 learning). This check greps for the inline
+# pattern across all skills/, hooks/, and scripts/ and fails if any match
+# is found outside scripts/lib.sh itself.
+#
+# Enforced pattern: `git rev-parse --abbrev-ref ... tr` or
+# `git branch --show-current ... tr` on the same line.
+# ============================================================================
+
+check_no_inline_branch_slug() {
+  local violations
+  # rg-style grep with line-content output, then filter out scripts/lib.sh
+  # (the canonical site) and any commented-out lines starting with #.
+  violations="$(grep -rnE 'git[[:space:]]+(rev-parse[[:space:]]+--abbrev-ref|branch[[:space:]]+--show-current)[^\n]*\|[[:space:]]*tr[[:space:]]' \
+    skills/ hooks/ scripts/ 2>/dev/null \
+    | grep -vE '^scripts/lib\.sh:' \
+    | grep -vE ':[[:space:]]*#' \
+    || true)"
+  if [ -z "$violations" ]; then
+    pass "QA-011-CLASS" "no inline branch-slug drift (git rev-parse|tr or git branch --show-current|tr) outside scripts/lib.sh"
+  else
+    local count
+    count="$(printf '%s\n' "$violations" | wc -l | tr -d ' ')"
+    fail "QA-011-CLASS" "$count inline branch-slug site(s) found outside scripts/lib.sh — drift of ABS-001 canonical helper:"
+    printf '%s\n' "$violations" | sed 's/^/    /' >&2
+  fi
+}
+
+# ============================================================================
+# QA-013 CLASS FIX: /tmp/ path usage in skill code fences.
+#
+# Source: QA-013 from round 2 of fix-diff-reviewer-migration. caudit's own
+# "All files inside the project directory. Never /tmp." constraint was
+# violated by two /tmp/fd-findings-*.json sites inside the skill's own step
+# 6a code fences. This check greps for `/tmp/` across all skills/*/SKILL.md,
+# excluding the prose constraint line itself (which documents the rule).
+# Any remaining match is a violation.
+# ============================================================================
+
+check_no_tmp_paths_in_skills() {
+  local violations
+  # Exclude the documentary constraint line which legitimately contains
+  # "Never /tmp" or "inside the project directory" prose. Any other /tmp/
+  # reference is a violation.
+  violations="$(grep -rnE '/tmp/' skills/ 2>/dev/null \
+    | grep -vE 'Never[[:space:]]*/tmp|inside the project directory' \
+    || true)"
+  if [ -z "$violations" ]; then
+    pass "QA-013-CLASS" "no /tmp/ paths in skill files (excluding documentary constraint lines)"
+  else
+    local count
+    count="$(printf '%s\n' "$violations" | wc -l | tr -d ' ')"
+    fail "QA-013-CLASS" "$count /tmp/ usage(s) found in skill files — violates caudit's 'Never /tmp' constraint:"
+    printf '%s\n' "$violations" | sed 's/^/    /' >&2
+  fi
+}
+
+# ============================================================================
 # Run all checks
 # ============================================================================
 
@@ -1779,6 +1842,8 @@ check_inv026
 check_inv027
 check_qa_001_class
 check_qa_002_class
+check_no_inline_branch_slug
+check_no_tmp_paths_in_skills
 
 run_negative_cases
 

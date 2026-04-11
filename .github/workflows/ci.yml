@@ -82,6 +82,7 @@ jobs:
           bash tests/test-token-tracking-skill-field.sh
           bash tests/test-semi-auto-mode.sh
           bash tests/test-architecture-drift.sh
+          bash tests/test-fix-diff-reviewer-agent.sh
 
       - name: Verify sync
         run: |
