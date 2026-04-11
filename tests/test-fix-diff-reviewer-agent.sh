@@ -1464,6 +1464,160 @@ check_producer_consumer_closure() {
   fi
 }
 
+# ============================================================================
+# QA-010 CLASS FIX: temporal Loop ordering enforcement.
+#
+# QA-002's point fix added a producer line for `refs/audit-round-${ROUND_N}-start`
+# inside step 6a — which runs AFTER step 6 (Commit fixes). The in-file
+# line-number ordering passed check_producer_consumer_closure (the producer
+# was on a line number before the consumer), but the Loop executes step 6a
+# AFTER fix commits land, so the ref ended up pinning the POST-commit SHA.
+# This check enforces the temporal contract: the `git update-ref` producer
+# must appear BEFORE the first `git commit` marker in The Loop AND before
+# the <!-- STEP 6A BEGIN --> sentinel.
+#
+# Generalization: "pin X before operation Y" contracts are enforced
+# structurally by ordering of source-text lines against anchor points.
+# ============================================================================
+
+check_producer_temporal_ordering() {
+  section "QA-010: temporal Loop ordering — round-start ref pinned BEFORE fix commits"
+
+  if [ ! -f "$CAUDIT_SKILL" ]; then
+    fail "QA-010-CLASS" "$CAUDIT_SKILL does not exist"
+    return
+  fi
+
+  local producer_ln commit_ln sentinel_ln
+  # Producer: must appear in a code fence, not just narrative. Accept either
+  # the quoted or unquoted ref form, with ${ROUND_N} or $ROUND_N.
+  producer_ln="$(grep -nE '^[[:space:]]*git[[:space:]]+update-ref[[:space:]]+"?refs/audit-round-\$\{?ROUND_N\}?-start"?[[:space:]]+HEAD' "$CAUDIT_SKILL" | head -n 1 | cut -d: -f1)"
+  # First `git commit` occurrence anywhere in the file — the Loop's step 6
+  # is phrased as "Commit fixes" in prose, so as a tighter anchor we use the
+  # `<!-- STEP 6A BEGIN -->` sentinel below. But any `git commit` mention
+  # also serves as a temporal lower bound.
+  commit_ln="$(grep -nE 'git[[:space:]]+commit([[:space:]]|$)' "$CAUDIT_SKILL" | head -n 1 | cut -d: -f1)"
+  sentinel_ln="$(grep -nF '<!-- STEP 6A BEGIN -->' "$CAUDIT_SKILL" | head -n 1 | cut -d: -f1)"
+
+  if [ -z "$producer_ln" ]; then
+    fail "QA-010-CLASS(a)" "no 'git update-ref refs/audit-round-\${ROUND_N}-start HEAD' producer found in $CAUDIT_SKILL"
+    return
+  fi
+  pass "QA-010-CLASS(a)" "producer at line $producer_ln"
+
+  if [ -z "$sentinel_ln" ]; then
+    fail "QA-010-CLASS(b)" "'<!-- STEP 6A BEGIN -->' sentinel missing"
+    return
+  fi
+
+  if [ "$producer_ln" -lt "$sentinel_ln" ]; then
+    pass "QA-010-CLASS(b)" "producer line $producer_ln precedes STEP 6A BEGIN at line $sentinel_ln (runs BEFORE step 6a, hence BEFORE fix commits observed in step 6a's temporal phase)"
+  else
+    fail "QA-010-CLASS(b)" "producer line $producer_ln is NOT before STEP 6A BEGIN at line $sentinel_ln — producer would execute AFTER fix commits land, pinning HEAD to the post-fix SHA (QA-002/QA-010 bypass)"
+  fi
+
+  # Belt-and-suspenders: the producer must also be before the first
+  # `git commit` mention in the file. If the file ever grows a commit
+  # anchor above the sentinel, this still fails.
+  if [ -n "$commit_ln" ]; then
+    if [ "$producer_ln" -lt "$commit_ln" ]; then
+      pass "QA-010-CLASS(c)" "producer (line $producer_ln) precedes first 'git commit' mention (line $commit_ln)"
+    else
+      fail "QA-010-CLASS(c)" "producer (line $producer_ln) is NOT before first 'git commit' mention (line $commit_ln)"
+    fi
+  else
+    skip "QA-010-CLASS(c)" "no 'git commit' anchor found in $CAUDIT_SKILL — temporal (c) check skipped"
+  fi
+}
+
+# ============================================================================
+# QA-012 CLASS FIX: orphan shell variables in step 6a code fences.
+#
+# Generalization of check_producer_consumer_closure. Extracts every
+# ${VAR}/$VAR expansion from shell fences inside the step 6a sentinel block
+# and, for each unique all-caps name, requires either:
+#   (a) an assignment anywhere in the caudit SKILL.md file (NAME=, NAME=",
+#       `export NAME=`, or the one-shot fallback ${NAME:-default}), OR
+#   (b) an entry on the explicit placeholder allowlist.
+#
+# The placeholder allowlist is deliberate: some variables are genuinely
+# orchestrator-bound at Task-invocation time (PROMPT_BODY, TASK_RESPONSE)
+# and have no producer in the skill text itself. Every allowlist entry
+# must have a matching comment in step 6a marking it as a placeholder
+# with a DD-* or QA-* reference.
+# ============================================================================
+
+check_orphan_variables() {
+  section "QA-012: orphan shell variables in step 6a"
+
+  local block
+  block="$(extract_step_6a_block "$CAUDIT_SKILL" 2>/dev/null || true)"
+  if [ -z "$block" ]; then
+    fail "QA-012-CLASS" "step 6a block is empty"
+    return
+  fi
+
+  # Extract every $VAR and ${VAR} expansion, all-caps convention only.
+  # Normalize to the bare variable name.
+  local vars
+  vars="$(printf '%s\n' "$block" | grep -oE '\$\{?[A-Z][A-Z0-9_]*\}?' | sed 's/[${}]//g' | sort -u)"
+
+  if [ -z "$vars" ]; then
+    skip "QA-012-CLASS" "no shell variable references found in step 6a"
+    return
+  fi
+
+  # Placeholder allowlist — these are bound by the orchestrator at runtime,
+  # not by the skill text itself. Each must have a nearby comment in step 6a
+  # marking it as orchestrator-bound per DD-002 / QA-012.
+  local placeholders=(PROMPT_BODY TASK_RESPONSE)
+
+  local orphan_count=0 var
+  for var in $vars; do
+    # Skip placeholders (they are exempt but must have a nearby comment).
+    local is_placeholder=0 p
+    for p in "${placeholders[@]}"; do
+      if [ "$var" = "$p" ]; then is_placeholder=1; break; fi
+    done
+
+    if [ "$is_placeholder" -eq 1 ]; then
+      # Require a "bound by the orchestrator" comment in step 6a referencing
+      # this variable name (belt-and-suspenders, enforces documentation).
+      if printf '%s\n' "$block" | grep -qE "${var}.*bound by the orchestrator"; then
+        pass "QA-012-CLASS($var)" "placeholder variable has orchestrator-bound documentation in step 6a"
+      else
+        fail "QA-012-CLASS($var)" "placeholder variable $var lacks 'bound by the orchestrator' documentation comment in step 6a"
+        orphan_count=$((orphan_count + 1))
+      fi
+      continue
+    fi
+
+    # Producer forms (look across whole caudit SKILL.md file):
+    #   VAR=...                    plain assignment
+    #   VAR="..."                  quoted assignment
+    #   export VAR=...             exported assignment
+    #   local VAR=...              local (inside a function)
+    #   : "${VAR:?...}"            parameter-error guard (treats as required,
+    #                              variable must be bound by caller — this is
+    #                              the step-1-of-6a ROUND_N guard pattern)
+    #   ${VAR:-default}            fallback-default form
+    if grep -qE "(^|[[:space:]]|;)(export[[:space:]]+|local[[:space:]]+)?${var}=" "$CAUDIT_SKILL" \
+       || grep -qE "\\\$\\{${var}:[-?]" "$CAUDIT_SKILL" \
+       || grep -qE "^[[:space:]]*:[[:space:]]+\"\\\$\\{${var}:\\?" "$CAUDIT_SKILL"; then
+      pass "QA-012-CLASS($var)" "producer found in caudit SKILL.md"
+    else
+      fail "QA-012-CLASS($var)" "ORPHAN — variable consumed in step 6a but no producer anywhere in caudit SKILL.md (add a producer in Step 5.5 or the appropriate earlier step, or add to placeholder allowlist with documentation)"
+      orphan_count=$((orphan_count + 1))
+    fi
+  done
+
+  if [ "$orphan_count" -eq 0 ]; then
+    pass "QA-012-CLASS(summary)" "all step 6a variables are either produced or explicit placeholders"
+  else
+    fail "QA-012-CLASS(summary)" "$orphan_count orphan variable(s) in step 6a"
+  fi
+}
+
 check_inv018() {
   section "INV-018: DD-008 rule-scan instructions in step 6a"
 
@@ -1778,13 +1932,50 @@ check_bnd002() {
     fail "BND-002(d)" "'lines' not adjacent (<=40 chars) to 'audit.zero_findings_threshold' — rejects findings-count paraphrases"
   fi
 
-  # (e) forensic-logging block must reference audit-trail artifact AND the
-  # zero_findings_on_nontrivial_diff flag somewhere in step 6a.
-  if printf '%s\n' "$block" | grep -qF 'audit-trail' && \
-     printf '%s\n' "$block" | grep -qF 'zero_findings_on_nontrivial_diff'; then
-    pass "BND-002(e)" "forensic-logging block references 'audit-trail' and 'zero_findings_on_nontrivial_diff'"
+  # (e) QA-016 strengthening: forensic-logging block must reference audit-trail
+  # artifact AND the zero_findings_on_nontrivial_diff flag INSIDE the guarded
+  # `if LINES_CHANGED -ge THRESHOLD` branch — not just anywhere in step 6a.
+  # Extract the range between the guard `if` and its matching `fi` and
+  # verify both keywords appear inside THAT range.
+  local guard_block
+  guard_block="$(printf '%s\n' "$block" | awk '
+    BEGIN { in_blk = 0; depth = 0 }
+    /if[[:space:]]+\[[[:space:]]*"\$FINDINGS_COUNT"[[:space:]]*-eq[[:space:]]*0[[:space:]]*\].*LINES_CHANGED.*-ge.*THRESHOLD/ {
+      in_blk = 1; depth = 1; print; next
+    }
+    in_blk {
+      print
+      # Track nested if/fi so we close on the matching fi (not an inner one).
+      if ($0 ~ /^[[:space:]]*if[[:space:]]/) depth++
+      if ($0 ~ /^[[:space:]]*fi[[:space:]]*$/) {
+        depth--
+        if (depth == 0) { in_blk = 0 }
+      }
+    }
+  ')"
+  if [ -n "$guard_block" ] \
+     && printf '%s\n' "$guard_block" | grep -qF 'audit-trail' \
+     && printf '%s\n' "$guard_block" | grep -qF 'zero_findings_on_nontrivial_diff'; then
+    pass "BND-002(e)" "forensic-logging block references 'audit-trail' AND 'zero_findings_on_nontrivial_diff' INSIDE the guarded if...fi range"
   else
-    fail "BND-002(e)" "step 6a missing audit-trail artifact write or 'zero_findings_on_nontrivial_diff' flag (forensic logging)"
+    fail "BND-002(e)" "step 6a missing audit-trail artifact write or 'zero_findings_on_nontrivial_diff' flag INSIDE the 'if LINES_CHANGED -ge THRESHOLD' guarded range"
+  fi
+
+  # (f) QA-015 class fix: the spec requires the malformed/unset/<1 fallback to
+  # emit a warning once per round. Assert that the fallback branch contains
+  # `>&2` (stderr emit) within 10 lines of the `THRESHOLD=50` assignment.
+  local fallback_ln warn_ln fdelta
+  fallback_ln="$(printf '%s\n' "$block" | grep -nE '^[[:space:]]*THRESHOLD=50[[:space:]]*$' | head -n 1 | cut -d: -f1)"
+  if [ -n "$fallback_ln" ]; then
+    warn_ln="$(printf '%s\n' "$block" | awk -v start="$fallback_ln" 'NR >= (start - 10) && NR <= (start + 10) && /BND-002-WARN|zero_findings_threshold.*>&2|>&2/ { print NR; exit }')"
+    if [ -n "$warn_ln" ]; then
+      fdelta=$(( warn_ln > fallback_ln ? warn_ln - fallback_ln : fallback_ln - warn_ln ))
+      pass "BND-002(f)" "fallback branch has '>&2' warning within $fdelta lines of THRESHOLD=50 assignment"
+    else
+      fail "BND-002(f)" "fallback branch (THRESHOLD=50 at line $fallback_ln) has no '>&2' warning within 10 lines (QA-015: spec requires logging warning on malformed/unset config)"
+    fi
+  else
+    fail "BND-002(f)" "no 'THRESHOLD=50' fallback assignment found in step 6a — QA-015 warning check cannot verify"
   fi
 }
 
@@ -1961,6 +2152,33 @@ check_bnd004() {
   else
     fail "BND-004(c)" "no byte-counting operation (wc -c, wc --bytes, \${#VAR}) found near '100 KB' mention"
   fi
+
+  # QA-016 strengthening: the byte-counting operation must feed a concrete
+  # control-flow construct — a `-gt 102400` comparison on PROMPT_BYTES AND
+  # an `exit 2` — within 10 lines forward of the wc line. Keyword-only
+  # presence is insufficient; the test asserts the measurement actually
+  # drives the fail-closed branch.
+  if [ -n "$measure_ln" ]; then
+    local window cmp_present exit_present has_var has_gt
+    # Window: measure_ln .. measure_ln+10 inside the block
+    window="$(printf '%s\n' "$block" | awk -v s="$measure_ln" 'NR >= s && NR <= s+10')"
+    cmp_present=0
+    exit_present=0
+    has_var=0
+    has_gt=0
+    # Use -- separator to prevent $PROMPT_BYTES being mistaken for an option.
+    printf '%s\n' "$window" | grep -q -- 'PROMPT_BYTES' && has_var=1
+    printf '%s\n' "$window" | grep -qE -- '-gt[[:space:]]+102400' && has_gt=1
+    [ "$has_var" -eq 1 ] && [ "$has_gt" -eq 1 ] && cmp_present=1
+    printf '%s\n' "$window" | grep -qE -- '(^|[[:space:]])exit[[:space:]]+2($|[[:space:]])' && exit_present=1
+    if [ "$cmp_present" -eq 1 ] && [ "$exit_present" -eq 1 ]; then
+      pass "BND-004(d)" "byte-count measurement feeds 'PROMPT_BYTES -gt 102400' comparison AND 'exit 2' within 10 lines"
+    else
+      fail "BND-004(d)" "byte-count measurement is not wired to control flow (has_var=$has_var has_gt=$has_gt exit_present=$exit_present) within 10 lines of wc -c"
+    fi
+  else
+    fail "BND-004(d)" "no byte-counting op line — cannot verify control-flow wiring"
+  fi
 }
 
 # ============================================================================
@@ -2110,6 +2328,8 @@ check_bnd004
 check_bnd005
 check_bnd006
 check_producer_consumer_closure
+check_producer_temporal_ordering
+check_orphan_variables
 check_gap002_dd009_metadata
 check_gap008_abs010_narrow_scope
 

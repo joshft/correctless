@@ -108,6 +108,8 @@ Clean up the checkpoint file when the audit converges and completes successfully
    Fix all confirmed findings on the audit branch:
    - Non-trivial: TDD (tests first, separate impl agent)
    - Trivial one-liners: apply directly
+5.5. Pin the round-start SHA BEFORE any fix commits land (QA-010).
+     See "Step 5.5: Pin the round-start SHA (pre-commit)" below.
 6. Commit fixes
 6a. FIX VERIFICATION — MANDATORY before spawning next round (AP-012).
     Structured per the fix-diff-reviewer-migration spec.
@@ -136,6 +138,47 @@ main workflow enforces on feature code. Running the test suite and a
 diff-focused review after each fix commit catches regressions cheaply, before
 they propagate to the next round.
 
+### Step 5.5: Pin the round-start SHA (pre-commit)
+
+This step runs AFTER step 5 (Fix all confirmed findings) and BEFORE step 6
+(Commit fixes). Its job is to pin the round's starting HEAD into a named git
+ref so that step 6a's consumer — which runs post-commit — can read back a
+SHA that really refers to the pre-fix tip.
+
+Placing the producer here (not inside step 6a) is required by temporal Loop
+ordering: step 6a runs AFTER step 6 commits the fixes, so a producer placed
+inside step 6a would pin HEAD to the post-fix SHA, making the diff range
+`ROUND_START_SHA..HEAD` empty and silently bypassing PRH-005's pre-diff
+git-state read. See QA-010 for the root-cause analysis.
+
+This step also binds `ROUND_N` from the workflow-state file (or a local
+counter) so that `refs/audit-round-${ROUND_N}-start` has a concrete number
+and so that step 6a's consumers of `$ROUND_N` are not orphaned.
+
+**Producer (pin at round start, before any fix commit for this round):**
+
+```sh
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+BRANCH_SLUG="$(branch_slug)"
+
+# Bind ROUND_N from workflow state or the orchestrator's round counter.
+# The workflow state file is written by /caudit as it advances rounds.
+STATE_FILE=".correctless/artifacts/workflow-state-${BRANCH_SLUG}.json"
+ROUND_N="$(jq -r '.audit.rounds_completed // 0' "$STATE_FILE" 2>/dev/null)"
+ROUND_N=$((ROUND_N + 1))
+
+# Run once at the top of each fix round, before committing any fixes:
+git update-ref "refs/audit-round-${ROUND_N}-start" HEAD
+```
+
+On checkpoint resume (see "Checkpoint Resume" above), the orchestrator MUST
+verify `refs/audit-round-${ROUND_N}-start` exists for each resumed round. If
+missing, recompute it from the checkpoint's recorded HEAD at round start and
+re-pin via `git update-ref` before proceeding. Do NOT fall back to a
+relative range that counts commits from the tip — the number of fix commits
+per round varies (INV-004 prohibits any relative diff range).
+
 ### Step 6a: Fix Verification
 
 <!-- STEP 6A BEGIN -->
@@ -149,33 +192,25 @@ Once tests pass, invoke the fix-diff reviewer plugin agent. The orchestrator
 path-scoped rules, wrapping both in untrusted fences, and invoking the agent
 via a namespaced Task call. The agent itself has read-only tools only.
 
-**Step 1 — Pin the round-start SHA.**
+**Step 1 — Read back the round-start SHA.**
 
-The round-start SHA is the git SHA immediately before the first fix commit of
-this round. The orchestrator MUST pin this ref at the moment round N begins,
-BEFORE any fix commits land — otherwise `git rev-parse` in the read-back step
-will fail with "fatal: ambiguous argument" and `ROUND_START_SHA` will be
-empty, silently bypassing PRH-005's pre-diff git-state read.
-
-**Producer (pin at round start, before any fix commit for this round):**
+The round-start ref was pinned in Step 5.5 (above, BEFORE step 6 committed
+fixes). See that section for the producer. Here we only READ it back, after
+fixes are committed:
 
 ```sh
-# Run once at the top of each fix round, before committing any fixes:
-git update-ref "refs/audit-round-${ROUND_N}-start" HEAD
-```
+# ROUND_N and BRANCH_SLUG were bound in Step 5.5; re-source lib.sh if the
+# orchestrator is resuming from a checkpoint and the shell variables are
+# not in scope.
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+BRANCH_SLUG="${BRANCH_SLUG:-$(branch_slug)}"
+# ROUND_N must already be bound from Step 5.5 — if empty, the producer step
+# was skipped and fix-verification MUST NOT proceed.
+: "${ROUND_N:?ROUND_N unset — Step 5.5 producer was not run; aborting round}"
 
-**Consumer (read back at fix-verification time, after fixes are committed):**
-
-```sh
 ROUND_START_SHA="$(git rev-parse "refs/audit-round-${ROUND_N}-start")"
 ```
-
-On checkpoint resume (see "Checkpoint Resume" above), the orchestrator MUST
-verify `refs/audit-round-${ROUND_N}-start` exists for each resumed round. If
-missing, recompute it from the checkpoint's recorded HEAD at round start and
-re-pin via `git update-ref` before proceeding. Do NOT fall back to a
-relative range that counts commits from the tip — the number of fix commits
-per round varies (INV-004 prohibits any relative diff range).
 
 **Step 2 — Compute the fix-round diff.**
 
@@ -235,6 +270,12 @@ Then the diff itself is wrapped in an `<UNTRUSTED_DIFF>` fence:
 
 **Step 5 — Size budget and fail-closed invocation.**
 
+`PROMPT_BODY` here is bound by the orchestrator at Task-invocation time per
+DD-002 — it is the text passed to Task's `prompt` parameter (framing +
+UNTRUSTED_RULES fences + UNTRUSTED_DIFF fence + output contract). It is an
+orchestrator-bound placeholder variable; the LLM orchestrator binds it
+before running this block. See QA-012.
+
 Measure the assembled prompt and abort if over the 100 KB hard ceiling (DD-010). No truncation, no smaller-subset retry.
 FAIL-CLOSED: Task failure aborts the current round.
 
@@ -256,7 +297,11 @@ The fix-diff reviewer returns only a JSON array. Parse it with an identity
 filter and abort the round on any parse error:
 
 ```sh
-printf '%s\n' "$TASK_RESPONSE" | jq -e . > /tmp/fd-findings-${ROUND_N}.json
+# TASK_RESPONSE is bound by the orchestrator at Task-invocation time from the
+# Task return value. Placeholder variable; the LLM orchestrator binds it from
+# the response body before running this block. See QA-012.
+# BRANCH_SLUG was bound in Step 1 above via source scripts/lib.sh.
+printf '%s\n' "$TASK_RESPONSE" | jq -e . > ".correctless/artifacts/fd-findings-${BRANCH_SLUG}-round-${ROUND_N}.json"
 ```
 
 Filter forms (a `jq -e` invocation followed by a field name or index
@@ -274,9 +319,17 @@ forensic logging. Default if unset, malformed, or `<1` is **50** lines:
 
 ```sh
 THRESHOLD="$(jq -r '.audit.zero_findings_threshold // 50' .correctless/config/workflow-config.json)"
-if ! [ "$THRESHOLD" -ge 1 ] 2>/dev/null; then THRESHOLD=50; fi
+if ! [ "$THRESHOLD" -ge 1 ] 2>/dev/null; then
+  # QA-015: spec requires a warning when the config value is absent,
+  # malformed, or <1. Round-scoped guard prevents repeat-warning spam.
+  if [ -z "${_BND002_WARNED:-}" ]; then
+    echo "BND-002-WARN: audit.zero_findings_threshold unset/malformed — using default 50 lines" >&2
+    _BND002_WARNED=1
+  fi
+  THRESHOLD=50
+fi
 LINES_CHANGED="$(git diff --numstat "${ROUND_START_SHA}..HEAD" | awk '{added+=$1; removed+=$2} END {print added+removed+0}')"
-FINDINGS_COUNT="$(jq 'length' /tmp/fd-findings-${ROUND_N}.json)"
+FINDINGS_COUNT="$(jq 'length' ".correctless/artifacts/fd-findings-${BRANCH_SLUG}-round-${ROUND_N}.json")"
 ```
 
 **Forensic-logging block.** If the reviewer returns zero findings on a
@@ -291,9 +344,15 @@ is treated as a clean pass and is not logged.
 
 ```sh
 if [ "$FINDINGS_COUNT" -eq 0 ] && [ "$LINES_CHANGED" -ge "$THRESHOLD" ]; then
-  BRANCH_SLUG="$(git rev-parse --abbrev-ref HEAD | tr '/' '-')"
+  # QA-011: BRANCH_SLUG is produced via the canonical branch_slug() helper
+  # in scripts/lib.sh (sourced in Step 1 above). Do NOT hand-roll a slug
+  # formula here — ABS-001 requires a single definition site.
   TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  jq -nc \
+  # QA-014: wrap the forensic jq call with error handling so that a
+  # silent jq failure (e.g. non-numeric --argjson input) does not drop
+  # the audit record while letting the round advance as if logging
+  # succeeded.
+  if ! jq -nc \
     --arg ts "$TIMESTAMP" \
     --arg branch "$BRANCH_SLUG" \
     --argjson round "$ROUND_N" \
@@ -310,7 +369,9 @@ if [ "$FINDINGS_COUNT" -eq 0 ] && [ "$LINES_CHANGED" -ge "$THRESHOLD" ]; then
       threshold: $threshold,
       reviewer_request: $request,
       reviewer_response: $response
-    }' >> ".correctless/artifacts/audit-trail-${BRANCH_SLUG}.jsonl"
+    }' >> ".correctless/artifacts/audit-trail-${BRANCH_SLUG}.jsonl"; then
+    echo "FORENSIC-LOG-FAILED: round=${ROUND_N} slug=${BRANCH_SLUG}" >&2
+  fi
 fi
 ```
 
