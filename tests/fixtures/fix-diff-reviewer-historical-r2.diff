@@ -1,0 +1,388 @@
+diff --git a/correctless/hooks/audit-trail.sh b/correctless/hooks/audit-trail.sh
+index ab1ce7a..dad19f4 100755
+--- a/correctless/hooks/audit-trail.sh
++++ b/correctless/hooks/audit-trail.sh
+@@ -19,6 +19,7 @@ INPUT="$(cat)"
+ eval "$(echo "$INPUT" | jq -r '
+   @sh "TOOL_NAME=\(.tool_name // "")",
+   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
++  @sh "TOOL_INPUT_PATH=\(.tool_input.path // "")",
+   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
+   @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))"
+ ' 2>/dev/null)" || exit 0
+@@ -48,6 +49,10 @@ case "$TOOL_NAME" in
+   MultiEdit)
+     FILES="$TOOL_INPUT_EDITS"
+     ;;
++  Grep)
++    # QA-R2-002: Grep uses .tool_input.path, not .tool_input.file_path
++    FILES="$TOOL_INPUT_PATH"
++    ;;
+   *)
+     FILES="$TOOL_INPUT_FILE"
+     ;;
+@@ -134,22 +139,23 @@ while IFS= read -r f; do
+   case "$PHASE" in
+     tdd-qa|tdd-verify)
+       # QA/verify phases should be read-only for source and test files
+-      if [ "$fclass" = "source" ] && [ "$TOOL_NAME" != "Read" ]; then
++      # QA-R2-001: Exclude read-only tools (Read, Grep) from "modified" warnings
++      if [ "$fclass" = "source" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
+         echo "⚠ $PHASE: Source file modified — ${f##*/} (this phase should be read-only)" >&2
+       fi
+-      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
++      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
+         echo "⚠ $PHASE: Test file modified — ${f##*/} (this phase should be read-only)" >&2
+       fi
+       ;;
+     tdd-impl)
+       # GREEN phase: test edits should be logged
+-      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
++      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
+         echo "📝 GREEN: Test file edited — ${f##*/} (should be logged in test-edit-log)" >&2
+       fi
+       ;;
+     spec|review|review-spec|model)
+-      # Spec/review phases: no source or test edits
+-      if [ "$fclass" = "source" ] || [ "$fclass" = "test" ]; then
++      # Spec/review phases: no source or test edits (reads are fine)
++      if { [ "$fclass" = "source" ] || [ "$fclass" = "test" ]; } && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
+         echo "⚠ $PHASE: Code file modified — ${f##*/} (spec/review phases are docs-only)" >&2
+       fi
+       ;;
+diff --git a/correctless/hooks/workflow-advance.sh b/correctless/hooks/workflow-advance.sh
+index a23de02..4a7b04a 100755
+--- a/correctless/hooks/workflow-advance.sh
++++ b/correctless/hooks/workflow-advance.sh
+@@ -530,12 +530,13 @@ cmd_qa() {
+     eval "$cov_cmd" > "$ARTIFACTS_DIR/coverage-baseline-$(branch_slug).out" 2>&1 || true
+   fi
+
+-  # Increment QA round counter and transition phase in a single write
+-  local state
+-  state="$(read_state)"
+-  state="$(echo "$state" | jq --arg t "$(date -u +%FT%TZ)" \
+-    '.qa_rounds += 1 | .phase = "tdd-qa" | .phase_entered_at = $t')"
+-  write_state "$state"
++  # QA-R2-004: Use locked_update_state for atomic read-modify-write
++  local sf ts
++  sf="$(state_file)"
++  ts="$(date -u +%FT%TZ)"
++  locked_update_state "$sf" \
++    ".qa_rounds += 1 | .phase = \"tdd-qa\" | .phase_entered_at = \"$ts\"" \
++    || die "Failed to update state for QA phase"
+   info "Phase: tdd-qa"
+   info "Next: QA review (edits blocked)"
+ }
+@@ -727,10 +728,13 @@ cmd_set_intensity() {
+   # Phase guard: set-intensity only valid during spec-related phases
+   require_phase_oneof "spec" "review" "review-spec"
+
+-  local state
+-  state="$(read_state)" || die "No state file — run 'init' first"
+-  state="$(echo "$state" | jq --arg level "$level" '.feature_intensity = $level')"
+-  write_state "$state"
++  # QA-R2-004: Use locked_update_state for atomic read-modify-write
++  local sf
++  sf="$(state_file)"
++  [ -f "$sf" ] || die "No state file — run 'init' first"
++  locked_update_state "$sf" \
++    ".feature_intensity = \"$level\"" \
++    || die "Failed to set feature intensity"
+   info "Feature intensity set to: $level"
+ }
+
+@@ -755,9 +759,14 @@ cmd_resolve_drift() {
+
+   # shellcheck disable=SC2064
+   trap "$(printf 'rm -f %q' "$DRIFT_DEBT_FILE.$$")" EXIT
+-  jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
++  # QA-R2-006: Check return code — don't report success if write failed
++  if ! (jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
+     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
+-    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
++    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"); then
++    rm -f "$DRIFT_DEBT_FILE.$$"
++    trap - EXIT
++    die "Failed to write drift debt file"
++  fi
+   trap - EXIT
+
+   info "Drift item $drift_id marked as resolved: $reason"
+@@ -768,24 +777,25 @@ cmd_spec_update() {
+   check_branch_match
+   require_phase_oneof "tdd-tests" "tdd-impl" "tdd-qa"
+
+-  local state from_phase
+-  state="$(read_state)"
+-  from_phase="$(echo "$state" | jq -r '.phase')"
++  # Read phase for logging (pre-read is fine — only used for info messages)
++  local from_phase
++  from_phase="$(read_phase)"
+
+-  # Track spec update in state
+-  local update_count
+-  update_count="$(echo "$state" | jq -r '.spec_updates // 0')"
+-  update_count=$((update_count + 1))
+-
+-  state="$(echo "$state" | jq \
+-    --arg reason "$reason" \
+-    --arg from "$from_phase" \
+-    --arg ts "$(now_iso)" \
+-    --argjson count "$update_count" \
+-    '.spec_updates = $count | .spec_update_history = (.spec_update_history // []) + [{from_phase: $from, reason: $reason, timestamp: $ts}] | .phase = "spec" | .phase_entered_at = $ts')"
+-  write_state "$state"
++  # QA-R2-004: Use locked_update_state for atomic read-modify-write
++  local sf ts
++  sf="$(state_file)"
++  ts="$(now_iso)"
++  locked_update_state "$sf" \
++    "(.spec_updates // 0) + 1 as \$count |
++     .spec_updates = \$count |
++     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: \"$reason\", timestamp: \"$ts\"}] |
++     .phase = \"spec\" | .phase_entered_at = \"$ts\"" \
++    || die "Failed to update state for spec-update"
+   info "Phase: spec"
+
++  # Re-read update_count for the warning check
++  local update_count
++  update_count="$(read_state | jq -r '.spec_updates // 0')"
+   if [ "$update_count" -ge 3 ]; then
+     info "WARNING: This spec has been revised $update_count times during implementation."
+     info "Consider whether the feature is under-specified or the approach is fundamentally wrong."
+@@ -850,18 +860,17 @@ cmd_override() {
+     die "An override is already active ($remaining calls remaining). It must expire before requesting another."
+   fi
+
+-  # Write override marker into state
+-  state="$(echo "$state" | jq \
+-    --arg reason "$reason" \
+-    --arg ts "$ts" \
+-    --argjson remaining 10 \
+-    --argjson count "$((override_count + 1))" \
+-    '.override = {active: true, reason: $reason, started_at: $ts, remaining_calls: $remaining} | .override_count = $count')"
+-  write_state "$state"
++  # QA-R2-004: Use locked_update_state for atomic read-modify-write
++  local sf
++  sf="$(state_file)"
++  locked_update_state "$sf" \
++    ".override = {active: true, reason: \"$reason\", started_at: \"$ts\", remaining_calls: 10} | .override_count = (.override_count // 0) + 1" \
++    || die "Failed to write override state"
+
+   # Append to override log
+   mkdir -p "$(dirname "$OVERRIDE_LOG")"
+-  if [ ! -f "$OVERRIDE_LOG" ]; then
++  # QA-R2-007: Validate or recreate override log if corrupted
++  if [ ! -f "$OVERRIDE_LOG" ] || ! jq empty "$OVERRIDE_LOG" 2>/dev/null; then
+     echo '[]' > "$OVERRIDE_LOG"
+   fi
+   local entry
+diff --git a/correctless/setup b/correctless/setup
+index 920e13c..9259cbe 100755
+--- a/correctless/setup
++++ b/correctless/setup
+@@ -263,8 +263,9 @@ install_hooks() {
+   if [ -d "$SCRIPT_DIR/scripts" ]; then
+     local script_dest="$REPO_ROOT/scripts"
+     mkdir -p "$script_dest"
++    # QA-R2-003: Always copy scripts (same as hooks — generated code, not user-edited)
+     for script in lib.sh antipattern-scan.sh; do
+-      if [ -f "$SCRIPT_DIR/scripts/$script" ] && [ ! -f "$script_dest/$script" ]; then
++      if [ -f "$SCRIPT_DIR/scripts/$script" ]; then
+         cp "$SCRIPT_DIR/scripts/$script" "$script_dest/$script"
+       fi
+     done
+diff --git a/hooks/audit-trail.sh b/hooks/audit-trail.sh
+index ab1ce7a..dad19f4 100755
+--- a/hooks/audit-trail.sh
++++ b/hooks/audit-trail.sh
+@@ -19,6 +19,7 @@ INPUT="$(cat)"
+ eval "$(echo "$INPUT" | jq -r '
+   @sh "TOOL_NAME=\(.tool_name // "")",
+   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
++  @sh "TOOL_INPUT_PATH=\(.tool_input.path // "")",
+   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
+   @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))"
+ ' 2>/dev/null)" || exit 0
+@@ -48,6 +49,10 @@ case "$TOOL_NAME" in
+   MultiEdit)
+     FILES="$TOOL_INPUT_EDITS"
+     ;;
++  Grep)
++    # QA-R2-002: Grep uses .tool_input.path, not .tool_input.file_path
++    FILES="$TOOL_INPUT_PATH"
++    ;;
+   *)
+     FILES="$TOOL_INPUT_FILE"
+     ;;
+@@ -134,22 +139,23 @@ while IFS= read -r f; do
+   case "$PHASE" in
+     tdd-qa|tdd-verify)
+       # QA/verify phases should be read-only for source and test files
+-      if [ "$fclass" = "source" ] && [ "$TOOL_NAME" != "Read" ]; then
++      # QA-R2-001: Exclude read-only tools (Read, Grep) from "modified" warnings
++      if [ "$fclass" = "source" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
+         echo "⚠ $PHASE: Source file modified — ${f##*/} (this phase should be read-only)" >&2
+       fi
+-      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
++      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
+         echo "⚠ $PHASE: Test file modified — ${f##*/} (this phase should be read-only)" >&2
+       fi
+       ;;
+     tdd-impl)
+       # GREEN phase: test edits should be logged
+-      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ]; then
++      if [ "$fclass" = "test" ] && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
+         echo "📝 GREEN: Test file edited — ${f##*/} (should be logged in test-edit-log)" >&2
+       fi
+       ;;
+     spec|review|review-spec|model)
+-      # Spec/review phases: no source or test edits
+-      if [ "$fclass" = "source" ] || [ "$fclass" = "test" ]; then
++      # Spec/review phases: no source or test edits (reads are fine)
++      if { [ "$fclass" = "source" ] || [ "$fclass" = "test" ]; } && [ "$TOOL_NAME" != "Read" ] && [ "$TOOL_NAME" != "Grep" ]; then
+         echo "⚠ $PHASE: Code file modified — ${f##*/} (spec/review phases are docs-only)" >&2
+       fi
+       ;;
+diff --git a/hooks/workflow-advance.sh b/hooks/workflow-advance.sh
+index a23de02..4a7b04a 100755
+--- a/hooks/workflow-advance.sh
++++ b/hooks/workflow-advance.sh
+@@ -530,12 +530,13 @@ cmd_qa() {
+     eval "$cov_cmd" > "$ARTIFACTS_DIR/coverage-baseline-$(branch_slug).out" 2>&1 || true
+   fi
+
+-  # Increment QA round counter and transition phase in a single write
+-  local state
+-  state="$(read_state)"
+-  state="$(echo "$state" | jq --arg t "$(date -u +%FT%TZ)" \
+-    '.qa_rounds += 1 | .phase = "tdd-qa" | .phase_entered_at = $t')"
+-  write_state "$state"
++  # QA-R2-004: Use locked_update_state for atomic read-modify-write
++  local sf ts
++  sf="$(state_file)"
++  ts="$(date -u +%FT%TZ)"
++  locked_update_state "$sf" \
++    ".qa_rounds += 1 | .phase = \"tdd-qa\" | .phase_entered_at = \"$ts\"" \
++    || die "Failed to update state for QA phase"
+   info "Phase: tdd-qa"
+   info "Next: QA review (edits blocked)"
+ }
+@@ -727,10 +728,13 @@ cmd_set_intensity() {
+   # Phase guard: set-intensity only valid during spec-related phases
+   require_phase_oneof "spec" "review" "review-spec"
+
+-  local state
+-  state="$(read_state)" || die "No state file — run 'init' first"
+-  state="$(echo "$state" | jq --arg level "$level" '.feature_intensity = $level')"
+-  write_state "$state"
++  # QA-R2-004: Use locked_update_state for atomic read-modify-write
++  local sf
++  sf="$(state_file)"
++  [ -f "$sf" ] || die "No state file — run 'init' first"
++  locked_update_state "$sf" \
++    ".feature_intensity = \"$level\"" \
++    || die "Failed to set feature intensity"
+   info "Feature intensity set to: $level"
+ }
+
+@@ -755,9 +759,14 @@ cmd_resolve_drift() {
+
+   # shellcheck disable=SC2064
+   trap "$(printf 'rm -f %q' "$DRIFT_DEBT_FILE.$$")" EXIT
+-  jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
++  # QA-R2-006: Check return code — don't report success if write failed
++  if ! (jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
+     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
+-    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
++    "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"); then
++    rm -f "$DRIFT_DEBT_FILE.$$"
++    trap - EXIT
++    die "Failed to write drift debt file"
++  fi
+   trap - EXIT
+
+   info "Drift item $drift_id marked as resolved: $reason"
+@@ -768,24 +777,25 @@ cmd_spec_update() {
+   check_branch_match
+   require_phase_oneof "tdd-tests" "tdd-impl" "tdd-qa"
+
+-  local state from_phase
+-  state="$(read_state)"
+-  from_phase="$(echo "$state" | jq -r '.phase')"
++  # Read phase for logging (pre-read is fine — only used for info messages)
++  local from_phase
++  from_phase="$(read_phase)"
+
+-  # Track spec update in state
+-  local update_count
+-  update_count="$(echo "$state" | jq -r '.spec_updates // 0')"
+-  update_count=$((update_count + 1))
+-
+-  state="$(echo "$state" | jq \
+-    --arg reason "$reason" \
+-    --arg from "$from_phase" \
+-    --arg ts "$(now_iso)" \
+-    --argjson count "$update_count" \
+-    '.spec_updates = $count | .spec_update_history = (.spec_update_history // []) + [{from_phase: $from, reason: $reason, timestamp: $ts}] | .phase = "spec" | .phase_entered_at = $ts')"
+-  write_state "$state"
++  # QA-R2-004: Use locked_update_state for atomic read-modify-write
++  local sf ts
++  sf="$(state_file)"
++  ts="$(now_iso)"
++  locked_update_state "$sf" \
++    "(.spec_updates // 0) + 1 as \$count |
++     .spec_updates = \$count |
++     .spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: \"$reason\", timestamp: \"$ts\"}] |
++     .phase = \"spec\" | .phase_entered_at = \"$ts\"" \
++    || die "Failed to update state for spec-update"
+   info "Phase: spec"
+
++  # Re-read update_count for the warning check
++  local update_count
++  update_count="$(read_state | jq -r '.spec_updates // 0')"
+   if [ "$update_count" -ge 3 ]; then
+     info "WARNING: This spec has been revised $update_count times during implementation."
+     info "Consider whether the feature is under-specified or the approach is fundamentally wrong."
+@@ -850,18 +860,17 @@ cmd_override() {
+     die "An override is already active ($remaining calls remaining). It must expire before requesting another."
+   fi
+
+-  # Write override marker into state
+-  state="$(echo "$state" | jq \
+-    --arg reason "$reason" \
+-    --arg ts "$ts" \
+-    --argjson remaining 10 \
+-    --argjson count "$((override_count + 1))" \
+-    '.override = {active: true, reason: $reason, started_at: $ts, remaining_calls: $remaining} | .override_count = $count')"
+-  write_state "$state"
++  # QA-R2-004: Use locked_update_state for atomic read-modify-write
++  local sf
++  sf="$(state_file)"
++  locked_update_state "$sf" \
++    ".override = {active: true, reason: \"$reason\", started_at: \"$ts\", remaining_calls: 10} | .override_count = (.override_count // 0) + 1" \
++    || die "Failed to write override state"
+
+   # Append to override log
+   mkdir -p "$(dirname "$OVERRIDE_LOG")"
+-  if [ ! -f "$OVERRIDE_LOG" ]; then
++  # QA-R2-007: Validate or recreate override log if corrupted
++  if [ ! -f "$OVERRIDE_LOG" ] || ! jq empty "$OVERRIDE_LOG" 2>/dev/null; then
+     echo '[]' > "$OVERRIDE_LOG"
+   fi
+   local entry
+diff --git a/setup b/setup
+index 920e13c..9259cbe 100755
+--- a/setup
++++ b/setup
+@@ -263,8 +263,9 @@ install_hooks() {
+   if [ -d "$SCRIPT_DIR/scripts" ]; then
+     local script_dest="$REPO_ROOT/scripts"
+     mkdir -p "$script_dest"
++    # QA-R2-003: Always copy scripts (same as hooks — generated code, not user-edited)
+     for script in lib.sh antipattern-scan.sh; do
+-      if [ -f "$SCRIPT_DIR/scripts/$script" ] && [ ! -f "$script_dest/$script" ]; then
++      if [ -f "$SCRIPT_DIR/scripts/$script" ]; then
+         cp "$SCRIPT_DIR/scripts/$script" "$script_dest/$script"
+       fi
+     done

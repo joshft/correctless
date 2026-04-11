@@ -1,7 +1,7 @@
 ---
 name: caudit
 description: Cross-codebase quality audit. Use after a major feature lands or periodically for systemic bug detection. Presets: QA, Hacker, Performance.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/antipatterns.md), Write(*test*), Write(*spec*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/antipatterns.md), Write(*test*), Write(*spec*), Edit, Task(correctless:fix-diff-reviewer)
 context: fork
 ---
 
@@ -109,16 +109,9 @@ Clean up the checkpoint file when the audit converges and completes successfully
    - Non-trivial: TDD (tests first, separate impl agent)
    - Trivial one-liners: apply directly
 6. Commit fixes
-6a. FIX VERIFICATION — MANDATORY before spawning next round (AP-012)
-    - Run full test suite (`commands.test` from workflow-config.json).
-      Test failures become BLOCKING findings for the current round —
-      do not advance until the test suite passes cleanly.
-    - Spawn a fix-diff review subagent scoped to the fix commit diff
-      (see "Fix-Diff Review Agent" below). Its sole job is to find
-      new bugs introduced by the fix commits. Blocking findings from
-      this agent are added to the current round immediately, NOT
-      deferred to the next round's specialist respawn.
-    - Only advance to step 7 once both checks pass.
+6a. FIX VERIFICATION — MANDATORY before spawning next round (AP-012).
+    Structured per the fix-diff-reviewer-migration spec.
+    See the detailed block below ("Step 6a: Fix Verification").
 7. Spawn FRESH agents for next round (new context, no memory)
    - Tell them: "The previous round was sloppy and missed things.
      The agents were overconfident and under-thorough. Do better."
@@ -143,36 +136,147 @@ main workflow enforces on feature code. Running the test suite and a
 diff-focused review after each fix commit catches regressions cheaply, before
 they propagate to the next round.
 
-### Fix-Diff Review Agent
+### Step 6a: Fix Verification
 
-After committing each round's fixes, spawn a single subagent with this framing:
+<!-- STEP 6A BEGIN -->
 
-> You are the fix-diff reviewer for the audit round just completed.
->
-> Your sole job is to find new bugs introduced by the fix commits — not to
-> re-find the original findings, and not to audit the unchanged codebase.
-> Your scope is the diff of the fix commit(s) from this round.
->
-> Run: `git diff HEAD~1..HEAD` (or the range covering this round's fixes)
-> to see what changed.
->
-> For each changed file, answer:
-> 1. Does the change actually address the finding it claims to fix?
-> 2. Does the change touch anything outside the minimum scope of the fix?
->    If so, why? Is that additional change correct?
-> 3. Could this change break another part of the system that the test suite
->    doesn't cover? (e.g., environment-version drift, undocumented API contracts,
->    side effects)
-> 4. Does the change introduce any patterns from .correctless/antipatterns.md?
->    Especially AP-011 (tooling version drift) and AP-012 (fix rounds untested).
->
-> Return BLOCKING findings only when you have a concrete new bug with evidence.
-> Style concerns and suggestions are out of scope — this agent catches bugs,
-> not taste.
+After committing each round's fixes, run the full project test suite (from
+`commands.test` in workflow-config.json). Test failures become BLOCKING
+findings for the round — do not advance until the suite is clean.
 
-Blocking findings from this agent are added to the current round's findings
-list. Re-run step 5 (human triage) to decide fix/defer/dispute for each, then
-re-commit, re-run step 6a. Loop until the fix-diff review is clean.
+Once tests pass, invoke the fix-diff reviewer plugin agent. The orchestrator
+(this skill, caudit) is responsible for computing the diff, enumerating
+path-scoped rules, wrapping both in untrusted fences, and invoking the agent
+via a namespaced Task call. The agent itself has read-only tools only.
+
+**Step 1 — Pin the round-start SHA.**
+
+The round-start SHA is the git SHA immediately before the first fix commit of
+this round. The orchestrator pins it into a shell variable in its own
+execution context before any `git show` usage:
+
+```sh
+ROUND_START_SHA="$(git rev-parse "refs/audit-round-${ROUND_N}-start")"
+```
+
+**Step 2 — Compute the fix-round diff.**
+
+```sh
+git diff "${ROUND_START_SHA}..HEAD"   # range literal: <round-start-sha>..HEAD
+```
+
+The diff range is always `<round-start-sha>..HEAD`. Do NOT use any relative
+range that counts commits from the tip — the number of fix commits per round
+varies (1, 2, or 3+), so any relative range would miss fixes or over-report.
+
+**Step 3 — Enumerate path-scoped rules that govern touched files.**
+
+For every rule file under `.claude/rules/*.md`, read its YAML frontmatter and
+extract the `paths:` list. Parse with `yq` if available, else fall back to
+`awk` reading the `paths:` block, else `grep -A` on `paths:`. Intersect the
+rule's `paths:` list with the set of files changed in the diff (via
+`git diff --name-only "${ROUND_START_SHA}..HEAD"`). For each matching rule
+file, the orchestrator reads the rule body from the pre-diff git state:
+
+```sh
+git show "${ROUND_START_SHA}:.claude/rules/${rule_basename}.md"
+```
+
+Reading from `${ROUND_START_SHA}` — not the index, not the checkout — is
+deliberate. It guarantees that if the fix commits themselves modified a rule
+file, the reviewer sees the rule as it applied *when the finding was
+identified*, not as rewritten by the fix.
+
+**Step 4 — Build the Task prompt with untrusted fences.**
+
+Structure the prompt as prose authored by the orchestrator, followed by two
+kinds of fenced data blocks:
+
+### Path-scoped rules applying to this diff
+
+Each matching rule body is wrapped in an `<UNTRUSTED_RULES>` fence:
+
+```
+<UNTRUSTED_RULES source=".claude/rules/hooks-pretooluse.md">
+(rule body text from git show)
+</UNTRUSTED_RULES>
+```
+
+If `.claude/rules/` is empty or absent (for example, if ABS-009 rolls back),
+the enumeration yields zero rule bodies and the fix-diff reviewer receives
+just the fenced diff — this is expected graceful degradation, not a failure
+(BND-005). No matching rule for a diff is a valid outcome.
+
+Then the diff itself is wrapped in an `<UNTRUSTED_DIFF>` fence:
+
+```
+<UNTRUSTED_DIFF>
+(output of git diff "${ROUND_START_SHA}..HEAD")
+</UNTRUSTED_DIFF>
+```
+
+**Step 5 — Size budget and fail-closed invocation.**
+
+Before invoking the Task, measure the total byte length of the assembled
+prompt. The Task prompt budget is 100 KB. If the assembled prompt exceeds
+100 KB (rule bodies + diff + framing), abort the round immediately with a
+BLOCKING finding — do not truncate, do not retry with a smaller subset.
+FAIL-CLOSED: Task failure aborts the current round.
+
+```sh
+Task(subagent_type="correctless:fix-diff-reviewer",
+     description="Review fix-round diff",
+     prompt="$PROMPT_BODY")
+```
+
+**Step 6 — Parse the response.**
+
+The fix-diff reviewer returns only a JSON array. Parse it with an identity
+filter and abort the round on any parse error:
+
+```sh
+printf '%s\n' "$TASK_RESPONSE" | jq -e . > /tmp/fd-findings-${ROUND_N}.json
+```
+
+Filter forms (a `jq -e` invocation followed by a field name or index
+expression instead of the bare dot) are prohibited — the reviewer's contract
+is that the entire response body is a JSON array, and the identity parse is
+the round-abort gate when that contract is violated.
+
+**Step 7 — Threshold and promotion.**
+
+Read the configurable threshold from workflow-config.json via jq:
+
+```sh
+THRESHOLD="$(jq -r '.audit.zero_findings_threshold // 0' .correctless/config/workflow-config.json)"
+```
+
+The key `audit.zero_findings_threshold` in `.correctless/config/workflow-config.json`
+(a json config file read via jq) controls how many new fix-diff findings are
+tolerated before the round must re-loop through step 5 (triage). Default is 0.
+
+Promote every element of the returned JSON array into the current round's
+findings list by merging in the following orchestrator-added keys. The
+reviewer supplies `id`, `severity`, `title`, `description`, `evidence`,
+`impact`, `location`, `instance_fix`, and `class_fix`. The orchestrator adds:
+
+```
+source: "fix-diff-reviewer"
+agent: "fix-diff-reviewer"
+tier: "confirmed"
+status: "open"
+bounty: 0
+invariant_ref: null
+round: <round number>
+timestamp: <ISO 8601>
+```
+
+Once promoted, re-run step 5 (human triage) for the new findings, re-commit,
+and re-run this fix-verification block. Loop until the fix-diff reviewer
+returns an empty array.
+
+<!-- STEP 6A END -->
+
 
 ## Convergence
 

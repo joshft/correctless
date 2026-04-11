@@ -11,6 +11,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | Skills | `skills/*/SKILL.md` | 27 skill definitions. Each is a slash command with frontmatter contract. |
+| Agents | `agents/*.md` | Plugin sub-agents (currently: fix-diff-reviewer). System prompt + frontmatter. Synced to `correctless/agents/` via sync.sh. See ABS-010. |
 | Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, token-tracking.sh (PostToolUse token logging with phase-to-skill mapping) |
 | Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs |
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |

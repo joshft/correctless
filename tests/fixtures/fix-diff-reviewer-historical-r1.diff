@@ -1,0 +1,657 @@
+diff --git a/correctless/hooks/audit-trail.sh b/correctless/hooks/audit-trail.sh
+index 87072fc..ab1ce7a 100755
+--- a/correctless/hooks/audit-trail.sh
++++ b/correctless/hooks/audit-trail.sh
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env bash
+ # shellcheck disable=SC2254  # Unquoted $pat in case is intentional — we need glob matching
+ # HOOK_TYPE: PostToolUse
+-# HOOK_MATCHER: Edit|Write|MultiEdit|CreateFile|Bash
++# HOOK_MATCHER: Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash|Read|Grep
+ # Correctless — PostToolUse audit trail + adherence feedback
+ # Records every file modification with workflow phase context.
+ # Lite mode: phase-violation alerts to stderr
+@@ -70,7 +70,9 @@ STATE_FILE=".correctless/artifacts/workflow-state-${_slug}.json"
+ [ -f "$STATE_FILE" ] || exit 0
+
+ # Read phase and config
+-PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)"
++# QA-R1-015: Default to "unknown" if jq fails on corrupted state file
++PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)" || true
++[ -n "$PHASE" ] || PHASE="unknown"
+ CONFIG_FILE="$(config_file 2>/dev/null)" || CONFIG_FILE=".correctless/config/workflow-config.json"
+
+ # --- Audit trail logging (batch all files in single jq call) ---
+@@ -111,7 +113,7 @@ if [ -f "$CONFIG_FILE" ]; then
+   eval "$(jq -r '
+     @sh "TEST_PATTERN=\(.patterns.test_file // "")",
+     @sh "SOURCE_PATTERN=\(.patterns.source_file // "")",
+-    @sh "IS_FULL=\(if (.workflow.intensity // "") | IN("high","critical") then "true" else "false" end)"
++    @sh "IS_FULL=\(if (.workflow.intensity // "" | ascii_downcase) | IN("high","critical") then "true" else "false" end)"
+   ' "$CONFIG_FILE" 2>/dev/null)" || true
+ fi
+
+@@ -119,6 +121,10 @@ fi
+ # Requires TEST_PATTERN and SOURCE_PATTERN globals set above.
+ command -v classify_file >/dev/null 2>&1 || exit 0
+
++# QA-R1-006: Disable glob expansion — patterns like *.ts must not expand to filenames
++# (workflow-gate.sh and sensitive-file-guard.sh both have this; audit-trail was missing it)
++set -f
++
+ # --- Lite mode: phase-violation alerts ---
+
+ while IFS= read -r f; do
+diff --git a/correctless/hooks/statusline.sh b/correctless/hooks/statusline.sh
+index 09d7910..a032321 100755
+--- a/correctless/hooks/statusline.sh
++++ b/correctless/hooks/statusline.sh
+@@ -9,6 +9,9 @@
+
+ input=$(cat)
+
++# QA-R1-016: Check jq availability (consistent with other hooks)
++command -v jq >/dev/null 2>&1 || { echo ""; exit 0; }
++
+ # Colors (all use \033 format for source consistency)
+ ORANGE='\033[38;5;214m'
+ GRAY='\033[2m'
+diff --git a/correctless/hooks/workflow-advance.sh b/correctless/hooks/workflow-advance.sh
+index 56fc024..a23de02 100755
+--- a/correctless/hooks/workflow-advance.sh
++++ b/correctless/hooks/workflow-advance.sh
+@@ -75,11 +75,16 @@ write_state() {
+
+ update_phase() {
+   local new_phase="$1"
+-  local state
+-  state="$(read_state)" || die "No state file — run 'init' first"
+-  state="$(echo "$state" | jq --arg p "$new_phase" --arg t "$(date -u +%FT%TZ)" \
+-    '.phase = $p | .phase_entered_at = $t')"
+-  write_state "$state"
++  # QA-R1-012: Use locked_update_state for atomic read-modify-write
++  # (prevents TOCTOU race if two workflow-advance.sh invocations overlap)
++  local sf
++  sf="$(state_file)"
++  [ -f "$sf" ] || die "No state file — run 'init' first"
++  local ts
++  ts="$(date -u +%FT%TZ)"
++  locked_update_state "$sf" \
++    ".phase = \"$new_phase\" | .phase_entered_at = \"$ts\"" \
++    || die "Failed to update phase"
+   info "Phase: $new_phase"
+ }
+
+@@ -409,11 +414,9 @@ cmd_init() {
+   local spec_file=".correctless/specs/${slug}.md"
+
+   mkdir -p "$ARTIFACTS_DIR"
+-  # Create the spec file stub so the path exists for downstream tools
+   mkdir -p "$REPO_ROOT/.correctless/specs"
+-  if [ ! -f "$REPO_ROOT/$spec_file" ]; then
+-    printf "# Spec: %s\n\n## Rules\n\n_(to be written)_\n" "$task" > "$REPO_ROOT/$spec_file"
+-  fi
++  # QA-R1-014: Write state BEFORE creating spec stub — if write_state fails,
++  # no orphaned spec file is left behind. On retry, the same slug is available.
+   write_state "$(jq -n \
+     --arg phase "spec" \
+     --arg task "$task" \
+@@ -430,6 +433,10 @@ cmd_init() {
+       branch: $branch,
+       qa_rounds: 0
+     }')"
++  # Create the spec file stub so the path exists for downstream tools
++  if [ ! -f "$REPO_ROOT/$spec_file" ]; then
++    printf "# Spec: %s\n\n## Rules\n\n_(to be written)_\n" "$task" > "$REPO_ROOT/$spec_file"
++  fi
+
+   info "Workflow initialized on branch '$branch'"
+   info "Phase: spec"
+@@ -599,6 +606,12 @@ cmd_verified() {
+   local state spec_file slug
+   state="$(read_state)"
+   spec_file="$(echo "$state" | jq -r '.spec_file')"
++
++  # QA-R1-019: Guard against null spec_file (e.g., on audit branches that transitioned to done)
++  if [ -z "$spec_file" ] || [ "$spec_file" = "null" ]; then
++    die "No spec file in workflow state — 'verified' is not applicable to audit workflows. Merge the audit branch directly."
++  fi
++
+   slug="$(basename "$spec_file" .md)"
+   local report="$REPO_ROOT/.correctless/verification/${slug}-verification.md"
+
+@@ -741,7 +754,7 @@ cmd_resolve_drift() {
+   fi
+
+   # shellcheck disable=SC2064
+-  trap "rm -f '$DRIFT_DEBT_FILE.$$'" EXIT
++  trap "$(printf 'rm -f %q' "$DRIFT_DEBT_FILE.$$")" EXIT
+   jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
+     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
+     "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
+@@ -859,7 +872,7 @@ cmd_override() {
+     --arg branch "$(current_branch)" \
+     '{phase: $phase, reason: $reason, timestamp: $ts, branch: $branch}')"
+   # shellcheck disable=SC2064
+-  trap "rm -f '$OVERRIDE_LOG.$$'" EXIT
++  trap "$(printf 'rm -f %q' "$OVERRIDE_LOG.$$")" EXIT
+   jq --argjson entry "$entry" '(. += [$entry]) | .[-100:]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
+     && mv "$OVERRIDE_LOG.$$" "$OVERRIDE_LOG"
+   trap - EXIT
+diff --git a/correctless/hooks/workflow-gate.sh b/correctless/hooks/workflow-gate.sh
+index 245ad4a..4404437 100755
+--- a/correctless/hooks/workflow-gate.sh
++++ b/correctless/hooks/workflow-gate.sh
+@@ -46,14 +46,20 @@ _source_lib() {
+ INPUT="$(cat)"
+ # shellcheck disable=SC2034  # Variables assigned via eval+jq below, used later
+ TOOL_NAME="" TOOL_INPUT_FILE="" TOOL_INPUT_COMMAND="" TOOL_INPUT_NEW="" TOOL_INPUT_EDITS="" TOOL_INPUT_EDITS_NEW=""
+-eval "$(echo "$INPUT" | jq -r '
++# QA-R1-005: Fail-closed on malformed stdin JSON (PreToolUse must not degrade to fail-open)
++_PARSED="$(echo "$INPUT" | jq -r '
+   @sh "TOOL_NAME=\(.tool_name // "")",
+   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
+   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
+   @sh "TOOL_INPUT_NEW=\(.tool_input.new_string // .tool_input.content // "")",
+   @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))",
+   @sh "TOOL_INPUT_EDITS_NEW=\([.tool_input.edits[]?.new_string // empty] | join("\n"))"
+-' 2>/dev/null)" || exit 0
++' 2>/dev/null)" || true
++if [ -z "$_PARSED" ]; then
++  echo "BLOCKED [fail-closed]: failed to parse tool input JSON" >&2
++  exit 2
++fi
++eval "$_PARSED"
+
+ # Only gate write operations
+ case "$TOOL_NAME" in
+@@ -67,7 +73,10 @@ case "$TOOL_NAME" in
+     fi
+     # R-024: workflow-advance.sh invocations always allowed (after write detection
+     # to avoid bypassing the gate for commands that merely mention the script name)
+-    [[ "$COMMAND" == *"workflow-advance.sh"* ]] && exit 0
++    # QA-R1-002: Strip shell comments before matching to prevent bypass via
++    # appending "# workflow-advance.sh" as a comment to arbitrary commands
++    _cmd_no_comment="${COMMAND%%#*}"
++    [[ "$_cmd_no_comment" == *"workflow-advance.sh"* ]] && exit 0
+     # Fall through to phase checking with the command as context
+     ;;
+   *)
+@@ -93,10 +102,19 @@ if [ ! -f "$STATE_FILE" ]; then
+   FAIL_CLOSED="false"
+   FC_SOURCE_PAT=""
+   if [ -f "$CONFIG_FILE" ]; then
+-    eval "$(jq -r '
++    # QA-R1-004: If config exists but jq fails (corrupted JSON), default to fail-closed
++    # to prevent silent degradation of fail-closed security posture
++    _fc_parsed="$(jq -r '
+       @sh "FAIL_CLOSED=\(.workflow.fail_closed_when_no_state // false)",
+       @sh "FC_SOURCE_PAT=\(.patterns.source_file // "")"
+     ' "$CONFIG_FILE" 2>/dev/null)" || true
++    if [ -n "$_fc_parsed" ]; then
++      eval "$_fc_parsed"
++    elif jq '.' "$CONFIG_FILE" >/dev/null 2>&1; then
++      : # Valid JSON but no relevant fields — keep defaults
++    else
++      FAIL_CLOSED="true"  # Corrupted config → fail-closed
++    fi
+   fi
+   if [ "$FAIL_CLOSED" = "true" ]; then
+     # Full mode fail-closed: block source edits when no state file exists
+diff --git a/correctless/scripts/lib.sh b/correctless/scripts/lib.sh
+index e220c5d..5e9b7cb 100755
+--- a/correctless/scripts/lib.sh
++++ b/correctless/scripts/lib.sh
+@@ -160,6 +160,14 @@ _acquire_state_lock() {
+         fi
+         continue
+       fi
++    elif [ -d "$lock_dir" ]; then
++      # QA-R1-018: No pid file — lock was interrupted between mkdir and pid write.
++      # Treat as stale and break it to prevent 5s timeout deadlock.
++      local break_dir="${lock_dir}.breaking.$$"
++      if mv "$lock_dir" "$break_dir" 2>/dev/null; then
++        rm -rf "$break_dir"
++      fi
++      continue
+     fi
+
+     # Holder is alive or PID unknown — wait and retry
+@@ -188,6 +196,10 @@ locked_update_state() {
+   local rc=0
+
+   _acquire_state_lock "$state_file" || return 1
++  # QA-R1-013: EXIT trap ensures lock is released on abnormal termination
++  # (e.g., hook runner kills the process at timeout between acquire and release)
++  # shellcheck disable=SC2064
++  trap "$(printf '_release_state_lock %q; rm -f %q' "$state_file" "${state_file}.$$.tmp")" EXIT
+
+   local tmp_file="${state_file}.$$.tmp"
+   if jq "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
+@@ -198,6 +210,7 @@ locked_update_state() {
+   fi
+
+   _release_state_lock "$state_file"
++  trap - EXIT
+   return "$rc"
+ }
+
+diff --git a/correctless/setup b/correctless/setup
+index cb4d6de..920e13c 100755
+--- a/correctless/setup
++++ b/correctless/setup
+@@ -252,9 +252,9 @@ install_hooks() {
+     [ -f "$hook" ] || continue
+     local basename_hook
+     basename_hook="$(basename "$hook")"
+-    if [ ! -f "$hook_dest/$basename_hook" ]; then
+-      cp "$hook" "$hook_dest/$basename_hook"
+-    fi
++    # QA-R1-001: Always copy hooks — they are generated code, not user-edited.
++    # The [ ! -f ] guard prevented updates, causing stale hook drift.
++    cp "$hook" "$hook_dest/$basename_hook"
+     chmod +x "$hook_dest/$basename_hook" 2>/dev/null || true
+   done
+   ok "Installed hooks to .correctless/hooks/"
+@@ -690,22 +690,23 @@ detect_version_file() {
+     version_file="package.json"
+     version_pattern=".version"
+   # Check Cargo.toml — section-aware: version must be under [package], not [workspace]
+-  elif [ -f "$REPO_ROOT/Cargo.toml" ] && sed -n '/^\[package\]/,/^\[/p' "$REPO_ROOT/Cargo.toml" 2>/dev/null | grep -q '^version\s*='; then
++  # QA-R1-009: Use [[:space:]] instead of \s for POSIX portability (AP-001)
++  elif [ -f "$REPO_ROOT/Cargo.toml" ] && sed -n '/^\[package\]/,/^\[/p' "$REPO_ROOT/Cargo.toml" 2>/dev/null | grep -q '^version[[:space:]]*='; then
+     version_file="Cargo.toml"
+-    version_pattern='version\s*=\s*"[^"]*"'
++    version_pattern='version[[:space:]]*=[[:space:]]*"[^"]*"'
+   # Check pyproject.toml — section-aware: version must be under [project]
+-  elif [ -f "$REPO_ROOT/pyproject.toml" ] && sed -n '/^\[project\]/,/^\[/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | grep -q '^version\s*='; then
++  elif [ -f "$REPO_ROOT/pyproject.toml" ] && sed -n '/^\[project\]/,/^\[/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | grep -q '^version[[:space:]]*='; then
+     version_file="pyproject.toml"
+-    version_pattern='version\s*=\s*"[^"]*"'
++    version_pattern='version[[:space:]]*=[[:space:]]*"[^"]*"'
+   # Check setup.cfg
+-  elif [ -f "$REPO_ROOT/setup.cfg" ] && grep -q '^version\s*=' "$REPO_ROOT/setup.cfg" 2>/dev/null; then
++  elif [ -f "$REPO_ROOT/setup.cfg" ] && grep -q '^version[[:space:]]*=' "$REPO_ROOT/setup.cfg" 2>/dev/null; then
+     version_file="setup.cfg"
+-    version_pattern='version\s*=\s*[0-9]'
++    version_pattern='version[[:space:]]*=[[:space:]]*[0-9]'
+   # Check Go version constants — capture find result once to avoid double traversal
+-  elif go_file="$(find "$REPO_ROOT" -maxdepth 4 -name '*.go' -exec grep -l 'const Version\s*=\|var Version\s*=' {} + 2>/dev/null | head -1)" && [ -n "$go_file" ]; then
++  elif go_file="$(find "$REPO_ROOT" -maxdepth 4 -name '*.go' -exec grep -l 'const Version[[:space:]]*=\|var Version[[:space:]]*=' {} + 2>/dev/null | head -1)" && [ -n "$go_file" ]; then
+     # Store relative path from repo root
+     version_file="${go_file#"$REPO_ROOT/"}"
+-    version_pattern='(const|var) Version\s*=\s*"[^"]*"'
++    version_pattern='(const|var) Version[[:space:]]*=[[:space:]]*"[^"]*"'
+   # Check CHANGELOG.md heading as fallback
+   elif [ -f "$REPO_ROOT/CHANGELOG.md" ] && grep -q '## \[[0-9]' "$REPO_ROOT/CHANGELOG.md" 2>/dev/null; then
+     version_file="CHANGELOG.md"
+diff --git a/correctless/skills/_shared/constraints.md b/correctless/skills/_shared/constraints.md
+index ec9a0a0..4c78373 100644
+--- a/correctless/skills/_shared/constraints.md
++++ b/correctless/skills/_shared/constraints.md
+@@ -34,6 +34,7 @@ After each subagent completes, capture `total_tokens` and `duration_ms` from the
+   "timestamp": "ISO",
+   "branch": "{branch-slug}",
+   "phase": "{phase}",
++  "skill": "{skill-name}",
+   "feature": "{feature-name}",
+   "agent_description": "{agent-description}",
+   "agent_type": "{agent-type}",
+diff --git a/hooks/audit-trail.sh b/hooks/audit-trail.sh
+index 87072fc..ab1ce7a 100755
+--- a/hooks/audit-trail.sh
++++ b/hooks/audit-trail.sh
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env bash
+ # shellcheck disable=SC2254  # Unquoted $pat in case is intentional — we need glob matching
+ # HOOK_TYPE: PostToolUse
+-# HOOK_MATCHER: Edit|Write|MultiEdit|CreateFile|Bash
++# HOOK_MATCHER: Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash|Read|Grep
+ # Correctless — PostToolUse audit trail + adherence feedback
+ # Records every file modification with workflow phase context.
+ # Lite mode: phase-violation alerts to stderr
+@@ -70,7 +70,9 @@ STATE_FILE=".correctless/artifacts/workflow-state-${_slug}.json"
+ [ -f "$STATE_FILE" ] || exit 0
+
+ # Read phase and config
+-PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)"
++# QA-R1-015: Default to "unknown" if jq fails on corrupted state file
++PHASE="$(jq -r '.phase // "unknown"' "$STATE_FILE" 2>/dev/null)" || true
++[ -n "$PHASE" ] || PHASE="unknown"
+ CONFIG_FILE="$(config_file 2>/dev/null)" || CONFIG_FILE=".correctless/config/workflow-config.json"
+
+ # --- Audit trail logging (batch all files in single jq call) ---
+@@ -111,7 +113,7 @@ if [ -f "$CONFIG_FILE" ]; then
+   eval "$(jq -r '
+     @sh "TEST_PATTERN=\(.patterns.test_file // "")",
+     @sh "SOURCE_PATTERN=\(.patterns.source_file // "")",
+-    @sh "IS_FULL=\(if (.workflow.intensity // "") | IN("high","critical") then "true" else "false" end)"
++    @sh "IS_FULL=\(if (.workflow.intensity // "" | ascii_downcase) | IN("high","critical") then "true" else "false" end)"
+   ' "$CONFIG_FILE" 2>/dev/null)" || true
+ fi
+
+@@ -119,6 +121,10 @@ fi
+ # Requires TEST_PATTERN and SOURCE_PATTERN globals set above.
+ command -v classify_file >/dev/null 2>&1 || exit 0
+
++# QA-R1-006: Disable glob expansion — patterns like *.ts must not expand to filenames
++# (workflow-gate.sh and sensitive-file-guard.sh both have this; audit-trail was missing it)
++set -f
++
+ # --- Lite mode: phase-violation alerts ---
+
+ while IFS= read -r f; do
+diff --git a/hooks/statusline.sh b/hooks/statusline.sh
+index 09d7910..a032321 100755
+--- a/hooks/statusline.sh
++++ b/hooks/statusline.sh
+@@ -9,6 +9,9 @@
+
+ input=$(cat)
+
++# QA-R1-016: Check jq availability (consistent with other hooks)
++command -v jq >/dev/null 2>&1 || { echo ""; exit 0; }
++
+ # Colors (all use \033 format for source consistency)
+ ORANGE='\033[38;5;214m'
+ GRAY='\033[2m'
+diff --git a/hooks/workflow-advance.sh b/hooks/workflow-advance.sh
+index 56fc024..a23de02 100755
+--- a/hooks/workflow-advance.sh
++++ b/hooks/workflow-advance.sh
+@@ -75,11 +75,16 @@ write_state() {
+
+ update_phase() {
+   local new_phase="$1"
+-  local state
+-  state="$(read_state)" || die "No state file — run 'init' first"
+-  state="$(echo "$state" | jq --arg p "$new_phase" --arg t "$(date -u +%FT%TZ)" \
+-    '.phase = $p | .phase_entered_at = $t')"
+-  write_state "$state"
++  # QA-R1-012: Use locked_update_state for atomic read-modify-write
++  # (prevents TOCTOU race if two workflow-advance.sh invocations overlap)
++  local sf
++  sf="$(state_file)"
++  [ -f "$sf" ] || die "No state file — run 'init' first"
++  local ts
++  ts="$(date -u +%FT%TZ)"
++  locked_update_state "$sf" \
++    ".phase = \"$new_phase\" | .phase_entered_at = \"$ts\"" \
++    || die "Failed to update phase"
+   info "Phase: $new_phase"
+ }
+
+@@ -409,11 +414,9 @@ cmd_init() {
+   local spec_file=".correctless/specs/${slug}.md"
+
+   mkdir -p "$ARTIFACTS_DIR"
+-  # Create the spec file stub so the path exists for downstream tools
+   mkdir -p "$REPO_ROOT/.correctless/specs"
+-  if [ ! -f "$REPO_ROOT/$spec_file" ]; then
+-    printf "# Spec: %s\n\n## Rules\n\n_(to be written)_\n" "$task" > "$REPO_ROOT/$spec_file"
+-  fi
++  # QA-R1-014: Write state BEFORE creating spec stub — if write_state fails,
++  # no orphaned spec file is left behind. On retry, the same slug is available.
+   write_state "$(jq -n \
+     --arg phase "spec" \
+     --arg task "$task" \
+@@ -430,6 +433,10 @@ cmd_init() {
+       branch: $branch,
+       qa_rounds: 0
+     }')"
++  # Create the spec file stub so the path exists for downstream tools
++  if [ ! -f "$REPO_ROOT/$spec_file" ]; then
++    printf "# Spec: %s\n\n## Rules\n\n_(to be written)_\n" "$task" > "$REPO_ROOT/$spec_file"
++  fi
+
+   info "Workflow initialized on branch '$branch'"
+   info "Phase: spec"
+@@ -599,6 +606,12 @@ cmd_verified() {
+   local state spec_file slug
+   state="$(read_state)"
+   spec_file="$(echo "$state" | jq -r '.spec_file')"
++
++  # QA-R1-019: Guard against null spec_file (e.g., on audit branches that transitioned to done)
++  if [ -z "$spec_file" ] || [ "$spec_file" = "null" ]; then
++    die "No spec file in workflow state — 'verified' is not applicable to audit workflows. Merge the audit branch directly."
++  fi
++
+   slug="$(basename "$spec_file" .md)"
+   local report="$REPO_ROOT/.correctless/verification/${slug}-verification.md"
+
+@@ -741,7 +754,7 @@ cmd_resolve_drift() {
+   fi
+
+   # shellcheck disable=SC2064
+-  trap "rm -f '$DRIFT_DEBT_FILE.$$'" EXIT
++  trap "$(printf 'rm -f %q' "$DRIFT_DEBT_FILE.$$")" EXIT
+   jq --arg id "$drift_id" --arg reason "$reason" --arg date "$(now_iso)" \
+     '(.drift_debt[] | select(.id == $id)) |= . + {status: "resolved", resolved_date: $date, resolution_reason: $reason}' \
+     "$DRIFT_DEBT_FILE" > "$DRIFT_DEBT_FILE.$$" && mv "$DRIFT_DEBT_FILE.$$" "$DRIFT_DEBT_FILE"
+@@ -859,7 +872,7 @@ cmd_override() {
+     --arg branch "$(current_branch)" \
+     '{phase: $phase, reason: $reason, timestamp: $ts, branch: $branch}')"
+   # shellcheck disable=SC2064
+-  trap "rm -f '$OVERRIDE_LOG.$$'" EXIT
++  trap "$(printf 'rm -f %q' "$OVERRIDE_LOG.$$")" EXIT
+   jq --argjson entry "$entry" '(. += [$entry]) | .[-100:]' "$OVERRIDE_LOG" > "$OVERRIDE_LOG.$$" \
+     && mv "$OVERRIDE_LOG.$$" "$OVERRIDE_LOG"
+   trap - EXIT
+diff --git a/hooks/workflow-gate.sh b/hooks/workflow-gate.sh
+index 245ad4a..4404437 100755
+--- a/hooks/workflow-gate.sh
++++ b/hooks/workflow-gate.sh
+@@ -46,14 +46,20 @@ _source_lib() {
+ INPUT="$(cat)"
+ # shellcheck disable=SC2034  # Variables assigned via eval+jq below, used later
+ TOOL_NAME="" TOOL_INPUT_FILE="" TOOL_INPUT_COMMAND="" TOOL_INPUT_NEW="" TOOL_INPUT_EDITS="" TOOL_INPUT_EDITS_NEW=""
+-eval "$(echo "$INPUT" | jq -r '
++# QA-R1-005: Fail-closed on malformed stdin JSON (PreToolUse must not degrade to fail-open)
++_PARSED="$(echo "$INPUT" | jq -r '
+   @sh "TOOL_NAME=\(.tool_name // "")",
+   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
+   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
+   @sh "TOOL_INPUT_NEW=\(.tool_input.new_string // .tool_input.content // "")",
+   @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))",
+   @sh "TOOL_INPUT_EDITS_NEW=\([.tool_input.edits[]?.new_string // empty] | join("\n"))"
+-' 2>/dev/null)" || exit 0
++' 2>/dev/null)" || true
++if [ -z "$_PARSED" ]; then
++  echo "BLOCKED [fail-closed]: failed to parse tool input JSON" >&2
++  exit 2
++fi
++eval "$_PARSED"
+
+ # Only gate write operations
+ case "$TOOL_NAME" in
+@@ -67,7 +73,10 @@ case "$TOOL_NAME" in
+     fi
+     # R-024: workflow-advance.sh invocations always allowed (after write detection
+     # to avoid bypassing the gate for commands that merely mention the script name)
+-    [[ "$COMMAND" == *"workflow-advance.sh"* ]] && exit 0
++    # QA-R1-002: Strip shell comments before matching to prevent bypass via
++    # appending "# workflow-advance.sh" as a comment to arbitrary commands
++    _cmd_no_comment="${COMMAND%%#*}"
++    [[ "$_cmd_no_comment" == *"workflow-advance.sh"* ]] && exit 0
+     # Fall through to phase checking with the command as context
+     ;;
+   *)
+@@ -93,10 +102,19 @@ if [ ! -f "$STATE_FILE" ]; then
+   FAIL_CLOSED="false"
+   FC_SOURCE_PAT=""
+   if [ -f "$CONFIG_FILE" ]; then
+-    eval "$(jq -r '
++    # QA-R1-004: If config exists but jq fails (corrupted JSON), default to fail-closed
++    # to prevent silent degradation of fail-closed security posture
++    _fc_parsed="$(jq -r '
+       @sh "FAIL_CLOSED=\(.workflow.fail_closed_when_no_state // false)",
+       @sh "FC_SOURCE_PAT=\(.patterns.source_file // "")"
+     ' "$CONFIG_FILE" 2>/dev/null)" || true
++    if [ -n "$_fc_parsed" ]; then
++      eval "$_fc_parsed"
++    elif jq '.' "$CONFIG_FILE" >/dev/null 2>&1; then
++      : # Valid JSON but no relevant fields — keep defaults
++    else
++      FAIL_CLOSED="true"  # Corrupted config → fail-closed
++    fi
+   fi
+   if [ "$FAIL_CLOSED" = "true" ]; then
+     # Full mode fail-closed: block source edits when no state file exists
+diff --git a/scripts/lib.sh b/scripts/lib.sh
+index e220c5d..5e9b7cb 100755
+--- a/scripts/lib.sh
++++ b/scripts/lib.sh
+@@ -160,6 +160,14 @@ _acquire_state_lock() {
+         fi
+         continue
+       fi
++    elif [ -d "$lock_dir" ]; then
++      # QA-R1-018: No pid file — lock was interrupted between mkdir and pid write.
++      # Treat as stale and break it to prevent 5s timeout deadlock.
++      local break_dir="${lock_dir}.breaking.$$"
++      if mv "$lock_dir" "$break_dir" 2>/dev/null; then
++        rm -rf "$break_dir"
++      fi
++      continue
+     fi
+
+     # Holder is alive or PID unknown — wait and retry
+@@ -188,6 +196,10 @@ locked_update_state() {
+   local rc=0
+
+   _acquire_state_lock "$state_file" || return 1
++  # QA-R1-013: EXIT trap ensures lock is released on abnormal termination
++  # (e.g., hook runner kills the process at timeout between acquire and release)
++  # shellcheck disable=SC2064
++  trap "$(printf '_release_state_lock %q; rm -f %q' "$state_file" "${state_file}.$$.tmp")" EXIT
+
+   local tmp_file="${state_file}.$$.tmp"
+   if jq "$jq_filter" "$state_file" > "$tmp_file" 2>/dev/null; then
+@@ -198,6 +210,7 @@ locked_update_state() {
+   fi
+
+   _release_state_lock "$state_file"
++  trap - EXIT
+   return "$rc"
+ }
+
+diff --git a/setup b/setup
+index cb4d6de..920e13c 100755
+--- a/setup
++++ b/setup
+@@ -252,9 +252,9 @@ install_hooks() {
+     [ -f "$hook" ] || continue
+     local basename_hook
+     basename_hook="$(basename "$hook")"
+-    if [ ! -f "$hook_dest/$basename_hook" ]; then
+-      cp "$hook" "$hook_dest/$basename_hook"
+-    fi
++    # QA-R1-001: Always copy hooks — they are generated code, not user-edited.
++    # The [ ! -f ] guard prevented updates, causing stale hook drift.
++    cp "$hook" "$hook_dest/$basename_hook"
+     chmod +x "$hook_dest/$basename_hook" 2>/dev/null || true
+   done
+   ok "Installed hooks to .correctless/hooks/"
+@@ -690,22 +690,23 @@ detect_version_file() {
+     version_file="package.json"
+     version_pattern=".version"
+   # Check Cargo.toml — section-aware: version must be under [package], not [workspace]
+-  elif [ -f "$REPO_ROOT/Cargo.toml" ] && sed -n '/^\[package\]/,/^\[/p' "$REPO_ROOT/Cargo.toml" 2>/dev/null | grep -q '^version\s*='; then
++  # QA-R1-009: Use [[:space:]] instead of \s for POSIX portability (AP-001)
++  elif [ -f "$REPO_ROOT/Cargo.toml" ] && sed -n '/^\[package\]/,/^\[/p' "$REPO_ROOT/Cargo.toml" 2>/dev/null | grep -q '^version[[:space:]]*='; then
+     version_file="Cargo.toml"
+-    version_pattern='version\s*=\s*"[^"]*"'
++    version_pattern='version[[:space:]]*=[[:space:]]*"[^"]*"'
+   # Check pyproject.toml — section-aware: version must be under [project]
+-  elif [ -f "$REPO_ROOT/pyproject.toml" ] && sed -n '/^\[project\]/,/^\[/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | grep -q '^version\s*='; then
++  elif [ -f "$REPO_ROOT/pyproject.toml" ] && sed -n '/^\[project\]/,/^\[/p' "$REPO_ROOT/pyproject.toml" 2>/dev/null | grep -q '^version[[:space:]]*='; then
+     version_file="pyproject.toml"
+-    version_pattern='version\s*=\s*"[^"]*"'
++    version_pattern='version[[:space:]]*=[[:space:]]*"[^"]*"'
+   # Check setup.cfg
+-  elif [ -f "$REPO_ROOT/setup.cfg" ] && grep -q '^version\s*=' "$REPO_ROOT/setup.cfg" 2>/dev/null; then
++  elif [ -f "$REPO_ROOT/setup.cfg" ] && grep -q '^version[[:space:]]*=' "$REPO_ROOT/setup.cfg" 2>/dev/null; then
+     version_file="setup.cfg"
+-    version_pattern='version\s*=\s*[0-9]'
++    version_pattern='version[[:space:]]*=[[:space:]]*[0-9]'
+   # Check Go version constants — capture find result once to avoid double traversal
+-  elif go_file="$(find "$REPO_ROOT" -maxdepth 4 -name '*.go' -exec grep -l 'const Version\s*=\|var Version\s*=' {} + 2>/dev/null | head -1)" && [ -n "$go_file" ]; then
++  elif go_file="$(find "$REPO_ROOT" -maxdepth 4 -name '*.go' -exec grep -l 'const Version[[:space:]]*=\|var Version[[:space:]]*=' {} + 2>/dev/null | head -1)" && [ -n "$go_file" ]; then
+     # Store relative path from repo root
+     version_file="${go_file#"$REPO_ROOT/"}"
+-    version_pattern='(const|var) Version\s*=\s*"[^"]*"'
++    version_pattern='(const|var) Version[[:space:]]*=[[:space:]]*"[^"]*"'
+   # Check CHANGELOG.md heading as fallback
+   elif [ -f "$REPO_ROOT/CHANGELOG.md" ] && grep -q '## \[[0-9]' "$REPO_ROOT/CHANGELOG.md" 2>/dev/null; then
+     version_file="CHANGELOG.md"
+diff --git a/skills/_shared/constraints.md b/skills/_shared/constraints.md
+index ec9a0a0..4c78373 100644
+--- a/skills/_shared/constraints.md
++++ b/skills/_shared/constraints.md
+@@ -34,6 +34,7 @@ After each subagent completes, capture `total_tokens` and `duration_ms` from the
+   "timestamp": "ISO",
+   "branch": "{branch-slug}",
+   "phase": "{phase}",
++  "skill": "{skill-name}",
+   "feature": "{feature-name}",
+   "agent_description": "{agent-description}",
+   "agent_type": "{agent-type}",
+diff --git a/tests/test-ci-hook-wiring.sh b/tests/test-ci-hook-wiring.sh
+index d06db93..9395b7f 100644
+--- a/tests/test-ci-hook-wiring.sh
++++ b/tests/test-ci-hook-wiring.sh
+@@ -593,7 +593,7 @@ test_inv009_existing_behavior_preserved() {
+
+   local audit_matcher
+   audit_matcher="$(echo "$audit_entry" | jq -r '.matcher // ""' 2>/dev/null || echo "")"
+-  assert_eq "INV-009: audit-trail matcher" "Edit|Write|MultiEdit|CreateFile|Bash" "$audit_matcher"
++  assert_eq "INV-009: audit-trail matcher" "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash|Read|Grep" "$audit_matcher"
+
+   local audit_timeout
+   audit_timeout="$(echo "$audit_entry" | jq -r '.hooks[0].timeout_ms // 0' 2>/dev/null || echo "0")"
+diff --git a/tests/test-consolidation.sh b/tests/test-consolidation.sh
+index 6cfa75e..8be2db 100755
+--- a/tests/test-consolidation.sh
++++ b/tests/test-consolidation.sh
+@@ -447,17 +447,19 @@ test_r008() {
+     fi
+
+     # B-04: Should not reference bare ARCHITECTURE.md (without .correctless/ prefix)
+-    # Match "ARCHITECTURE.md" not preceded by ".correctless/" or "/"
+-    if grep -P '(?<!\.correctless/)(?<!/)ARCHITECTURE\.md' "$skill_file" 2>/dev/null | \
+-       grep -v '\.correctless/ARCHITECTURE\.md' >/dev/null 2>&1; then
++    # QA-R1-010: Use POSIX-portable grep instead of grep -P (AP-001)
++    if grep 'ARCHITECTURE\.md' "$skill_file" 2>/dev/null | \
++       grep -v '\.correctless/ARCHITECTURE\.md' | \
++       grep -v '/ARCHITECTURE\.md' >/dev/null 2>&1; then
+       echo "  FAIL: R-008: $skill_name/SKILL.md references bare ARCHITECTURE.md"
+       FAIL=$((FAIL + 1))
+       fail_count_local=$((fail_count_local + 1))
+     fi
+
+     # B-04: Should not reference bare AGENT_CONTEXT.md (without .correctless/ prefix)
+-    if grep -P '(?<!\.correctless/)(?<!/)AGENT_CONTEXT\.md' "$skill_file" 2>/dev/null | \
+-       grep -v '\.correctless/AGENT_CONTEXT\.md' >/dev/null 2>&1; then
++    if grep 'AGENT_CONTEXT\.md' "$skill_file" 2>/dev/null | \
++       grep -v '\.correctless/AGENT_CONTEXT\.md' | \
++       grep -v '/AGENT_CONTEXT\.md' >/dev/null 2>&1; then
+       echo "  FAIL: R-008: $skill_name/SKILL.md references bare AGENT_CONTEXT.md"
+       FAIL=$((FAIL + 1))
+       fail_count_local=$((fail_count_local + 1))
+@@ -675,13 +677,13 @@ test_r010() {
+     FAIL=$((FAIL + 1))
+   fi
+
+-  # B-05: Verify hook file content preserved
++  # B-05: Verify hook file exists after install (QA-R1-001: hooks are always overwritten)
+   if [ -f .correctless/hooks/workflow-gate.sh ]; then
+-    file_contains ".correctless/hooks/workflow-gate.sh" "#!/bin/bash" \
++    file_contains ".correctless/hooks/workflow-gate.sh" "workflow" \
+       && local hook_ok="true" || local hook_ok="false"
+-    assert_eq "R-010: migrated hook content preserved" "true" "$hook_ok"
++    assert_eq "R-010: hook file installed" "true" "$hook_ok"
+   else
+-    echo "  FAIL: R-010: workflow-gate hook not found for content preservation check"
++    echo "  FAIL: R-010: workflow-gate hook not found after install"
+     FAIL=$((FAIL + 1))
+   fi

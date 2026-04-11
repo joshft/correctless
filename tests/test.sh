@@ -515,6 +515,21 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+# ============================================================================
+# Fix-diff reviewer agent structural test — enforces the
+# fix-diff-reviewer-migration spec (INV-001..INV-020, PRH-001..PRH-005,
+# BND-001..BND-006). Runs before the summary so its pass/fail feeds into the
+# aggregate count. NOTE: do NOT append '|| true' or '|| :' here — the test
+# itself checks for exit-code swallowing (INV-012(b)).
+# ============================================================================
+if (cd "$REPO_DIR" && bash tests/test-fix-diff-reviewer-agent.sh); then
+  echo "  PASS: fix-diff-reviewer agent structural test"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: fix-diff-reviewer agent structural test — see output above"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "======================"
 echo "Results: $PASS passed, $FAIL failed"
