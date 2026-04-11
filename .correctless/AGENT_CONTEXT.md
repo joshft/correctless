@@ -1,6 +1,6 @@
 # Agent Context — Correctless
 
-> Last updated: 2026-04-09
+> Last updated: 2026-04-11
 
 ## What This Project Does
 
@@ -17,7 +17,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 27-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 33 test files (~2,810 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, shift-left-review, lib, lib-locking, gate-path-exceptions, token-tracking, token-tracking-setup, ci-hook-wiring, workflow-gate, intensity-calibration, auto-recurring-patterns, token-aware-intensity, allowed-tools-check, token-tracking-skill-field, semi-auto-mode |
+| Tests | `tests/test*.sh` | 33 test files (~2,810 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, shift-left-review, lib, lib-locking, gate-path-exceptions, token-tracking, token-tracking-setup, ci-hook-wiring, workflow-gate, intensity-calibration, auto-recurring-patterns, token-aware-intensity, allowed-tools-check, token-tracking-skill-field, semi-auto-mode, architecture-drift, fix-diff-reviewer-agent |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns
@@ -38,6 +38,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 - **Editing distribution target directly**: changes in `correctless/` will be overwritten by `sync.sh` — **Instead**: edit in root `skills/`, `hooks/`, `templates/`, `helpers/` then run `bash sync.sh`
 - **Forgetting to sync after edits**: distribution targets go stale — **Instead**: always run `bash sync.sh` after editing source files, then `bash tests/test.sh` to verify
 - **Adding a skill without updating sync.sh**: new skills won't appear in the distribution — **Instead**: add the skill directory to the skill list in `sync.sh`
+- **Inline subagent prompts in skill files**: defining a subagent as prose inside a `skills/*/SKILL.md` file is brittle — the prompt can't actually be invoked without `Task()` wiring, and drift between the prose and any real implementation is invisible — **Instead**: define the subagent in `agents/{name}.md` (frontmatter + system prompt body) and invoke via `Task(subagent_type="correctless:{name}")`. See ABS-010 in `.correctless/ARCHITECTURE.md` for the contract and `agents/fix-diff-reviewer.md` for the canonical example
 
 ## Quick Reference
 
