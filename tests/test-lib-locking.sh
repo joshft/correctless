@@ -410,6 +410,56 @@ test_no_flock_dependency() {
 }
 
 # ============================================================================
+# AP-015: Every script writing workflow-state-*.json must use advisory locking
+# ============================================================================
+
+test_all_state_writers_use_locking() {
+  echo ""
+  echo "=== AP-015: All workflow state writers use advisory locking ==="
+
+  # Find all scripts that write to workflow-state files
+  local scripts_with_state_writes=()
+
+  for script in "$REPO_DIR"/scripts/*.sh; do
+    [ -f "$script" ] || continue
+    local bname
+    bname="$(basename "$script")"
+
+    # Check if the script modifies state files specifically:
+    # Must reference state file AND write to it (mv ... state_file pattern)
+    # Exclude scripts that only READ state or write to OTHER files
+    if grep -qE 'mv.*state_file|mv.*STATE_FILE|mv.*workflow-state' "$script" 2>/dev/null; then
+      scripts_with_state_writes+=("$bname")
+    elif grep -qE '>\s*"\$.*state_file|>\s*"\$.*STATE_FILE' "$script" 2>/dev/null; then
+      scripts_with_state_writes+=("$bname")
+    fi
+  done
+
+  # Each state-writing script must reference locking functions
+  for script_name in "${scripts_with_state_writes[@]}"; do
+    local script_path="$REPO_DIR/scripts/$script_name"
+    local has_lock="no"
+    if grep -q '_acquire_state_lock' "$script_path" 2>/dev/null; then
+      has_lock="yes"
+    fi
+    assert_eq "AP-015: $script_name uses _acquire_state_lock" "yes" "$has_lock"
+
+    local has_release="no"
+    if grep -q '_release_state_lock' "$script_path" 2>/dev/null; then
+      has_release="yes"
+    fi
+    assert_eq "AP-015: $script_name uses _release_state_lock" "yes" "$has_release"
+  done
+
+  # Verify workflow-advance.sh uses locking (transitively via write_state/locked_update_state)
+  local adv_has_lock="no"
+  if grep -qE '_acquire_state_lock|write_state|locked_update_state' "$ADV_HOOK" 2>/dev/null; then
+    adv_has_lock="yes"
+  fi
+  assert_eq "AP-015: workflow-advance.sh uses locking (direct or transitive)" "yes" "$adv_has_lock"
+}
+
+# ============================================================================
 # Run all tests
 # ============================================================================
 
@@ -419,6 +469,7 @@ test_stale_lock_detection
 test_lock_timeout
 test_lock_cleanup_on_all_paths
 test_no_flock_dependency
+test_all_state_writers_use_locking
 
 # ============================================================================
 # Summary
