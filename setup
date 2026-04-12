@@ -968,6 +968,11 @@ create_if_missing "$REPO_ROOT/.correctless/antipatterns.md" "$SCRIPT_DIR/templat
 # Create preferences.md at .correctless/ (R-013 — semi-auto mode preferences)
 create_if_missing "$REPO_ROOT/.correctless/preferences.md" "$SCRIPT_DIR/templates/preferences.md" "preferences.md"
 
+# Create auto-policy.json at .correctless/config/ (INV-014 — Auto Mode Phase 2 policy)
+if [ -f "$SCRIPT_DIR/templates/auto-policy.json" ]; then
+  create_if_missing "$REPO_ROOT/.correctless/config/auto-policy.json" "$SCRIPT_DIR/templates/auto-policy.json" "auto-policy.json"
+fi
+
 # Record file state for the skill agent (template, existing, or missing→template)
 ARCH_STATE="$(detect_file_state "$REPO_ROOT/.correctless/ARCHITECTURE.md")"
 AGENT_STATE="$(detect_file_state "$REPO_ROOT/.correctless/AGENT_CONTEXT.md")"

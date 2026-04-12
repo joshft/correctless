@@ -59,6 +59,42 @@
         ".correctless/specs/path-scoped-rules-pat001.md"
       ],
       "timestamp": "2026-04-10T19:38:45Z"
+    },
+    {
+      "feature_slug": "auto-mode-phase-2",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 3,
+      "actual_findings_count": 5,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/config/workflow-config.json",
+        ".github/workflows/ci.yml",
+        "agents/decision-agent.md",
+        "agents/supervisor.md",
+        "hooks/sensitive-file-guard.sh",
+        "scripts/auto-policy.sh",
+        "scripts/auto-report.sh",
+        "scripts/budget-check.sh",
+        "scripts/cauto-lock.sh",
+        "scripts/decision-record.sh",
+        "scripts/decision-routing.sh",
+        "scripts/intent-hash.sh",
+        "scripts/security-scan.sh",
+        "scripts/workflow-state-ext.sh",
+        "setup",
+        "skills/cauto/SKILL.md",
+        "templates/auto-policy.json",
+        "tests/test-auto-agents.sh",
+        "tests/test-auto-budget.sh",
+        "tests/test-auto-policy.sh",
+        "tests/test-auto-report.sh",
+        "tests/test-auto-safety.sh",
+        "tests/test-auto-state-ext.sh",
+        "tests/test-decision-record.sh"
+      ],
+      "timestamp": "2026-04-12T12:00:00Z"
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Agent Context — Correctless
 
-> Last updated: 2026-04-11
+> Last updated: 2026-04-12
 
 ## What This Project Does
 
@@ -11,13 +11,14 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | Skills | `skills/*/SKILL.md` | 27 skill definitions. Each is a slash command with frontmatter contract. |
-| Agents | `agents/*.md` | Plugin sub-agents (currently: fix-diff-reviewer). System prompt + frontmatter. Synced to `correctless/agents/` via sync.sh. See ABS-010. |
+| Agents | `agents/*.md` | Plugin sub-agents: fix-diff-reviewer, supervisor, decision-agent. System prompt + frontmatter. Synced to `correctless/agents/` via sync.sh. See ABS-010. |
 | Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, token-tracking.sh (PostToolUse token logging with phase-to-skill mapping) |
-| Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs |
+| Scripts | `scripts/` | 11 shared scripts: lib.sh (shared utilities), antipattern-scan.sh, auto-policy.sh (Tier 0 engine), auto-report.sh (Auto Run Report), budget-check.sh (token+time enforcement), cauto-lock.sh (pipeline lockfile), decision-record.sh (append-only DD-xxx), decision-routing.sh (tier hierarchy), intent-hash.sh (immutable intent), security-scan.sh (PRH-001 3-layer), workflow-state-ext.sh (Phase 2 state fields) |
+| Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs, auto-policy.json |
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 27-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 33 test files (~2,810 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, shift-left-review, lib, lib-locking, gate-path-exceptions, token-tracking, token-tracking-setup, ci-hook-wiring, workflow-gate, intensity-calibration, auto-recurring-patterns, token-aware-intensity, allowed-tools-check, token-tracking-skill-field, semi-auto-mode, architecture-drift, fix-diff-reviewer-agent |
+| Tests | `tests/test*.sh` | 41 test files (~3,060 shell tests) covering all hooks, scripts, skills, agents, and Phase 2 components (auto-state-ext, auto-policy, decision-record, auto-agents, auto-budget, auto-safety, auto-report) |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns
@@ -30,6 +31,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 - **Shift-left review** (PAT-006): `/creview` and `/creview-spec` read historical findings (QA, Olympics audits, Devil's Advocate reports) to detect recurring patterns. Classification is ephemeral — see ABS-002 in ARCHITECTURE.md. 10-file budget (PAT-004)
 - **Cross-skill calibration** (ABS-005): `/cverify` writes outcome data (QA rounds, BLOCKING findings, actual_tokens) to `.correctless/meta/intensity-calibration.json`, `/cspec` reads it during intensity detection as a post-signal modifier. Token data (ABS-006) enriches calibration — features exceeding 200K tokens trigger auto-raise alongside QA rounds >= 3 and findings >= 8. cspec is read-only — only cverify writes. 50-entry recency window. Configurable modes: passive (advisory), active (auto-raise), hybrid (passive→active after 5 entries)
 - **Semi-auto mode** (PAT-009): `/cauto` orchestrates the implementation pipeline after human-approved spec review. Pipeline: `ctdd → simplify → cverify → cupdate-arch → cdocs → PR`. Escalates on architectural decisions, persistent failures, or spec contradictions. Preferences from `.correctless/preferences.md` guide autonomous decisions. See ABS-007 (escalation file), ABS-008 (preferences contract), TB-004 (orchestrator autonomy boundary).
+- **Auto Mode Phase 2** (ABS-011..017, PAT-011): Policy-driven decision engine extending `/cauto` with tiered architecture (Tier 0 policy engine, Tier 1 worker self-resolution, Tier 2 ephemeral decision agents, Tier 3 lightweight supervisor, Tier 4 hard stop). Decisions use structured DR-xxx format routed through the tier hierarchy. Budget enforcement (token + time) with warn/hard-stop thresholds. Decision record (append-only DD-xxx entries with size-regression detection). Intent summary (immutable, SHA-256 hash verified). Auto Run Report generated on completion/pause. Policy integrity verified via hash chain (PAT-011). See `scripts/auto-policy.sh`, `scripts/decision-routing.sh`, `agents/supervisor.md`, `agents/decision-agent.md`.
 - **Path-scoped rules** (ABS-009): rule files under `.claude/rules/*.md` with YAML `paths:` frontmatter load into an agent's editing context whenever a scoped file is opened. PAT-001 (PreToolUse hook fail-closed posture) lives in `.claude/rules/hooks-pretooluse.md`; `.correctless/ARCHITECTURE.md` contains only the 2-line index entry. Structural drift is enforced by `tests/test-architecture-drift.sh`. **Provisional** — the convention is on probation until a post-merge measurement gate (MG-001/MG-002/MG-003) confirms the rule-in-context prevention signal. Until then, new PAT entries land full-body in ARCHITECTURE.md. See `.correctless/specs/path-scoped-rules-pat001.md` for scope and rollback procedure.
 - **MCP integration** (optional): Serena for symbol-level code analysis, Context7 for library docs — check `mcp.serena` and `mcp.context7` in workflow-config.json. Falls back to grep/read silently when unavailable
 
@@ -56,5 +58,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Check MCP status | `jq '.mcp' .correctless/config/workflow-config.json` |
 | Set feature intensity | `bash hooks/workflow-advance.sh set-intensity <standard\|high\|critical>` |
 | Configure detection signals | Add `workflow.intensity_signals` to `.correctless/config/workflow-config.json` |
-| Run semi-auto pipeline | `/cauto` (after spec review approved) |
+| Run auto pipeline | `/cauto` (after spec review approved) |
+| Resume from hard stop | `/cauto resume "decision"` |
 | Edit project preferences | `.correctless/preferences.md` |
+| Configure auto-mode policy | `.correctless/config/auto-policy.json` |

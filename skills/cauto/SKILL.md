@@ -1,7 +1,7 @@
 ---
 name: cauto
 description: Semi-auto mode. Orchestrates the full implementation pipeline after human-approved spec review. Runs ctdd, simplify, cverify, cupdate-arch, cdocs, then creates a PR.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Edit, Task
 context: fork
 ---
 
@@ -229,3 +229,71 @@ Log orchestration decisions to the audit trail at `.correctless/artifacts/audit-
 ## Progress Updates (R-014) [advisory]
 
 Emit progress updates between each skill invocation. Progress is observable via the audit trail entries which include `elapsed_ms` and skill transition data. Conversational progress updates to the user (e.g., "Starting /cverify...") are best-effort and not mechanically enforced. The audit trail provides the reliable progress record.
+
+---
+
+## Phase 2: Tiered Decision Architecture
+
+Phase 2 extends the pipeline with a policy-driven decision engine that resolves most runtime decisions without human intervention.
+
+### Decision Tiers
+
+Decisions are routed through a tiered hierarchy — no tier may be skipped:
+
+- **Tier 0 (Policy)**: Deterministic evaluation against `auto-policy.json`. Same inputs always produce the same output. No LLM reasoning. Dual-pass: pre-routing and post-Tier-2 validation.
+- **Tier 1 (Worker)**: Self-resolution for within-domain decisions. Logged as DD-xxx.
+- **Tier 2 (Decision Agent)**: Ephemeral agent via `Task(subagent_type="correctless:decision-agent")` with minimal context per INV-006. Tools pinned to Read, Grep, Glob only.
+- **Tier 3 (Supervisor)**: Lightweight supervisor via `Task(subagent_type="correctless:supervisor")`. Activates on escalation, phase transitions, and budget warnings.
+- **Tier 4 (Hard Stop)**: Pipeline pauses for human input with structured escalation file.
+
+### Supervisor Response Handling
+
+The supervisor returns structured JSON with `decision`, `reasoning`, and `flags`. Valid terminal decisions: `approve`, `reject`, `hard_stop`. If the supervisor returns an unexpected or unrecognized decision value, treat it as `hard_stop` (default to hard_stop on unrecognized responses). If the supervisor returns `redirect`, treat it as `hard_stop` — redirect is not a valid terminal decision.
+
+### Budget Enforcement (INV-008)
+
+Token and time budgets are checked before and after each skill invocation:
+- **warn** threshold: 75% of max_tokens or warn_at_hours exceeded
+- **hard_stop** threshold: 100% of max_tokens or max_duration_hours exceeded (non-negotiable)
+- Before spawning Tier 2: if remaining budget < 5%, escalate to Tier 3 instead
+
+### Hard Stop + Resume (INV-010, INV-015)
+
+When Tier 4 fires, write structured escalation to `.correctless/artifacts/escalation-{slug}.md` with:
+- Phase where work stopped
+- Specific condition that triggered hard stop
+- Numbered options with recommendation
+- Resume command: `/cauto resume "decision"`
+
+All pipeline progress is preserved — no work is lost on hard stop.
+
+**Priority ordering** for multiple simultaneous hard-stop conditions (highest priority first):
+1. Integrity violations (decision record tamper, intent tampered, policy tampered)
+2. Security (CLAUDE.md changes, PRH-001 security constraint)
+3. Budget/time exceeded
+4. Supervisor cap exceeded (>= 20 activations)
+5. Other escalations (policy conflict, attempt threshold)
+
+When multiple hard-stop conditions exist simultaneously, log all active conditions as a DD-xxx entry with tier "system" and category "hard_stop_multiplex."
+
+### Resume from Hard Stop (INV-015)
+
+On `/cauto resume "decision"`:
+1. Re-hash intent summary and compare against stored hash — mismatch triggers hard stop (intent tampered)
+2. Re-hash auto-policy.json and compare against stored hash — mismatch triggers hard stop (policy tampered)
+3. Parse escalation file
+4. Parse human decision — try numeric option first, fall back to text interpretation
+5. Apply human decision to decision record as DD-xxx with tier "human"
+6. Resume pipeline from exact phase where it paused
+
+Stale escalation (phase mismatch) triggers a fresh start, not a crash.
+
+### Intent Hash Verification (INV-013)
+
+Before each supervisor activation, verify the intent hash against the stored value in workflow state. Intent mismatch triggers immediate hard stop with reason "intent summary tampered."
+
+### Prohibitions
+
+- **Never delete tests** autonomously (PRH-003). If a test deletion is needed, escalate to the human. Test removal requires human approval.
+- **Never override the workflow gate** (PRH-004). The gate override mechanism is reserved for human-interactive use only. Never use override in auto mode.
+- **Never merge to main** (PRH-002). Auto mode completes on a feature branch. The human reviews and merges.

@@ -338,7 +338,9 @@ id_ed25519
 id_ed25519.*
 *.keystore
 *.jks
-.correctless/preferences.md"
+.correctless/preferences.md
+.correctless/config/auto-policy.json
+.correctless/artifacts/intent-*.md"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)
