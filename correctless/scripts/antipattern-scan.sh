@@ -48,6 +48,7 @@ declare -A PATTERN_META=(
     ["placeholder"]="high|Placeholder credential or value left in code|security"
     ["todo-comment"]="low|TODO/FIXME/HACK comment left in code|code-quality"
     ["todo-macro"]="low|todo!() macro left in code|code-quality"
+    ["jq-slurp-jsonl"]="high|jq -s (slurp) on JSONL file — malformed lines cause total parse failure (AP-014)|data-integrity"
 )
 
 # ============================================
@@ -435,6 +436,13 @@ check_shell() {
 
   # (c) TODO / FIXME / HACK
   check_todo_comments "$file" '#[[:space:]]*(TODO|FIXME|HACK)'
+
+  # (d) AP-014: jq -s / jq --slurp on JSONL — malformed lines cause total parse failure
+  # JSONL consumers must use jq -R with try/catch, never jq -s (ABS-006)
+  while IFS=: read -r line_num _; do
+    [ -n "$line_num" ] || continue
+    add_finding "jq-slurp-jsonl" "$file" "$line_num"
+  done < <(grep -nE 'jq[[:space:]]+(--slurp|-s[[:space:]])' "$file" 2>/dev/null || true)
 }
 
 # --- Rust checks (R-008) ---
