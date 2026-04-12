@@ -83,6 +83,13 @@ jobs:
           bash tests/test-semi-auto-mode.sh
           bash tests/test-architecture-drift.sh
           bash tests/test-fix-diff-reviewer-agent.sh
+          bash tests/test-auto-state-ext.sh
+          bash tests/test-auto-policy.sh
+          bash tests/test-decision-record.sh
+          bash tests/test-auto-agents.sh
+          bash tests/test-auto-budget.sh
+          bash tests/test-auto-safety.sh
+          bash tests/test-auto-report.sh
 
       - name: Verify sync
         run: |

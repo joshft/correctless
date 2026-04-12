@@ -119,6 +119,55 @@
 - **Violated when**: an inline fix-diff-reviewer prompt reappears in any skill file; the frontmatter `name:` drifts from the filename basename; a skill invokes the bare (non-namespaced) subagent_type form; the distribution copy diverges from the source; the frontmatter tools list grows a write or escalation tool; a new agent file lands without a corresponding test update.
 - **Test**: `tests/test-fix-diff-reviewer-agent.sh`
 
+### ABS-011: Decision record (.correctless/artifacts/)
+- **What**: Append-only markdown file at `.correctless/artifacts/decision-record-{slug}.md` recording every autonomous decision as DD-xxx entries. Primary audience is the human reviewing post-run. Each entry: decision ID, tier, category, summary, disposition, reasoning, timestamp. ASSUMPTION-tagged entries surface in the Auto Run Report.
+- **Invariant**: Append-only with size-regression detection. File size stored in workflow state; shrinkage triggers hard stop (INV-016). Cardinality verified post-pipeline against audit trail (INV-002).
+- **Enforced at**: `scripts/decision-record.sh` (dr_append, dr_verify_size, dr_verify_cardinality)
+- **Violated when**: Record modified in place, truncated, or tier invocation occurs without DD-xxx entry
+- **Test**: test-decision-record.sh — INV-002, INV-016 suites
+
+### ABS-012: Intent summary (.correctless/artifacts/)
+- **What**: Immutable markdown file at `.correctless/artifacts/intent-{slug}.md` written once at pipeline startup from the approved spec. Captures what the human wants, key constraints, explicit risk acceptances (≤500 words). Passed to the supervisor on every activation. Referenced from DD-000.
+- **Invariant**: Written once, never modified. SHA-256 hash stored in workflow state at creation, verified on each supervisor activation and on `/cauto resume`. Mismatch triggers hard stop (INV-013). Protected by sensitive-file-guard.
+- **Enforced at**: `scripts/intent-hash.sh` (intent_create, intent_verify), `hooks/sensitive-file-guard.sh` (protected path)
+- **Violated when**: Intent file modified after creation, hash check skipped, or mismatch does not trigger hard stop
+- **Test**: test-auto-report.sh — INV-013 suite
+
+### ABS-013: Auto Run Report (.correctless/artifacts/)
+- **What**: Structured markdown report at `.correctless/artifacts/auto-report-{slug}.md` generated on pipeline completion or hard stop. Contains 12 required sections: feature, branch, timestamps, duration, token cost, status, decision summary by tier, decisions requiring human review (ASSUMPTION-tagged + hedging scan), spec summary, implementation summary, verification summary, "What to Review First."
+- **Invariant**: Report must be generated on every pipeline termination (complete or paused). All 12 sections required (INV-009). ASSUMPTION-tagged decisions and hedging-scan candidates must appear in review section (INV-011).
+- **Enforced at**: `scripts/auto-report.sh` (report_generate, report_section_decisions)
+- **Violated when**: Pipeline ends without report, or report missing required sections
+- **Test**: test-auto-report.sh — INV-009 suite
+
+### ABS-014: Pending-decision checkpoint (.correctless/artifacts/)
+- **What**: JSON file at `.correctless/artifacts/pending-decision-{slug}.json` written before spawning a Tier 2 decision agent. Contains: DR-xxx being evaluated, current tier, requesting skill, pipeline phase. Enables crash recovery — on resume, if checkpoint exists without corresponding DD-xxx, the Tier 2 invocation is replayed (idempotent per INV-006).
+- **Invariant**: Checkpoint must exist before any Tier 2 spawn. Deleted after decision logged. Stale checkpoints (DD-xxx exists) cleaned up on resume (INV-017).
+- **Enforced at**: `/cauto` orchestrator (SKILL.md Phase 2 section)
+- **Violated when**: Tier 2 spawned without checkpoint, or checkpoint not cleaned after logging
+- **Test**: test-auto-agents.sh — INV-017 suite
+
+### ABS-015: Pipeline lockfile (.correctless/artifacts/)
+- **What**: Lockfile at `.correctless/artifacts/cauto-lock-{slug}` preventing concurrent `/cauto` runs on the same branch. Contains the PID of the owning process. Stale locks (PID not running) auto-cleaned. Corrupted locks (unparsable PID) refuse start with manual cleanup message (BND-006).
+- **Invariant**: At most one `/cauto` run per branch. Lock acquired at startup, released on completion/hard-stop/escalation. Corrupted lockfile = fail-closed refuse, not auto-clean.
+- **Enforced at**: `scripts/cauto-lock.sh` (lock_acquire, lock_release, lock_check_stale)
+- **Violated when**: Two concurrent runs on same branch, or corrupted lockfile silently cleaned
+- **Test**: test-auto-budget.sh — BND-006 suite
+
+### ABS-016: Auto-policy config (.correctless/config/)
+- **What**: JSON config at `.correctless/config/auto-policy.json` defining Tier 0 policy rules. Sections: review_dispositions, qa_dispositions, spec_update, drift, security, budget, time, hard_stops. Controlled category vocabulary (8 values) and disposition vocabulary (8 values). First-match-wins evaluation. Scaffolded by `/csetup` with conservative defaults.
+- **Invariant**: Tier 0 evaluation is deterministic — same DR-xxx + same policy = same disposition (INV-001). Policy integrity verified via SHA-256 hash on each Tier 0 evaluation (INV-018). `security.never_relax_autonomously` hardcoded in orchestrator, not overridable. Malformed JSON → all decisions route to Tier 1+ (BND-001). Protected by sensitive-file-guard.
+- **Enforced at**: `scripts/auto-policy.sh` (policy_evaluate, policy_hash), `hooks/sensitive-file-guard.sh`
+- **Violated when**: Non-deterministic evaluation, hash mismatch not detected, security floor bypassed via config
+- **Test**: test-auto-policy.sh — INV-001, INV-018, BND-001 suites
+
+### ABS-017: Structured decision request (DR-xxx)
+- **What**: JSON format for routing decisions beyond Tier 0. Required fields: decision_id, requesting_agent, phase, category (controlled vocabulary), summary, severity, options (array), relevant_rules, relevant_policies, prior_decisions (summary + disposition only). Validated by orchestrator before routing — malformed requests fail-closed (INV-003, BND-003).
+- **Invariant**: Every decision routed to Tier 1/2/3 uses DR-xxx format. All 10 required fields present. Category from controlled vocabulary. Malformed → logged as error DD-xxx, escalated to Tier 3.
+- **Enforced at**: `scripts/decision-record.sh` (drx_validate), `scripts/decision-routing.sh` (route_decision)
+- **Violated when**: Decision routed without DR-xxx, missing required fields, or malformed DR-xxx silently dropped
+- **Test**: test-decision-record.sh — INV-003, BND-003 suites
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.
@@ -181,6 +230,12 @@ See `.claude/rules/hooks-pretooluse.md`.
 - **Why**: jq 1.8+ parses `(.spec_updates // 0) + 1 as $count | rest` as `((.spec_updates // 0) + 1) as $count | rest`. jq 1.7 (Ubuntu 24.04 default) parses it as `(.spec_updates // 0) + (1 as $count | rest)` — binding `as` to the right-hand operand only. The resulting `0 + object` evaluates at runtime and crashes. Local development with jq 1.8 passes; CI with jq 1.7 fails silently (hook returns non-zero, state unchanged, no visible error).
 - **Violated when**: A jq filter contains `EXPR OP VALUE as $var` without surrounding parens on the expression being bound
 - **Test**: Static grep check — any `) + ` or `) // ` followed by ` as \$` on the same or next line without enclosing parens is suspect. Runtime: CI runs on jq 1.7 (Ubuntu 24.04), so precedence bugs surface as test failures.
+
+### PAT-011: SHA-256 hash verification chain
+- **Pattern**: Immutable artifacts verified via hash-on-create → hash-on-use
+- **Rule**: Compute SHA-256 at creation, store hash in workflow state, re-hash and compare before each use. Mismatch → hard stop. Fallback chain: sha256sum → shasum -a 256 → openssl dgst -sha256. No hash tool available → graceful degradation (skip checks), not crash.
+- **Violated when**: Artifact accessed without hash check, hash mismatch silently ignored, or missing hash tool causes crash
+- **Test**: test-auto-policy.sh (INV-018), test-auto-report.sh (INV-013) — hash compute, tamper detection, enforcement through routing
 
 ## Environment Assumptions
 
