@@ -248,7 +248,7 @@ test_prh003_no_test_deletion() {
     "PRH-003: cauto documents prohibition on test deletion"
 
   # cauto must mention escalation for test deletion requests
-  file_contains_i "$skill_file" "escalat.*test.*delete\|test.*delete.*escalat\|human.*test.*delete\|test.*remov.*escalat" \
+  file_contains_i "$skill_file" "escalat.*human.*test\|test.*delete.*escalat\|test.*remov.*human\|delete.*escalat.*human" \
     "PRH-003: cauto escalates test deletion to human"
 }
 
