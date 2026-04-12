@@ -2162,6 +2162,54 @@ test_r018_universal_placeholder_detection
 test_r019_shared_lib
 
 # ---------------------------------------------------------------------------
+# AP-014: jq -s on JSONL detection
+# ---------------------------------------------------------------------------
+
+test_ap014_jq_slurp_jsonl() {
+  echo ""
+  echo "=== AP-014: jq -s on JSONL detection ==="
+
+  # (a) Pattern metadata exists in scanner
+  local has_pattern="no"
+  if grep -q 'jq-slurp-jsonl' "$SCANNER" 2>/dev/null; then
+    has_pattern="yes"
+  fi
+  assert_eq "AP-014(a): jq-slurp-jsonl pattern registered in scanner" "yes" "$has_pattern"
+
+  # (b) The grep pattern in check_shell() catches jq -s usage
+  local test_content='usage=$(jq -s "[.[] | .total_tokens] | add" "$LOG_FILE")'
+  local matches_slurp="no"
+  if echo "$test_content" | grep -qE 'jq[[:space:]]+(--slurp|-s[[:space:]])'; then
+    matches_slurp="yes"
+  fi
+  assert_eq "AP-014(b): grep pattern catches 'jq -s' usage" "yes" "$matches_slurp"
+
+  # (b2) Pattern also catches --slurp form
+  local test_content2='usage=$(jq --slurp "[.[] | .total_tokens]" "$LOG_FILE")'
+  local matches_longform="no"
+  if echo "$test_content2" | grep -qE 'jq[[:space:]]+(--slurp|-s[[:space:]])'; then
+    matches_longform="yes"
+  fi
+  assert_eq "AP-014(b2): grep pattern catches 'jq --slurp' usage" "yes" "$matches_longform"
+
+  # (b3) Pattern does NOT match jq -r (safe pattern)
+  local test_safe='usage=$(jq -R "try (fromjson)" "$LOG_FILE")'
+  local false_positive="no"
+  if echo "$test_safe" | grep -qE 'jq[[:space:]]+(--slurp|-s[[:space:]])'; then
+    false_positive="yes"
+  fi
+  assert_eq "AP-014(b3): grep pattern does not match 'jq -R' (safe)" "no" "$false_positive"
+
+  # (c) Antipatterns.md has AP-014 entry
+  local has_entry="no"
+  if grep -q 'AP-014' "$REPO_DIR/.correctless/antipatterns.md" 2>/dev/null; then
+    has_entry="yes"
+  fi
+  assert_eq "AP-014(c): AP-014 entry exists in antipatterns.md" "yes" "$has_entry"
+}
+test_ap014_jq_slurp_jsonl
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 
