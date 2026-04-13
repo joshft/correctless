@@ -238,7 +238,8 @@ _has_write_pattern() {
   for tok in $cmd; do
     case "$tok" in
       cp|mv|tee|install|rm|rmdir|unlink|dd|curl|wget|rsync|patch|truncate|shred|ln|python|python3|node|ruby) return 0 ;;
-      git) [[ "$cmd" =~ git[[:space:]]+(checkout|restore|reset|stash|clean) ]] && return 0 ;;
+      tar|unzip|7z|cpio|ar|touch|chmod|chown|chgrp|scp|sftp|mkdir) return 0 ;;
+      git) [[ "$cmd" =~ git[[:space:]]+(checkout|restore|reset|stash|clean|apply|am|merge|rebase|cherry-pick) ]] && return 0 ;;
       sed) [[ "$cmd" =~ sed[[:space:]]+-i ]] && return 0 ;;
       perl) [[ "$cmd" =~ perl[[:space:]]+-i ]] && return 0 ;;
     esac
