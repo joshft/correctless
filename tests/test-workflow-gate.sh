@@ -126,8 +126,8 @@ setup_test_env() {
   git checkout -q -b "$BRANCH_NAME"
 
   # Copy lib.sh so the hook can source it
-  mkdir -p scripts
-  cp "$REPO_DIR/scripts/lib.sh" scripts/lib.sh
+  mkdir -p .correctless/scripts
+  cp "$REPO_DIR/scripts/lib.sh" .correctless/scripts/lib.sh
 
   # Create workflow config with test/source patterns
   mkdir -p .correctless/config
@@ -147,7 +147,7 @@ WCEOF
   mkdir -p .correctless/artifacts
 
   # Compute the branch slug using lib.sh
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
   SLUG="$(branch_slug)"
   STATE_FILE=".correctless/artifacts/workflow-state-${SLUG}.json"
 }

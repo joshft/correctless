@@ -110,7 +110,7 @@ Compliance checks are custom scripts written by the team. Correctless runs them 
 Run the deterministic antipattern-scan script to detect mechanical code smells:
 
 ```bash
-bash scripts/antipattern-scan.sh {default_branch}
+bash .correctless/scripts/antipattern-scan.sh {default_branch}
 ```
 
 where `{default_branch}` is read from `workflow.default_branch` in `workflow-config.json`, falling back to `main` if absent.

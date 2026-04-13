@@ -501,10 +501,10 @@ test_inv005_integration_wiring() {
   git checkout -q -b feature/test-inv005
 
   # Copy hook + lib.sh (lib.sh must be present for wiring to work)
-  mkdir -p hooks scripts .correctless/config .correctless/artifacts
+  mkdir -p hooks .correctless/scripts .correctless/config .correctless/artifacts
   cp "$REPO_DIR/hooks/workflow-gate.sh" hooks/workflow-gate.sh
-  cp "$REPO_DIR/scripts/lib.sh" scripts/lib.sh
-  source scripts/lib.sh
+  cp "$REPO_DIR/scripts/lib.sh" .correctless/scripts/lib.sh
+  source .correctless/scripts/lib.sh
   local slug
   slug="$(branch_slug)"
 
@@ -579,9 +579,9 @@ test_inv006_source_guard_pretooluse() {
 EOF
 
   # Copy lib.sh temporarily to compute the slug, then remove it
-  mkdir -p scripts
-  cp "$REPO_DIR/scripts/lib.sh" scripts/lib.sh
-  source scripts/lib.sh
+  mkdir -p .correctless/scripts
+  cp "$REPO_DIR/scripts/lib.sh" .correctless/scripts/lib.sh
+  source .correctless/scripts/lib.sh
   local slug
   slug="$(branch_slug)"
 
@@ -595,7 +595,7 @@ EOF
 EOF
 
   # NOW remove lib.sh to test the source guard
-  rm -f scripts/lib.sh
+  rm -f .correctless/scripts/lib.sh
 
   # Provide a Bash write command that targets a source file.
   # This JSON navigates past:
@@ -651,9 +651,9 @@ test_inv006_source_guard_posttooluse() {
 EOF
 
   # Copy lib.sh temporarily to compute slug, then remove it
-  mkdir -p scripts
-  cp "$REPO_DIR/scripts/lib.sh" scripts/lib.sh
-  source scripts/lib.sh
+  mkdir -p .correctless/scripts
+  cp "$REPO_DIR/scripts/lib.sh" .correctless/scripts/lib.sh
+  source .correctless/scripts/lib.sh
   local slug
   slug="$(branch_slug)"
 
@@ -666,7 +666,7 @@ EOF
 EOF
 
   # Remove lib.sh
-  rm -f scripts/lib.sh
+  rm -f .correctless/scripts/lib.sh
 
   # Provide a Bash command with a known extension file.
   # After refactoring, audit-trail.sh will use get_target_file from lib.sh.

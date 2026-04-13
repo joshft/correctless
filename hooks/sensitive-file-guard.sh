@@ -73,8 +73,8 @@ _source_lib_sh() {
   if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
     # shellcheck source=../scripts/lib.sh
     source "$_LIB_DIR/lib.sh"
-  elif [ -f "scripts/lib.sh" ]; then
-    source "scripts/lib.sh"
+  elif [ -f ".correctless/scripts/lib.sh" ]; then
+    source ".correctless/scripts/lib.sh"
   else
     return 1
   fi

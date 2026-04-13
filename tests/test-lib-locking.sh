@@ -81,8 +81,8 @@ setup_test_env() {
   git checkout -q -b feature/test-locking
 
   # Copy lib.sh
-  mkdir -p scripts
-  cp "$LIB_SH" scripts/lib.sh
+  mkdir -p .correctless/scripts
+  cp "$LIB_SH" .correctless/scripts/lib.sh
 
   # Create config and artifacts dirs
   mkdir -p .correctless/config .correctless/artifacts
@@ -99,7 +99,7 @@ setup_test_env() {
 WCEOF
 
   # Source lib.sh to get functions
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
 
   # Set up state file path
   STATE_FILE="$TEST_DIR/.correctless/artifacts/test-state.json"
@@ -137,7 +137,7 @@ test_write_state_lockfile() {
   setup_test_env
 
   # Source lib.sh again after setup to get the latest functions
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
 
   # We need to verify that the lockfile (a directory via mkdir) exists DURING
   # the write and does NOT exist AFTER the write completes.
@@ -201,7 +201,7 @@ test_locked_update_state() {
   echo "=== R-016: locked_update_state lock lifecycle and rollback ==="
 
   setup_test_env
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
 
   # (1) Successful transformation — state updated, lock released after
   locked_update_state "$STATE_FILE" '.phase = "tdd-qa"' 2>/dev/null
@@ -247,7 +247,7 @@ test_stale_lock_detection() {
   echo "=== R-017: Stale lock broken when holder PID is dead ==="
 
   setup_test_env
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
 
   # Create a stale lock with a dead PID
   # Fork a subshell, capture PID, let it exit
@@ -296,7 +296,7 @@ test_lock_timeout() {
   echo "=== R-018: Lock acquisition timeout ==="
 
   setup_test_env
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
 
   # Create a lock held by a LIVE process (ourselves, effectively)
   mkdir -p "$LOCK_DIR"
@@ -335,7 +335,7 @@ test_lock_cleanup_on_all_paths() {
   echo "=== R-019: Lock released on success and failure paths ==="
 
   setup_test_env
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
 
   # (1) Success path: valid JSON write
   rm -rf "$LOCK_DIR"

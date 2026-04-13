@@ -180,6 +180,50 @@
         "tests/test-semi-auto-mode.sh"
       ],
       "timestamp": "2026-04-13T20:30:00Z"
+    },
+    {
+      "feature_slug": "scripts-namespace-migration",
+      "recommended_intensity": "standard",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/config/workflow-config.json",
+        ".github/workflows/ci.yml",
+        "README.md",
+        "correctless/hooks/audit-trail.sh",
+        "correctless/hooks/sensitive-file-guard.sh",
+        "correctless/hooks/statusline.sh",
+        "correctless/hooks/token-tracking.sh",
+        "correctless/hooks/workflow-advance.sh",
+        "correctless/hooks/workflow-gate.sh",
+        "correctless/scripts/antipattern-scan.sh",
+        "correctless/setup",
+        "correctless/skills/ctdd/SKILL.md",
+        "correctless/skills/cverify/SKILL.md",
+        "hooks/audit-trail.sh",
+        "hooks/sensitive-file-guard.sh",
+        "hooks/statusline.sh",
+        "hooks/token-tracking.sh",
+        "hooks/workflow-advance.sh",
+        "hooks/workflow-gate.sh",
+        "scripts/antipattern-scan.sh",
+        "setup",
+        "skills/ctdd/SKILL.md",
+        "skills/cverify/SKILL.md",
+        "tests/test-gate-path-exceptions.sh",
+        "tests/test-hook-sync.sh",
+        "tests/test-lib-locking.sh",
+        "tests/test-scripts-namespace-migration.sh",
+        "tests/test-token-aware-intensity.sh",
+        "tests/test-token-tracking-setup.sh",
+        "tests/test-token-tracking-skill-field.sh",
+        "tests/test-token-tracking.sh",
+        "tests/test-workflow-gate.sh"
+      ],
+      "timestamp": "2026-04-13T22:50:00Z"
     }
   ]
 }

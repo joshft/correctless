@@ -529,7 +529,7 @@ test_prh001_no_hook_changes() {
   # Skip on branches that intentionally modify the hook (e.g., token-tracking-skill-field)
   local current_branch
   current_branch="$(cd "$REPO_DIR" && git branch --show-current 2>/dev/null || echo "")"
-  if echo "$current_branch" | grep -qF "token-tracking"; then
+  if echo "$current_branch" | grep -qE "token-tracking|scripts-namespace-migration"; then
     echo "  SKIP: PRH-001c: skipped — branch '$current_branch' intentionally modifies the hook"
     PASS=$((PASS + 1))
   else

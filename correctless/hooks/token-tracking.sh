@@ -51,8 +51,8 @@ command -v jq >/dev/null 2>&1 || exit 0; eval "$(echo "$INPUT" | jq -r '
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
 if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
   source "$_LIB_DIR/lib.sh" || exit 0
-elif [ -f "scripts/lib.sh" ]; then
-  source "scripts/lib.sh" || exit 0
+elif [ -f ".correctless/scripts/lib.sh" ]; then
+  source ".correctless/scripts/lib.sh" || exit 0
 else
   exit 0
 fi

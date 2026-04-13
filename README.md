@@ -408,7 +408,6 @@ To fully remove Correctless from a project:
 
 # Clean up project files
 rm -rf .correctless/
-rm -f scripts/lib.sh scripts/antipattern-scan.sh
 
 # Remove hook entries from .claude/settings.json (edit manually or delete the file)
 # Remove the "## Correctless" section from CLAUDE.md if present
