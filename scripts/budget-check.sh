@@ -123,6 +123,11 @@ budget_check() {
     return 0
   fi
 
+  # R2-F4: guard against division by zero if policy sets max_tokens to 0
+  if [ "$max_tokens" -le 0 ] 2>/dev/null; then
+    max_tokens=2000000
+  fi
+
   # Calculate token percentage
   local token_pct=$(( (token_usage * 100) / max_tokens ))
 

@@ -49,7 +49,7 @@ detect_pre_existing_claim() {
 # Usage: base_commit_crosscheck CONFIG_FILE
 # Outputs cross-check evidence JSON:
 #   {"pre_existing_claimed":bool,"base_commit":"...","base_build_success":bool,
-#    "base_build_exit_code":N,"base_build_stderr":"...","claim_verified":bool,
+#    "base_build_exit_code":N,"base_build_stderr":"...","claim_verified":bool|null,
 #    "failure_mode":null|"..."}
 base_commit_crosscheck() {
   local _config_file="$1"
@@ -70,7 +70,7 @@ base_commit_crosscheck() {
       base_build_success: false,
       base_build_exit_code: null,
       base_build_stderr: "",
-      claim_verified: false,
+      claim_verified: null,
       failure_mode: "no_test_command"
     }'
     return 0
@@ -97,7 +97,7 @@ base_commit_crosscheck() {
       base_build_success: false,
       base_build_exit_code: null,
       base_build_stderr: "",
-      claim_verified: false,
+      claim_verified: null,
       failure_mode: "merge_base_failed"
     }'
     return 0
@@ -112,7 +112,7 @@ base_commit_crosscheck() {
       base_build_success: false,
       base_build_exit_code: null,
       base_build_stderr: "",
-      claim_verified: false,
+      claim_verified: null,
       failure_mode: "worktree_creation_failed"
     }'
     return 0
@@ -123,7 +123,7 @@ base_commit_crosscheck() {
 
   # QA-005: trap for worktree cleanup on signal/abnormal exit
   # shellcheck disable=SC2064
-  trap "(cd '$config_dir' && git worktree remove --force '$worktree_path' 2>/dev/null) || true; rm -rf '$worktree_dir' 2>/dev/null" EXIT SIGTERM SIGINT
+  trap "$(printf '(cd %q && git worktree remove --force %q 2>/dev/null) || true; rm -rf %q 2>/dev/null' "$config_dir" "$worktree_path" "$worktree_dir")" EXIT SIGTERM SIGINT
 
   if ! (cd "$config_dir" && git worktree add -q "$worktree_path" "$base_commit" 2>/dev/null); then
     trap - EXIT SIGTERM SIGINT
@@ -134,7 +134,7 @@ base_commit_crosscheck() {
       base_build_success: false,
       base_build_exit_code: null,
       base_build_stderr: "",
-      claim_verified: false,
+      claim_verified: null,
       failure_mode: "worktree_add_failed"
     }'
     return 0

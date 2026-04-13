@@ -141,27 +141,25 @@ enforce_prh003() {
     [range($findings | length)] | map(. as $i |
       ($resp[$i] // null) as $decision |
       $findings[$i] as $finding |
-      # QA-004: if decision is null (supervisor returned fewer), use hard_stop for security
-      if $decision == null then
-        {"decision": "hard_stop", "prh003_missing_decision": true}
-      else
       (
-        # Check if this finding requires PRH-003 enforcement
         ($finding.source_agent == "red-team") or
         ($finding.category == "security") or
         (
-          # Check security keywords in summary and category
           ($keywords | split(" ")) as $kws |
           (($finding.summary // "") | ascii_downcase) as $summary_lower |
           (($finding.category // "") | ascii_downcase) as $cat_lower |
           any($kws[]; . as $kw | ($summary_lower | contains($kw)) or ($cat_lower | contains($kw)))
         )
       ) as $is_security |
-      if $is_security and ($decision.decision == "reject") then
+      if $decision == null then
+        # R2-F2: missing decision — hard_stop for security, accept for non-security
+        if $is_security then {"decision": "hard_stop", "prh003_missing_decision": true}
+        else {"decision": "accept", "prh003_missing_decision": true}
+        end
+      elif $is_security and ($decision.decision == "reject") then
         $decision | .decision = "hard_stop" | .prh003_override = true
       else
         $decision
-      end
       end
     )
   ' 2>/dev/null)" || { echo "[]"; return 1; }
@@ -228,7 +226,8 @@ triage_findings_batch() {
     )] | length' 2>/dev/null)" || has_security="0"
     if [ "$has_security" -gt 0 ] 2>/dev/null; then
       # Fail-closed: force hard_stop on all decisions
-      result="$(echo "$raw_decisions" | jq '[.[] | .decision = "hard_stop" | .prh003_failclosed = true]' 2>/dev/null)" || result="$raw_decisions"
+      # R2-F5: if jq also fails (malformed raw_decisions), return empty array, not raw data
+      result="$(echo "$raw_decisions" | jq '[.[] | .decision = "hard_stop" | .prh003_failclosed = true]' 2>/dev/null)" || { echo "[]"; return 1; }
     else
       result="$raw_decisions"
     fi

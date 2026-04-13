@@ -59,7 +59,7 @@ ws_increment_field() {
 
   # QA-009: use locked_update_state for correct EXIT trap handling (AP-015 class fix)
   locked_update_state "$state_file" \
-    '((.[$f] // 0) | tonumber) as $cur | .[$f] = ($cur + 1)' \
+    '((.[$f] // 0) | tonumber) as $cur | .[$f] = (($cur + 1) | tostring)' \
     --arg f "$field"
 }
 

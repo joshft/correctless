@@ -79,6 +79,9 @@ build_mandate_context() {
       esac
     done < "$_decision_record_file"
 
+    # R2-F7: validate categories_json is valid JSON before --argjson
+    echo "$categories_json" | jq -e '.' >/dev/null 2>&1 || categories_json="{}"
+
     decision_patterns="$(jq -n \
       --argjson cats "$categories_json" \
       --argjson total "$total" \
@@ -101,7 +104,7 @@ build_mandate_context() {
     spec_scope="$(awk '/^## Scope$/{found=1; next} /^## /{if(found) exit} found' "$_spec_file" 2>/dev/null | head -20)" || true
   fi
 
-  # Assemble the full context
+  # Assemble the full context (R2-F7: fallback if jq fails)
   jq -n \
     --argjson prefs "$preferences" \
     --argjson dp "$decision_patterns" \
@@ -110,7 +113,7 @@ build_mandate_context() {
       preferences: $prefs,
       decision_patterns: $dp,
       spec_scope: $scope
-    }'
+    }' 2>/dev/null || echo '{"preferences":{},"decision_patterns":{},"spec_scope":""}'
 
   return 0
 }

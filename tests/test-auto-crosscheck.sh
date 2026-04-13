@@ -600,10 +600,10 @@ EOF
   echo "$result" | jq -e '.failure_mode != null' >/dev/null 2>&1 && has_failure="yes"
   assert_eq "BND-007: merge-base failure sets failure_mode" "yes" "$has_failure"
 
-  # claim_verified should be false (fail-closed)
-  local verified="true"
-  echo "$result" | jq -e '.claim_verified == false' >/dev/null 2>&1 && verified="false"
-  assert_eq "BND-007: merge-base failure → claim not verified (fail-closed)" "false" "$verified"
+  # R2-F3: infrastructure failures return null (inconclusive), not false (disconfirmed)
+  local verified
+  verified="$(echo "$result" | jq -r 'if .claim_verified == null then "null" elif .claim_verified == true then "true" else "false" end' 2>/dev/null)"
+  assert_eq "BND-007: merge-base failure → claim inconclusive (null)" "null" "$verified"
 }
 
 test_bnd007_no_test_command() {

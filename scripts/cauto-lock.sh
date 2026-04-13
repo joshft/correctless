@@ -78,7 +78,8 @@ lock_check_stale() {
     # PID is alive — lock is active
     return 1
   else
-    # PID is dead — stale lock, auto-clean
+    # PID is dead — stale lock, auto-clean (including .d directory from atomic locking)
+    rm -rf "${lock_file}.d" 2>/dev/null
     rm -f "$lock_file"
     return 0
   fi

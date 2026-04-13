@@ -133,7 +133,7 @@ tier2_build_context() {
   local _ctx_tmp
   _ctx_tmp="$(mktemp)"
   # shellcheck disable=SC2064
-  trap "rm -f '$_ctx_tmp'" EXIT
+  trap "$(printf 'rm -f %q' "$_ctx_tmp")" EXIT
   echo "$dr_json" > "$_ctx_tmp"
 
   local result

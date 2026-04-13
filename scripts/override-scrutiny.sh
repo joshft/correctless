@@ -90,7 +90,7 @@ review_override_issuance() {
     # QA-006: persist rejection so Jaccard retry prevention (PRH-006) can detect retries
     if [ -f "$_state_file" ]; then
       locked_update_state "$_state_file" \
-        '.rejected_overrides = ((.rejected_overrides // []) + [$reason])' \
+        '.rejected_overrides = (((.rejected_overrides // []) + [$reason]) | .[-50:])' \
         --arg reason "$_override_reason" 2>/dev/null || true
     fi
     echo "reject_override"
@@ -118,8 +118,8 @@ build_override_action_payload() {
   local _intent_summary="$3"
   local _dd_entries_since="$4"
 
-  # QA-026: validate _dd_entries_since is valid JSON before --argjson
-  if ! echo "$_dd_entries_since" | jq -e '.' >/dev/null 2>&1; then
+  # QA-026 + R2-F10: validate _dd_entries_since is a JSON array before --argjson
+  if ! echo "$_dd_entries_since" | jq -e 'type == "array"' >/dev/null 2>&1; then
     _dd_entries_since="[]"
   fi
 
