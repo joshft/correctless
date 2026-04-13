@@ -95,6 +95,37 @@
         "tests/test-decision-record.sh"
       ],
       "timestamp": "2026-04-12T12:00:00Z"
+    },
+    {
+      "feature_slug": "auto-mode-phase-3",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 2,
+      "actual_findings_count": 3,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/config/workflow-config.json",
+        ".github/workflows/ci.yml",
+        "agents/supervisor.md",
+        "scripts/auto-policy.sh",
+        "scripts/auto-report.sh",
+        "scripts/intent-hash.sh",
+        "scripts/lib.sh",
+        "scripts/override-crosscheck.sh",
+        "scripts/override-scrutiny.sh",
+        "scripts/review-triage.sh",
+        "scripts/supervisor-mandate.sh",
+        "scripts/workflow-state-ext.sh",
+        "skills/cauto/SKILL.md",
+        "tests/test-auto-crosscheck.sh",
+        "tests/test-auto-mandate.sh",
+        "tests/test-auto-override.sh",
+        "tests/test-auto-phase3-pipeline.sh",
+        "tests/test-auto-phase3-supervisor.sh",
+        "tests/test-auto-review-triage.sh"
+      ],
+      "timestamp": "2026-04-13T01:00:00Z"
     }
   ]
 }

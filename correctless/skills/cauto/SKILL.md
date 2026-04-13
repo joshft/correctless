@@ -297,3 +297,53 @@ Before each supervisor activation, verify the intent hash against the stored val
 - **Never delete tests** autonomously (PRH-003). If a test deletion is needed, escalate to the human. Test removal requires human approval.
 - **Never override the workflow gate** (PRH-004). The gate override mechanism is reserved for human-interactive use only. Never use override in auto mode.
 - **Never merge to main** (PRH-002). Auto mode completes on a feature branch. The human reviews and merges.
+
+---
+
+## Phase 3: Spec-to-PR Orchestration and Supervisor Mandate Expansion
+
+Phase 3 extends `/cauto` to handle the full workflow from prompt to PR, including spec creation and review.
+
+### Phase Gate Extension — No-Workflow Invocation (INV-019)
+
+When `/cauto` is invoked and no active workflow exists on the current branch (no existing workflow state), `/cauto` accepts the invocation and enters the spec phase. It initializes the workflow via `bash .correctless/hooks/workflow-advance.sh init` and proceeds to spec creation.
+
+When invoked with an active workflow in `review` or `review-spec` phase, existing Phase 2 behavior is preserved unchanged (INV-027 backward compatibility).
+
+**Branch guard (BND-005)**: Before initializing, check the current branch. If on main or master branch, refuse invocation with: **"Error: /cauto cannot run on main/master. Create a feature branch first."** The pipeline must not run on main or master.
+
+### Two Entry Modes (INV-020)
+
+When starting from no workflow, `/cauto` supports two entry modes:
+
+1. **Interactive entry mode**: Invoke `/cspec` to run the Socratic brainstorm with the human, producing a spec interactively.
+2. **Provided spec mode**: The human supplies a pre-written spec file path. `/cauto` validates the provided spec file exists and is non-empty (BND-003), then installs it as the workflow spec and skips `/cspec`.
+
+In both modes, the spec must exist and be non-empty before review begins. If a provided spec file does not exist or is empty, abort with an error message including the path (BND-003).
+
+### Autonomous Review with Supervisor Triage (INV-021, INV-032)
+
+After the spec exists, invoke the review skill (`/creview-spec` at high+ intensity, `/creview` at standard). Review agents produce findings.
+
+All review findings are passed to the supervisor agent for triage via `Task(subagent_type="correctless:supervisor")` with `activation_type: review_triage`. The supervisor evaluates each finding and returns `accept`, `reject`, or `hard_stop` per finding.
+
+- **Accepted findings**: Auto-incorporated into the spec.
+- **Rejected findings**: Logged to the review decisions artifact.
+- **Hard-stopped findings**: Escalated to the human during the mandatory spec approval gate.
+
+Review triage always goes through the supervisor agent — never inline triage logic (PRH-004). Supervisor responses must come from the supervisor agent's actual output — never from default values, pattern matching, or boilerplate auto-answers (PRH-005). If a supervisor response is malformed, treat all findings as hard-stopped (BND-004).
+
+**Supervisor unavailable fallback (BND-002)**: If the supervisor invocation fails (Task returns error), fall back to treating all findings as hard-stopped — present all findings to the human during the spec approval gate.
+
+### Mandatory Spec Approval Gate (INV-023, PRH-001)
+
+After autonomous review completes and findings are incorporated, `/cauto` pauses and presents the spec to the human for approval. The mandatory spec approval gate is non-negotiable — the human must always approve before implementation begins.
+
+Present to the human:
+1. The final spec with all accepted findings incorporated
+2. A summary of review decisions (N accepted, M rejected, K hard-stopped)
+3. A link to the review decisions artifact
+
+The human's options: **approve** (proceed to implementation), **reject** (abort pipeline), or **revise** (human edits spec, then re-approve).
+
+When the human approves, record `spec_approved_by: "human"` and `spec_approved_at: <ISO timestamp>` in workflow state (INV-025). Providing a spec does not imply approval — explicit human confirmation is always required.

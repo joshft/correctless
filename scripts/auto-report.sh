@@ -252,3 +252,101 @@ report_section_implementation() {
   dr_size="$(jq -r '.decision_record_size // 0' "$state_file" 2>/dev/null)" || dr_size="0"
   echo "Supervisor activations: ${supervisor_count}. Decision record size: ${dr_size} bytes."
 }
+
+# ---------------------------------------------------------------------------
+# Phase 3 extensions
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# report_section_review_triage — generate review triage summary section
+# ---------------------------------------------------------------------------
+# Usage: report_section_review_triage REVIEW_DECISIONS_FILE
+# Outputs markdown section with findings by source agent, accept/reject/hard_stop
+# counts, rejected findings with supervisor reasoning.
+report_section_review_triage() {
+  local _review_decisions_file="$1"
+
+  if [ ! -f "$_review_decisions_file" ]; then
+    echo "## Review Triage"
+    echo ""
+    echo "No review decisions file found."
+    return 0
+  fi
+
+  # Count decisions by type — single jq pass (PAT-010: explicit parens for as bindings)
+  local accept_count=0 reject_count=0 hard_stop_count=0 total_count=0
+  eval "$(jq -r '
+    (length) as $total |
+    ([.[] | select(.supervisor_decision == "accept")] | length) as $accept |
+    ([.[] | select(.supervisor_decision == "reject")] | length) as $reject |
+    ([.[] | select(.supervisor_decision == "hard_stop")] | length) as $hs |
+    @sh "total_count=\($total) accept_count=\($accept) reject_count=\($reject) hard_stop_count=\($hs)"
+  ' "$_review_decisions_file" 2>/dev/null)" || true
+
+  echo "## Review Triage"
+  echo ""
+  echo "Total findings: ${total_count}"
+  echo "- accept: ${accept_count}"
+  echo "- reject: ${reject_count}"
+  echo "- hard_stop: ${hard_stop_count}"
+  echo ""
+
+  # List rejected findings with reasoning
+  if [ "$reject_count" -gt 0 ] 2>/dev/null; then
+    echo "### Rejected Findings"
+    echo ""
+    jq -r '.[] | select(.supervisor_decision == "reject") | "- **\(.finding_id)**: \(.finding_summary // .summary // "unknown") — Reasoning: \(.supervisor_reasoning // "none")"' \
+      "$_review_decisions_file" 2>/dev/null || true
+    echo ""
+  fi
+
+  # List hard_stop findings
+  if [ "$hard_stop_count" -gt 0 ] 2>/dev/null; then
+    echo "### Hard-Stopped Findings"
+    echo ""
+    jq -r '.[] | select(.supervisor_decision == "hard_stop") | "- **\(.finding_id)**: \(.finding_summary // .summary // "unknown")"' \
+      "$_review_decisions_file" 2>/dev/null || true
+    echo ""
+  fi
+
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# report_section_override_scrutiny — generate override scrutiny summary section
+# ---------------------------------------------------------------------------
+# Usage: report_section_override_scrutiny STATE_FILE
+# Outputs markdown section with override window activity, dispositions,
+# scope drift flags, and override activation counter.
+report_section_override_scrutiny() {
+  local _state_file="$1"
+
+  if [ ! -f "$_state_file" ]; then
+    echo "## Override Scrutiny"
+    echo ""
+    echo "No state file found."
+    return 0
+  fi
+
+  local activation_count
+  activation_count="$(jq -r '.override_activation_count // 0' "$_state_file" 2>/dev/null)" || activation_count="0"
+
+  echo "## Override Scrutiny"
+  echo ""
+  echo "Override window activations: ${activation_count}"
+  echo ""
+
+  # List override log entries
+  local log_length
+  log_length="$(jq '.override_log // [] | length' "$_state_file" 2>/dev/null)" || log_length="0"
+
+  if [ "$log_length" -gt 0 ] 2>/dev/null; then
+    echo "### Override Log"
+    echo ""
+    jq -r '.override_log // [] | .[] | "- **\(.override_id // "unknown")** [\(.review_type // "unknown")]: \(.disposition // "unknown") — \(.reasoning // "")"' \
+      "$_state_file" 2>/dev/null || true
+    echo ""
+  fi
+
+  return 0
+}
