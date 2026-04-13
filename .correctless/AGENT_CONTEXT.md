@@ -17,8 +17,8 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs, auto-policy.json |
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 27-skill distribution target — never edit directly |
-| Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 48 test files (~3,970 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, test-evasion antipattern validation, scanner expansion (grep portability + dead-security-fn detection), and auto-UX improvements (flexible phase entry, scoped consolidation, pipeline summary) |
+| Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks, install scripts to `.correctless/scripts/` (migrates from `scripts/` on upgrade) |
+| Tests | `tests/test*.sh` | 49 test files (~4,030 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, test-evasion antipattern validation, scanner expansion (grep portability + dead-security-fn detection), auto-UX improvements (flexible phase entry, scoped consolidation, pipeline summary), and scripts namespace migration |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns
