@@ -144,6 +144,26 @@
         "tests/test-test-evasion-antipatterns.sh"
       ],
       "timestamp": "2026-04-13T02:00:00Z"
+    },
+    {
+      "feature_slug": "scanner-expansion",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 1,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/antipatterns.md",
+        ".correctless/specs/scanner-expansion.md",
+        "correctless/scripts/antipattern-scan.sh",
+        "correctless/skills/ctdd/SKILL.md",
+        "scripts/antipattern-scan.sh",
+        "skills/ctdd/SKILL.md",
+        "tests/test-antipattern-scan.sh",
+        "tests/test-test-evasion-antipatterns.sh"
+      ],
+      "timestamp": "2026-04-13T19:00:00Z"
     }
   ]
 }

@@ -432,7 +432,7 @@ rm -f scripts/lib.sh scripts/antipattern-scan.sh
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 27 skills, 3 intensity levels, ~3,800 automated tests, 7 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 27 skills, 3 intensity levels, ~3,900 automated tests, 7 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 

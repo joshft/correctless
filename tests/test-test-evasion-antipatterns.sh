@@ -387,6 +387,34 @@ test_r009_corpus_audit_drift() {
 }
 
 # ============================================
+# SE-R-009 [unit]: Content-pairing drift test for dead-security-fn
+# From scanner-expansion spec R-009
+# ============================================
+
+test_se_r009_dead_security_fn_drift() {
+  echo ""
+  echo "=== SE-R-009: Drift test — dead-security-fn pairing ==="
+
+  local scanner="$REPO_DIR/scripts/antipattern-scan.sh"
+
+  # (1) skills/ctdd/SKILL.md audit blockquote contains a numbered check with
+  #     anchor phrase "production call chain"
+  local has_prod_chain="no"
+  grep -E '^> [0-9]+\.' "$CTDD_SKILL" 2>/dev/null | grep -qi 'production call chain' && has_prod_chain="yes"
+  assert_eq "SE-R-009(1): audit blockquote has check with 'production call chain'" "yes" "$has_prod_chain"
+
+  # (2) scripts/antipattern-scan.sh PATTERN_META contains key dead-security-fn
+  local has_pattern="no"
+  grep -q 'dead-security-fn' "$scanner" 2>/dev/null && has_pattern="yes"
+  assert_eq "SE-R-009(2): PATTERN_META has dead-security-fn" "yes" "$has_pattern"
+
+  # (3) skills/ctdd/SKILL.md audit blockquote contains the literal string "dead-security-fn"
+  local has_literal="no"
+  grep -q 'dead-security-fn' "$CTDD_SKILL" 2>/dev/null && has_literal="yes"
+  assert_eq "SE-R-009(3): ctdd audit contains 'dead-security-fn'" "yes" "$has_literal"
+}
+
+# ============================================
 # Runner
 # ============================================
 
@@ -420,6 +448,9 @@ test_r008_source_frequency
 
 # R-009: Drift test
 test_r009_corpus_audit_drift
+
+# SE-R-009: dead-security-fn drift test (scanner-expansion)
+test_se_r009_dead_security_fn_drift
 
 echo ""
 echo "============================================="

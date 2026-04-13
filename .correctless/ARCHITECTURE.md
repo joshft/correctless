@@ -275,6 +275,18 @@ See `.claude/rules/hooks-pretooluse.md`.
 - **Violated when**: Code is refactored but docs still reference old names, deleted files, or removed components
 - **Test**: /cdocs staleness check; per-feature grep for old names in .md files
 
+### PAT-014: Scanner tag conventions (`# scanner: security`, `# scanner: library`)
+- **Pattern**: In-file metadata tags that classify scripts for scanner behavior
+- **Rule**: Scripts in `scripts/` can be tagged in their first 5 lines with `# scanner: security` (include in dead-code scanning even if filename doesn't match the security-script patterns in R-004) or `# scanner: library` (exclude from dead-code scanning if referenced by a `skills/*/SKILL.md` file). Tags affect `check_dead_security_calls()` only — they do not influence portability or other scanner checks. A `# scanner: library` tag is not a blanket escape hatch: a library-tagged script that is unreferenced by any skill file is still scanned.
+- **Violated when**: A security-critical script outside the R-004 filename patterns is added without a `# scanner: security` tag, causing dead functions to go undetected; or a `# scanner: library` tag is added to suppress findings on a script that has no skill consumer
+- **Test**: R-004 in scanner-expansion spec (tag detection logic), R-007 integration fixture (c) and (d)/(e) in test-antipattern-scan.sh
+
+### PAT-015: Content-pairing drift tests (guards AP-005 dual-source drift)
+- **Pattern**: When two artifacts must stay in sync (e.g., a scanner pattern ID and a skill prompt check), a drift test asserts both are present and reference each other
+- **Rule**: For each pair of artifacts that form a dual-source-of-truth (scanner detection + skill prompt advisory), write a test that asserts: (1) the skill prompt contains the anchor phrase, (2) the scanner contains the pattern ID, (3) the skill prompt contains the literal pattern ID string. If any assertion fails, the pairing has drifted. This is a structural alternative to AP-005 doc-update reviews — the test catches drift mechanically rather than relying on human review.
+- **Violated when**: A new scanner pattern ID is added with a corresponding skill audit check, but no content-pairing drift test links them; or one side of a pair is updated without the other
+- **Test**: SE-R-009 in test-test-evasion-antipatterns.sh (checks 5/6/7 ↔ AP-016/017/018), SE-R-009 in test-antipattern-scan.sh (check 8 ↔ dead-security-fn)
+
 ## Environment Assumptions
 
 ### ENV-001: Bash 4+ required

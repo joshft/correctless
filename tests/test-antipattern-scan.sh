@@ -2209,6 +2209,838 @@ test_ap014_jq_slurp_jsonl() {
 }
 test_ap014_jq_slurp_jsonl
 
+# ===========================================================================
+# Scanner-Expansion Spec Tests
+# Tests R-001 through R-011 from .correctless/specs/scanner-expansion.md
+# ===========================================================================
+
+# ===========================================================================
+# SE-R-001 [unit]: check_shell() detects grep -P in .sh files
+# ===========================================================================
+
+test_se_r001_grep_p_detection() {
+  echo ""
+  echo "=== SE-R-001: check_shell() detects grep -P ==="
+
+  local test_dir="$TMPDIR/se-r001"
+
+  # (a) grep -P in a .sh file -> produces gnu-grep-p finding with high severity
+  setup_git_repo "$test_dir/grep-p"
+  cd "$test_dir/grep-p" || return
+  mkdir -p src
+  cat > src/scanner.sh <<'EOF'
+#!/usr/bin/env bash
+result=$(grep -P '\d+' somefile.txt)
+EOF
+  git add src/scanner.sh
+  git commit -q -m "add grep -P script"
+  cd - >/dev/null || return
+
+  local output
+  output="$(run_scanner "$test_dir/grep-p" main)"
+  assert_finding_with_pattern "SE-R-001a: grep -P detected" "gnu-grep-p" "$output"
+  assert_finding_severity "SE-R-001a: gnu-grep-p severity is high" "gnu-grep-p" "high" "$output"
+
+  # (b) grep -oP variant
+  setup_git_repo "$test_dir/grep-op"
+  cd "$test_dir/grep-op" || return
+  mkdir -p src
+  cat > src/extract.sh <<'EOF'
+#!/usr/bin/env bash
+val=$(grep -oP 'HOOK_TYPE=\K.*' settings.json)
+EOF
+  git add src/extract.sh
+  git commit -q -m "add grep -oP script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/grep-op" main)"
+  assert_finding_with_pattern "SE-R-001b: grep -oP detected" "gnu-grep-p" "$output"
+
+  # (c) grep -E (POSIX ERE) should NOT be flagged
+  setup_git_repo "$test_dir/grep-e"
+  cd "$test_dir/grep-e" || return
+  mkdir -p src
+  cat > src/safe.sh <<'EOF'
+#!/usr/bin/env bash
+result=$(grep -E '[[:digit:]]+' somefile.txt)
+EOF
+  git add src/safe.sh
+  git commit -q -m "add grep -E script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/grep-e" main)"
+  assert_no_finding_with_pattern "SE-R-001c: grep -E not flagged" "gnu-grep-p" "$output"
+
+  # (d) Non-.sh files should not be scanned for grep -P
+  setup_git_repo "$test_dir/grep-p-py"
+  cd "$test_dir/grep-p-py" || return
+  mkdir -p src
+  cat > src/script.py <<'EOF'
+import subprocess
+result = subprocess.run(["grep", "-P", "\\d+", "file.txt"])
+EOF
+  git add src/script.py
+  git commit -q -m "add python file with grep -P"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/grep-p-py" main)"
+  assert_no_finding_with_pattern "SE-R-001d: grep -P in .py not flagged as gnu-grep-p" "gnu-grep-p" "$output"
+}
+
+# ===========================================================================
+# SE-R-002 [unit]: check_shell() detects \s, \w, \d, \b in grep patterns
+# ===========================================================================
+
+test_se_r002_gnu_grep_ext_detection() {
+  echo ""
+  echo "=== SE-R-002: check_shell() detects GNU grep extensions ==="
+
+  local test_dir="$TMPDIR/se-r002"
+
+  # (a) \s in grep pattern -> gnu-grep-ext, medium severity
+  setup_git_repo "$test_dir/backslash-s"
+  cd "$test_dir/backslash-s" || return
+  mkdir -p src
+  cat > 'src/check.sh' <<'SEOF'
+#!/usr/bin/env bash
+grep -E '\s+' somefile.txt
+SEOF
+  git add src/check.sh
+  git commit -q -m "add backslash-s script"
+  cd - >/dev/null || return
+
+  local output
+  output="$(run_scanner "$test_dir/backslash-s" main)"
+  assert_finding_with_pattern "SE-R-002a: \\s in grep detected" "gnu-grep-ext" "$output"
+  assert_finding_severity "SE-R-002a: gnu-grep-ext severity is medium" "gnu-grep-ext" "medium" "$output"
+
+  # (b) \w in grep pattern -> gnu-grep-ext, medium severity
+  setup_git_repo "$test_dir/backslash-w"
+  cd "$test_dir/backslash-w" || return
+  mkdir -p src
+  cat > 'src/check.sh' <<'WEOF'
+#!/usr/bin/env bash
+grep -E '\w+' somefile.txt
+WEOF
+  git add src/check.sh
+  git commit -q -m "add backslash-w script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/backslash-w" main)"
+  assert_finding_with_pattern "SE-R-002b: \\w in grep detected" "gnu-grep-ext" "$output"
+
+  # (c) \d in grep pattern -> gnu-grep-ext, medium severity
+  setup_git_repo "$test_dir/backslash-d"
+  cd "$test_dir/backslash-d" || return
+  mkdir -p src
+  cat > 'src/check.sh' <<'DEOF'
+#!/usr/bin/env bash
+grep -E '\d+' somefile.txt
+DEOF
+  git add src/check.sh
+  git commit -q -m "add backslash-d script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/backslash-d" main)"
+  assert_finding_with_pattern "SE-R-002c: \\d in grep detected" "gnu-grep-ext" "$output"
+
+  # (d) \b in grep pattern -> gnu-grep-ext-low, low severity
+  setup_git_repo "$test_dir/backslash-b"
+  cd "$test_dir/backslash-b" || return
+  mkdir -p src
+  cat > 'src/check.sh' <<'BEOF'
+#!/usr/bin/env bash
+grep -E '\bword\b' somefile.txt
+BEOF
+  git add src/check.sh
+  git commit -q -m "add backslash-b script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/backslash-b" main)"
+  assert_finding_with_pattern "SE-R-002d: \\b in grep detected" "gnu-grep-ext-low" "$output"
+  assert_finding_severity "SE-R-002d: gnu-grep-ext-low severity is low" "gnu-grep-ext-low" "low" "$output"
+
+  # (e) Line-scoped POSIX exclusion: \s with [[:space:]] on same line -> suppressed
+  setup_git_repo "$test_dir/posix-exclusion"
+  cd "$test_dir/posix-exclusion" || return
+  mkdir -p src
+  cat > 'src/safe.sh' <<'PEEOF'
+#!/usr/bin/env bash
+# Uses both \s and its POSIX equivalent on the same line
+grep -E '\s[[:space:]]' somefile.txt
+PEEOF
+  git add src/safe.sh
+  git commit -q -m "add posix exclusion script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/posix-exclusion" main)"
+  assert_no_finding_with_pattern "SE-R-002e: \\s suppressed when [[:space:]] on same line" "gnu-grep-ext" "$output"
+
+  # (f) \w with [[:alnum:]] on same line -> suppressed
+  setup_git_repo "$test_dir/alnum-exclusion"
+  cd "$test_dir/alnum-exclusion" || return
+  mkdir -p src
+  cat > 'src/safe.sh' <<'AEEOF'
+#!/usr/bin/env bash
+grep -E '\w[[:alnum:]]' somefile.txt
+AEEOF
+  git add src/safe.sh
+  git commit -q -m "add alnum exclusion script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/alnum-exclusion" main)"
+  assert_no_finding_with_pattern "SE-R-002f: \\w suppressed when [[:alnum:]] on same line" "gnu-grep-ext" "$output"
+
+  # (g) \d with [[:digit:]] on same line -> suppressed
+  setup_git_repo "$test_dir/digit-exclusion"
+  cd "$test_dir/digit-exclusion" || return
+  mkdir -p src
+  cat > 'src/safe.sh' <<'DGEOF'
+#!/usr/bin/env bash
+grep -E '\d[[:digit:]]' somefile.txt
+DGEOF
+  git add src/safe.sh
+  git commit -q -m "add digit exclusion script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/digit-exclusion" main)"
+  assert_no_finding_with_pattern "SE-R-002g: \\d suppressed when [[:digit:]] on same line" "gnu-grep-ext" "$output"
+
+  # (h) \b with grep -w on same line -> suppressed
+  setup_git_repo "$test_dir/w-exclusion"
+  cd "$test_dir/w-exclusion" || return
+  mkdir -p src
+  cat > 'src/safe.sh' <<'GWEOF'
+#!/usr/bin/env bash
+grep -w '\bword' somefile.txt
+GWEOF
+  git add src/safe.sh
+  git commit -q -m "add grep -w exclusion script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/w-exclusion" main)"
+  assert_no_finding_with_pattern "SE-R-002h: \\b suppressed when grep -w on same line" "gnu-grep-ext-low" "$output"
+
+  # (i) \s in sed/awk context -> NOT flagged (out of scope per R-002)
+  setup_git_repo "$test_dir/sed-context"
+  cd "$test_dir/sed-context" || return
+  mkdir -p src
+  cat > 'src/transform.sh' <<'SDEOF'
+#!/usr/bin/env bash
+sed 's/\s\+/ /g' somefile.txt
+SDEOF
+  git add src/transform.sh
+  git commit -q -m "add sed script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/sed-context" main)"
+  assert_no_finding_with_pattern "SE-R-002i: \\s in sed not flagged" "gnu-grep-ext" "$output"
+}
+
+# ===========================================================================
+# SE-R-003 [unit]: PATTERN_META entries for new pattern IDs
+# ===========================================================================
+
+test_se_r003_pattern_meta_entries() {
+  echo ""
+  echo "=== SE-R-003: PATTERN_META entries for new pattern IDs ==="
+
+  # Check that PATTERN_META contains entries for all new pattern IDs.
+  # Uses quoted form "pattern-id" to avoid substring false positives (e.g., gnu-grep-ext vs gnu-grep-ext-low).
+  local has_grep_p="no"
+  grep -qF '"gnu-grep-p"' "$SCANNER" 2>/dev/null && has_grep_p="yes"
+  assert_eq "SE-R-003a: PATTERN_META has gnu-grep-p" "yes" "$has_grep_p"
+
+  local has_grep_ext="no"
+  grep -qF '"gnu-grep-ext"' "$SCANNER" 2>/dev/null && has_grep_ext="yes"
+  assert_eq "SE-R-003b: PATTERN_META has gnu-grep-ext" "yes" "$has_grep_ext"
+
+  local has_grep_ext_low="no"
+  grep -qF '"gnu-grep-ext-low"' "$SCANNER" 2>/dev/null && has_grep_ext_low="yes"
+  assert_eq "SE-R-003c: PATTERN_META has gnu-grep-ext-low" "yes" "$has_grep_ext_low"
+
+  local has_dead_fn="no"
+  grep -qF '"dead-security-fn"' "$SCANNER" 2>/dev/null && has_dead_fn="yes"
+  assert_eq "SE-R-003d: PATTERN_META has dead-security-fn" "yes" "$has_dead_fn"
+
+  # Verify severity values via running the scanner with fixtures
+  local test_dir="$TMPDIR/se-r003"
+
+  # gnu-grep-p severity = high
+  setup_git_repo "$test_dir/meta-grep-p"
+  cd "$test_dir/meta-grep-p" || return
+  mkdir -p src
+  cat > src/test.sh <<'EOF'
+#!/usr/bin/env bash
+grep -P '\d+' file.txt
+EOF
+  git add src/test.sh
+  git commit -q -m "add"
+  cd - >/dev/null || return
+
+  local output
+  output="$(run_scanner "$test_dir/meta-grep-p" main)"
+  assert_finding_severity "SE-R-003a: gnu-grep-p severity is high" "gnu-grep-p" "high" "$output"
+
+  # Verify category for gnu-grep-p is portability
+  local grep_p_cat
+  grep_p_cat="$(echo "$output" | jq -r '.findings[] | select(.pattern == "gnu-grep-p") | .category' 2>/dev/null | head -1)"
+  assert_eq "SE-R-003a: gnu-grep-p category is portability" "portability" "$grep_p_cat"
+
+  # Verify PATTERN_META entry for dead-security-fn contains security-enforcement category
+  local dead_fn_has_cat="no"
+  grep -q 'dead-security-fn.*security-enforcement' "$SCANNER" 2>/dev/null && dead_fn_has_cat="yes"
+  assert_eq "SE-R-003d: dead-security-fn category contains security-enforcement" "yes" "$dead_fn_has_cat"
+}
+
+# ===========================================================================
+# SE-R-004 [unit]: check_dead_security_calls() function exists and detects dead fns
+# ===========================================================================
+
+test_se_r004_dead_security_calls() {
+  echo ""
+  echo "=== SE-R-004: check_dead_security_calls() detects dead security functions ==="
+
+  # (a) Function exists in scanner
+  local has_fn="no"
+  grep -q 'check_dead_security_calls' "$SCANNER" 2>/dev/null && has_fn="yes"
+  assert_eq "SE-R-004a: check_dead_security_calls() exists in scanner" "yes" "$has_fn"
+
+  # (b) Functional test: security script with dead function
+  local test_dir="$TMPDIR/se-r004"
+  setup_git_repo "$test_dir/dead-fn"
+  cd "$test_dir/dead-fn" || return
+
+  # Create a security script matching R-004 path patterns (override-*.sh)
+  mkdir -p scripts hooks
+  cat > scripts/override-scrutiny.sh <<'EOF'
+#!/usr/bin/env bash
+# A security script with a dead function
+
+check_override_retry() {
+  echo "checking override retry"
+  return 0
+}
+
+cmd_override() {
+  echo "override command"
+  # Note: check_override_retry is NOT called here
+}
+
+cmd_override "$@"
+EOF
+
+  # Create a test file that calls the dead function (but NOT a production file)
+  mkdir -p tests
+  cat > tests/test-override.sh <<'EOF'
+#!/usr/bin/env bash
+source scripts/override-scrutiny.sh
+check_override_retry  # called from test, not production
+EOF
+
+  # Create a production hook that does NOT call check_override_retry
+  cat > hooks/workflow-gate.sh <<'EOF'
+#!/usr/bin/env bash
+source scripts/override-scrutiny.sh
+cmd_override "$@"
+EOF
+
+  git add scripts/override-scrutiny.sh tests/test-override.sh hooks/workflow-gate.sh
+  git commit -q -m "add security script with dead function"
+  cd - >/dev/null || return
+
+  local output
+  output="$(run_scanner "$test_dir/dead-fn" main)"
+  assert_finding_with_pattern "SE-R-004b: dead security function detected" "dead-security-fn" "$output"
+  assert_finding_severity "SE-R-004b: dead-security-fn severity is high" "dead-security-fn" "high" "$output"
+
+  # (c) Function that IS called from production -> NOT flagged
+  setup_git_repo "$test_dir/live-fn"
+  cd "$test_dir/live-fn" || return
+
+  mkdir -p scripts hooks
+  cat > scripts/override-scrutiny.sh <<'EOF'
+#!/usr/bin/env bash
+check_override_retry() {
+  echo "checking override retry"
+  return 0
+}
+
+cmd_override() {
+  check_override_retry
+  echo "override command"
+}
+EOF
+
+  cat > hooks/workflow-gate.sh <<'EOF'
+#!/usr/bin/env bash
+source scripts/override-scrutiny.sh
+cmd_override "$@"
+EOF
+
+  git add scripts/override-scrutiny.sh hooks/workflow-gate.sh
+  git commit -q -m "add security script with live function"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/live-fn" main)"
+  assert_no_finding_with_pattern "SE-R-004c: live security function not flagged" "dead-security-fn" "$output"
+
+  # (d) Script tagged with "# scanner: security" -> scanned for dead functions
+  setup_git_repo "$test_dir/tagged-security"
+  cd "$test_dir/tagged-security" || return
+
+  mkdir -p scripts
+  cat > scripts/custom-check.sh <<'EOF'
+#!/usr/bin/env bash
+# scanner: security
+# Custom security check
+
+dead_guard() {
+  echo "I'm never called from production"
+}
+
+active_guard() {
+  echo "I'm called from production"
+}
+EOF
+
+  # Production caller for active_guard only
+  cat > scripts/auto-policy.sh <<'EOF'
+#!/usr/bin/env bash
+source scripts/custom-check.sh
+active_guard
+EOF
+
+  git add scripts/custom-check.sh scripts/auto-policy.sh
+  git commit -q -m "add tagged security script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/tagged-security" main)"
+  assert_finding_with_pattern "SE-R-004d: dead fn in tagged security script detected" "dead-security-fn" "$output"
+
+  # (e) Script tagged with "# scanner: library" -> excluded from dead-call scanning
+  setup_git_repo "$test_dir/tagged-library"
+  cd "$test_dir/tagged-library" || return
+
+  mkdir -p scripts
+  cat > scripts/lib-utils.sh <<'EOF'
+#!/usr/bin/env bash
+# scanner: library
+# Library functions called by LLM skill orchestrators
+
+helper_fn() {
+  echo "called by skills, not bash scripts"
+}
+EOF
+
+  # Create a skill file that references this library
+  mkdir -p skills/ctdd
+  cat > skills/ctdd/SKILL.md <<'EOF'
+---
+name: ctdd
+---
+Source lib-utils.sh for helper functions.
+EOF
+
+  git add scripts/lib-utils.sh skills/ctdd/SKILL.md
+  git commit -q -m "add library-tagged script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/tagged-library" main)"
+  assert_no_finding_with_pattern "SE-R-004e: library-tagged script excluded" "dead-security-fn" "$output"
+
+  # (f) Library-tagged script NOT referenced by any skill -> still flagged
+  setup_git_repo "$test_dir/orphan-library"
+  cd "$test_dir/orphan-library" || return
+
+  mkdir -p scripts
+  cat > scripts/orphan-lib.sh <<'EOF'
+#!/usr/bin/env bash
+# scanner: library
+# Library with no skill reference
+
+orphan_fn() {
+  echo "nobody references this library"
+}
+EOF
+
+  git add scripts/orphan-lib.sh
+  git commit -q -m "add orphan library script"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/orphan-library" main)"
+  assert_finding_with_pattern "SE-R-004f: orphan library script flagged" "dead-security-fn" "$output"
+
+  # (g) Hooks/ excluded from security-script scanning
+  setup_git_repo "$test_dir/hooks-excluded"
+  cd "$test_dir/hooks-excluded" || return
+
+  mkdir -p hooks
+  cat > hooks/workflow-gate.sh <<'EOF'
+#!/usr/bin/env bash
+internal_check() {
+  echo "this is a hook-internal function"
+}
+EOF
+
+  git add hooks/workflow-gate.sh
+  git commit -q -m "add hook with internal function"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/hooks-excluded" main)"
+  assert_no_finding_with_pattern "SE-R-004g: hooks/ internal functions not flagged" "dead-security-fn" "$output"
+
+  # (h) function name { } syntax (not just name() { })
+  setup_git_repo "$test_dir/function-keyword"
+  cd "$test_dir/function-keyword" || return
+
+  mkdir -p scripts
+  cat > scripts/workflow-gate.sh <<'EOF'
+#!/usr/bin/env bash
+function dead_function {
+  echo "dead"
+}
+
+function live_function {
+  echo "live"
+}
+EOF
+
+  cat > scripts/auto-policy.sh <<'EOF'
+#!/usr/bin/env bash
+source scripts/workflow-gate.sh
+live_function
+EOF
+
+  git add scripts/workflow-gate.sh scripts/auto-policy.sh
+  git commit -q -m "add function keyword syntax"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/function-keyword" main)"
+  assert_finding_with_pattern "SE-R-004h: dead 'function name {' syntax detected" "dead-security-fn" "$output"
+
+  # (i) Finding description is from PATTERN_META, NOT includes function name (TB-002)
+  output="$(run_scanner "$test_dir/dead-fn" main)"
+  local desc
+  desc="$(echo "$output" | jq -r '.findings[] | select(.pattern == "dead-security-fn") | .description' 2>/dev/null | head -1)"
+  if [ -n "$desc" ]; then
+    # Description should NOT contain the actual function name (TB-002)
+    assert_not_contains "SE-R-004i: finding description does not contain function name" "check_override_retry" "$desc"
+  else
+    echo "  FAIL: SE-R-004i: no dead-security-fn finding to check description"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# ===========================================================================
+# SE-R-005 [unit]: check_dead_security_calls() excludes pluggable/callback functions
+# ===========================================================================
+
+test_se_r005_pluggable_exclusion() {
+  echo ""
+  echo "=== SE-R-005: Pluggable/callback functions excluded ==="
+
+  local test_dir="$TMPDIR/se-r005"
+
+  # (a) _default_ prefix excluded
+  setup_git_repo "$test_dir/default-prefix"
+  cd "$test_dir/default-prefix" || return
+
+  mkdir -p scripts
+  cat > scripts/workflow-gate.sh <<'EOF'
+#!/usr/bin/env bash
+_default_handler() {
+  echo "pluggable default handler"
+}
+EOF
+
+  git add scripts/workflow-gate.sh
+  git commit -q -m "add default prefix function"
+  cd - >/dev/null || return
+
+  local output
+  output="$(run_scanner "$test_dir/default-prefix" main)"
+  assert_no_finding_with_pattern "SE-R-005a: _default_ prefix function excluded" "dead-security-fn" "$output"
+
+  # (b) "pluggable" comment on definition line excluded
+  setup_git_repo "$test_dir/pluggable-comment"
+  cd "$test_dir/pluggable-comment" || return
+
+  mkdir -p scripts
+  cat > scripts/workflow-gate.sh <<'EOF'
+#!/usr/bin/env bash
+custom_handler() { # pluggable
+  echo "pluggable handler"
+}
+EOF
+
+  git add scripts/workflow-gate.sh
+  git commit -q -m "add pluggable comment function"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/pluggable-comment" main)"
+  assert_no_finding_with_pattern "SE-R-005b: pluggable-comment function excluded" "dead-security-fn" "$output"
+
+  # (c) "callback" comment on definition line excluded
+  setup_git_repo "$test_dir/callback-comment"
+  cd "$test_dir/callback-comment" || return
+
+  mkdir -p scripts
+  cat > scripts/workflow-gate.sh <<'EOF'
+#!/usr/bin/env bash
+on_complete() { # callback
+  echo "callback handler"
+}
+EOF
+
+  git add scripts/workflow-gate.sh
+  git commit -q -m "add callback comment function"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/callback-comment" main)"
+  assert_no_finding_with_pattern "SE-R-005c: callback-comment function excluded" "dead-security-fn" "$output"
+
+  # (d) Non-pluggable dead function IS still flagged (control case)
+  setup_git_repo "$test_dir/not-pluggable"
+  cd "$test_dir/not-pluggable" || return
+
+  mkdir -p scripts
+  cat > scripts/workflow-gate.sh <<'EOF'
+#!/usr/bin/env bash
+normal_dead_fn() {
+  echo "I have no pluggable/callback marker"
+}
+EOF
+
+  git add scripts/workflow-gate.sh
+  git commit -q -m "add normal dead function"
+  cd - >/dev/null || return
+
+  output="$(run_scanner "$test_dir/not-pluggable" main)"
+  assert_finding_with_pattern "SE-R-005d: non-pluggable dead function still flagged" "dead-security-fn" "$output"
+}
+
+# ===========================================================================
+# SE-R-007 [integration]: Full scanner run with all three new pattern IDs
+# ===========================================================================
+
+test_se_r007_integration_all_patterns() {
+  echo ""
+  echo "=== SE-R-007: Integration test with all three new pattern IDs ==="
+
+  local test_dir="$TMPDIR/se-r007"
+
+  setup_git_repo "$test_dir/all-patterns"
+  cd "$test_dir/all-patterns" || return
+
+  # (a) File with grep -P -> gnu-grep-p
+  mkdir -p src scripts hooks tests
+  cat > src/grep-p-file.sh <<'EOF'
+#!/usr/bin/env bash
+grep -P '\d+' somefile.txt
+EOF
+
+  # (b) File with \s in grep pattern -> gnu-grep-ext
+  cat > src/grep-ext-file.sh <<'EOF'
+#!/usr/bin/env bash
+grep -E '\s+' somefile.txt
+EOF
+
+  # (c) Security script with dead function called only from test -> dead-security-fn
+  cat > scripts/review-triage.sh <<'EOF'
+#!/usr/bin/env bash
+dead_enforce_fn() {
+  echo "this function is never called from production"
+}
+
+active_fn() {
+  echo "this function is called"
+}
+EOF
+
+  # Test file calls dead_enforce_fn (but tests don't count as production)
+  cat > tests/test-review.sh <<'EOF'
+#!/usr/bin/env bash
+source scripts/review-triage.sh
+dead_enforce_fn  # called from test, not production
+active_fn
+EOF
+
+  # Production file only calls active_fn
+  cat > scripts/auto-policy.sh <<'EOF'
+#!/usr/bin/env bash
+source scripts/review-triage.sh
+active_fn
+EOF
+
+  git add src/ scripts/ tests/
+  git commit -q -m "add all pattern fixtures"
+  cd - >/dev/null || return
+
+  local output
+  output="$(run_scanner "$test_dir/all-patterns" main)"
+  assert_json_valid "SE-R-007: Output is valid JSON" "$output"
+
+  # All three new pattern IDs should appear
+  assert_finding_with_pattern "SE-R-007a: gnu-grep-p found" "gnu-grep-p" "$output"
+  assert_finding_with_pattern "SE-R-007b: gnu-grep-ext found" "gnu-grep-ext" "$output"
+  assert_finding_with_pattern "SE-R-007c: dead-security-fn found" "dead-security-fn" "$output"
+}
+
+# ===========================================================================
+# SE-R-008 [unit]: ctdd SKILL.md test audit check 8 (production call chain)
+# ===========================================================================
+
+test_se_r008_ctdd_check8() {
+  echo ""
+  echo "=== SE-R-008: ctdd SKILL.md audit check 8 (production call chain) ==="
+
+  local ctdd_skill="$REPO_DIR/skills/ctdd/SKILL.md"
+
+  # (a) Check 8 exists as a numbered item in the test auditor blockquote
+  local has_check8="no"
+  grep -q '^> 8\.' "$ctdd_skill" 2>/dev/null && has_check8="yes"
+  assert_eq "SE-R-008a: ctdd SKILL.md has numbered check '> 8.'" "yes" "$has_check8"
+
+  # (b) Check 8 text contains "production call chain"
+  local check8_line
+  check8_line="$(grep -A 3 '^> 8\.' "$ctdd_skill" 2>/dev/null)"
+
+  local has_anchor="no"
+  echo "$check8_line" | grep -qi 'production call chain' && has_anchor="yes"
+  assert_eq "SE-R-008b: check 8 contains 'production call chain' anchor" "yes" "$has_anchor"
+
+  # (c) Check 8 text mentions dead-code-in-security-paths
+  local has_dead_code="no"
+  echo "$check8_line" | grep -qi 'dead-code-in-security\|dead.code.in.security' && has_dead_code="yes"
+  assert_eq "SE-R-008c: check 8 mentions dead-code-in-security-paths" "yes" "$has_dead_code"
+
+  # (d) Check 8 mentions "called from" or "invoked by" detection
+  local has_detection="no"
+  echo "$check8_line" | grep -qi 'called from\|invoked by' && has_detection="yes"
+  assert_eq "SE-R-008d: check 8 mentions 'called from' or 'invoked by'" "yes" "$has_detection"
+}
+
+# ===========================================================================
+# SE-R-009 [unit]: Content-pairing drift test for dead-security-fn
+# (in tests/test-test-evasion-antipatterns.sh — tested separately)
+# We verify here that the three assertions listed in R-009 hold:
+# ===========================================================================
+
+test_se_r009_drift_test() {
+  echo ""
+  echo "=== SE-R-009: Drift test for dead-security-fn pairing ==="
+
+  local ctdd_skill="$REPO_DIR/skills/ctdd/SKILL.md"
+
+  # (1) ctdd audit blockquote has a numbered check with anchor phrase "production call chain"
+  local has_prod_chain="no"
+  grep -E '^> [0-9]+\.' "$ctdd_skill" 2>/dev/null | grep -qi 'production call chain' && has_prod_chain="yes"
+  assert_eq "SE-R-009(1): audit check with 'production call chain' exists" "yes" "$has_prod_chain"
+
+  # (2) PATTERN_META contains key dead-security-fn
+  local has_pattern="no"
+  grep -q 'dead-security-fn' "$SCANNER" 2>/dev/null && has_pattern="yes"
+  assert_eq "SE-R-009(2): PATTERN_META has dead-security-fn" "yes" "$has_pattern"
+
+  # (3) ctdd audit blockquote contains literal string "dead-security-fn"
+  local has_literal="no"
+  grep -q 'dead-security-fn' "$ctdd_skill" 2>/dev/null && has_literal="yes"
+  assert_eq "SE-R-009(3): ctdd audit contains 'dead-security-fn'" "yes" "$has_literal"
+}
+
+# ===========================================================================
+# SE-R-010 [unit]: AP-001 entry in antipatterns.md updated
+# ===========================================================================
+
+test_se_r010_ap001_update() {
+  echo ""
+  echo "=== SE-R-010: AP-001 antipatterns.md entry updated ==="
+
+  local antipatterns="$REPO_DIR/.correctless/antipatterns.md"
+
+  # (a) Frequency field references 2026-04-12 audit
+  local ap001_block
+  ap001_block="$(sed -n '/### AP-001/,/### AP-002/p' "$antipatterns" 2>/dev/null)"
+
+  local has_audit_ref="no"
+  echo "$ap001_block" | grep -qi '2026-04-12\|49.*occurrences\|49+\|5 test files' && has_audit_ref="yes"
+  assert_eq "SE-R-010a: AP-001 Frequency references 2026-04-12 audit data" "yes" "$has_audit_ref"
+
+  # (b) How to catch it references scanner enforcement
+  local has_scanner_ref="no"
+  echo "$ap001_block" | grep -qi 'antipattern-scan\|check_shell\|gnu-grep-p\|gnu-grep-ext' && has_scanner_ref="yes"
+  assert_eq "SE-R-010b: AP-001 How-to-catch references scanner enforcement" "yes" "$has_scanner_ref"
+}
+
+# ===========================================================================
+# SE-R-011 [unit]: AP-022 (or next slot) entry for dead code in security paths
+# ===========================================================================
+
+test_se_r011_ap022_entry() {
+  echo ""
+  echo "=== SE-R-011: AP-022 entry for dead code in security paths ==="
+
+  local antipatterns="$REPO_DIR/.correctless/antipatterns.md"
+
+  # (a) A new AP entry for "Dead code in security paths" exists
+  local has_heading="no"
+  grep -qi 'AP-0[0-9][0-9]:.*[Dd]ead.*code.*security\|AP-0[0-9][0-9]:.*[Dd]ead.*security.*path' "$antipatterns" 2>/dev/null && has_heading="yes"
+  assert_eq "SE-R-011a: AP entry for dead code in security paths exists" "yes" "$has_heading"
+
+  # (b) Entry mentions check_override_retry as the canonical example
+  local entry_block
+  # Find the block — try AP-022 first, fall back to scanning for the heading
+  entry_block="$(sed -n '/[Dd]ead.*code.*security\|[Dd]ead.*security.*path/,/### AP-/p' "$antipatterns" 2>/dev/null)"
+  if [ -z "$entry_block" ]; then
+    entry_block="$(sed -n '/[Dd]ead.*code.*security\|[Dd]ead.*security.*path/,$ p' "$antipatterns" 2>/dev/null)"
+  fi
+
+  local has_example="no"
+  echo "$entry_block" | grep -q 'check_override_retry' && has_example="yes"
+  assert_eq "SE-R-011b: Entry mentions check_override_retry" "yes" "$has_example"
+
+  # (c) Entry references the scanner enforcement
+  local has_scanner="no"
+  echo "$entry_block" | grep -qi 'antipattern-scan\|check_dead_security_calls\|dead-security-fn' && has_scanner="yes"
+  assert_eq "SE-R-011c: Entry references scanner enforcement" "yes" "$has_scanner"
+
+  # (d) Entry has standard fields
+  local has_what="no"
+  echo "$entry_block" | grep -q '\*\*What went wrong\*\*' && has_what="yes"
+  assert_eq "SE-R-011d: Entry has What went wrong field" "yes" "$has_what"
+
+  local has_how="no"
+  echo "$entry_block" | grep -q '\*\*How to catch it\*\*' && has_how="yes"
+  assert_eq "SE-R-011d: Entry has How to catch it field" "yes" "$has_how"
+
+  local has_freq="no"
+  echo "$entry_block" | grep -q '\*\*Frequency\*\*' && has_freq="yes"
+  assert_eq "SE-R-011d: Entry has Frequency field" "yes" "$has_freq"
+
+  # (e) Entry mentions PRH-006
+  local has_prh="no"
+  echo "$entry_block" | grep -q 'PRH-006' && has_prh="yes"
+  assert_eq "SE-R-011e: Entry mentions PRH-006" "yes" "$has_prh"
+
+  # (f) Entry mentions ctdd check 8 as advisory
+  local has_advisory="no"
+  echo "$entry_block" | grep -qi 'check 8\|audit.*production call chain\|advisory' && has_advisory="yes"
+  assert_eq "SE-R-011f: Entry mentions advisory backstop" "yes" "$has_advisory"
+}
+
+# Run all scanner-expansion tests
+test_se_r001_grep_p_detection
+test_se_r002_gnu_grep_ext_detection
+test_se_r003_pattern_meta_entries
+test_se_r004_dead_security_calls
+test_se_r005_pluggable_exclusion
+test_se_r007_integration_all_patterns
+test_se_r008_ctdd_check8
+test_se_r009_drift_test
+test_se_r010_ap001_update
+test_se_r011_ap022_entry
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
