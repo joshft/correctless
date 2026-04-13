@@ -87,9 +87,17 @@ review_override_issuance() {
 
   if [ "$claim_verified" = "false" ]; then
     # Pre-existing claim was false — reject the override
-    # In production, the supervisor agent would make this decision via
-    # Task(subagent_type="correctless:supervisor") with activation_type override_issued
+    # QA-006: persist rejection so Jaccard retry prevention (PRH-006) can detect retries
+    if [ -f "$_state_file" ]; then
+      locked_update_state "$_state_file" \
+        '.rejected_overrides = ((.rejected_overrides // []) + [$reason])' \
+        --arg reason "$_override_reason" 2>/dev/null || true
+    fi
     echo "reject_override"
+    return 0
+  elif [ "$claim_verified" = "null" ]; then
+    # QA-014: timeout or inconclusive — escalate instead of rejecting
+    echo "escalate_to_human"
     return 0
   fi
 
@@ -109,6 +117,11 @@ build_override_action_payload() {
   local _override_reason="$2"
   local _intent_summary="$3"
   local _dd_entries_since="$4"
+
+  # QA-026: validate _dd_entries_since is valid JSON before --argjson
+  if ! echo "$_dd_entries_since" | jq -e '.' >/dev/null 2>&1; then
+    _dd_entries_since="[]"
+  fi
 
   # Build JSON payload using jq --arg (AP-010)
   jq -n \
@@ -293,13 +306,13 @@ update_override_log() {
 
   # Use locked_update_state from lib.sh for atomic read-modify-write (AP-010)
   locked_update_state "$_state_file" \
-    '.override_log = ((.override_log // []) + [{
+    '.override_log = (((.override_log // []) + [{
        override_id: $oid,
        review_type: $rt,
        disposition: $disp,
        reasoning: $rsn,
        timestamp: $ts
-     }])' \
+     }]) | .[-100:])' \
     --arg oid "$_override_id" --arg rt "$_review_type" \
     --arg disp "$_disposition" --arg rsn "$_reasoning" --arg ts "$timestamp"
 }

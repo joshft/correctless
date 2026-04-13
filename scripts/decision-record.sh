@@ -54,7 +54,7 @@ drx_validate() {
   category="$(echo "$dr_json" | jq -r '.category' 2>/dev/null)"
 
   case "$category" in
-    security|availability|testability|scope_expansion|performance|architecture|observability|technical_debt|intent|hard_stop_multiplex)
+    security|availability|testability|scope_expansion|performance|architecture|observability|technical_debt|intent|hard_stop_multiplex|dependency|budget|policy|configuration)
       # Valid category
       ;;
     *)

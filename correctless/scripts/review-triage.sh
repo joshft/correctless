@@ -131,14 +131,20 @@ enforce_prh003() {
   # Security keywords from PRH-001 (security-scan.sh keyword list)
   local security_keywords="auth credential encrypt token secret permission access control trust boundary identity authorization login verification level privilege"
 
-  # Process each finding: if source_agent is red-team OR category/summary
-  # contains security keywords, and supervisor returned "reject", override to "hard_stop"
+  # QA-004: Cardinality assertion — fail-closed on array length mismatch.
+  # If supervisor returned fewer decisions than findings, security findings
+  # beyond the response are silently dropped. Iterate over findings length
+  # and treat missing decisions as hard_stop for security-tagged findings.
   local result
   result="$(jq -n --argjson resp "$_supervisor_response" --argjson findings "$_findings_json" \
     --arg keywords "$security_keywords" '
-    [range($resp | length)] | map(. as $i |
-      $resp[$i] as $decision |
+    [range($findings | length)] | map(. as $i |
+      ($resp[$i] // null) as $decision |
       $findings[$i] as $finding |
+      # QA-004: if decision is null (supervisor returned fewer), use hard_stop for security
+      if $decision == null then
+        {"decision": "hard_stop", "prh003_missing_decision": true}
+      else
       (
         # Check if this finding requires PRH-003 enforcement
         ($finding.source_agent == "red-team") or
@@ -155,6 +161,7 @@ enforce_prh003() {
         $decision | .decision = "hard_stop" | .prh003_override = true
       else
         $decision
+      end
       end
     )
   ' 2>/dev/null)" || { echo "[]"; return 1; }
@@ -210,8 +217,22 @@ triage_findings_batch() {
   raw_decisions="$($supervisor_fn "$_findings_json" 2>/dev/null)" || { echo "[]"; return 1; }
 
   # Step 4: Apply enforce_prh003 post-processing on supervisor result
+  # QA-001: fail-closed — if enforcement fails and security findings exist,
+  # force hard_stop on all security-tagged findings instead of passing through raw decisions
   local result
-  result="$(enforce_prh003 "$raw_decisions" "$_findings_json" 2>/dev/null)" || result="$raw_decisions"
+  if ! result="$(enforce_prh003 "$raw_decisions" "$_findings_json" 2>/dev/null)"; then
+    # Check if any finding is security-tagged — if so, fail-closed
+    local has_security
+    has_security="$(echo "$_findings_json" | jq '[.[] | select(
+      .source_agent == "red-team" or .category == "security"
+    )] | length' 2>/dev/null)" || has_security="0"
+    if [ "$has_security" -gt 0 ] 2>/dev/null; then
+      # Fail-closed: force hard_stop on all decisions
+      result="$(echo "$raw_decisions" | jq '[.[] | .decision = "hard_stop" | .prh003_failclosed = true]' 2>/dev/null)" || result="$raw_decisions"
+    else
+      result="$raw_decisions"
+    fi
+  fi
 
   echo "$result"
   return 0

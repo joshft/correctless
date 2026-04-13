@@ -121,7 +121,12 @@ base_commit_crosscheck() {
   # Clean up worktree on exit
   local worktree_path="${worktree_dir}/crosscheck"
 
+  # QA-005: trap for worktree cleanup on signal/abnormal exit
+  # shellcheck disable=SC2064
+  trap "(cd '$config_dir' && git worktree remove --force '$worktree_path' 2>/dev/null) || true; rm -rf '$worktree_dir' 2>/dev/null" EXIT SIGTERM SIGINT
+
   if ! (cd "$config_dir" && git worktree add -q "$worktree_path" "$base_commit" 2>/dev/null); then
+    trap - EXIT SIGTERM SIGINT
     rm -rf "$worktree_dir"
     jq -n --arg bc "$base_commit" '{
       pre_existing_claimed: false,
@@ -150,22 +155,27 @@ base_commit_crosscheck() {
   local build_success="false"
   [ "$build_exit_code" -eq 0 ] && build_success="true"
 
-  # Clean up worktree
+  # Clean up worktree (trap handles abnormal exit; explicit cleanup for normal path)
   (cd "$config_dir" && git worktree remove --force "$worktree_path" 2>/dev/null) || true
   rm -rf "$worktree_dir" 2>/dev/null || true
+  trap - EXIT SIGTERM SIGINT
 
   # Determine claim_verified: if build fails on base, the claim might be true
   # If build succeeds on base, the pre-existing claim is false
+  # QA-014: timeout is inconclusive (null), not disconfirmed (false)
   local claim_verified="false"
   if [ "$build_success" = "false" ] && [ "$failure_mode_val" = "null" ]; then
     claim_verified="true"
+  elif [ "$failure_mode_val" != "null" ]; then
+    # Timeout or other non-clean failure — inconclusive
+    claim_verified="null"
   fi
 
   jq -n --arg bc "$base_commit" \
     --argjson success "$build_success" \
     --argjson exit_code "$build_exit_code" \
     --arg stderr "$build_stderr" \
-    --argjson verified "$claim_verified" \
+    --arg verified "$claim_verified" \
     --arg fm "$failure_mode_val" \
     '{
       pre_existing_claimed: false,
@@ -173,7 +183,7 @@ base_commit_crosscheck() {
       base_build_success: $success,
       base_build_exit_code: $exit_code,
       base_build_stderr: $stderr,
-      claim_verified: $verified,
+      claim_verified: (if $verified == "null" then null elif $verified == "true" then true else false end),
       failure_mode: (if $fm == "null" then null else $fm end)
     }'
 
@@ -375,6 +385,19 @@ check_spec_completeness() {
       missing_deliverables: [],
       check_applicable: false,
       complete: true
+    }'
+    return 0
+  fi
+
+  # QA-007: Validate completed_files_json before --argjson (fail-closed on malformed input)
+  if ! echo "$_completed_files_json" | jq -e 'type == "array"' >/dev/null 2>&1; then
+    # Malformed completed_files — fail-closed: report all deliverables as missing
+    jq -n --argjson declared "$deliverables" '{
+      declared_deliverables: $declared,
+      completed_deliverables: [],
+      missing_deliverables: $declared,
+      check_applicable: true,
+      complete: false
     }'
     return 0
   fi

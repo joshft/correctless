@@ -43,11 +43,13 @@ build_mandate_context() {
     # Extract tier and category and disposition from structured entries
     local total=0 tier0=0 tier1=0 tier2=0 tier3=0
     local categories_json="{}"
+    local _current_category=""
 
     while IFS= read -r line; do
       case "$line" in
         "### DD-"*)
           total=$((total + 1))
+          _current_category=""
           ;;
         *"**Tier**:"*)
           local tier_val
@@ -62,7 +64,6 @@ build_mandate_context() {
         *"**Category**:"*)
           local cat_val
           cat_val="$(echo "$line" | sed 's/.*Category[^:]*:[[:space:]]*//' | tr -d '[:space:]')"
-          # Will pair with disposition on next relevant line
           _current_category="$cat_val"
           ;;
         *"**Disposition**:"*)
@@ -96,7 +97,8 @@ build_mandate_context() {
   local spec_scope=""
   if [ -f "$_spec_file" ]; then
     # Extract content under ## Scope heading until the next ## heading
-    spec_scope="$(awk '/^## Scope/,/^## [^S]/' "$_spec_file" 2>/dev/null | head -20)" || true
+    # QA-010: stop at ANY next ## heading, not just non-S headings
+    spec_scope="$(awk '/^## Scope$/{found=1; next} /^## /{if(found) exit} found' "$_spec_file" 2>/dev/null | head -20)" || true
   fi
 
   # Assemble the full context

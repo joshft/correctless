@@ -251,14 +251,14 @@ test_r001_skill_mapping() {
 
   # Must contain a case statement (non-comment lines)
   local has_case="no"
-  if grep -vE '^\s*#' <<<"$hook_src" | grep -qE '^\s*case\b'; then
+  if grep -vE '^[[:space:]]*#' <<<"$hook_src" | grep -qE '^[[:space:]]*case\b'; then
     has_case="yes"
   fi
   assert_eq "R-001m: mapping uses bash case statement" "yes" "$has_case"
 
   # The case statement body must reference at least spec, review, tdd
   local case_body
-  case_body="$(grep -vE '^\s*#' <<<"$hook_src" || true)"
+  case_body="$(grep -vE '^[[:space:]]*#' <<<"$hook_src" || true)"
   local has_spec_in_case="no"
   if grep -qF 'spec)' <<<"$case_body" || grep -qF 'spec|' <<<"$case_body" || grep -qF '"spec"' <<<"$case_body"; then
     has_spec_in_case="yes"
@@ -277,7 +277,7 @@ test_r002_skill_via_arg() {
   local hook_src
   hook_src="$(cat "$HOOK")"
   local non_comment
-  non_comment="$(grep -vE '^\s*#' <<<"$hook_src")"
+  non_comment="$(grep -vE '^[[:space:]]*#' <<<"$hook_src")"
 
   # -----------------------------------------------
   # R-002a: --arg for skill must appear in the jq command
@@ -341,11 +341,11 @@ test_r003_mapping_in_hook() {
   local hook_src
   hook_src="$(cat "$HOOK")"
   local non_comment
-  non_comment="$(grep -vE '^\s*#' <<<"$hook_src")"
+  non_comment="$(grep -vE '^[[:space:]]*#' <<<"$hook_src")"
 
   local hook_has_mapping="no"
   # The hook must have a case statement and reference skill-related terms
-  if grep -qE '^\s*case\b' <<<"$non_comment"; then
+  if grep -qE '^[[:space:]]*case\b' <<<"$non_comment"; then
     # And within that code, we should see skill assignments (cspec, ctdd, creview, etc.)
     if grep -qF 'cspec' <<<"$non_comment" || grep -qF 'ctdd' <<<"$non_comment" || grep -qF 'creview' <<<"$non_comment"; then
       hook_has_mapping="yes"
@@ -359,7 +359,7 @@ test_r003_mapping_in_hook() {
   # -----------------------------------------------
   local extra_sources
   # Match 'source FILE' or '. FILE' (dot-space for POSIX sourcing), exclude lib.sh
-  extra_sources="$(grep -vE '^\s*#' <<<"$hook_src" | grep -E '(^|[[:space:]])(source[[:space:]]|\.[[:space:]])' | grep -vE 'lib\.sh' || true)"
+  extra_sources="$(grep -vE '^[[:space:]]*#' <<<"$hook_src" | grep -E '(^|[[:space:]])(source[[:space:]]|\.[[:space:]])' | grep -vE 'lib\.sh' || true)"
   local has_extra_source="no"
   if [ -n "$extra_sources" ]; then
     has_extra_source="yes"
@@ -592,7 +592,7 @@ test_r007_pat005_conventions() {
   # R-007a: no set -e (or set -euo pipefail)
   # -----------------------------------------------
   local has_set_e="no"
-  if grep -vE '^\s*#' <<<"$hook_src" | grep -qE 'set[[:space:]]+-[a-z]*e'; then
+  if grep -vE '^[[:space:]]*#' <<<"$hook_src" | grep -qE 'set[[:space:]]+-[a-z]*e'; then
     has_set_e="yes"
   fi
   assert_eq "R-007a: no set -e in hook" "no" "$has_set_e"
@@ -601,7 +601,7 @@ test_r007_pat005_conventions() {
   # R-007b: has || exit 0 guards (fail-open)
   # -----------------------------------------------
   local has_exit_0_guard="no"
-  if grep -vE '^\s*#' <<<"$hook_src" | grep -qE '\|\|[[:space:]]*exit[[:space:]]+0'; then
+  if grep -vE '^[[:space:]]*#' <<<"$hook_src" | grep -qE '\|\|[[:space:]]*exit[[:space:]]+0'; then
     has_exit_0_guard="yes"
   fi
   assert_eq "R-007b: hook has || exit 0 guards" "yes" "$has_exit_0_guard"
@@ -610,7 +610,7 @@ test_r007_pat005_conventions() {
   # R-007c: always exits 0 (last meaningful line)
   # -----------------------------------------------
   local last_line
-  last_line="$(grep -vE '^\s*$|^\s*#' <<<"$hook_src" | tail -1)"
+  last_line="$(grep -vE '^[[:space:]]*$|^[[:space:]]*#' <<<"$hook_src" | tail -1)"
   local ends_exit_0="no"
   if grep -qF 'exit 0' <<<"$last_line"; then
     ends_exit_0="yes"
@@ -621,7 +621,7 @@ test_r007_pat005_conventions() {
   # R-007d: no exit [1-9] anywhere (non-comment lines)
   # -----------------------------------------------
   local has_nonzero_exit="no"
-  if grep -vE '^\s*#' <<<"$hook_src" | grep -qE 'exit[[:space:]]+[1-9]'; then
+  if grep -vE '^[[:space:]]*#' <<<"$hook_src" | grep -qE 'exit[[:space:]]+[1-9]'; then
     has_nonzero_exit="yes"
   fi
   assert_eq "R-007d: no non-zero exit codes" "no" "$has_nonzero_exit"
@@ -711,7 +711,7 @@ test_r008_phase_sync() {
   local hook_src
   hook_src="$(cat "$HOOK")"
   local non_comment
-  non_comment="$(grep -vE '^\s*#' <<<"$hook_src")"
+  non_comment="$(grep -vE '^[[:space:]]*#' <<<"$hook_src")"
 
   local missing_count=0
   local missing_phases=""

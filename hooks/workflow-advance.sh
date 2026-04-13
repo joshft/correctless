@@ -823,6 +823,9 @@ cmd_reset() {
           "$ARTIFACTS_DIR/checkpoint-creview-spec-"*.json "$ARTIFACTS_DIR/checkpoint-caudit-"*.json 2>/dev/null
     rm -f "$ARTIFACTS_DIR/.pkg-cache-"*.json 2>/dev/null
     rm -f "$ARTIFACTS_DIR/tdd-test-edits.log" "$ARTIFACTS_DIR/coverage-baseline-${slug_hash}.out" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/token-log-${slug_hash}.jsonl" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/review-decisions-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/antipattern-findings-${slug_hash}.json" 2>/dev/null
     # Clean lock dirs and temp files from locking operations
     rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null
     rm -f "${sf}."*.tmp "${sf}."[0-9]* 2>/dev/null

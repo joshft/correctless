@@ -20,7 +20,7 @@ skills/               # Source skills (27 SKILL.md files)
 hooks/                # Bash hooks (gate, state machine, statusline, audit trail)
 templates/            # Config, doc, and spec templates
 helpers/              # PBT guides per language (high+ intensity)
-tests/                # 32 test files (~2,000 assertions)
+tests/                # 48 test files (~3,900 assertions)
 setup                 # Install script
 sync.sh               # Copies source → correctless/ distribution
 correctless/          # Single distribution (27 skills, intensity-gated)
@@ -88,7 +88,7 @@ Run ShellCheck before submitting: `shellcheck hooks/*.sh`
 ## Testing
 
 ```bash
-# Run all 32 test suites (canonical command from workflow-config.json):
+# Run all 48 test suites (canonical command from workflow-config.json):
 bash tests/test.sh && bash tests/test-mcp.sh && bash tests/test-bugfixes.sh && bash tests/test-qol.sh && bash tests/test-decisions.sh && bash tests/test-statusline.sh && bash tests/test-consolidation.sh && bash tests/test-crelease.sh && bash tests/test-calm-resets.sh && bash tests/test-dynamic-rigor.sh && bash tests/test-intensity-detection.sh && bash tests/test-wire-intensity-creview.sh && bash tests/test-wire-intensity-pipeline.sh && bash tests/test-cexplain.sh && bash tests/test-auto-format.sh && bash tests/test-sensitive-file-guard.sh && bash tests/test-antipattern-scan.sh
 
 # Quick smoke test (2 suites):

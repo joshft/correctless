@@ -5,7 +5,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Skills: 26](https://img.shields.io/badge/skills-26-blue.svg)](docs/skills/)
+[![Skills: 27](https://img.shields.io/badge/skills-27-blue.svg)](docs/skills/)
 [![Version: 3.0.0](https://img.shields.io/badge/version-3.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
@@ -406,7 +406,7 @@ Optional (high+/critical):
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 27 skills, 3 intensity levels, ~3,060 automated tests, 4 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 27 skills, 3 intensity levels, ~3,900 automated tests, 4 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 
