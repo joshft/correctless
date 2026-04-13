@@ -1087,6 +1087,351 @@ SCRIPTEOF
 }
 
 # ============================================
+# UX-R-001 [unit]: Flexible phase entry — accepts any active phase
+# Tests spec rule R-001 from auto-ux-improvements.md
+# ============================================
+
+test_ux_r001_flexible_phase_entry() {
+  echo ""
+  echo "=== UX-R-001: Flexible phase entry ==="
+
+  local skill_file="$REPO_DIR/skills/cauto/SKILL.md"
+
+  # UX-R-001: SKILL.md must contain the phase-to-step mapping
+  file_contains_i "$skill_file" "phase.*step.*mapping\|phase-to-step\|remaining.*pipeline.*steps" \
+    "UX-R-001: SKILL.md contains phase-to-step mapping"
+
+  # UX-R-001: review/review-spec maps to full pipeline (ctdd through PR)
+  file_contains_i "$skill_file" "review.*full.*pipeline\|review.*ctdd.*through\|review-spec.*full" \
+    "UX-R-001: review/review-spec maps to full pipeline"
+
+  # UX-R-001: tdd phases resume from ctdd
+  file_contains_i "$skill_file" "tdd-tests.*resume.*ctdd\|tdd-impl.*resume.*ctdd\|tdd-qa.*resume.*ctdd" \
+    "UX-R-001: tdd phases resume from ctdd"
+
+  # UX-R-001: done maps to simplify through PR
+  file_contains_i "$skill_file" "done.*simplify" \
+    "UX-R-001: done phase maps to simplify through PR"
+
+  # UX-R-001: verified maps to cupdate-arch (if high+) through PR
+  file_contains_i "$skill_file" "verified.*cupdate-arch\|verified.*high" \
+    "UX-R-001: verified phase maps to cupdate-arch (if high+) through PR"
+
+  # UX-R-001: documented maps to consolidation/PR only
+  file_contains_i "$skill_file" "documented.*PR.*only\|documented.*Consolidation" \
+    "UX-R-001: documented phase maps to PR only"
+
+  # UX-R-001: spec and model phases are rejected
+  file_contains_i "$skill_file" "spec.*reject\|model.*reject\|spec.*before.*pipeline" \
+    "UX-R-001: spec and model phases are rejected"
+
+  # UX-R-001: spec rejection message mentions /creview
+  file_contains_i "$skill_file" "creview.*first\|Run.*creview" \
+    "UX-R-001: spec rejection message mentions /creview"
+
+  # UX-R-001: mid-TDD resume delegated to /ctdd
+  file_contains_i "$skill_file" "delegate.*ctdd\|trusts.*ctdd\|ctdd.*handle.*internal" \
+    "UX-R-001: mid-TDD resume delegated to /ctdd"
+}
+
+# ============================================
+# UX-R-002 [unit]: Artifact validation for skipped phases
+# Tests spec rule R-002 from auto-ux-improvements.md
+# ============================================
+
+test_ux_r002_artifact_validation() {
+  echo ""
+  echo "=== UX-R-002: Artifact validation for skipped phases ==="
+
+  local skill_file="$REPO_DIR/skills/cauto/SKILL.md"
+
+  # UX-R-002: validation only for phases being skipped, not current phase
+  file_contains_i "$skill_file" "validation.*skip\|already.*completed.*validate\|behind.*current.*phase" \
+    "UX-R-002: validation applies to skipped phases only"
+
+  # UX-R-002: ctdd validation = test suite passes
+  file_contains_i "$skill_file" "ctdd.*complete.*test.*suite\|test.*suite.*pass" \
+    "UX-R-002: ctdd validation checks test suite passes"
+
+  # UX-R-002: test timeout configurable via commands.test_timeout
+  file_contains_i "$skill_file" "test_timeout\|timeout.*configurable\|300.*second" \
+    "UX-R-002: test timeout configurable via commands.test_timeout"
+
+  # UX-R-002: cverify validation = verification report exists
+  file_contains_i "$skill_file" "verification.*report.*exist\|{task-slug}-verification" \
+    "UX-R-002: cverify validation checks verification report exists"
+
+  # UX-R-002: simplify, cupdate-arch, cdocs need no validation
+  file_contains_i "$skill_file" "no.*validation.*needed\|optional.*step\|advisory" \
+    "UX-R-002: optional steps need no validation"
+
+  # UX-R-002: validation failure triggers re-run of that phase
+  file_contains_i "$skill_file" "validation.*fail.*re-run\|re-run.*phase" \
+    "UX-R-002: validation failure triggers phase re-run"
+
+  # UX-R-002: 2 consecutive failures skip validation
+  file_contains_i "$skill_file" "2.*consecutive.*fail.*skip\|2.*consecutive.*proceed" \
+    "UX-R-002: 2 consecutive validation failures skips validation"
+
+  # UX-R-002: validation failure logged as artifact_validation_failed
+  file_contains "$skill_file" "artifact_validation_failed" \
+    "UX-R-002: validation failure logged as artifact_validation_failed"
+}
+
+# ============================================
+# UX-R-003 [unit]: Scoped commit consolidation before PR (F-001)
+# Tests spec rule R-003 from auto-ux-improvements.md
+# ============================================
+
+test_ux_r003_scoped_commit_consolidation() {
+  echo ""
+  echo "=== UX-R-003: Scoped commit consolidation ==="
+
+  local skill_file="$REPO_DIR/skills/cauto/SKILL.md"
+
+  # UX-R-003: consolidation step between cdocs and PR
+  file_contains_i "$skill_file" "consolidation.*cdocs.*PR\|cdocs.*consolidation\|consolidation.*step" \
+    "UX-R-003: consolidation step between cdocs and PR"
+
+  # UX-R-003: uses git diff main...HEAD --name-only
+  file_contains "$skill_file" "git diff main...HEAD --name-only" \
+    "UX-R-003: uses git diff main...HEAD --name-only"
+
+  # UX-R-003: explicit pipeline output paths listed
+  file_contains_i "$skill_file" "explicit.*path.*list\|pipeline.*output.*path" \
+    "UX-R-003: explicit pipeline output paths listed"
+
+  # UX-R-003: specific paths in the explicit list
+  file_contains "$skill_file" ".correctless/verification/{task-slug}-verification.md" \
+    "UX-R-003: explicit list includes verification report"
+  file_contains "$skill_file" ".correctless/ARCHITECTURE.md" \
+    "UX-R-003: explicit list includes ARCHITECTURE.md"
+  file_contains "$skill_file" ".correctless/AGENT_CONTEXT.md" \
+    "UX-R-003: explicit list includes AGENT_CONTEXT.md"
+  file_contains "$skill_file" "README.md" \
+    "UX-R-003: explicit list includes README.md"
+  file_contains "$skill_file" "CONTRIBUTING.md" \
+    "UX-R-003: explicit list includes CONTRIBUTING.md"
+  file_contains "$skill_file" "docs/workflow-history.md" \
+    "UX-R-003: explicit list includes docs/workflow-history.md"
+  file_contains_i "$skill_file" "docs/features/" \
+    "UX-R-003: explicit list includes docs/features/"
+
+  # UX-R-003: unknown untracked files never staged
+  file_contains_i "$skill_file" "untracked.*never.*staged\|unknown.*untracked.*never" \
+    "UX-R-003: unknown untracked files never staged"
+
+  # UX-R-003: belt-and-suspenders unstage .correctless/artifacts/
+  file_contains "$skill_file" "git reset HEAD .correctless/artifacts/" \
+    "UX-R-003: belt-and-suspenders unstage .correctless/artifacts/"
+
+  # UX-R-003: commit message convention
+  file_contains "$skill_file" "Add pipeline artifacts for {task-slug}" \
+    "UX-R-003: commit message is 'Add pipeline artifacts for {task-slug}'"
+
+  # UX-R-003: push derives remote name from branch config
+  file_contains_i "$skill_file" "git config.*branch.*remote\|derive.*remote" \
+    "UX-R-003: push derives remote name from branch config"
+
+  # UX-R-003: fresh branch uses --set-upstream
+  file_contains_i "$skill_file" "set-upstream" \
+    "UX-R-003: fresh branch uses --set-upstream"
+
+  # UX-R-003: no remote configured aborts
+  file_contains "$skill_file" "No git remote configured" \
+    "UX-R-003: aborts if no git remote configured"
+
+  # UX-R-003: protected branch guard
+  file_contains_i "$skill_file" "main.*master.*develop.*release\|must not push.*main" \
+    "UX-R-003: protected branch guard for main/master/develop/release"
+
+  # UX-R-003: no-op when nothing to commit
+  file_contains_i "$skill_file" "no.*uncommitted.*skip\|no-op" \
+    "UX-R-003: no-op when no uncommitted changes"
+
+  # UX-R-003: push failure preserves commit, skips PR
+  file_contains_i "$skill_file" "push.*fail.*abort\|local.*commit.*preserved" \
+    "UX-R-003: push failure preserves local commit, skips PR"
+}
+
+# ============================================
+# UX-R-004 [unit]: Structured end-of-pipeline summary
+# Tests spec rule R-004 from auto-ux-improvements.md
+# ============================================
+
+test_ux_r004_pipeline_summary() {
+  echo ""
+  echo "=== UX-R-004: Structured end-of-pipeline summary ==="
+
+  local skill_file="$REPO_DIR/skills/cauto/SKILL.md"
+
+  # UX-R-004: summary has three sections
+  file_contains_i "$skill_file" "Findings.*Decisions" \
+    "UX-R-004: summary has Findings & Decisions section"
+
+  file_contains_i "$skill_file" "Phase.*Breakdown" \
+    "UX-R-004: summary has Phase Breakdown section"
+
+  file_contains "$skill_file" "Artifacts" \
+    "UX-R-004: summary has Artifacts section"
+
+  # UX-R-004: findings include dispositions
+  file_contains_i "$skill_file" "disposition.*fixed.*deferred.*accepted\|finding.*disposition" \
+    "UX-R-004: findings include dispositions (fixed/deferred/accepted)"
+
+  # UX-R-004: deferred items shown with reason
+  file_contains_i "$skill_file" "deferred.*reason\|deferred.*items.*reason" \
+    "UX-R-004: deferred items shown with reason"
+
+  # UX-R-004: Phase Breakdown columns: step name, duration, token count, result
+  file_contains_i "$skill_file" "step.*name.*duration.*token.*result\|duration.*token.*count.*result" \
+    "UX-R-004: Phase Breakdown table has step name, duration, token count, result"
+
+  # UX-R-004: duration from skill_started/skill_completed elapsed_ms
+  file_contains_i "$skill_file" "skill_completed.*elapsed_ms.*skill_started\|last.*skill_completed.*first.*skill_started" \
+    "UX-R-004: duration from skill_started/skill_completed elapsed_ms"
+
+  # UX-R-004: incomplete phases detected
+  file_contains_i "$skill_file" "skill_started.*without.*skill_completed\|never.*completed.*incomplete" \
+    "UX-R-004: incomplete phases detected"
+
+  # UX-R-004: Artifacts section lists file paths
+  file_contains_i "$skill_file" "file.*path.*spec.*verification\|spec.*verification.*report.*QA" \
+    "UX-R-004: Artifacts section lists key file paths"
+
+  # UX-R-004: truncation at >20 severity-bearing items
+  file_contains_i "$skill_file" "more.*than.*20\|truncation.*20\|20.*items" \
+    "UX-R-004: truncation at >20 severity-bearing items"
+
+  # UX-R-004: HIGH/CRITICAL always shown inline
+  file_contains_i "$skill_file" "HIGH.*CRITICAL.*always.*shown\|always.*shown.*inline" \
+    "UX-R-004: HIGH/CRITICAL always shown inline"
+
+  # UX-R-004: deferred items always shown inline
+  file_contains_i "$skill_file" "deferred.*always.*shown\|deferred.*inline" \
+    "UX-R-004: deferred items always shown inline"
+
+  # UX-R-004: override activity always shown inline
+  file_contains_i "$skill_file" "override.*activity.*shown\|override.*always" \
+    "UX-R-004: override activity always shown inline"
+
+  # UX-R-004: non-severity sources always shown inline
+  file_contains_i "$skill_file" "non-severity.*inline\|non-severity.*always" \
+    "UX-R-004: non-severity sources always shown inline"
+
+  # UX-R-004: count-and-reference summary for truncated items
+  file_contains_i "$skill_file" "count.*reference.*summary\|see.*qa-findings.*full" \
+    "UX-R-004: count-and-reference summary for truncated items"
+
+  # UX-R-004: orchestrator logs skill events for all steps including /simplify
+  file_contains_i "$skill_file" "orchestrator.*log.*all.*step\|including.*simplify" \
+    "UX-R-004: orchestrator logs skill events for all steps including /simplify"
+}
+
+# ============================================
+# UX-R-005 [unit]: New audit trail event type artifact_validation_failed
+# Tests spec rule R-005 from auto-ux-improvements.md
+# ============================================
+
+test_ux_r005_artifact_validation_event() {
+  echo ""
+  echo "=== UX-R-005: artifact_validation_failed event type ==="
+
+  local skill_file="$REPO_DIR/skills/cauto/SKILL.md"
+
+  # UX-R-005: artifact_validation_failed event type in audit trail section
+  file_contains "$skill_file" "artifact_validation_failed" \
+    "UX-R-005: SKILL.md contains artifact_validation_failed event type"
+
+  # UX-R-005: event includes phase, expected_artifact, validation_error fields
+  file_contains_i "$skill_file" "artifact_validation_failed.*phase\|phase.*expected_artifact.*validation_error" \
+    "UX-R-005: artifact_validation_failed event includes phase field"
+
+  file_contains "$skill_file" "expected_artifact" \
+    "UX-R-005: artifact_validation_failed event includes expected_artifact field"
+
+  file_contains "$skill_file" "validation_error" \
+    "UX-R-005: artifact_validation_failed event includes validation_error field"
+
+  # UX-R-005: event type count is now 8 (was 7)
+  # The SKILL.md declares "one of the 8 event types" in the audit trail section
+  file_contains "$skill_file" "one of the 8 event types" \
+    "UX-R-005: audit trail declares 8 event types"
+}
+
+# ============================================
+# UX-R-006 [unit]: Summary reads from multiple data sources
+# Tests spec rule R-006 from auto-ux-improvements.md
+# ============================================
+
+test_ux_r006_summary_data_sources() {
+  echo ""
+  echo "=== UX-R-006: Summary data sources ==="
+
+  local skill_file="$REPO_DIR/skills/cauto/SKILL.md"
+
+  # UX-R-006: each data source file is referenced by name
+  file_contains "$skill_file" "qa-findings-{task-slug}.json" \
+    "UX-R-006(a): reads QA findings JSON"
+
+  file_contains "$skill_file" "{task-slug}-verification.md" \
+    "UX-R-006(b): reads verification report"
+
+  file_contains "$skill_file" "review-decisions-{task-slug}.json" \
+    "UX-R-006(c): reads review decisions JSON"
+
+  file_contains "$skill_file" "override-log-{branch-slug}.json" \
+    "UX-R-006(d): reads override log JSON"
+
+  file_contains "$skill_file" "audit-trail-{branch-slug}.jsonl" \
+    "UX-R-006(e): reads audit trail JSONL"
+
+  # UX-R-006: missing source files are omitted, not errors
+  file_contains_i "$skill_file" "source.*doesn.*exist.*omit\|not.*exist.*omit" \
+    "UX-R-006: missing source files are omitted, not errors"
+
+  # UX-R-006: documents task-slug vs branch-slug distinction
+  file_contains_i "$skill_file" "task-slug.*branch-slug.*different\|different.*values" \
+    "UX-R-006: documents task-slug vs branch-slug distinction"
+}
+
+# ============================================
+# UX-R-007 [unit]: Phase Breakdown uses skill names
+# Tests spec rule R-007 from auto-ux-improvements.md
+# ============================================
+
+test_ux_r007_phase_breakdown_skill_names() {
+  echo ""
+  echo "=== UX-R-007: Phase Breakdown uses skill names ==="
+
+  local skill_file="$REPO_DIR/skills/cauto/SKILL.md"
+
+  # UX-R-007: Phase Breakdown uses skill names as row identifiers
+  file_contains_i "$skill_file" "skill.*name.*row\|row.*identifier.*skill\|skill.*name.*identifier" \
+    "UX-R-007: Phase Breakdown uses skill names as row identifiers"
+
+  # UX-R-007: explicitly states not using phase names for rows
+  file_contains_i "$skill_file" "not.*workflow.*phase.*name\|not.*phase.*name" \
+    "UX-R-007: explicitly states not using phase names for rows"
+
+  # UX-R-007: duration from last skill_completed minus first skill_started
+  file_contains_i "$skill_file" "last.*skill_completed.*first.*skill_started\|skill_completed.*elapsed_ms.*skill_started" \
+    "UX-R-007: duration computed from audit trail entries"
+
+  # UX-R-007: multiple attempts span covered
+  file_contains_i "$skill_file" "multiple.*attempts.*span\|covers.*all.*attempts" \
+    "UX-R-007: multiple attempts/retries span covered"
+
+  # UX-R-007: token count from token-log JSONL
+  file_contains "$skill_file" "token-log-{branch-slug}.jsonl" \
+    "UX-R-007: token count from token-log JSONL"
+
+  # UX-R-007: missing token log shows dash
+  file_contains_i "$skill_file" "token.*log.*doesn.*exist.*—\|no.*entries.*—" \
+    "UX-R-007: missing token log shows dash"
+}
+
+# ============================================
 # Runner
 # ============================================
 
@@ -1127,6 +1472,15 @@ test_pre007_sync_includes_cauto
 # QA class fixes
 test_qa001_skill_count_matches_docs
 test_qa002_is_full_mode_behavioral
+
+# UX improvements (auto-ux-improvements spec)
+test_ux_r001_flexible_phase_entry
+test_ux_r002_artifact_validation
+test_ux_r003_scoped_commit_consolidation
+test_ux_r004_pipeline_summary
+test_ux_r005_artifact_validation_event
+test_ux_r006_summary_data_sources
+test_ux_r007_phase_breakdown_skill_names
 
 echo ""
 echo "============================================="
