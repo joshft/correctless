@@ -92,6 +92,23 @@ now_iso() {
   date -u +%FT%TZ
 }
 
+# _read_spec_hash — resolve spec file path from state and compute its SHA-256 hash
+# Sets caller variables: _spec_path, _spec_hash, _spec_lines
+# Returns 1 if the spec path is unset/null or the file is missing/unhashable.
+_read_spec_hash() {
+  local state="$1"
+  _spec_path="$(echo "$state" | jq -r '.spec_file // ""')"
+  _spec_hash=""
+  _spec_lines="0"
+
+  [ -n "$_spec_path" ] && [ "$_spec_path" != "null" ] || return 1
+  [ -f "$REPO_ROOT/$_spec_path" ] || return 1
+
+  _spec_hash="$(sha256_hash_file "$REPO_ROOT/$_spec_path" 2>/dev/null || echo "")"
+  _spec_lines="$(wc -l < "$REPO_ROOT/$_spec_path" 2>/dev/null || echo "0")"
+  [ -n "$_spec_hash" ] || return 1
+}
+
 current_branch() {
   local b
   b="$(git branch --show-current 2>/dev/null)" || die "Not in a git repository"
@@ -507,18 +524,14 @@ cmd_tests() {
   spec_file_exists
 
   # R-001: Hash the spec file at review->tests transition and store spec_hash
-  local state spec_path spec_hash sf ts spec_lines
-  state="$(read_state)"
-  spec_path="$(echo "$state" | jq -r '.spec_file')"
-  spec_hash="$(sha256_hash_file "$REPO_ROOT/$spec_path" 2>/dev/null || echo "")"
-  spec_lines="$(wc -l < "$REPO_ROOT/$spec_path" 2>/dev/null || echo "0")"
-
-  sf="$(state_file)"
-  ts="$(now_iso)"
-  if [ -n "$spec_hash" ]; then
+  local _spec_path _spec_hash _spec_lines
+  if _read_spec_hash "$(read_state)"; then
+    local sf ts
+    sf="$(state_file)"
+    ts="$(now_iso)"
     locked_update_state "$sf" \
       '.phase = "tdd-tests" | .phase_entered_at = $ts | .spec_hash = $hash | .spec_line_count = ($lines | tonumber)' \
-      --arg ts "$ts" --arg hash "$spec_hash" --arg lines "$spec_lines" \
+      --arg ts "$ts" --arg hash "$_spec_hash" --arg lines "$_spec_lines" \
       || die "Failed to update state for tdd-tests phase"
     info "Phase: tdd-tests"
   else
@@ -635,15 +648,9 @@ cmd_done() {
         local original_lines current_lines delta
         original_lines="$(echo "$state" | jq -r '.spec_line_count // 0')"
         current_lines="$(wc -l < "$REPO_ROOT/$spec_path" 2>/dev/null || echo "0")"
-        if [ "$original_lines" -gt 0 ] 2>/dev/null; then
-          delta="$((current_lines - original_lines))"
-          if [ "$delta" -ge 0 ]; then
-            delta="+$delta"
-          fi
-          info "WARNING: Spec file was modified after review approval. ${delta} lines changed. The implementation may not match the reviewed spec. Consider re-running /creview-spec."
-        else
-          info "WARNING: Spec file was modified after review approval. $(wc -l < "$REPO_ROOT/$spec_path") lines changed. The implementation may not match the reviewed spec. Consider re-running /creview-spec."
-        fi
+        delta="$((current_lines - original_lines))"
+        [ "$delta" -ge 0 ] && delta="+$delta"
+        info "WARNING: Spec file was modified after review approval. ${delta} lines changed. The implementation may not match the reviewed spec. Consider re-running /creview-spec."
       fi
     fi
   fi
@@ -835,15 +842,9 @@ cmd_spec_update() {
   from_phase="$(read_phase)"
 
   # R-003: Re-hash spec file and update spec_hash (legitimate spec change path)
-  local state spec_path spec_hash spec_lines
-  state="$(read_state)"
-  spec_path="$(echo "$state" | jq -r '.spec_file // ""')"
-  spec_hash=""
-  spec_lines="0"
-  if [ -n "$spec_path" ] && [ "$spec_path" != "null" ] && [ -f "$REPO_ROOT/$spec_path" ]; then
-    spec_hash="$(sha256_hash_file "$REPO_ROOT/$spec_path" 2>/dev/null || echo "")"
-    spec_lines="$(wc -l < "$REPO_ROOT/$spec_path" 2>/dev/null || echo "0")"
-  fi
+  local _spec_path _spec_hash _spec_lines
+  local has_hash=false
+  _read_spec_hash "$(read_state)" && has_hash=true
 
   # QA-R2-004: Use locked_update_state for atomic read-modify-write
   local sf ts
@@ -851,25 +852,21 @@ cmd_spec_update() {
   ts="$(now_iso)"
   # QA-R3-001: Use --arg for user-supplied $reason to prevent jq injection
   # Note: avoid `X + 1 as $c` — jq 1.7 parses this as `X + (1 as $c)` (CI regression)
-  if [ -n "$spec_hash" ]; then
-    locked_update_state "$sf" \
-      '.spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: $reason, timestamp: $ts}]
-       | .spec_updates = ((.spec_updates // 0) + 1)
-       | .phase = "spec"
-       | .phase_entered_at = $ts
-       | .spec_hash = $hash
-       | .spec_line_count = ($lines | tonumber)' \
-      --arg reason "$reason" --arg ts "$ts" --arg hash "$spec_hash" --arg lines "$spec_lines" \
-      || die "Failed to update state for spec-update"
-  else
-    locked_update_state "$sf" \
-      '.spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: $reason, timestamp: $ts}]
-       | .spec_updates = ((.spec_updates // 0) + 1)
-       | .phase = "spec"
-       | .phase_entered_at = $ts' \
-      --arg reason "$reason" --arg ts "$ts" \
-      || die "Failed to update state for spec-update"
+  local jq_filter hash_args=()
+  jq_filter='.spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: $reason, timestamp: $ts}]
+     | .spec_updates = ((.spec_updates // 0) + 1)
+     | .phase = "spec"
+     | .phase_entered_at = $ts'
+  if [ "$has_hash" = true ]; then
+    jq_filter="$jq_filter"'
+     | .spec_hash = $hash
+     | .spec_line_count = ($lines | tonumber)'
+    hash_args=(--arg hash "$_spec_hash" --arg lines "$_spec_lines")
   fi
+  locked_update_state "$sf" \
+    "$jq_filter" \
+    --arg reason "$reason" --arg ts "$ts" "${hash_args[@]}" \
+    || die "Failed to update state for spec-update"
   info "Phase: spec"
 
   # Re-read update_count for the warning check
