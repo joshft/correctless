@@ -343,7 +343,7 @@ Then advance:
 Before spawning the QA agent, run the deterministic antipattern scanner:
 
 ```bash
-bash scripts/antipattern-scan.sh {default_branch}
+bash .correctless/scripts/antipattern-scan.sh {default_branch}
 ```
 
 where `{default_branch}` is read from `workflow.default_branch` in `workflow-config.json`, falling back to `main` if absent.

@@ -4,7 +4,7 @@
 # Scans files changed on current branch for common AI-generated code antipatterns.
 # Outputs findings as JSON to stdout.
 #
-# Usage: bash scripts/antipattern-scan.sh [base-branch]
+# Usage: bash .correctless/scripts/antipattern-scan.sh [base-branch]
 #   base-branch: Branch to diff against (default: main)
 
 set -euo pipefail

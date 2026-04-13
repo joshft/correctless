@@ -177,8 +177,8 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
     _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd || true)"
     if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
       source "$_LIB_DIR/lib.sh"; _LIBS_LOADED=1
-    elif [ -f "scripts/lib.sh" ]; then
-      source "scripts/lib.sh"; _LIBS_LOADED=1
+    elif [ -f ".correctless/scripts/lib.sh" ]; then
+      source ".correctless/scripts/lib.sh"; _LIBS_LOADED=1
     fi
   fi
 

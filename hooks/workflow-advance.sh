@@ -30,10 +30,10 @@ _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd ||
 if [ -n "$_LIB_DIR" ] && [ -f "$_LIB_DIR/lib.sh" ]; then
   # shellcheck source=../scripts/lib.sh
   source "$_LIB_DIR/lib.sh"
-elif [ -f "$REPO_ROOT/scripts/lib.sh" ]; then
-  source "$REPO_ROOT/scripts/lib.sh"
+elif [ -f "$REPO_ROOT/.correctless/scripts/lib.sh" ]; then
+  source "$REPO_ROOT/.correctless/scripts/lib.sh"
 else
-  die "Cannot find scripts/lib.sh — run setup or check installation"
+  die "Cannot find .correctless/scripts/lib.sh — run setup or check installation"
 fi
 unset _LIB_DIR
 

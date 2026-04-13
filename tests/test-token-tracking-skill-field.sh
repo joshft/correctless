@@ -69,8 +69,8 @@ setup_test_env() {
   git checkout -q -b "$BRANCH_NAME"
 
   # Copy lib.sh so the hook can source it
-  mkdir -p scripts
-  cp "$LIB_SH" scripts/lib.sh
+  mkdir -p .correctless/scripts
+  cp "$LIB_SH" .correctless/scripts/lib.sh
 
   # Copy the hook under test
   mkdir -p hooks
@@ -81,7 +81,7 @@ setup_test_env() {
   mkdir -p .correctless/artifacts
 
   # Compute the branch slug using lib.sh
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
   SLUG="$(branch_slug)"
   TOKEN_LOG=".correctless/artifacts/token-log-${SLUG}.jsonl"
   STATE_FILE=".correctless/artifacts/workflow-state-${SLUG}.json"

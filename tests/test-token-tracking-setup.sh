@@ -68,8 +68,8 @@ setup_test_env() {
   git checkout -q -b feature/test-token-setup
 
   # Copy lib.sh
-  mkdir -p scripts
-  cp "$LIB_SH" scripts/lib.sh
+  mkdir -p .correctless/scripts
+  cp "$LIB_SH" .correctless/scripts/lib.sh
 
   # Create .claude directory with settings.json
   mkdir -p .claude

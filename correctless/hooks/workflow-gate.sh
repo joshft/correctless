@@ -32,8 +32,8 @@ _source_lib() {
   if [ -n "$lib_dir" ] && [ -f "$lib_dir/lib.sh" ]; then
     # shellcheck source=../scripts/lib.sh
     source "$lib_dir/lib.sh"
-  elif [ -f "$REPO_ROOT/scripts/lib.sh" ]; then
-    source "$REPO_ROOT/scripts/lib.sh"
+  elif [ -f "$REPO_ROOT/.correctless/scripts/lib.sh" ]; then
+    source "$REPO_ROOT/.correctless/scripts/lib.sh"
   else
     return 1
   fi

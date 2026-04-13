@@ -105,8 +105,8 @@ setup_test_env() {
   git checkout -q -b "$BRANCH_NAME"
 
   # Copy lib.sh
-  mkdir -p scripts
-  cp "$LIB_SH" scripts/lib.sh
+  mkdir -p .correctless/scripts
+  cp "$LIB_SH" .correctless/scripts/lib.sh
 
   # Create workflow config
   mkdir -p .correctless/config
@@ -126,7 +126,7 @@ WCEOF
   mkdir -p .correctless/artifacts .correctless/specs
 
   # Compute branch slug for state file path
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
   SLUG="$(branch_slug)"
   STATE_FILE=".correctless/artifacts/workflow-state-${SLUG}.json"
 }
@@ -176,7 +176,7 @@ test_override_uses_locking() {
   setup_test_env
   set_phase_with_override "tdd-qa" 5
 
-  source scripts/lib.sh
+  source .correctless/scripts/lib.sh
 
   # The override decrement in workflow-gate.sh should acquire the state lock
   # before reading/writing the state file. We verify this by checking that:
