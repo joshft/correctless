@@ -441,6 +441,13 @@ check_shell() {
   # (c) TODO / FIXME / HACK
   check_todo_comments "$file" '#[[:space:]]*(TODO|FIXME|HACK)'
 
+  # (d) AP-014: jq -s / jq --slurp on JSONL — malformed lines cause total parse failure
+  # JSONL consumers must use jq -R with try/catch, never jq -s (ABS-006)
+  while IFS=: read -r line_num _; do
+    [ -n "$line_num" ] || continue
+    add_finding "jq-slurp-jsonl" "$file" "$line_num"
+  done < <(grep -nE 'jq[[:space:]]+(--slurp|-s[[:space:]])' "$file" 2>/dev/null || true)
+
   # (e) AP-001: Perl regex mode in grep — not portable, fails silently on BSD/macOS
   # Detects uses of the Perl-compatible regex flag and --perl-regexp long form
   while IFS=: read -r line_num _; do
@@ -449,57 +456,46 @@ check_shell() {
   done < <(grep -nE "grep[[:space:]]+((-[[:alpha:]]*[P])|--perl-regexp)" "$file" 2>/dev/null || true)
 
   # (f) AP-001: GNU extensions in grep patterns — not POSIX ERE
-  # Detects backslash-s/w/d/b in grep context with line-scoped POSIX exclusions
-  # Uses printf to build match patterns, avoiding literal non-POSIX sequences in this file
-  local _bs_s _bs_w _bs_d _bs_b
-  _bs_s="$(printf '\\s')"
-  _bs_w="$(printf '\\w')"
-  _bs_d="$(printf '\\d')"
-  _bs_b="$(printf '\\b')"
+  # Detects backslash-s/w/d/b in grep context with line-scoped POSIX exclusions.
+  # Uses printf to build match patterns, avoiding literal non-POSIX sequences in this file.
+  # Each entry: "escape_char posix_exclusion_pattern pattern_id"
+  #   \s -> [[:space:]] suppresses, \w -> [[:alnum:]], \d -> [[:digit:]]
+  #   \b uses a regex check for grep -w instead of a fixed-string exclusion
+  local _gnu_ext_checks=(
+    "s [[:space:]] gnu-grep-ext"
+    "w [[:alnum:]] gnu-grep-ext"
+    "d [[:digit:]] gnu-grep-ext"
+  )
 
   while IFS=: read -r line_num line_content; do
     [ -n "$line_num" ] || continue
-    # Only scan lines that contain grep
     case "$line_content" in
       *grep*) ;;
       *) continue ;;
     esac
 
-    # Check for backslash-s with POSIX exclusion [[:space:]]
-    if echo "$line_content" | grep -qF "$_bs_s" 2>/dev/null; then
-      if ! echo "$line_content" | grep -qF '[[:space:]]' 2>/dev/null; then
-        add_finding "gnu-grep-ext" "$file" "$line_num"
+    local _check
+    for _check in "${_gnu_ext_checks[@]}"; do
+      local _char _posix_excl _pat_id
+      read -r _char _posix_excl _pat_id <<< "$_check"
+      local _bs
+      _bs="$(printf '\\%s' "$_char")"
+      if echo "$line_content" | grep -qF "$_bs" 2>/dev/null; then
+        if ! echo "$line_content" | grep -qF "$_posix_excl" 2>/dev/null; then
+          add_finding "$_pat_id" "$file" "$line_num"
+        fi
       fi
-    fi
+    done
 
-    # Check for backslash-w with POSIX exclusion [[:alnum:]]
-    if echo "$line_content" | grep -qF "$_bs_w" 2>/dev/null; then
-      if ! echo "$line_content" | grep -qF '[[:alnum:]]' 2>/dev/null; then
-        add_finding "gnu-grep-ext" "$file" "$line_num"
-      fi
-    fi
-
-    # Check for backslash-d with POSIX exclusion [[:digit:]]
-    if echo "$line_content" | grep -qF "$_bs_d" 2>/dev/null; then
-      if ! echo "$line_content" | grep -qF '[[:digit:]]' 2>/dev/null; then
-        add_finding "gnu-grep-ext" "$file" "$line_num"
-      fi
-    fi
-
-    # Check for backslash-b with POSIX exclusion: grep -w on same line
+    # \b is special: suppressed by grep -w (regex check), not a POSIX character class
+    local _bs_b
+    _bs_b="$(printf '\\b')"
     if echo "$line_content" | grep -qF "$_bs_b" 2>/dev/null; then
       if ! echo "$line_content" | grep -qE 'grep[[:space:]]+-w' 2>/dev/null; then
         add_finding "gnu-grep-ext-low" "$file" "$line_num"
       fi
     fi
   done < <(grep -nF '\' "$file" 2>/dev/null | grep -E '[\\][swdb]' || true)
-
-  # (d) AP-014: jq -s / jq --slurp on JSONL — malformed lines cause total parse failure
-  # JSONL consumers must use jq -R with try/catch, never jq -s (ABS-006)
-  while IFS=: read -r line_num _; do
-    [ -n "$line_num" ] || continue
-    add_finding "jq-slurp-jsonl" "$file" "$line_num"
-  done < <(grep -nE 'jq[[:space:]]+(--slurp|-s[[:space:]])' "$file" 2>/dev/null || true)
 }
 
 # --- Rust checks (R-008) ---
@@ -702,7 +698,7 @@ _is_pluggable_function() {
 }
 
 check_dead_security_calls() {
-  # Find all security scripts in the repo
+  # Collect security scripts from the repo
   local -a security_scripts=()
   while IFS= read -r script; do
     [ -z "$script" ] && continue
@@ -721,17 +717,27 @@ check_dead_security_calls() {
     fi
   done < <(find scripts/ -name '*.sh' -type f 2>/dev/null)
 
-  # For each function defined in security scripts
+  [ ${#security_scripts[@]} -eq 0 ] && return 0
+
+  # Build production directory list once (stable across all scripts)
+  local -a prod_dirs=()
+  [ -d "hooks" ] && prod_dirs+=("hooks/")
+  [ -d "scripts" ] && prod_dirs+=("scripts/")
+  [ -f "setup" ] && prod_dirs+=("setup")
+  [ -d "bin" ] && prod_dirs+=("bin/")
+  [ ${#prod_dirs[@]} -eq 0 ] && return 0
+
   for script in "${security_scripts[@]}"; do
     while IFS= read -r fn_line; do
       [ -z "$fn_line" ] && continue
 
-      local line_num fn_name full_line
+      local line_num full_line fn_name
       line_num="${fn_line%%:*}"
       full_line="${fn_line#*:}"
 
       # Extract function name from both syntaxes:
-      # name() { ... and function name { ...
+      #   name() { ...      -> capture "name"
+      #   function name { .. -> capture "name"
       if echo "$full_line" | grep -qE '^[[:space:]]*function[[:space:]]+'; then
         fn_name="$(echo "$full_line" | sed -n 's/^[[:space:]]*function[[:space:]]\+\([a-zA-Z_][a-zA-Z0-9_]*\).*/\1/p')"
       else
@@ -745,51 +751,37 @@ check_dead_security_calls() {
         continue
       fi
 
-      # Check if any production file calls this function
-      # Production files: hooks/, scripts/, setup, bin/ — excluding tests/
+      # Search production directories for callers, excluding tests and the definition line
       local has_caller=false
+      local caller_output
+      caller_output="$(grep -rnF "$fn_name" "${prod_dirs[@]}" 2>/dev/null | \
+        grep -v "tests/test-" | \
+        grep -v "/tests/" | \
+        grep -v "^${script}:${line_num}:" || true)"
 
-      # Search production directories for callers (using fixed-string grep)
-      local -a prod_dirs=()
-      [ -d "hooks" ] && prod_dirs+=("hooks/")
-      [ -d "scripts" ] && prod_dirs+=("scripts/")
-      [ -f "setup" ] && prod_dirs+=("setup")
-      [ -d "bin" ] && prod_dirs+=("bin/")
+      while IFS= read -r caller_line; do
+        [ -z "$caller_line" ] && continue
+        local caller_content
+        # Strip "file:line:" prefix to get line content
+        caller_content="${caller_line#*:}"
+        caller_content="${caller_content#*:}"
 
-      if [ ${#prod_dirs[@]} -gt 0 ]; then
-        # Grep for the function name in production files, excluding the definition file itself
-        # and excluding test paths
-        local caller_output
-        caller_output="$(grep -rnF "$fn_name" "${prod_dirs[@]}" 2>/dev/null | \
-          grep -v "tests/test-" | \
-          grep -v "/tests/" | \
-          grep -v "^${script}:${line_num}:" || true)"
+        # Skip comment-only lines (strip leading spaces and tabs, then check for #)
+        local trimmed
+        trimmed="${caller_content#"${caller_content%%[! ]*}"}"
+        trimmed="${trimmed#"${trimmed%%[!	]*}"}"
+        case "$trimmed" in
+          \#*) continue ;;
+        esac
 
-        # Filter out the function definition line itself (same file, different lines still count)
-        # Also filter out comments-only matches
-        while IFS= read -r caller_line; do
-          [ -z "$caller_line" ] && continue
-          local caller_content
-          caller_content="${caller_line#*:}"
-          caller_content="${caller_content#*:}"
+        # Skip lines that are themselves function definitions of the same name
+        if echo "$caller_content" | grep -qE "(^|[[:space:]])(function[[:space:]]+)?${fn_name}[[:space:]]*\(\)|^[[:space:]]*function[[:space:]]+${fn_name}[[:space:]]*\{"; then
+          continue
+        fi
 
-          # Skip comment-only lines
-          local trimmed
-          trimmed="${caller_content#"${caller_content%%[! ]*}"}"
-          trimmed="${trimmed#"${trimmed%%[!	]*}"}"
-          case "$trimmed" in
-            \#*) continue ;;
-          esac
-
-          # Skip the function definition itself (any syntax)
-          if echo "$caller_content" | grep -qE "(^|[[:space:]])(function[[:space:]]+)?${fn_name}[[:space:]]*\(\)|^[[:space:]]*function[[:space:]]+${fn_name}[[:space:]]*\{"; then
-            continue
-          fi
-
-          has_caller=true
-          break
-        done <<< "$caller_output"
-      fi
+        has_caller=true
+        break
+      done <<< "$caller_output"
 
       if [ "$has_caller" = false ]; then
         add_finding "dead-security-fn" "$script" "$line_num"

@@ -2445,33 +2445,22 @@ test_se_r003_pattern_meta_entries() {
   echo ""
   echo "=== SE-R-003: PATTERN_META entries for new pattern IDs ==="
 
-  # Check that PATTERN_META contains entries for all new pattern IDs
-  # gnu-grep-p: high, portability
+  # Check that PATTERN_META contains entries for all new pattern IDs.
+  # Uses quoted form "pattern-id" to avoid substring false positives (e.g., gnu-grep-ext vs gnu-grep-ext-low).
   local has_grep_p="no"
-  grep -q '"gnu-grep-p"' "$SCANNER" 2>/dev/null || \
-  grep -q '\[gnu-grep-p\]' "$SCANNER" 2>/dev/null || \
-  grep -q '\["gnu-grep-p"\]' "$SCANNER" 2>/dev/null && has_grep_p="yes"
+  grep -qF '"gnu-grep-p"' "$SCANNER" 2>/dev/null && has_grep_p="yes"
   assert_eq "SE-R-003a: PATTERN_META has gnu-grep-p" "yes" "$has_grep_p"
 
-  # gnu-grep-ext: medium, portability
   local has_grep_ext="no"
-  grep -q '"gnu-grep-ext"' "$SCANNER" 2>/dev/null || \
-  grep -q '\[gnu-grep-ext\]' "$SCANNER" 2>/dev/null || \
-  grep -q '\["gnu-grep-ext"\]' "$SCANNER" 2>/dev/null && has_grep_ext="yes"
+  grep -qF '"gnu-grep-ext"' "$SCANNER" 2>/dev/null && has_grep_ext="yes"
   assert_eq "SE-R-003b: PATTERN_META has gnu-grep-ext" "yes" "$has_grep_ext"
 
-  # gnu-grep-ext-low: low, portability (for \b)
   local has_grep_ext_low="no"
-  grep -q '"gnu-grep-ext-low"' "$SCANNER" 2>/dev/null || \
-  grep -q '\[gnu-grep-ext-low\]' "$SCANNER" 2>/dev/null || \
-  grep -q '\["gnu-grep-ext-low"\]' "$SCANNER" 2>/dev/null && has_grep_ext_low="yes"
+  grep -qF '"gnu-grep-ext-low"' "$SCANNER" 2>/dev/null && has_grep_ext_low="yes"
   assert_eq "SE-R-003c: PATTERN_META has gnu-grep-ext-low" "yes" "$has_grep_ext_low"
 
-  # dead-security-fn: high, security-enforcement
   local has_dead_fn="no"
-  grep -q '"dead-security-fn"' "$SCANNER" 2>/dev/null || \
-  grep -q '\[dead-security-fn\]' "$SCANNER" 2>/dev/null || \
-  grep -q '\["dead-security-fn"\]' "$SCANNER" 2>/dev/null && has_dead_fn="yes"
+  grep -qF '"dead-security-fn"' "$SCANNER" 2>/dev/null && has_dead_fn="yes"
   assert_eq "SE-R-003d: PATTERN_META has dead-security-fn" "yes" "$has_dead_fn"
 
   # Verify severity values via running the scanner with fixtures
@@ -2498,18 +2487,10 @@ EOF
   grep_p_cat="$(echo "$output" | jq -r '.findings[] | select(.pattern == "gnu-grep-p") | .category' 2>/dev/null | head -1)"
   assert_eq "SE-R-003a: gnu-grep-p category is portability" "portability" "$grep_p_cat"
 
-  # Verify category for dead-security-fn is security-enforcement
-  # (This will fail until R-004 is implemented — dead function detection needs fixtures)
-  # We verify the PATTERN_META entry statically for now
-  local dead_fn_meta
-  dead_fn_meta="$(grep 'dead-security-fn' "$SCANNER" 2>/dev/null || echo "")"
-  if echo "$dead_fn_meta" | grep -qi 'security-enforcement\|security'; then
-    echo "  PASS: SE-R-003d: dead-security-fn category contains security"
-    PASS=$((PASS + 1))
-  else
-    echo "  FAIL: SE-R-003d: dead-security-fn category should contain security-enforcement"
-    FAIL=$((FAIL + 1))
-  fi
+  # Verify PATTERN_META entry for dead-security-fn contains security-enforcement category
+  local dead_fn_has_cat="no"
+  grep -q 'dead-security-fn.*security-enforcement' "$SCANNER" 2>/dev/null && dead_fn_has_cat="yes"
+  assert_eq "SE-R-003d: dead-security-fn category contains security-enforcement" "yes" "$dead_fn_has_cat"
 }
 
 # ===========================================================================
@@ -2917,9 +2898,9 @@ test_se_r008_ctdd_check8() {
   local ctdd_skill="$REPO_DIR/skills/ctdd/SKILL.md"
 
   # (a) Check 8 exists as a numbered item in the test auditor blockquote
-  file_contains "$ctdd_skill" \
-    '^> 8\.' \
-    "SE-R-008a: ctdd SKILL.md has numbered check '> 8.'"
+  local has_check8="no"
+  grep -q '^> 8\.' "$ctdd_skill" 2>/dev/null && has_check8="yes"
+  assert_eq "SE-R-008a: ctdd SKILL.md has numbered check '> 8.'" "yes" "$has_check8"
 
   # (b) Check 8 text contains "production call chain"
   local check8_line
