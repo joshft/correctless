@@ -70,8 +70,23 @@ review_override_issuance() {
   local _decision_record_file="$5"
   local _crosscheck_evidence="$6"
 
-  # BND-008: Intent hash presence check.
-  # In production, intent_verify would be called for full verification.
+  # R4-S4 / BND-008: Intent hash verification (mirrors review_override_action pattern)
+  if [ -f "$_state_file" ]; then
+    local stored_intent_hash
+    stored_intent_hash="$(jq -r '.intent_hash // ""' "$_state_file" 2>/dev/null)" || true
+    if [ -n "$stored_intent_hash" ] && [ "$stored_intent_hash" != "null" ]; then
+      local intent_file
+      intent_file="$(jq -r '.intent_file // ""' "$_state_file" 2>/dev/null)" || intent_file=""
+      if [ -n "$intent_file" ] && [ -f "$intent_file" ]; then
+        local current_intent_hash
+        current_intent_hash="$(sha256_hash_file "$intent_file" 2>/dev/null)" || current_intent_hash=""
+        if [ -n "$current_intent_hash" ] && [ "$current_intent_hash" != "$stored_intent_hash" ]; then
+          echo "hard_stop"
+          return 0
+        fi
+      fi
+    fi
+  fi
 
   # BND-006: Validate cross-check evidence is valid JSON
   if ! echo "$_crosscheck_evidence" | jq '.' >/dev/null 2>&1; then

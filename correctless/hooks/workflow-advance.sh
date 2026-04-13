@@ -857,6 +857,17 @@ cmd_override() {
     die "Override limit reached (3 per workflow). If the gate is consistently blocking legitimate edits, the workflow config or patterns may need adjustment. Use 'reset' as a last resort."
   fi
 
+  # R4-S1: Check for Jaccard retry prevention (PRH-006)
+  if command -v jaccard_similarity >/dev/null 2>&1 || {
+    local _os_dir
+    _os_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/../scripts"
+    [ -f "$_os_dir/override-scrutiny.sh" ] && source "$_os_dir/override-scrutiny.sh" 2>/dev/null
+  }; then
+    if ! check_override_retry "$reason" "$sf" 2>/dev/null; then
+      die "Override rejected: too similar to a previously rejected override (Jaccard >= 0.4). Rephrase with a materially different justification."
+    fi
+  fi
+
   # Block renewal while an override is still active
   local override_active
   override_active="$(echo "$state" | jq -r '.override.active // false')"
