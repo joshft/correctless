@@ -255,3 +255,33 @@ get_target_file() {
   local cmd="$1"
   echo "$cmd" | sed "s/['\"]//g" | tr ' \t' '\n\n' | grep -E '\.(go|ts|tsx|js|jsx|py|rs|java|rb|cpp|c|h|sh|json|md|yaml|yml|toml|cfg|ini|sql|css|html|vue|svelte)$'
 }
+
+# ---------------------------------------------------------------------------
+# sha256_hash_file — compute SHA-256 hash of a file (cross-platform)
+# ---------------------------------------------------------------------------
+# Tries sha256sum, shasum -a 256, openssl dgst -sha256 in order.
+# Usage: sha256_hash_file FILE_PATH
+# Outputs the hex hash to stdout. Returns 1 if no tool available.
+
+sha256_hash_file() {
+  local file="$1"
+
+  [ -f "$file" ] || return 1
+
+  local hash=""
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    hash="$(sha256sum "$file" 2>/dev/null | cut -d' ' -f1)"
+  elif command -v shasum >/dev/null 2>&1; then
+    hash="$(shasum -a 256 "$file" 2>/dev/null | cut -d' ' -f1)"
+  elif command -v openssl >/dev/null 2>&1; then
+    hash="$(openssl dgst -sha256 "$file" 2>/dev/null | sed 's/^.*= //')"
+  fi
+
+  if [ -n "$hash" ]; then
+    echo "$hash"
+    return 0
+  fi
+
+  return 1
+}

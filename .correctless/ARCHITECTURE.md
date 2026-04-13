@@ -47,6 +47,11 @@
 - **Violated when**: The LLM silently makes an architectural decision (adds a trust boundary, changes a spec rule, adds a dependency) without triggering escalation
 - **Test**: R-006 in semi-auto-mode tests (escalation heuristic presence), R-005 (mechanical backstop via failure threshold)
 
+#### TB-004a: Supervisor decision authority (Phase 3 extension)
+- **Scoped extension**: Phase 3 expands supervisor authority but with codified hard limits. The supervisor MAY approve: architectural decisions within spec scope (with citation), review finding triage (accept/reject), override issuance/actions/closure. The supervisor MUST NOT approve: unspecced dependencies, security constraint relaxation, budget/time exceeded, intent/policy tampering, CLAUDE.md modifications, spec fundamental restructure — these bypass the supervisor entirely and route to Tier 4 hard stop.
+- **Structural enforcement**: At conservative mandate level, the orchestrator applies post-response validation on architectural decisions — missing or invalid spec citation overrides the supervisor's `approve` to `hard_stop`. Red Team and security-keyword review findings cannot receive `reject` — orchestrator overrides to `hard_stop` (PRH-003).
+- **Test**: test-auto-mandate.sh — INV-028 (citation), INV-030 (hard limits), INV-034 (conservative enforcement); test-auto-review-triage.sh — PRH-003 (source agent authority)
+
 ## Abstractions
 
 ### ABS-001: Shared script library (scripts/lib.sh)
@@ -167,6 +172,27 @@
 - **Enforced at**: `scripts/decision-record.sh` (drx_validate), `scripts/decision-routing.sh` (route_decision)
 - **Violated when**: Decision routed without DR-xxx, missing required fields, or malformed DR-xxx silently dropped
 - **Test**: test-decision-record.sh — INV-003, BND-003 suites
+
+### ABS-018: Review-triage artifact (.correctless/artifacts/)
+- **What**: JSON file at `.correctless/artifacts/review-decisions-{branch_slug}.json` recording supervisor triage of review findings during Phase 3 spec pipeline. Each entry: finding_id, source_agent, finding_summary, supervisor_decision (accept/reject/hard_stop), supervisor_reasoning, timestamp. Hash-verified per PAT-011 before spec approval gate.
+- **Invariant**: All findings triaged by supervisor are logged. Accepted findings are incorporated into spec. Rejected findings are visible in Auto Run Report. Hash mismatch → hard stop.
+- **Enforced at**: `scripts/review-triage.sh` (create_review_decisions, hash_review_decisions, verify_review_decisions_hash)
+- **Violated when**: A finding is triaged without logging, or artifact tampered between triage and spec approval
+- **Test**: test-auto-review-triage.sh — INV-022 suite
+
+### ABS-019: Supervisor mandate contract (agents/supervisor.md)
+- **What**: Extended supervisor input contract for Phase 3. Adds: `preferences` (from preferences.md), `decision_patterns` (category/tier counts from current run), `spec_scope` (approved spec scope text). Adds 4 activation types: `review_triage`, `override_issued`, `override_action_review`, `override_window_closing`. Mandate level (conservative/moderate/aggressive) controls approval threshold — conservative requires spec citation validated by orchestrator.
+- **Invariant**: Supervisor activations include all 3 new context fields. New activation types use distinct schemas (not overloaded on `escalation`). Conservative mandate enforced structurally by orchestrator post-validation (missing/invalid citation → hard_stop).
+- **Enforced at**: `agents/supervisor.md` (contract), `scripts/supervisor-mandate.sh` (context building, citation validation), `scripts/override-scrutiny.sh` (override activation types)
+- **Violated when**: Supervisor activated without preferences/patterns/scope context, or conservative citation check bypassed
+- **Test**: test-auto-mandate.sh — INV-028, INV-029, INV-033, INV-034 suites
+
+### ABS-020: Override scrutiny lifecycle (scripts/override-scrutiny.sh)
+- **What**: Three-phase supervisor review of override windows: (1) issuance — supervisor reviews override reason before it takes effect, (2) per-action — supervisor reviews each action during the window against override reason + drift evidence, (3) closure — supervisor reviews cumulative work with pretext and spec-completeness checks. Separate activation counter (exempt from 20-cap, soft cap at 50). Override log records full review history per override entry.
+- **Invariant**: No override takes effect without supervisor approval. Every action during an active window is reviewed. Window cannot close without final review. Override-window activations tracked separately. Rejected overrides cannot be re-issued (Jaccard similarity ≥ 0.4 detection).
+- **Enforced at**: `scripts/override-scrutiny.sh` (all 10 functions), `scripts/override-crosscheck.sh` (evidence gathering: base-commit verification, file-touch drift, spec completeness)
+- **Violated when**: Override applied without supervisor review, action during window not reviewed, window closes without final review, or rejected override re-issued with similar justification
+- **Test**: test-auto-override.sh — INV-035 through INV-039, PRH-006 suites; test-auto-crosscheck.sh — INV-040 through INV-042, BND-007 suites
 
 ## Patterns
 

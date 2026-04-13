@@ -88,3 +88,43 @@ ws_increment_field() {
   _release_state_lock "$state_file"
   return "$rc"
 }
+
+# ---------------------------------------------------------------------------
+# Phase 3 extensions
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# ws_set_spec_approval — record spec approval in workflow state
+# ---------------------------------------------------------------------------
+# Usage: ws_set_spec_approval STATE_FILE APPROVER TIMESTAMP
+# Writes spec_approved_by and spec_approved_at fields atomically.
+# ABS-003: uses single locked_update_state call to set both fields in one
+# lock cycle, avoiding the non-atomic two-field write antipattern.
+ws_set_spec_approval() {
+  local _state_file="$1"
+  local _approver="$2"
+  local _timestamp="$3"
+
+  [ -f "$_state_file" ] || return 1
+
+  # Atomic: set both fields in a single locked read-modify-write
+  locked_update_state "$_state_file" \
+    '.spec_approved_by = $approver | .spec_approved_at = $ts' \
+    --arg approver "$_approver" --arg ts "$_timestamp"
+}
+
+# ---------------------------------------------------------------------------
+# ws_get_spec_approval — read spec approval from workflow state
+# ---------------------------------------------------------------------------
+# Usage: ws_get_spec_approval STATE_FILE
+# Outputs JSON: {"approver":"...","timestamp":"..."}
+ws_get_spec_approval() {
+  local _state_file="$1"
+
+  [ -f "$_state_file" ] || { echo '{"approver":"","timestamp":""}'; return 1; }
+
+  # Single jq pass to extract both fields
+  jq '{approver: (.spec_approved_by // ""), timestamp: (.spec_approved_at // "")}' \
+    "$_state_file" 2>/dev/null || echo '{"approver":"","timestamp":""}'
+  return 0
+}

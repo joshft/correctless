@@ -4,6 +4,15 @@
 
 # No set -euo pipefail — this file is sourced by other scripts
 
+# Source lib.sh for shared utilities (sha256_hash_file).
+# Source at top level (not inside functions) to avoid RETURN trap interaction.
+_AUTO_POLICY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+if [ -n "$_AUTO_POLICY_DIR" ] && [ -f "$_AUTO_POLICY_DIR/lib.sh" ]; then
+  # shellcheck source=lib.sh
+  source "$_AUTO_POLICY_DIR/lib.sh"
+fi
+unset _AUTO_POLICY_DIR
+
 # ---------------------------------------------------------------------------
 # policy_parse — parse auto-policy.json, return parsed structure or error
 # ---------------------------------------------------------------------------
@@ -159,26 +168,7 @@ policy_validate_tier2() {
 # policy_hash — compute SHA-256 hash of the policy file
 # ---------------------------------------------------------------------------
 # Usage: policy_hash POLICY_FILE
-# Tries sha256sum, shasum -a 256, openssl dgst -sha256 in order.
+# Delegates to sha256_hash_file in lib.sh for the cross-platform fallback chain.
 policy_hash() {
-  local policy_file="$1"
-
-  [ -f "$policy_file" ] || return 1
-
-  local hash=""
-
-  if command -v sha256sum >/dev/null 2>&1; then
-    hash="$(sha256sum "$policy_file" 2>/dev/null | cut -d' ' -f1)"
-  elif command -v shasum >/dev/null 2>&1; then
-    hash="$(shasum -a 256 "$policy_file" 2>/dev/null | cut -d' ' -f1)"
-  elif command -v openssl >/dev/null 2>&1; then
-    hash="$(openssl dgst -sha256 "$policy_file" 2>/dev/null | sed 's/^.*= //')"
-  fi
-
-  if [ -n "$hash" ]; then
-    echo "$hash"
-    return 0
-  fi
-
-  return 1
+  sha256_hash_file "$1"
 }

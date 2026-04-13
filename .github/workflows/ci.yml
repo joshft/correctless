@@ -90,6 +90,12 @@ jobs:
           bash tests/test-auto-budget.sh
           bash tests/test-auto-safety.sh
           bash tests/test-auto-report.sh
+          bash tests/test-auto-review-triage.sh
+          bash tests/test-auto-mandate.sh
+          bash tests/test-auto-override.sh
+          bash tests/test-auto-crosscheck.sh
+          bash tests/test-auto-phase3-pipeline.sh
+          bash tests/test-auto-phase3-supervisor.sh
 
       - name: Verify sync
         run: |
