@@ -340,7 +340,6 @@ id_ed25519.*
 *.jks
 .correctless/preferences.md
 .correctless/config/auto-policy.json
-.correctless/config/workflow-config.json
 .correctless/artifacts/intent-*.md
 .correctless/artifacts/workflow-state-*.json
 .correctless/artifacts/decision-record-*.md"

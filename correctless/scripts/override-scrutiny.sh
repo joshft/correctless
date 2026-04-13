@@ -84,6 +84,10 @@ review_override_issuance() {
           echo "hard_stop"
           return 0
         fi
+      else
+        # R5-F2: Intent file missing or path unknown — fail-closed
+        echo "hard_stop"
+        return 0
       fi
     fi
   fi
