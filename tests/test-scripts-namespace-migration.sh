@@ -87,6 +87,17 @@ assert_file_not_exists() {
   fi
 }
 
+assert_dir_exists() {
+  local desc="$1" path="$2"
+  if [ -d "$path" ]; then
+    echo "  PASS: $desc"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: $desc (directory not found: $path)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Tests R-001 [unit]: Setup installs scripts to .correctless/scripts/
 # ---------------------------------------------------------------------------
@@ -111,8 +122,8 @@ test_r001_setup_installs_to_correctless_scripts() {
     "$TEST_DIR/scripts/antipattern-scan.sh"
 
   # Verify the mkdir -p target is .correctless/scripts
-  assert_eq "R-001: .correctless/scripts directory exists" "true" \
-    "$([ -d "$TEST_DIR/.correctless/scripts" ] && echo true || echo false)"
+  assert_dir_exists "R-001: .correctless/scripts directory exists" \
+    "$TEST_DIR/.correctless/scripts"
 
   cleanup
 }
@@ -148,8 +159,8 @@ test_r002_upgrade_migration() {
     "$output"
 
   # The old scripts/ directory must NOT be deleted (user may have their own files)
-  assert_eq "R-002: scripts/ directory NOT deleted" "true" \
-    "$([ -d "$TEST_DIR/scripts" ] && echo true || echo false)"
+  assert_dir_exists "R-002: scripts/ directory NOT deleted" \
+    "$TEST_DIR/scripts"
 
   # But the old files should be gone (moved, not copied)
   assert_file_not_exists "R-002: old scripts/lib.sh removed after migration" \
@@ -207,8 +218,8 @@ test_r002_migration_before_hooks() {
     "$TEST_DIR/.correctless/scripts/lib.sh"
 
   # Also verify the hooks directory was created
-  assert_eq "R-002: hooks directory exists" "true" \
-    "$([ -d "$TEST_DIR/.correctless/hooks" ] && echo true || echo false)"
+  assert_dir_exists "R-002: hooks directory exists" \
+    "$TEST_DIR/.correctless/hooks"
 
   # The relative path from hooks to scripts resolves correctly
   local resolved_path
@@ -241,36 +252,24 @@ test_r003_hook_fallback_paths() {
     local hook_path="$REPO_DIR/hooks/$hook"
     [ -f "$hook_path" ] || continue
 
-    # The fallback path should reference .correctless/scripts/lib.sh, not scripts/lib.sh
-    # The primary path (dirname BASH_SOURCE/../scripts) should remain unchanged
-    # SC source directives (../scripts/lib.sh) should remain unchanged
-
-    # Check that bare "scripts/lib.sh" fallback is gone (except in shellcheck directives and primary path)
-    # Grep for the fallback pattern: lines that source or reference scripts/lib.sh
-    # but are NOT the primary dirname-based path and NOT shellcheck directives
+    # 1. Check that bare "scripts/lib.sh" fallback is gone
+    #    (exclude primary dirname-based path, shellcheck directives, and error messages)
     local fallback_lines
     fallback_lines="$(grep -n 'scripts/lib\.sh' "$hook_path" | \
       grep -v 'dirname' | \
       grep -v 'shellcheck source=' | \
       grep -v 'Cannot find' || true)"
 
-    # Any remaining bare scripts/lib.sh reference should be .correctless/scripts/lib.sh
     if [ -n "$fallback_lines" ]; then
       local has_old_fallback
       has_old_fallback="$(echo "$fallback_lines" | grep -v '\.correctless/scripts/lib\.sh' || true)"
       assert_eq "R-003: $hook has no old fallback to scripts/lib.sh" "" "$has_old_fallback"
     else
-      # No fallback lines at all — this means either there's no fallback or it's been updated
       echo "  PASS: R-003: $hook has no bare scripts/lib.sh fallback"
       PASS=$((PASS + 1))
     fi
-  done
 
-  # Verify the primary resolution path is unchanged (../scripts relative)
-  for hook in "${hooks_to_check[@]}"; do
-    local hook_path="$REPO_DIR/hooks/$hook"
-    [ -f "$hook_path" ] || continue
-
+    # 2. Verify the primary resolution path is unchanged (../scripts relative)
     local has_primary
     has_primary="$(grep -c 'dirname.*BASH_SOURCE.*\.\./scripts' "$hook_path" || true)"
     if [ "$has_primary" -gt 0 ]; then
@@ -281,20 +280,13 @@ test_r003_hook_fallback_paths() {
       echo "  PASS: R-003: $hook primary path check (pattern varies)"
       PASS=$((PASS + 1))
     fi
-  done
 
-  # Verify shellcheck source directives remain as ../scripts/lib.sh
-  for hook in "${hooks_to_check[@]}"; do
-    local hook_path="$REPO_DIR/hooks/$hook"
-    [ -f "$hook_path" ] || continue
+    # 3. Verify shellcheck source directives remain as ../scripts/lib.sh
     local shellcheck_directive
     shellcheck_directive="$(grep 'shellcheck source=../scripts/lib.sh' "$hook_path" || true)"
     if [ -n "$shellcheck_directive" ]; then
       echo "  PASS: R-003: $hook shellcheck directive unchanged"
       PASS=$((PASS + 1))
-    else
-      # Not all hooks have shellcheck directives — skip
-      :
     fi
   done
 }

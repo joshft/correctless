@@ -265,10 +265,10 @@ install_hooks() {
   # Must run BEFORE hook installation so hooks can find lib.sh at the new path.
   # ============================================
   local script_dest="$REPO_ROOT/.correctless/scripts"
+  mkdir -p "$script_dest"
   local migrated=false
   for old_script in lib.sh antipattern-scan.sh; do
     if [ -f "$REPO_ROOT/scripts/$old_script" ]; then
-      mkdir -p "$script_dest"
       mv "$REPO_ROOT/scripts/$old_script" "$script_dest/$old_script"
       migrated=true
     fi
@@ -291,7 +291,6 @@ install_hooks() {
 
   # Install phase-transition scripts (sourced by hooks and invoked by skills)
   if [ -d "$SCRIPT_DIR/scripts" ]; then
-    mkdir -p "$script_dest"
     # QA-R2-003: Always copy scripts (same as hooks — generated code, not user-edited)
     for script in lib.sh antipattern-scan.sh; do
       if [ -f "$SCRIPT_DIR/scripts/$script" ]; then
