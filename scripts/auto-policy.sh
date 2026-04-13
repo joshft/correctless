@@ -83,7 +83,7 @@ policy_evaluate() {
   local disposition=""
 
   case "$phase" in
-    review)
+    review|review-spec)
       disposition="$(echo "$parsed" | jq -r --arg cat "$category" \
         '.review_dispositions[$cat] // .review_dispositions.default // empty' 2>/dev/null)" || true
       ;;
@@ -95,7 +95,7 @@ policy_evaluate() {
         disposition="tier2_decide"
       fi
       ;;
-    verify|done|verified)
+    verify|done|verified|tdd-verify)
       disposition="$(echo "$parsed" | jq -r --arg cat "$category" \
         '.drift[$cat] // empty' 2>/dev/null)" || true
       ;;

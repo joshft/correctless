@@ -98,10 +98,10 @@ budget_check() {
 
   local time_exceeded="no" time_warn="no"
   if [ -n "$elapsed" ] && [ "$elapsed" != "0" ]; then
-    eval "$(awk "BEGIN {
-      if ($elapsed >= $max_hours) print \"time_exceeded=yes\"
-      else if ($elapsed >= $warn_hours) print \"time_warn=yes\"
-    }")"
+    eval "$(awk -v elapsed="$elapsed" -v max_hours="$max_hours" -v warn_hours="$warn_hours" 'BEGIN {
+      if (elapsed >= max_hours) print "time_exceeded=yes"
+      else if (elapsed >= warn_hours) print "time_warn=yes"
+    }')"
   fi
 
   if [ "$time_exceeded" = "yes" ]; then
@@ -121,6 +121,11 @@ budget_check() {
       echo "ok"
     fi
     return 0
+  fi
+
+  # R2-F4: guard against division by zero if policy sets max_tokens to 0
+  if [ "$max_tokens" -le 0 ] 2>/dev/null; then
+    max_tokens=2000000
   fi
 
   # Calculate token percentage

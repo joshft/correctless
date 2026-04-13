@@ -160,7 +160,7 @@
 - **Test**: test-auto-budget.sh — BND-006 suite
 
 ### ABS-016: Auto-policy config (.correctless/config/)
-- **What**: JSON config at `.correctless/config/auto-policy.json` defining Tier 0 policy rules. Sections: review_dispositions, qa_dispositions, spec_update, drift, security, budget, time, hard_stops. Controlled category vocabulary (8 values) and disposition vocabulary (8 values). First-match-wins evaluation. Scaffolded by `/csetup` with conservative defaults.
+- **What**: JSON config at `.correctless/config/auto-policy.json` defining Tier 0 policy rules. Sections: review_dispositions, qa_dispositions, spec_update, drift, security, budget, time, hard_stops. Controlled category vocabulary (14 values) and disposition vocabulary (8 values). First-match-wins evaluation. Scaffolded by `/csetup` with conservative defaults.
 - **Invariant**: Tier 0 evaluation is deterministic — same DR-xxx + same policy = same disposition (INV-001). Policy integrity verified via SHA-256 hash on each Tier 0 evaluation (INV-018). `security.never_relax_autonomously` hardcoded in orchestrator, not overridable. Malformed JSON → all decisions route to Tier 1+ (BND-001). Protected by sensitive-file-guard.
 - **Enforced at**: `scripts/auto-policy.sh` (policy_evaluate, policy_hash), `hooks/sensitive-file-guard.sh`
 - **Violated when**: Non-deterministic evaluation, hash mismatch not detected, security floor bypassed via config

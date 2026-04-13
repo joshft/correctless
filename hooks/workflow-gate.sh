@@ -131,9 +131,10 @@ if [ ! -f "$STATE_FILE" ]; then
           IFS="$_FC_OLDIFS"
           case "$BASENAME_CHECK" in
             $p)
-              echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+              echo "BLOCKED [fail-closed]: Cannot edit source file — no active workflow.
   Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
   (You must be on a feature branch, not main.)
+  Diagnose: .correctless/hooks/workflow-advance.sh diagnose \"filepath\"
   Or run /cstatus to see what's going on." >&2
               exit 2
               ;;
@@ -153,9 +154,10 @@ if [ ! -f "$STATE_FILE" ]; then
             IFS="$_FC_OLDIFS2"
             case "$_fc_bn" in
               $p)
-                echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+                echo "BLOCKED [fail-closed]: Cannot edit source file — no active workflow.
   Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
   (You must be on a feature branch, not main.)
+  Diagnose: .correctless/hooks/workflow-advance.sh diagnose \"filepath\"
   Or run /cstatus to see what's going on." >&2
                 exit 2
                 ;;
@@ -178,9 +180,10 @@ if [ ! -f "$STATE_FILE" ]; then
             IFS="$_FC_OLDIFS"
             case "$BASENAME_CHECK" in
               $p)
-                echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+                echo "BLOCKED [fail-closed]: Cannot edit source file — no active workflow.
   Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
   (You must be on a feature branch, not main.)
+  Diagnose: .correctless/hooks/workflow-advance.sh diagnose \"filepath\"
   Or run /cstatus to see what's going on." >&2
                 exit 2
                 ;;
@@ -203,12 +206,18 @@ eval "$(jq -r '
   @sh "OVERRIDE_ACTIVE=\(.override.active // false)",
   @sh "OVERRIDE_REMAINING=\(.override.remaining_calls // 0)"
 ' "$STATE_FILE" 2>/dev/null)" || {
-  echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
+  echo "BLOCKED: State file is corrupt or unreadable.
+  Try: .correctless/hooks/workflow-advance.sh status
+  If that also fails: .correctless/hooks/workflow-advance.sh reset
+  (Reset removes state for this branch — restart with init.)" >&2
   exit 2
 }
 # Post-eval validation: if PHASE is still empty, jq produced no output (corrupt file)
 if [ -z "$PHASE" ]; then
-  echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
+  echo "BLOCKED: State file is corrupt or unreadable.
+  Try: .correctless/hooks/workflow-advance.sh status
+  If that also fails: .correctless/hooks/workflow-advance.sh reset
+  (Reset removes state for this branch — restart with init.)" >&2
   exit 2
 fi
 

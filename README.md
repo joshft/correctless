@@ -5,7 +5,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Skills: 26](https://img.shields.io/badge/skills-26-blue.svg)](docs/skills/)
+[![Skills: 27](https://img.shields.io/badge/skills-27-blue.svg)](docs/skills/)
 [![Version: 3.0.0](https://img.shields.io/badge/version-3.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
@@ -113,7 +113,7 @@ graph LR
     style F fill:#51cf66,color:#fff
 ```
 
-Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. A PreToolUse hook blocks source code edits until tests exist — this isn't a suggestion, it's enforced by bash. See the [Standard Workflow Guide](https://joshft.github.io/correctless/standard-workflow) for state machine diagrams, hook architecture, and phase gating details.
+Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. A PreToolUse hook blocks source code edits until tests exist — this isn't a suggestion, it's enforced by bash. See the [Standard Workflow Guide](docs/standard-workflow.md) for state machine diagrams, hook architecture, and phase gating details.
 
 ### The Critical Workflow
 
@@ -381,11 +381,37 @@ Mutation testing and PBT helpers are available at high+ intensity. Standard inte
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
 - A **Claude Max subscription** ($100/mo or $200/mo plan). Correctless spawns multiple agents per feature — $200/mo is recommended at high+ intensity.
 - A project with a test runner
+- **jq** (JSON processor) — required for all hooks. Install: `brew install jq` (macOS), `apt install jq` (Ubuntu)
+- **Bash 4+** — required for hooks. macOS ships Bash 3.2 by default; install modern bash: `brew install bash`
 
 Optional (high+/critical):
 - [Alloy Analyzer](https://alloytools.org/) for formal modeling
 - Mutation testing tool for your language
 - Isolated environment (Docker/VPS) for red team assessments
+
+## Good to Know
+
+**Opt-in per feature.** Correctless is passive when no workflow is active. Start a workflow with `/cspec` on a feature branch — skip it on branches where you don't need it. All normal Claude Code behavior is unchanged outside active workflows.
+
+**CI unchanged.** Correctless runs entirely inside Claude Code sessions via local hooks. It does not modify your CI pipeline, add CI steps, or require any CI changes.
+
+**After merge.** Delete the feature branch and start fresh with a new branch + `/cspec`. Workflow state files in `.correctless/artifacts/` are branch-scoped and harmless — they provide history for `/cmetrics` and `/csummary`.
+
+### Uninstall
+
+To fully remove Correctless from a project:
+
+```bash
+# Remove the plugin
+/plugin uninstall correctless
+
+# Clean up project files
+rm -rf .correctless/
+rm -f scripts/lib.sh scripts/antipattern-scan.sh
+
+# Remove hook entries from .claude/settings.json (edit manually or delete the file)
+# Remove the "## Correctless" section from CLAUDE.md if present
+```
 
 ## Glossary
 
@@ -406,7 +432,7 @@ Optional (high+/critical):
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 27 skills, 3 intensity levels, ~3,060 automated tests, 4 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 27 skills, 3 intensity levels, ~3,800 automated tests, 7 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 

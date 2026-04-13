@@ -595,7 +595,7 @@ test_r007_structural_constraints() {
 
   # Count jq invocations in the hook source (exclude comments)
   local jq_count
-  jq_count="$(grep -vE '^\s*#' "$HOOK" | grep -cE '\bjq\b' || true)"
+  jq_count="$(grep -vE '^[[:space:]]*#' "$HOOK" | grep -cE '\bjq\b' || true)"
   jq_count="${jq_count:-0}"
   jq_count="$(echo "$jq_count" | tr -d '[:space:]')"
   if [ "$jq_count" -le 2 ]; then
@@ -610,8 +610,8 @@ test_r007_structural_constraints() {
   # Look for while/for blocks containing $()
   local subshell_in_loop
   subshell_in_loop="$(awk '
-    /^\s*(while|for)\b/ { in_loop=1 }
-    /^\s*done\b/ { in_loop=0 }
+    /^[[:space:]]*(while|for)\b/ { in_loop=1 }
+    /^[[:space:]]*done\b/ { in_loop=0 }
     in_loop && /\$\(/ { found=1 }
     END { print (found ? "yes" : "no") }
   ' "$HOOK")"
@@ -620,18 +620,18 @@ test_r007_structural_constraints() {
   # Check only allowed external commands: jq, date, cat, and file redirects
   # Extract non-comment lines that invoke external commands (exclude builtins)
   local disallowed_cmds
-  disallowed_cmds="$(grep -vE '^\s*#' "$HOOK" \
-    | grep -vE '^\s*$' \
-    | grep -vE '^\s*@sh\b' \
-    | grep -vE '^\s*(if|then|else|elif|fi|local|echo|exit|eval|source|return|set|\.|export|read|shift|case|esac|while|for|do|done|function|true|declare|unset|\[\[|test|printf|\{|\})' \
+  disallowed_cmds="$(grep -vE '^[[:space:]]*#' "$HOOK" \
+    | grep -vE '^[[:space:]]*$' \
+    | grep -vE '^[[:space:]]*@sh\b' \
+    | grep -vE '^[[:space:]]*(if|then|else|elif|fi|local|echo|exit|eval|source|return|set|\.|export|read|shift|case|esac|while|for|do|done|function|true|declare|unset|\[\[|test|printf|\{|\})' \
     | grep -vE '\b(jq|date|cat|command|mkdir|cd|pwd)\b' \
     | grep -vE '(>>|>|<|/dev/null|\|\|)' \
     | grep -vE '^[A-Z_]+=' \
-    | grep -vE '^\s*--arg(json)?\b' \
-    | grep -vE "^\s*['\"\{]" \
-    | grep -vE '^\s*\w+:' \
-    | grep -vE '^\s*[a-z|*-]+\)' \
-    | grep -vE '^\s*[A-Z_]+="[^"]*"\s*;;' \
+    | grep -vE '^[[:space:]]*--arg(json)?\b' \
+    | grep -vE "^[[:space:]]*['\"\{]" \
+    | grep -vE '^[[:space:]]*\w+:' \
+    | grep -vE '^[[:space:]]*[a-z|*-]+\)' \
+    | grep -vE '^[[:space:]]*[A-Z_]+="[^"]*"[[:space:]]*;;' \
     || echo "")"
   # This is advisory — we just log what we find for manual review
   if [ -z "$disallowed_cmds" ]; then
@@ -653,28 +653,28 @@ test_r009_pat005_conventions() {
 
   # Must NOT contain "set -euo pipefail" (that is PAT-001 for PreToolUse)
   local has_set_euo="no"
-  if grep -qE 'set\s+-[a-z]*e[a-z]*' "$HOOK"; then
+  if grep -qE 'set[[:space:]]+-[a-z]*e[a-z]*' "$HOOK"; then
     has_set_euo="yes"
   fi
   assert_eq "R-009a: hook does NOT use set -e (or set -euo pipefail)" "no" "$has_set_euo"
 
   # Must have || exit 0 guards (fail-open pattern)
   local has_exit_0_guard="no"
-  if grep -qE '\|\|\s*exit\s+0' "$HOOK"; then
+  if grep -qE '\|\|[[:space:]]*exit[[:space:]]+0' "$HOOK"; then
     has_exit_0_guard="yes"
   fi
   assert_eq "R-009b: hook has || exit 0 guards" "yes" "$has_exit_0_guard"
 
   # Must have command -v jq check with exit 0 (not exit 2 like PreToolUse)
   local has_jq_check="no"
-  if grep -qE 'command\s+-v\s+jq' "$HOOK"; then
+  if grep -qE 'command[[:space:]]+-v[[:space:]]+jq' "$HOOK"; then
     has_jq_check="yes"
   fi
   assert_eq "R-009c: hook checks command -v jq" "yes" "$has_jq_check"
 
   # The jq check must NOT exit 2 (that would be fail-closed like PreToolUse)
   local jq_exits_2="no"
-  if grep -A2 'command.*-v.*jq' "$HOOK" | grep -qE 'exit\s+2'; then
+  if grep -A2 'command.*-v.*jq' "$HOOK" | grep -qE 'exit[[:space:]]+2'; then
     jq_exits_2="yes"
   fi
   assert_eq "R-009d: jq check does NOT exit 2 (fail-open)" "no" "$jq_exits_2"
@@ -682,9 +682,9 @@ test_r009_pat005_conventions() {
   # Must have eval + jq -r @sh for stdin parsing (may span multiple lines)
   local has_eval_jq="no"
   local _has_eval _has_jq_r _has_at_sh
-  _has_eval="$(grep -vE '^\s*#' "$HOOK" | grep -cE '\beval\b' || echo 0)"
-  _has_jq_r="$(grep -vE '^\s*#' "$HOOK" | grep -cE 'jq\s+-r' || echo 0)"
-  _has_at_sh="$(grep -vE '^\s*#' "$HOOK" | grep -cE '@sh' || echo 0)"
+  _has_eval="$(grep -vE '^[[:space:]]*#' "$HOOK" | grep -cE '\beval\b' || echo 0)"
+  _has_jq_r="$(grep -vE '^[[:space:]]*#' "$HOOK" | grep -cE 'jq[[:space:]]+-r' || echo 0)"
+  _has_at_sh="$(grep -vE '^[[:space:]]*#' "$HOOK" | grep -cE '@sh' || echo 0)"
   if [ "$_has_eval" -gt 0 ] && [ "$_has_jq_r" -gt 0 ] && [ "$_has_at_sh" -gt 0 ]; then
     has_eval_jq="yes"
   fi
@@ -692,7 +692,7 @@ test_r009_pat005_conventions() {
 
   # Hook must always exit 0 — check the last line (excluding empty/comments)
   local last_meaningful_line
-  last_meaningful_line="$(grep -vE '^\s*$|^\s*#' "$HOOK" | tail -1)"
+  last_meaningful_line="$(grep -vE '^[[:space:]]*$|^[[:space:]]*#' "$HOOK" | tail -1)"
   assert_contains "R-009f: hook ends with exit 0" "exit 0" "$last_meaningful_line"
 }
 
@@ -736,7 +736,7 @@ EOF
   # Test 5: Hook must never exit non-zero (PRH-001)
   # Search the hook source for any exit statement with non-zero value
   local has_nonzero_exit="no"
-  if grep -vE '^\s*#' "$HOOK" | grep -qE 'exit\s+[1-9]'; then
+  if grep -vE '^[[:space:]]*#' "$HOOK" | grep -qE 'exit[[:space:]]+[1-9]'; then
     has_nonzero_exit="yes"
   fi
   assert_eq "R-010e: hook source has no exit [1-9] statements" "no" "$has_nonzero_exit"
@@ -759,14 +759,14 @@ test_r011_sources_lib() {
 
   # Check that the hook does NOT define branch_slug locally (ABS-001 violation)
   local defines_branch_slug="no"
-  if grep -qE '^branch_slug\s*\(\)|^function\s+branch_slug' "$HOOK"; then
+  if grep -qE '^branch_slug[[:space:]]*\(\)|^function[[:space:]]+branch_slug' "$HOOK"; then
     defines_branch_slug="yes"
   fi
   assert_eq "R-011b: hook does NOT define branch_slug locally" "no" "$defines_branch_slug"
 
   # Check that branch_slug is CALLED in executable code (not just sourced)
   local calls_branch_slug="no"
-  if grep -vE '^\s*#' "$HOOK" | grep -qE 'branch_slug'; then
+  if grep -vE '^[[:space:]]*#' "$HOOK" | grep -qE 'branch_slug'; then
     calls_branch_slug="yes"
   fi
   assert_eq "R-011b2: hook calls branch_slug in executable code" "yes" "$calls_branch_slug"
@@ -792,14 +792,14 @@ test_prh003_no_result_processing() {
 
   # Hook must not reference .result in jq expressions (non-comment lines)
   local refs_result_jq="no"
-  if grep -vE '^\s*#' "$HOOK" | grep -qE '\.result'; then
+  if grep -vE '^[[:space:]]*#' "$HOOK" | grep -qE '\.result'; then
     refs_result_jq="yes"
   fi
   assert_eq "PRH-003a: no .result in jq expressions" "no" "$refs_result_jq"
 
   # Hook must not declare a variable named result or RESULT
   local has_result_var="no"
-  if grep -vE '^\s*#' "$HOOK" | grep -qE '\b(result|RESULT)\s*='; then
+  if grep -vE '^[[:space:]]*#' "$HOOK" | grep -qE '\b(result|RESULT)[[:space:]]*='; then
     has_result_var="yes"
   fi
   assert_eq "PRH-003b: no shell variable named result/RESULT" "no" "$has_result_var"

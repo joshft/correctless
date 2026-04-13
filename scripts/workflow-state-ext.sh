@@ -40,23 +40,9 @@ ws_set_field() {
 
   [ -f "$state_file" ] || return 1
 
-  # QA-002 / ABS-003: acquire advisory lock before state file write
-  _acquire_state_lock "$state_file" || return 1
-
-  local tmp_file="${state_file}.$$.tmp"
-  local rc=0
-  # Use if/else to handle numeric vs string values (jq 1.7 compat — no try/catch)
-  if jq --arg f "$field" --arg v "$value" \
-      'if ($v | test("^-?[0-9]+$")) then .[$f] = ($v | tonumber) else .[$f] = $v end' \
-      "$state_file" > "$tmp_file" 2>/dev/null; then
-    mv "$tmp_file" "$state_file" || { rm -f "$tmp_file"; rc=1; }
-  else
-    rm -f "$tmp_file"
-    rc=1
-  fi
-
-  _release_state_lock "$state_file"
-  return "$rc"
+  # QA-009: use locked_update_state for correct EXIT trap handling (AP-015 class fix)
+  # QA-012: always store as string — callers needing integers use ws_increment_field
+  locked_update_state "$state_file" '.[$f] = $v' --arg f "$field" --arg v "$value"
 }
 
 # ---------------------------------------------------------------------------
@@ -71,22 +57,10 @@ ws_increment_field() {
 
   [ -f "$state_file" ] || return 1
 
-  # QA-002 / ABS-003: acquire advisory lock before state file write
-  _acquire_state_lock "$state_file" || return 1
-
-  local tmp_file="${state_file}.$$.tmp"
-  local rc=0
-  if jq --arg f "$field" \
-      '((.[$f] // 0) | tonumber) as $cur | .[$f] = ($cur + 1)' \
-      "$state_file" > "$tmp_file" 2>/dev/null; then
-    mv "$tmp_file" "$state_file" || { rm -f "$tmp_file"; rc=1; }
-  else
-    rm -f "$tmp_file"
-    rc=1
-  fi
-
-  _release_state_lock "$state_file"
-  return "$rc"
+  # QA-009: use locked_update_state for correct EXIT trap handling (AP-015 class fix)
+  locked_update_state "$state_file" \
+    '((.[$f] // 0) | tonumber) as $cur | .[$f] = (($cur + 1) | tostring)' \
+    --arg f "$field"
 }
 
 # ---------------------------------------------------------------------------

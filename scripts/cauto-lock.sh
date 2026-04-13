@@ -12,20 +12,33 @@
 # Writes current PID to lockfile. Checks for stale locks (BND-006).
 lock_acquire() {
   local lock_file="$1"
+  local lock_dir="${lock_file}.d"
 
-  if [ -f "$lock_file" ]; then
-    # Check if existing lock is stale (0=stale/cleaned, 1=active, 2=corrupted)
-    lock_check_stale "$lock_file"
-    case $? in
-      0) ;; # Stale lock was auto-cleaned — proceed to acquire
-      1) echo "ERROR: Another /cauto run is active on this branch." >&2; return 1 ;;
-      2) echo "ERROR: Lockfile corrupted; delete '$lock_file' manually if no /cauto run is active." >&2; return 1 ;;
-    esac
+  # QA-015: use mkdir for atomic lock creation (matches lib.sh pattern)
+  if mkdir "$lock_dir" 2>/dev/null; then
+    # Acquired — write PID inside the lock directory
+    echo "$$" > "$lock_dir/pid" 2>/dev/null || true
+    # Also write to the legacy lock_file location for lock_check_stale compat
+    echo "$$" > "$lock_file" 2>/dev/null || true
+    return 0
   fi
 
-  # Create lockfile with current PID
-  echo "$$" > "$lock_file" || return 1
-  return 0
+  # Lock dir exists — check if stale
+  lock_check_stale "$lock_file"
+  case $? in
+    0)
+      # Stale lock was cleaned — retry acquire
+      if mkdir "$lock_dir" 2>/dev/null; then
+        echo "$$" > "$lock_dir/pid" 2>/dev/null || true
+        echo "$$" > "$lock_file" 2>/dev/null || true
+        return 0
+      fi
+      echo "ERROR: Another /cauto run is active on this branch." >&2
+      return 1
+      ;;
+    1) echo "ERROR: Another /cauto run is active on this branch." >&2; return 1 ;;
+    2) echo "ERROR: Lockfile corrupted; delete '$lock_file' and '$lock_dir' manually if no /cauto run is active." >&2; return 1 ;;
+  esac
 }
 
 # ---------------------------------------------------------------------------
@@ -34,6 +47,7 @@ lock_acquire() {
 # Usage: lock_release LOCK_FILE
 lock_release() {
   local lock_file="$1"
+  rm -rf "${lock_file}.d" 2>/dev/null
   rm -f "$lock_file"
   return 0
 }
@@ -64,7 +78,8 @@ lock_check_stale() {
     # PID is alive — lock is active
     return 1
   else
-    # PID is dead — stale lock, auto-clean
+    # PID is dead — stale lock, auto-clean (including .d directory from atomic locking)
+    rm -rf "${lock_file}.d" 2>/dev/null
     rm -f "$lock_file"
     return 0
   fi

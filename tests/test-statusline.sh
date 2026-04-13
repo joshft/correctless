@@ -143,7 +143,7 @@ state_filename() {
   local branch="$1"
   local slug hash
   slug="$(printf '%s' "$branch" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-80)"
-  hash="$(printf '%s' "$branch" | md5sum | cut -c1-6)"
+  hash="$(printf '%s' "$branch" | (md5sum 2>/dev/null || md5) | cut -c1-6)"
   echo ".correctless/artifacts/workflow-state-${slug}-${hash}.json"
 }
 

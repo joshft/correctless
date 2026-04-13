@@ -115,7 +115,8 @@ require_phase() {
   local expected="$1"
   local current
   current="$(read_phase)"
-  [ "$current" = "$expected" ] || die "Expected phase '$expected', but current phase is '$current'"
+  [ "$current" = "$expected" ] || die "Expected phase '$expected', but current phase is '$current'.
+  Run /cstatus to see available transitions, or use 'workflow-advance.sh status' for details."
 }
 
 require_phase_oneof() {
@@ -124,7 +125,8 @@ require_phase_oneof() {
   for p in "$@"; do
     [ "$current" = "$p" ] && return 0
   done
-  die "Current phase '$current' is not one of: $*"
+  die "Current phase '$current' is not one of: $*.
+  Run /cstatus to see available transitions, or use 'workflow-advance.sh status' for details."
 }
 
 read_config_field() {
@@ -372,7 +374,8 @@ cmd_init() {
   [ -z "$default_branch" ] && default_branch="main"
 
   if [ "$branch" = "$default_branch" ] || [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
-    die "Cannot init workflow on '$branch'. Create a feature branch first: git checkout -b feature/my-feature"
+    die "Cannot init workflow on '$branch'. Create a feature branch first: git checkout -b feature/my-feature
+  For small fixes (< 50 LOC), try /cquick instead."
   fi
 
   local sf
@@ -823,6 +826,9 @@ cmd_reset() {
           "$ARTIFACTS_DIR/checkpoint-creview-spec-"*.json "$ARTIFACTS_DIR/checkpoint-caudit-"*.json 2>/dev/null
     rm -f "$ARTIFACTS_DIR/.pkg-cache-"*.json 2>/dev/null
     rm -f "$ARTIFACTS_DIR/tdd-test-edits.log" "$ARTIFACTS_DIR/coverage-baseline-${slug_hash}.out" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/token-log-${slug_hash}.jsonl" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/review-decisions-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/antipattern-findings-${slug_hash}.json" 2>/dev/null
     # Clean lock dirs and temp files from locking operations
     rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null
     rm -f "${sf}."*.tmp "${sf}."[0-9]* 2>/dev/null
@@ -852,6 +858,17 @@ cmd_override() {
   override_count="$(echo "$state" | jq -r '.override_count // 0')"
   if [ "$override_count" -ge 3 ]; then
     die "Override limit reached (3 per workflow). If the gate is consistently blocking legitimate edits, the workflow config or patterns may need adjustment. Use 'reset' as a last resort."
+  fi
+
+  # R4-S1: Check for Jaccard retry prevention (PRH-006)
+  if command -v jaccard_similarity >/dev/null 2>&1 || {
+    local _os_dir
+    _os_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/../scripts"
+    [ -f "$_os_dir/override-scrutiny.sh" ] && source "$_os_dir/override-scrutiny.sh" 2>/dev/null
+  }; then
+    if ! check_override_retry "$reason" "$sf" 2>/dev/null; then
+      die "Override rejected: your reason is too similar to a previous override request. Provide a genuinely different justification — explain why this specific edit is needed, not just a rephrasing of the previous reason."
+    fi
   fi
 
   # Block renewal while an override is still active

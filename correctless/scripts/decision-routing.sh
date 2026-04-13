@@ -132,6 +132,8 @@ tier2_build_context() {
   # Use a temp file approach for complex JSON to avoid shell quoting issues
   local _ctx_tmp
   _ctx_tmp="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "$(printf 'rm -f %q' "$_ctx_tmp")" EXIT
   echo "$dr_json" > "$_ctx_tmp"
 
   local result
@@ -148,6 +150,7 @@ tier2_build_context() {
     }' 2>/dev/null)"
   local rc=$?
   rm -f "$_ctx_tmp"
+  trap - EXIT
   echo "$result"
   return "$rc"
 }

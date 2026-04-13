@@ -281,6 +281,68 @@ _extract_bash_targets() {
           continue
         fi
         ;;
+      # touch/chmod/chown/chgrp/mkdir: emit all non-flag arguments (R6 fix)
+      touch|chmod|chown|chgrp|mkdir)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;
+            *) _strip_quotes "${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # tar: emit all non-flag arguments (archive and extracted files)
+      tar)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;
+            *) _strip_quotes "${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # unzip/7z/cpio/ar: emit all non-flag arguments (R6 fix)
+      unzip|7z|cpio|ar)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;
+            *) _strip_quotes "${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # scp/sftp: emit all non-flag arguments (R6 fix)
+      scp|sftp)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;
+            *) _strip_quotes "${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # git write subcommands: emit all non-flag arguments after the subcommand
+      git)
+        if [[ "$cmd" =~ git[[:space:]]+(checkout|restore|reset|stash|clean|apply|am|merge|rebase|cherry-pick) ]]; then
+          i=$((i + 2))  # skip 'git' and the subcommand
+          while [ $i -lt ${#tokens[@]} ]; do
+            case "${tokens[$i]}" in
+              -*) ;;
+              *) _strip_quotes "${tokens[$i]}" ;;
+            esac
+            i=$((i + 1))
+          done
+          continue
+        fi
+        ;;
       # python/node/ruby: generic interpreters that could write to any file
       # Over-extract all non-flag tokens as potential targets (downstream matching filters)
       python|python3|node|ruby)
@@ -341,7 +403,9 @@ id_ed25519.*
 *.jks
 .correctless/preferences.md
 .correctless/config/auto-policy.json
-.correctless/artifacts/intent-*.md"
+.correctless/artifacts/intent-*.md
+.correctless/artifacts/workflow-state-*.json
+.correctless/artifacts/decision-record-*.md"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)
@@ -415,7 +479,8 @@ while IFS= read -r target; do
   matched_pattern="$(_check_file_against_patterns "$target")" || true
 
   if [ -n "$matched_pattern" ]; then
-    echo "BLOCKED [sensitive-file]: $target matches protected pattern '$matched_pattern'. Edit sensitive files manually." >&2
+    echo "BLOCKED [sensitive-file]: $target matches protected pattern '$matched_pattern'.
+  Edit this file outside Claude Code, or add an exclusion to protected_files.custom_patterns in .correctless/config/workflow-config.json if this file is not actually sensitive." >&2
     exit 2
   fi
 done <<< "$FILE_TARGETS"

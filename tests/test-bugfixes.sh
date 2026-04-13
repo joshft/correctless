@@ -288,8 +288,8 @@ test_qa_findings_status() {
   # This must appear as a spawned agent instruction (in a blockquote or dedicated section),
   # not just the orchestrator's own procedure notes.
   # We look for "fix agent" near "qa-findings" and "status" in a targeted way.
-  if grep -qiP 'fix\s+agent.*qa-findings.*status.*fixed' "$ctdd_skill" || \
-     grep -qiP '> .*update.*qa-findings.*status.*fixed' "$ctdd_skill"; then
+  if grep -qiE 'fix[[:space:]]+agent.*qa-findings.*status.*fixed' "$ctdd_skill" || \
+     grep -qiE '> .*update.*qa-findings.*status.*fixed' "$ctdd_skill"; then
     has_fix_agent_instruction="true"
   fi
   assert_eq "R-006: /ctdd SKILL.md instructs fix agent to update findings status to fixed" "true" "$has_fix_agent_instruction"
@@ -299,9 +299,9 @@ test_qa_findings_status() {
   # each fix round and update any finding that was fixed but still shows status: open"
 
   local has_verify_instruction="false"
-  if grep -qiP 'orchestrator.*verify.*findings.*status' "$ctdd_skill" || \
-     grep -qiP 'verify.*finding.*status.*(open|fixed)' "$ctdd_skill" || \
-     grep -qiP 'after.*fix.*round.*verif' "$ctdd_skill"; then
+  if grep -qiE 'orchestrator.*verify.*findings.*status' "$ctdd_skill" || \
+     grep -qiE 'verify.*finding.*status.*(open|fixed)' "$ctdd_skill" || \
+     grep -qiE 'after.*fix.*round.*verif' "$ctdd_skill"; then
     has_verify_instruction="true"
   fi
   assert_eq "R-007: /ctdd SKILL.md instructs orchestrator to verify findings statuses" "true" "$has_verify_instruction"

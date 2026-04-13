@@ -190,3 +190,61 @@ Zero new findings from Regression Hunter. **Converged.**
 - **.claude/hooks/ stale copies**: sync.sh syncs to correctless/hooks/ but not .claude/hooks/. The installed hooks drift from source. (2026-04-03, 2026-04-05, 2026-04-09). Root cause fixed in 2026-04-09: install_hooks() now always overwrites.
 - **HOOK_MATCHER expansion without body update**: Adding tools to HOOK_MATCHER without updating the hook body's tool-specific logic (field extraction, warning exclusions). (2026-04-09)
 - **locked_update_state string interpolation**: User-supplied values embedded in jq filter strings via bash interpolation instead of jq --arg. Same class as QA-007 (2026-04-03). Fixed by extending locked_update_state to accept --arg passthrough. (2026-04-09)
+- **PRH-003 enforcement fail-open**: Security enforcement function had fail-open fallback. Paired-array cardinality mismatch silently dropped security findings. (2026-04-12)
+- **Phase name drift between policy_evaluate and tier2_build_context**: Phase 3 added review-spec and tdd-verify phases but only updated one of the two consumers. (2026-04-12)
+- **AP-001 \s/grep -P systemic**: 4th+ recurrence — 49+ occurrences in 5 test files. Needs scanner expansion. (2026-04-12)
+- **AP-005 stale counts**: README badge, test count, CONTRIBUTING file count all stale after 16 test files added. (2026-04-12)
+
+## Run: 2026-04-12
+### Round 1
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| QA-001 | high | confirmed | PRH-003 enforcement fail-open fallback | fixed | adc5235 |
+| QA-002 | high | confirmed | policy_evaluate misses review-spec phase | fixed | adc5235 |
+| QA-003 | high | confirmed | check_hard_limits categories not in drx_validate | fixed | adc5235 |
+| QA-004 | high | confirmed | enforce_prh003 array length mismatch drops findings | fixed | adc5235 |
+| QA-005 | medium | confirmed | Git worktree leaked in base_commit_crosscheck | fixed | adc5235 |
+| QA-006 | medium | confirmed | rejected_overrides never written (PRH-006 dead) | fixed | adc5235 |
+| QA-007 | medium | confirmed | check_spec_completeness fail-open on malformed JSON | fixed | adc5235 |
+| QA-008 | medium | confirmed | build_mandate_context _current_category leak | fixed | adc5235 |
+| QA-009 | medium | confirmed | ws_set/increment_field missing EXIT trap | fixed | adc5235 |
+| QA-010 | medium | confirmed | build_mandate_context awk leaks S-prefixed sections | fixed | adc5235 |
+| QA-014 | medium | probable | base_commit_crosscheck timeout = disconfirmed | fixed | adc5235 |
+| QA-015 | medium | probable | cauto-lock TOCTOU (file-based) | fixed | adc5235 |
+| QA-017 | medium | probable | override_log unbounded growth | fixed | adc5235 |
+| QA-018 | medium | confirmed | tier2_build_context temp file no trap | fixed | adc5235 |
+| QA-019 | medium | confirmed | REGRESSION: grep -P in test-bugfixes.sh (AP-001) | fixed | adc5235 |
+| QA-020 | medium | confirmed | REGRESSION: \s in 4 test files (AP-001) | fixed | adc5235 |
+| QA-021 | medium | confirmed | REGRESSION: README badge 26→27 skills (AP-005) | fixed | adc5235 |
+| QA-022 | medium | confirmed | REGRESSION: README ~3,060→~3,900 tests (AP-005) | fixed | adc5235 |
+| QA-023 | medium | confirmed | REGRESSION: CONTRIBUTING 32→48 files (AP-005) | fixed | adc5235 |
+| QA-024 | low | confirmed | cmd_reset missing new artifact cleanup | fixed | adc5235 |
+| QA-025 | low | confirmed | budget_check awk interpolation | fixed | adc5235 |
+| QA-026 | low | confirmed | build_override_action_payload silent on bad JSON | fixed | adc5235 |
+
+### Round 2
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| R2-001 | high | confirmed | R1 regression: lock_check_stale misses .d dir | fixed | 5aa376d |
+| R2-002 | high | confirmed | R1 regression: enforce_prh003 hard_stops all missing | fixed | 5aa376d |
+| R2-003 | high | confirmed | R1 incomplete: infrastructure failures still false | fixed | 5aa376d |
+| R2-004 | high | confirmed | budget_check division by zero on max_tokens=0 | fixed | 5aa376d |
+| R2-005 | medium | confirmed | triage fail-closed double-failure passes raw data | fixed | 5aa376d |
+| R2-006 | medium | confirmed | trap quoting uses single-quotes not printf %q | fixed | 5aa376d |
+| R2-007 | medium | confirmed | build_mandate_context silent empty output | fixed | 5aa376d |
+| R2-008 | low | confirmed | ws_increment_field type inconsistency (number/string) | fixed | 5aa376d |
+| R2-009 | low | probable | rejected_overrides unbounded growth | fixed | 5aa376d |
+| R2-010 | low | confirmed | dd_entries_since validates JSON not array type | fixed | 5aa376d |
+
+### Round 3
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| R3-001 | medium | confirmed | Supervisor prompt missing null claim_verified doc | fixed | 3430408 |
+| R3-002 | medium | probable | Auto-accept missing decisions lacks reasoning | fixed | 3430408 |
+| R3-004 | low | confirmed | build_mandate_context fallback masks root cause | fixed | 3430408 |
+
+Zero HIGH findings in Round 3. **Converged.**
+
+### Deferred
+- QA-011: setup detect_config heredoc JSON injection (previously deferred 2026-04-03)
+- QA-016: Adherence state unlocked read-modify-write (previously deferred)

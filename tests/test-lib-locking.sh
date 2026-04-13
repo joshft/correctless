@@ -377,33 +377,33 @@ test_no_flock_dependency() {
   # Static analysis: grep lib.sh for flock or lockfile as command invocations
   # (exclude comments — lines starting with #)
   local flock_found="no"
-  if grep -vE '^\s*#' "$LIB_SH" 2>/dev/null | grep -qE '\bflock\b'; then
+  if grep -vE '^[[:space:]]*#' "$LIB_SH" 2>/dev/null | grep -qE '\bflock\b'; then
     flock_found="yes"
   fi
   assert_eq "R-021a: lib.sh does not invoke flock" "no" "$flock_found"
 
   local lockfile_found="no"
-  if grep -vE '^\s*#' "$LIB_SH" 2>/dev/null | grep -qE '\blockfile\b'; then
+  if grep -vE '^[[:space:]]*#' "$LIB_SH" 2>/dev/null | grep -qE '\blockfile\b'; then
     lockfile_found="yes"
   fi
   assert_eq "R-021b: lib.sh does not invoke lockfile command" "no" "$lockfile_found"
 
   # Verify mkdir IS used in non-comment code (positive check)
   local mkdir_found="no"
-  if grep -vE '^\s*#' "$LIB_SH" 2>/dev/null | grep -qE 'mkdir.*lock'; then
+  if grep -vE '^[[:space:]]*#' "$LIB_SH" 2>/dev/null | grep -qE 'mkdir.*lock'; then
     mkdir_found="yes"
   fi
   assert_eq "R-021c: lib.sh uses mkdir for locking" "yes" "$mkdir_found"
 
   # Also check workflow-advance.sh and workflow-gate.sh for flock invocations
   local adv_flock="no"
-  if grep -vE '^\s*#' "$ADV_HOOK" 2>/dev/null | grep -qE '\bflock\b'; then
+  if grep -vE '^[[:space:]]*#' "$ADV_HOOK" 2>/dev/null | grep -qE '\bflock\b'; then
     adv_flock="yes"
   fi
   assert_eq "R-021d: workflow-advance.sh does not invoke flock" "no" "$adv_flock"
 
   local gate_flock="no"
-  if grep -vE '^\s*#' "$GATE_HOOK" 2>/dev/null | grep -qE '\bflock\b'; then
+  if grep -vE '^[[:space:]]*#' "$GATE_HOOK" 2>/dev/null | grep -qE '\bflock\b'; then
     gate_flock="yes"
   fi
   assert_eq "R-021e: workflow-gate.sh does not invoke flock" "no" "$gate_flock"
@@ -430,7 +430,7 @@ test_all_state_writers_use_locking() {
     # Exclude scripts that only READ state or write to OTHER files
     if grep -qE 'mv.*state_file|mv.*STATE_FILE|mv.*workflow-state' "$script" 2>/dev/null; then
       scripts_with_state_writes+=("$bname")
-    elif grep -qE '>\s*"\$.*state_file|>\s*"\$.*STATE_FILE' "$script" 2>/dev/null; then
+    elif grep -qE '>[[:space:]]*"\$.*state_file|>[[:space:]]*"\$.*STATE_FILE' "$script" 2>/dev/null; then
       scripts_with_state_writes+=("$bname")
     fi
   done

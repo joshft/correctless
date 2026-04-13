@@ -198,7 +198,7 @@ test_inv002_hook_metadata_headers() {
     first10="$(head -10 "$hook_path")"
 
     local has_type="false"
-    if echo "$first10" | grep -qE '^# HOOK_TYPE:\s*(PreToolUse|PostToolUse)\s*$'; then
+    if echo "$first10" | grep -qE '^# HOOK_TYPE:[[:space:]]*(PreToolUse|PostToolUse)[[:space:]]*$'; then
       has_type="true"
     fi
     assert_eq "INV-002: $hook has valid HOOK_TYPE header" "true" "$has_type"
@@ -216,7 +216,7 @@ test_inv002_hook_metadata_headers() {
 
     # Check HOOK_MATCHER header in first 10 lines
     local has_matcher="false"
-    if echo "$first10" | grep -qE '^# HOOK_MATCHER:\s*.+$'; then
+    if echo "$first10" | grep -qE '^# HOOK_MATCHER:[[:space:]]*.+$'; then
       has_matcher="true"
     fi
     assert_eq "INV-002: $hook has HOOK_MATCHER header" "true" "$has_matcher"
@@ -393,13 +393,13 @@ test_inv005_auto_format_in_hooks() {
     first10="$(head -10 "$REPO_DIR/hooks/auto-format.sh")"
 
     local has_type="false"
-    if echo "$first10" | grep -qE '^# HOOK_TYPE:\s*(PreToolUse|PostToolUse)\s*$'; then
+    if echo "$first10" | grep -qE '^# HOOK_TYPE:[[:space:]]*(PreToolUse|PostToolUse)[[:space:]]*$'; then
       has_type="true"
     fi
     assert_eq "INV-005: auto-format.sh has valid HOOK_TYPE" "true" "$has_type"
 
     local has_matcher="false"
-    if echo "$first10" | grep -qE '^# HOOK_MATCHER:\s*.+$'; then
+    if echo "$first10" | grep -qE '^# HOOK_MATCHER:[[:space:]]*.+$'; then
       has_matcher="true"
     fi
     assert_eq "INV-005: auto-format.sh has HOOK_MATCHER" "true" "$has_matcher"
@@ -533,7 +533,7 @@ test_inv008_shellcheck_scans_scripts() {
   fi
 
   # Option C: scandir is . (scans everything)
-  if echo "$ci_content" | grep -qE 'scandir:\s*\.\s*$'; then
+  if echo "$ci_content" | grep -qE 'scandir:[[:space:]]*\.[[:space:]]*$'; then
     covers_scripts="true"
   fi
 
@@ -542,14 +542,14 @@ test_inv008_shellcheck_scans_scripts() {
   # Specifically verify scripts/lib.sh would be scanned
   # This is a secondary check — if scandir covers scripts/, this passes implicitly
   local lib_covered="false"
-  if echo "$ci_content" | grep -qE '(scripts/lib\.sh|scandir:\s*\./?\s*$|scandir:.*scripts)'; then
+  if echo "$ci_content" | grep -qE '(scripts/lib\.sh|scandir:[[:space:]]*\./?[[:space:]]*$|scandir:.*scripts)'; then
     lib_covered="true"
   fi
   assert_eq "INV-008: scripts/lib.sh covered by shellcheck" "true" "$lib_covered"
 
   # Verify scripts/antipattern-scan.sh would be scanned
   local scan_covered="false"
-  if echo "$ci_content" | grep -qE '(scripts/antipattern-scan\.sh|scandir:\s*\./?\s*$|scandir:.*scripts)'; then
+  if echo "$ci_content" | grep -qE '(scripts/antipattern-scan\.sh|scandir:[[:space:]]*\./?[[:space:]]*$|scandir:.*scripts)'; then
     scan_covered="true"
   fi
   assert_eq "INV-008: scripts/antipattern-scan.sh covered by shellcheck" "true" "$scan_covered"

@@ -109,3 +109,18 @@ When a bug is found (pre-merge by QA, or post-merge by /cpostmortem):
 - **Frequency**: 0 findings in-project (external report, Andrew's clawker)
 - **Scanner rule**: Detect phantom execution by checking for execution evidence in test output. Look for timestamp progression, execution log entries, actual test output with durations, and docker/service startup logs for integration-tagged tests. Flag tests that contain `t.Skip`, `@pytest.mark.skip`, or `xit(`/`describe(` in integration/e2e suites. Implementation deferred to language-specific dogfooding.
 - **Source**: Andrew's clawker feedback, 2026-04-13
+
+### AP-019: Fail-open fallback on security enforcement failure
+- **What went wrong**: `enforce_prh003` in review-triage.sh had `|| result="$raw_decisions"` — if the security enforcement function failed, the fallback passed through unenforced supervisor decisions. A supervisor `reject` on a red-team security finding would not be elevated to `hard_stop`.
+- **How to catch it**: Security enforcement functions must never have a fail-open fallback. When enforcement cannot be verified, return a safe default (empty array + error code) rather than the unenforced input. Spec rule: "Functions implementing PRH-xxx constraints must return hard_stop or error on failure, never the unenforced input."
+- **Frequency**: 1 finding in 1 feature (qa-audit-2026-04-12 R1)
+
+### AP-020: Paired-array processing without cardinality assertion
+- **What went wrong**: `enforce_prh003` iterated over `[range($resp | length)]` instead of `[range($findings | length)]`. When the supervisor returned fewer decisions than findings, trailing security findings were silently dropped from output — no enforcement, no error.
+- **How to catch it**: Any function that zips two arrays by index must validate they have the same length first. Iterate over the longer array and handle missing elements explicitly (hard_stop for security, accept for non-security). Spec rule: "Paired-array processing must assert equal lengths. Mismatched lengths are fail-closed for security elements."
+- **Frequency**: 1 finding in 1 feature (qa-audit-2026-04-12 R1)
+
+### AP-021: Lock mechanism creates coupled artifacts without consistent cleanup
+- **What went wrong**: cauto-lock.sh's R1 fix introduced a `.d` directory alongside the legacy lockfile for atomic locking, but `lock_check_stale` only cleaned the flat file, not the directory. Stale lock recovery was permanently broken — users had to manually delete the `.d` directory.
+- **How to catch it**: When a lock mechanism creates multiple artifacts (file + directory), all cleanup paths (stale detection, release, error recovery) must remove all artifacts. Test stale recovery end-to-end: create lock with dead PID, verify new acquisition succeeds.
+- **Frequency**: 1 finding in 1 feature (qa-audit-2026-04-12 R2, R1 regression)

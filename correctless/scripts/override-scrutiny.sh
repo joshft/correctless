@@ -70,8 +70,27 @@ review_override_issuance() {
   local _decision_record_file="$5"
   local _crosscheck_evidence="$6"
 
-  # BND-008: Intent hash presence check.
-  # In production, intent_verify would be called for full verification.
+  # R4-S4 / BND-008: Intent hash verification (mirrors review_override_action pattern)
+  if [ -f "$_state_file" ]; then
+    local stored_intent_hash
+    stored_intent_hash="$(jq -r '.intent_hash // ""' "$_state_file" 2>/dev/null)" || true
+    if [ -n "$stored_intent_hash" ] && [ "$stored_intent_hash" != "null" ]; then
+      local intent_file
+      intent_file="$(jq -r '.intent_file // ""' "$_state_file" 2>/dev/null)" || intent_file=""
+      if [ -n "$intent_file" ] && [ -f "$intent_file" ]; then
+        local current_intent_hash
+        current_intent_hash="$(sha256_hash_file "$intent_file" 2>/dev/null)" || current_intent_hash=""
+        if [ -n "$current_intent_hash" ] && [ "$current_intent_hash" != "$stored_intent_hash" ]; then
+          echo "hard_stop"
+          return 0
+        fi
+      else
+        # R5-F2: Intent file missing or path unknown — fail-closed
+        echo "hard_stop"
+        return 0
+      fi
+    fi
+  fi
 
   # BND-006: Validate cross-check evidence is valid JSON
   if ! echo "$_crosscheck_evidence" | jq '.' >/dev/null 2>&1; then
@@ -87,9 +106,17 @@ review_override_issuance() {
 
   if [ "$claim_verified" = "false" ]; then
     # Pre-existing claim was false — reject the override
-    # In production, the supervisor agent would make this decision via
-    # Task(subagent_type="correctless:supervisor") with activation_type override_issued
+    # QA-006: persist rejection so Jaccard retry prevention (PRH-006) can detect retries
+    if [ -f "$_state_file" ]; then
+      locked_update_state "$_state_file" \
+        '.rejected_overrides = (((.rejected_overrides // []) + [$reason]) | .[-50:])' \
+        --arg reason "$_override_reason" 2>/dev/null || true
+    fi
     echo "reject_override"
+    return 0
+  elif [ "$claim_verified" = "null" ]; then
+    # QA-014: timeout or inconclusive — escalate instead of rejecting
+    echo "escalate_to_human"
     return 0
   fi
 
@@ -109,6 +136,11 @@ build_override_action_payload() {
   local _override_reason="$2"
   local _intent_summary="$3"
   local _dd_entries_since="$4"
+
+  # QA-026 + R2-F10: validate _dd_entries_since is a JSON array before --argjson
+  if ! echo "$_dd_entries_since" | jq -e 'type == "array"' >/dev/null 2>&1; then
+    _dd_entries_since="[]"
+  fi
 
   # Build JSON payload using jq --arg (AP-010)
   jq -n \
@@ -293,13 +325,13 @@ update_override_log() {
 
   # Use locked_update_state from lib.sh for atomic read-modify-write (AP-010)
   locked_update_state "$_state_file" \
-    '.override_log = ((.override_log // []) + [{
+    '.override_log = (((.override_log // []) + [{
        override_id: $oid,
        review_type: $rt,
        disposition: $disp,
        reasoning: $rsn,
        timestamp: $ts
-     }])' \
+     }]) | .[-100:])' \
     --arg oid "$_override_id" --arg rt "$_review_type" \
     --arg disp "$_disposition" --arg rsn "$_reasoning" --arg ts "$timestamp"
 }

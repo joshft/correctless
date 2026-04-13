@@ -11,12 +11,12 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | Skills | `skills/*/SKILL.md` | 27 skill definitions. Each is a slash command with frontmatter contract. |
-| Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, token-tracking.sh (PostToolUse token logging) |
+| Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), sensitive-file-guard.sh (PreToolUse file protection), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, auto-format.sh (PostToolUse formatting), token-tracking.sh (PostToolUse token logging) |
 | Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs |
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
-| Distribution | `correctless/` | Single 26-skill distribution target — never edit directly |
+| Distribution | `correctless/` | Single 27-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 21 test files (~2,140 shell tests) covering setup, state machine, gate hook, full mode, MCP integration, bug fixes, QoL, decision UX, statusline, consolidation, crelease, cexplain, calm resets, dynamic rigor, intensity detection, wire-intensity-creview, wire-intensity-pipeline, auto-format, sensitive-file-guard, antipattern-scan, shift-left-review, lib, lib-locking, gate-path-exceptions, token-tracking, token-tracking-setup |
+| Tests | `tests/test*.sh` | 48 test files (~3,800 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, and test-evasion antipattern validation |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns

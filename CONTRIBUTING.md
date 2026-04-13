@@ -17,10 +17,10 @@ bash sync.sh --check      # Verify distributions are in sync (exit 0 = clean)
 
 ```
 skills/               # Source skills (27 SKILL.md files)
-hooks/                # Bash hooks (gate, state machine, statusline, audit trail)
+hooks/                # Bash hooks (gate, sensitive-file-guard, state machine, statusline, audit trail, auto-format, token-tracking)
 templates/            # Config, doc, and spec templates
 helpers/              # PBT guides per language (high+ intensity)
-tests/                # 32 test files (~2,000 assertions)
+tests/                # 48 test files (~3,800 assertions)
 setup                 # Install script
 sync.sh               # Copies source → correctless/ distribution
 correctless/          # Single distribution (27 skills, intensity-gated)
@@ -72,7 +72,7 @@ The hooks (`hooks/workflow-gate.sh`, `hooks/workflow-advance.sh`, `hooks/audit-t
 - **Gate must be <5s.** It runs before every file edit.
 - **Audit trail must be <100ms.** It runs after every tool call.
 - **Statusline must be <50ms.** It renders continuously.
-- **All hooks must be macOS + Linux portable.** Test with: `md5sum || md5`, `stat -c || stat -f`, no bashisms beyond what bash 3.2 supports.
+- **All hooks must be macOS + Linux portable.** Requires Bash 4+ (see ENV-001). Test with: `md5sum || md5`, `stat -c || stat -f`. macOS users need Homebrew bash (`brew install bash`).
 - **Gate must never fail open.** If something goes wrong, block (exit 2), don't allow (exit 0). Exception: the no-state-file path.
 
 Run ShellCheck before submitting: `shellcheck hooks/*.sh`
@@ -80,7 +80,7 @@ Run ShellCheck before submitting: `shellcheck hooks/*.sh`
 ## Code Style
 
 - **Skills:** Markdown with YAML frontmatter. Keep descriptions as trigger conditions ("Use when X"), not capability summaries.
-- **Hooks:** Bash with `set -euo pipefail`. Portable to macOS bash 3.2 + BSD tools.
+- **PreToolUse hooks:** Bash with `set -euo pipefail` (fail-closed, see PAT-001). **PostToolUse hooks:** NO `set -euo pipefail` (fail-open, see PAT-005). Requires Bash 4+.
 - **Tests:** Bash assertions in `tests/test*.sh`. Each test is a function that prints PASS/FAIL.
 - **No emojis in skill files** unless the user explicitly requests them.
 - **No model overrides** in skill frontmatter (`model:` field). Removed early to avoid rate limits.
@@ -88,8 +88,8 @@ Run ShellCheck before submitting: `shellcheck hooks/*.sh`
 ## Testing
 
 ```bash
-# Run all 32 test suites (canonical command from workflow-config.json):
-bash tests/test.sh && bash tests/test-mcp.sh && bash tests/test-bugfixes.sh && bash tests/test-qol.sh && bash tests/test-decisions.sh && bash tests/test-statusline.sh && bash tests/test-consolidation.sh && bash tests/test-crelease.sh && bash tests/test-calm-resets.sh && bash tests/test-dynamic-rigor.sh && bash tests/test-intensity-detection.sh && bash tests/test-wire-intensity-creview.sh && bash tests/test-wire-intensity-pipeline.sh && bash tests/test-cexplain.sh && bash tests/test-auto-format.sh && bash tests/test-sensitive-file-guard.sh && bash tests/test-antipattern-scan.sh
+# Run all 48 test suites — use the canonical command from workflow-config.json:
+jq -r '.commands.test' .correctless/config/workflow-config.json | bash
 
 # Quick smoke test (2 suites):
 bash tests/test.sh && bash tests/test-mcp.sh

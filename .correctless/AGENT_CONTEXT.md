@@ -12,13 +12,13 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 |-----------|----------|---------|
 | Skills | `skills/*/SKILL.md` | 27 skill definitions. Each is a slash command with frontmatter contract. |
 | Agents | `agents/*.md` | Plugin sub-agents: fix-diff-reviewer, supervisor, decision-agent. System prompt + frontmatter. Synced to `correctless/agents/` via sync.sh. See ABS-010. |
-| Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, token-tracking.sh (PostToolUse token logging with phase-to-skill mapping) |
+| Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), sensitive-file-guard.sh (PreToolUse file protection), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, auto-format.sh (PostToolUse formatting), token-tracking.sh (PostToolUse token logging with phase-to-skill mapping) |
 | Scripts | `scripts/` | 15 shared scripts: lib.sh (shared utilities + sha256_hash_file), antipattern-scan.sh, auto-policy.sh (Tier 0 engine), auto-report.sh (Auto Run Report + Phase 3 review/override sections), budget-check.sh (token+time enforcement), cauto-lock.sh (pipeline lockfile), decision-record.sh (append-only DD-xxx), decision-routing.sh (tier hierarchy), intent-hash.sh (immutable intent), security-scan.sh (PRH-001 3-layer), workflow-state-ext.sh (state fields + spec approval), review-triage.sh (Phase 3 review finding triage + PRH-003 enforcement), supervisor-mandate.sh (Phase 3 mandate validation + hard limits + citation check), override-scrutiny.sh (Phase 3 override lifecycle + Jaccard retry prevention), override-crosscheck.sh (Phase 3 base-commit verification + file-touch drift + spec completeness) |
 | Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs, auto-policy.json |
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 27-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 48 test files (~3,530 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, and test-evasion antipattern validation |
+| Tests | `tests/test*.sh` | 48 test files (~3,800 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, and test-evasion antipattern validation |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns

@@ -84,7 +84,9 @@ standard supervisor input:
 > independently verify:
 >
 > 1. **Pre-existing claims**: Did the cross-check evidence confirm the claim?
->    If claim_verified is false, reject immediately.
+>    If claim_verified is false, reject immediately. If claim_verified is
+>    null (infrastructure failure — timeout, no test command), escalate to
+>    human — do not approve with inconclusive evidence.
 > 2. **Scope drift**: Does the file-touch evidence show files outside the
 >    override reason, spec scope, or intent summary? If so, escalate.
 > 3. **Pretext**: At window closure, did the accumulated work actually ADDRESS
