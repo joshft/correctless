@@ -113,7 +113,10 @@ build_mandate_context() {
       preferences: $prefs,
       decision_patterns: $dp,
       spec_scope: $scope
-    }' 2>/dev/null || echo '{"preferences":{},"decision_patterns":{},"spec_scope":""}'
+    }' 2>/dev/null || {
+    echo "WARNING: build_mandate_context jq assembly failed, using empty context" >&2
+    echo '{"preferences":{},"decision_patterns":{},"spec_scope":""}'
+  }
 
   return 0
 }

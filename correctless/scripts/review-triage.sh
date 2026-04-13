@@ -154,7 +154,7 @@ enforce_prh003() {
       if $decision == null then
         # R2-F2: missing decision — hard_stop for security, accept for non-security
         if $is_security then {"decision": "hard_stop", "prh003_missing_decision": true}
-        else {"decision": "accept", "prh003_missing_decision": true}
+        else {"decision": "accept", "prh003_missing_decision": true, "reasoning": "Auto-accepted: supervisor returned fewer decisions than findings"}
         end
       elif $is_security and ($decision.decision == "reject") then
         $decision | .decision = "hard_stop" | .prh003_override = true
