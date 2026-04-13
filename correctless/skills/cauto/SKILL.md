@@ -11,11 +11,43 @@ context: fork
 
 You are the pipeline orchestrator. You invoke skills in sequence, monitor for failures, and escalate to the human when autonomous resolution is not possible. You do not write tests or production code yourself — each skill handles its own domain. You are the orchestrator that invokes skills; skills do not auto-continue on their own.
 
-## Phase Gate (R-002)
+## Phase Gate — Flexible Phase Entry (R-002)
 
 Before doing anything, read the current workflow state by running `bash .correctless/hooks/workflow-advance.sh status` and check the current phase.
 
-`/cauto` is only invocable when the workflow phase is `review` (standard intensity) or `review-spec` (high+ intensity). If the current phase is not one of these, produce an error: **"Error: /cauto requires the workflow phase to be `review` or `review-spec`. Current phase is `{phase}`. Complete the current phase before invoking /cauto."** and abort. The phase must be `review` or `review-spec` — any other phase (including `spec` and all implementation/post-implementation phases) is not valid and must be refused.
+`/cauto` accepts any active workflow phase and computes the remaining pipeline steps using a fixed phase-to-step mapping. The implementation pipeline mapping is:
+
+| Current Phase | Remaining Pipeline Steps |
+|---|---|
+| `review` / `review-spec` | Full pipeline: `ctdd` → `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
+| `tdd-tests` | Resume from `ctdd` (handles internal TDD phases) → `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
+| `tdd-impl` | Resume from `ctdd` (handles internal TDD phases) → `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
+| `tdd-qa` | Resume from `ctdd` (handles internal TDD phases) → `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
+| `done` | `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
+| `verified` | `cupdate-arch` (if high+ intensity) → `cdocs` → consolidation → PR |
+| `documented` | Consolidation → PR only |
+
+**Rejected phases**: `spec` and `model` are rejected — the spec must be reviewed before the implementation pipeline can run. The `spec` rejection message: **"Run `/creview` or `/creview-spec` first — /cauto starts after spec review."**
+
+Mid-TDD resume semantics are delegated to `/ctdd` — `/cauto` trusts `/ctdd` to handle the internal TDD state machine from wherever it currently is. `/ctdd` has its own internal phase-aware logic and will not restart from `tdd-tests` if the workflow is already at `tdd-impl` or `tdd-qa`.
+
+When no workflow exists, `/cauto` delegates to Phase 3 entry logic (INV-019), which transitions through spec creation and review before entering this phase-to-step mapping at `review`/`review-spec`.
+
+### Artifact Validation for Skipped Phases (R-002 supplement)
+
+Before skipping a phase that is *behind* the current phase (already completed), `/cauto` validates that the phase's artifacts exist. For the current phase, `/cauto` invokes the corresponding skill directly without validation — validation only applies to phases being skipped, not phases being resumed.
+
+Validation checks per phase:
+
+- **(a) `ctdd` complete** → test suite passes. Execute `commands.test` from workflow-config.json using the Bash tool's `timeout` parameter, defaulting to 300 seconds. The timeout is configurable via `commands.test_timeout` in workflow-config.json (integer, seconds). Exit code 0 = validation pass. Non-zero or timeout = validation fail; `/cauto` re-runs the phase.
+- **(b) `simplify`** → no validation needed (optional step).
+- **(c) `cverify` complete** → verification report exists at `.correctless/verification/{task-slug}-verification.md`.
+- **(d) `cupdate-arch`** → no validation needed (advisory).
+- **(e) `cdocs`** → no validation needed (advisory).
+
+If validation fails 2 consecutive times, skip validation and proceed — the phase's own skill will re-verify.
+
+The validation failure is logged in the audit trail with type `artifact_validation_failed`.
 
 ## Effective Intensity
 
@@ -131,7 +163,40 @@ Spawn a sub-agent to execute `/cdocs`. Log `skill_started` before, `skill_comple
 
 After `/cdocs` completes, run `git diff --name-only HEAD` and check if CLAUDE.md appears in the changed files. If it does, trigger R-006(e) escalation — CLAUDE.md changes require human approval. Write the escalation file and halt the pipeline; do not proceed to PR creation until the human approves the CLAUDE.md changes.
 
-### Step 8: Create PR (R-008)
+### Step 8: Consolidation — Scoped Commit and Push (R-003, F-001)
+
+Between `/cdocs` completion and PR creation, `/cauto` runs a consolidation step. This step uses scoped staging to prevent accidental commit of secrets or unintended files.
+
+**Step 8.1: Stage known pipeline output paths only.** The staging set is the union of:
+- Files changed on the branch: `git diff main...HEAD --name-only`
+- Uncommitted pipeline outputs matching the explicit path list below
+
+The explicit pipeline output path list is a constant — future additions to pipeline outputs must be added here. Unknown untracked files are never staged.
+
+```
+.correctless/verification/{task-slug}-verification.md
+.correctless/ARCHITECTURE.md
+.correctless/AGENT_CONTEXT.md
+README.md
+CONTRIBUTING.md
+docs/workflow-history.md
+docs/features/*.md
+```
+
+**Step 8.2: Belt-and-suspenders artifact guard.** Verify nothing under `.correctless/artifacts/` was staged — if anything was, unstage it:
+```bash
+git reset HEAD .correctless/artifacts/
+```
+
+**Step 8.3: Commit.** If there are uncommitted changes after steps 8.1–8.2, commit with message: `"Add pipeline artifacts for {task-slug}"`. If there are no uncommitted changes after steps 8.1–8.2, skip steps 8.3–8.4 (no-op).
+
+**Step 8.4: Push.** Derive remote name from `git config --get branch.$(git branch --show-current).remote` for tracked branches. If unset (fresh branch), use the first remote from `git remote | head -1` with `--set-upstream`. If `git remote` returns nothing, abort with: **"No git remote configured. Push manually or add a remote."**
+
+R-003 must not push to branches matching `main`, `master`, `develop`, or `release/*` — abort with an error if the current branch matches any of these.
+
+If `git push` fails (auth failure, rejected push), `/cauto` aborts with a clear error message including the git error output. The local commit is preserved but the PR step is skipped. Re-running `/cauto` after fixing the push issue resumes at the PR step (the phase is `documented`, so the phase-to-step mapping routes to PR-only).
+
+### Step 9: Create PR (R-008)
 
 Create a PR according to the `pr_creation` preference from `preferences.md`:
 
@@ -146,6 +211,49 @@ Create a PR according to the `pr_creation` preference from `preferences.md`:
 Log a `preference_applied` audit event with the selected PR creation mode (e.g., "pr_creation: gh", "pr_creation: skip", or "pr_creation: custom").
 
 Log `pipeline_completed` in the audit trail.
+
+### Step 10: Pipeline Summary
+
+After PR creation (or after the last pipeline step if `pr_creation: skip`), print a structured summary with three sections.
+
+#### (a) Findings & Decisions
+
+Every QA finding, review decision, override, and architectural decision from the pipeline, each with its disposition (fixed, deferred, accepted). Includes findings from the verification report. Deferred items are always shown with their reason.
+
+Items from sources without a severity field (verification findings, override activity) are always shown inline — they are not subject to severity-based truncation.
+
+**Data sources** (per R-006): The Findings & Decisions section reads from these sources:
+- `.correctless/artifacts/qa-findings-{task-slug}.json` — QA findings and their dispositions
+- `.correctless/verification/{task-slug}-verification.md` — verification findings (parse Rule Coverage and Smells sections)
+- `.correctless/artifacts/review-decisions-{task-slug}.json` — review triage decisions (if Phase 3 review ran)
+- `.correctless/artifacts/override-log-{branch-slug}.json` — override activity (if any overrides were issued)
+- `.correctless/artifacts/audit-trail-{branch-slug}.jsonl` — escalation events, simplify reverts, and architectural decision events
+
+If a source file doesn't exist, that source is omitted from the summary (not an error).
+
+Note: QA findings and the verification report use `{task-slug}` (the feature name from workflow init). Override log, audit trail, and token log use `{branch-slug}` (derived from the branch name via `branch_slug()` in scripts/lib.sh). These are different values — task-slug is e.g. `scanner-expansion`, branch-slug is e.g. `feature-scanner-expansion-0c9277`.
+
+**Truncation rule**: If the Findings & Decisions section has more than 20 items from severity-bearing sources, truncation applies:
+1. All items with severity HIGH or CRITICAL are always shown inline
+2. All items with explicit disposition `deferred` are always shown inline (the user needs to see what got punted regardless of severity)
+3. All override activity is always shown inline
+4. All items from non-severity sources (verification findings) are always shown inline
+
+Items not matching any of these four criteria go into a count-and-reference summary, e.g.: "QA Findings: 47 total — 3 HIGH + 2 deferred shown below, see qa-findings-{task-slug}.json for full list"
+
+#### (b) Phase Breakdown
+
+A table with one row per pipeline step. Use **skill names** (ctdd, simplify, cverify, cupdate-arch, cdocs) as row identifiers, not workflow phase names (tdd-tests, tdd-impl, etc.). No phase-to-skill name mapping is needed — the table shows what was invoked, which is what humans care about.
+
+Each row shows: step name, duration, token count, and result (pass/fail/skipped/reverted/incomplete).
+
+**Duration**: last `skill_completed` elapsed_ms minus first `skill_started` elapsed_ms for that skill name (clock-independent, uses audit trail's authoritative time representation). For skills with multiple attempts (retries, QA rounds), the span covers all attempts. The orchestrator logs `skill_started`/`skill_completed` for all pipeline steps including `/simplify`, which does not log its own entries. Phases that never completed (pipeline aborted mid-run, detected by `skill_started` without matching `skill_completed`) appear with duration up to the abort point and result `(incomplete)`.
+
+**Token count**: computed by summing `total_tokens` from `.correctless/artifacts/token-log-{branch-slug}.jsonl` entries where the `skill` field matches the row's skill name. If the token log doesn't exist or has no entries for a skill, the token column shows `—`.
+
+#### (c) Artifacts
+
+File paths for: spec, verification report, QA findings file, audit trail, and PR URL. Documentation and architecture changes get a one-line summary each (e.g., "README, AGENT_CONTEXT updated; PAT-014, PAT-015 added").
 
 ## Escalation (R-005)
 
@@ -214,12 +322,13 @@ The shared constraint "Never auto-invoke the next skill" remains the default beh
 
 Log orchestration decisions to the audit trail at `.correctless/artifacts/audit-trail-{branch_slug}.jsonl`. Each orchestration entry must have:
 
-- `type`: one of the 7 event types:
+- `type`: one of the 8 event types:
   - `skill_started` — before invoking a pipeline skill
   - `skill_completed` — after a skill finishes successfully
   - `preference_applied` — when a preference from preferences.md influences a decision
   - `escalation_triggered` — when escalation to human is initiated
   - `simplify_reverted` — when simplify changes are reverted (R-015)
+  - `artifact_validation_failed` — when a skipped phase's artifact validation fails (R-002). Includes additional fields: `phase` (which phase failed validation), `expected_artifact` (what was checked), and `validation_error` (why it failed)
   - `pipeline_completed` — successful pipeline completion
   - `pipeline_failed` — pipeline stopped due to escalation or unrecoverable error
 - `timestamp`: ISO 8601 format
