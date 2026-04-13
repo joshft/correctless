@@ -52,6 +52,12 @@
 - **Structural enforcement**: At conservative mandate level, the orchestrator applies post-response validation on architectural decisions — missing or invalid spec citation overrides the supervisor's `approve` to `hard_stop`. Red Team and security-keyword review findings cannot receive `reject` — orchestrator overrides to `hard_stop` (PRH-003).
 - **Test**: test-auto-mandate.sh — INV-028 (citation), INV-030 (hard limits), INV-034 (conservative enforcement); test-auto-review-triage.sh — PRH-003 (source agent authority)
 
+#### TB-004c: Scoped git push authority (consolidation step)
+- **Scoped exception**: `/cauto` Step 8 (consolidation) commits and pushes pipeline artifacts to the remote. The orchestrator stages only files from an explicit allowlist (committed branch changes + known pipeline output paths), unstages `.correctless/artifacts/` as a belt-and-suspenders guard, and pushes to the current feature branch. This is autonomous git-write authority beyond TB-004's "how" delegation — it modifies the remote repository.
+- **Trust model**: The push targets only the feature branch (never `main`, `master`, `develop`, or `release/*` — hard-coded guard). The staging allowlist is a constant in SKILL.md Step 8.1; unknown untracked files are never staged. The `.correctless/artifacts/` unstage guard prevents secrets or ephemeral data from reaching the remote even if `.gitignore` is misconfigured.
+- **Constraint**: If the consolidation step is ever extended to push to protected branches, force-push, or stage files outside the explicit allowlist, this exception MUST be revisited. The allowlist is the safety boundary — expanding it is an architectural decision requiring human approval.
+- **Test**: UX-R-003 in test-semi-auto-mode.sh (explicit path list presence, protected branch guard, belt-and-suspenders unstage, no-op when nothing to commit, push failure handling)
+
 ## Abstractions
 
 ### ABS-001: Shared script library (scripts/lib.sh)

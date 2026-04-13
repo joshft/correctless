@@ -164,6 +164,22 @@
         "tests/test-test-evasion-antipatterns.sh"
       ],
       "timestamp": "2026-04-13T19:00:00Z"
+    },
+    {
+      "feature_slug": "auto-ux-improvements",
+      "recommended_intensity": "standard",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/specs/auto-ux-improvements.md",
+        "correctless/skills/cauto/SKILL.md",
+        "skills/cauto/SKILL.md",
+        "tests/test-semi-auto-mode.sh"
+      ],
+      "timestamp": "2026-04-13T20:30:00Z"
     }
   ]
 }

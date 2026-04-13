@@ -207,6 +207,7 @@ graph LR
 | [`/ctdd`](docs/skills/ctdd.md) | After review approves spec | RED, test audit, GREEN, /simplify, QA — all enforced |
 | [`/cverify`](docs/skills/cverify.md) | After /ctdd completes | Spec-to-code verification, drift detection |
 | [`/cdocs`](docs/skills/cdocs.md) | After /cverify | Update README, AGENT_CONTEXT, ARCHITECTURE, feature docs |
+| [`/cauto`](docs/skills/cauto.md) | After spec review approved | Orchestrate full pipeline: TDD, verify, docs, PR — with flexible phase resume |
 | [`/crelease`](docs/skills/crelease.md) | Ready to tag a version | Version bump, changelog, sanity checks, annotated tag |
 
 ### Code Quality
@@ -432,7 +433,7 @@ rm -f scripts/lib.sh scripts/antipattern-scan.sh
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 27 skills, 3 intensity levels, ~3,900 automated tests, 7 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 27 skills, 3 intensity levels, ~3,970 automated tests, 7 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 
