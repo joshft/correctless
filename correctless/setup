@@ -7,6 +7,19 @@
 
 set -euo pipefail
 
+# Fail-fast prerequisites
+if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+  echo "ERROR: Correctless requires Bash 4+. You have Bash ${BASH_VERSION}." >&2
+  echo "  macOS: brew install bash" >&2
+  echo "  Ubuntu: sudo apt install bash" >&2
+  exit 1
+fi
+
+if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+  echo "ERROR: Not in a git repository. Run setup from within a git project." >&2
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
@@ -906,11 +919,11 @@ echo "Correctless — Setup"
 echo "==================="
 echo ""
 
-# Check for jq — hooks require it
+# Check for jq — hooks require it (fail-fast, not warn)
 if ! command -v jq >/dev/null 2>&1; then
-  warn "jq is not installed. The workflow hooks require jq to function."
-  warn "Install: brew install jq (macOS) / apt install jq (Debian) / pacman -S jq (Arch)"
-  echo ""
+  echo "ERROR: jq is required but not installed. All hooks depend on jq for JSON processing." >&2
+  echo "  Install: brew install jq (macOS) / apt install jq (Debian) / pacman -S jq (Arch)" >&2
+  exit 1
 fi
 
 # Detect language
@@ -1073,5 +1086,5 @@ echo "     Note: On existing projects, this takes a few minutes — the agent is
 if [ "$HAS_INTENSITY" != "true" ]; then
   echo "     To increase intensity: add \"intensity\": \"high\" or \"critical\" to workflow section"
 fi
-echo "  2. Try it: git checkout -b feature/my-feature && then run /cspec"
+echo "  2. Try it: git checkout -b feature/my-feature, then run /cspec"
 echo ""

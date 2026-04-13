@@ -143,7 +143,7 @@ If something looks wrong, let the human correct it before proceeding.
 
 ## Step 2: Run the Setup Script
 
-Tell the user what this step does before running: "I'll run the setup script now — it creates the `.correctless/artifacts/` directory, registers workflow hooks, and generates a config template. It doesn't modify your source code."
+Tell the user what this step does before running: "I'll run the setup script now — it creates the `.correctless/artifacts/` directory, registers workflow hooks, and generates a config template. It does not modify your application source code, but it creates/updates `.claude/settings.json` (hook registration) and `scripts/lib.sh` (shared utilities)."
 
 Then run the setup script to do the mechanical work:
 

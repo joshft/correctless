@@ -115,7 +115,8 @@ require_phase() {
   local expected="$1"
   local current
   current="$(read_phase)"
-  [ "$current" = "$expected" ] || die "Expected phase '$expected', but current phase is '$current'"
+  [ "$current" = "$expected" ] || die "Expected phase '$expected', but current phase is '$current'.
+  Run /cstatus to see available transitions, or use 'workflow-advance.sh status' for details."
 }
 
 require_phase_oneof() {
@@ -124,7 +125,8 @@ require_phase_oneof() {
   for p in "$@"; do
     [ "$current" = "$p" ] && return 0
   done
-  die "Current phase '$current' is not one of: $*"
+  die "Current phase '$current' is not one of: $*.
+  Run /cstatus to see available transitions, or use 'workflow-advance.sh status' for details."
 }
 
 read_config_field() {
@@ -372,7 +374,8 @@ cmd_init() {
   [ -z "$default_branch" ] && default_branch="main"
 
   if [ "$branch" = "$default_branch" ] || [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
-    die "Cannot init workflow on '$branch'. Create a feature branch first: git checkout -b feature/my-feature"
+    die "Cannot init workflow on '$branch'. Create a feature branch first: git checkout -b feature/my-feature
+  For small fixes (< 50 LOC), try /cquick instead."
   fi
 
   local sf
@@ -864,7 +867,7 @@ cmd_override() {
     [ -f "$_os_dir/override-scrutiny.sh" ] && source "$_os_dir/override-scrutiny.sh" 2>/dev/null
   }; then
     if ! check_override_retry "$reason" "$sf" 2>/dev/null; then
-      die "Override rejected: too similar to a previously rejected override (Jaccard >= 0.4). Rephrase with a materially different justification."
+      die "Override rejected: your reason is too similar to a previous override request. Provide a genuinely different justification — explain why this specific edit is needed, not just a rephrasing of the previous reason."
     fi
   fi
 

@@ -478,7 +478,8 @@ while IFS= read -r target; do
   matched_pattern="$(_check_file_against_patterns "$target")" || true
 
   if [ -n "$matched_pattern" ]; then
-    echo "BLOCKED [sensitive-file]: $target matches protected pattern '$matched_pattern'. Edit sensitive files manually." >&2
+    echo "BLOCKED [sensitive-file]: $target matches protected pattern '$matched_pattern'.
+  Edit this file outside Claude Code, or add an exclusion to protected_files.custom_patterns in .correctless/config/workflow-config.json if this file is not actually sensitive." >&2
     exit 2
   fi
 done <<< "$FILE_TARGETS"
