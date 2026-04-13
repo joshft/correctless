@@ -1,0 +1,9 @@
+{
+  "preset": "qa",
+  "date": "2026-04-12",
+  "round": 7,
+  "specialist_lenses": ["final-convergence"],
+  "findings": [],
+  "converged": true,
+  "deferred": []
+}

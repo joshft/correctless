@@ -194,6 +194,10 @@ Zero new findings from Regression Hunter. **Converged.**
 - **Phase name drift between policy_evaluate and tier2_build_context**: Phase 3 added review-spec and tdd-verify phases but only updated one of the two consumers. (2026-04-12)
 - **AP-001 \s/grep -P systemic**: 4th+ recurrence — 49+ occurrences in 5 test files. Needs scanner expansion. (2026-04-12)
 - **AP-005 stale counts**: README badge, test count, CONTRIBUTING file count all stale after 16 test files added. (2026-04-12)
+- **_has_write_pattern / _extract_bash_targets drift**: Adding write commands to the detection function without matching target extractors creates a false sense of security — command detected but no file targets extracted, so the guard allows it through. (2026-04-12, R5→R6 regression chain)
+- **Dead code in security paths**: Functions defined and unit-tested but never called from production code (check_override_retry, review_override_issuance rejected_overrides writer). Tests pass because they test the function in isolation, not through the production call chain. (2026-04-12)
+- **Fix-round regressions compound**: R4 introduced 2 regressions (R5), R5 introduced 1 regression (R6). Each fix-round expansion creates a new attack surface that the next round must verify. The _has_write_pattern → _extract_bash_targets drift is the canonical example. (2026-04-12)
+- **Error messages as UX**: BLOCKED/die messages are the primary user interface for new users hitting the workflow gate. Cryptic messages ("Expected phase X, current is Y") without recovery guidance cause users to fight the tool instead of working with it. (2026-04-12, UX round)
 
 ## Run: 2026-04-12
 ### Round 1
@@ -243,8 +247,72 @@ Zero new findings from Regression Hunter. **Converged.**
 | R3-002 | medium | probable | Auto-accept missing decisions lacks reasoning | fixed | 3430408 |
 | R3-004 | low | confirmed | build_mandate_context fallback masks root cause | fixed | 3430408 |
 
-Zero HIGH findings in Round 3. **Converged.**
+Zero HIGH findings in Round 3. **Converged (R1-R3).**
 
-### Deferred
-- QA-011: setup detect_config heredoc JSON injection (previously deferred 2026-04-03)
-- QA-016: Adherence state unlocked read-modify-write (previously deferred)
+Audit reopened for R4-R7 with new specialist lenses.
+
+### Round 4 (new lenses: shell portability, security enforcement, doc-code consistency, test blind spots)
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| R4-S1 | critical | confirmed | check_override_retry never called from cmd_override — PRH-006 dead | fixed | 61db087 |
+| R4-S2 | high | confirmed | git write commands bypass both hooks — not in _has_write_pattern | fixed | 61db087 |
+| R4-S3 | high | confirmed | workflow-config.json unprotected between workflows | fixed | 61db087 |
+| R4-S4 | high | confirmed | review_override_issuance skips intent hash verification | fixed | 61db087 |
+| R4-S5 | high | confirmed | Override window allows writes to state/config files | fixed | 61db087 |
+| R4-D1 | high | confirmed | CONTRIBUTING.md says bash 3.2, codebase requires 4+ | fixed | 61db087 |
+| R4-D2 | medium | confirmed | CONTRIBUTING.md hook style contradicts PAT-005 | fixed | 3e4e27b |
+| R4-D3 | medium | confirmed | README/CONTRIBUTING/AGENT_CONTEXT test counts wrong | fixed | 61db087 |
+| R4-D4 | medium | confirmed | AGENT_CONTEXT.md missing 2 hooks | fixed | 61db087 |
+| R4-D5 | medium | confirmed | README missing /cauto from skills table | deferred | (content) |
+| R4-D6 | low | confirmed | README "4 enforcement hooks" stale | fixed | 61db087 |
+| R4-D7 | medium | confirmed | CONTRIBUTING.md test command lists 18 of 48 suites | fixed | 3e4e27b |
+| R4-P1 | medium | confirmed | sha256sum without fallback in 2 test files | deferred | (portability) |
+| R4-P2 | medium | confirmed | md5sum without fallback in test-statusline.sh | fixed | 61db087 |
+
+### Round 5 (regression check on R4 fixes + security deep sweep)
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| R5-001 | critical | confirmed | R4 regression: sensitive-file-guard blocks /csetup from writing workflow-config.json | fixed | 9f233b6 |
+| R5-002 | high | confirmed | R4 regression: review_override_issuance missing fail-closed for absent intent file | fixed | 9f233b6 |
+| R5-003 | critical | confirmed | _has_write_pattern misses tar, unzip, touch, scp, chmod + 5 git subcommands | fixed | 774f83c |
+
+### Round 6 (regression check on R5 write pattern expansion)
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| R6-001 | critical | confirmed | R5 regression: 12 new write commands have no target extractors in sensitive-file-guard | fixed | 506fa66 |
+
+### Round 7
+Zero findings. **Converged (R4-R7).**
+
+### UX Round (new user experience: fresh project, existing codebase, error messages)
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| UX-F01 | high | confirmed | Standard Workflow Guide link points to non-existent GitHub Pages site | fixed | 3e4e27b |
+| UX-F02 | high | confirmed | marketplace.json says 26 skills, actual 27 | fixed | 3e4e27b |
+| UX-F03 | medium | confirmed | Root AGENT_CONTEXT.md stale counts (21 tests, 26 skills) | fixed | 3e4e27b |
+| UX-F04 | medium | confirmed | Prerequisites (jq, bash 4+) not in README Requirements | fixed | 3e4e27b |
+| UX-F05 | medium | confirmed | No "opt-in per feature" statement in README | fixed | 3e4e27b |
+| UX-F06 | medium | confirmed | No CI interaction guidance in README | fixed | 3e4e27b |
+| UX-F07 | medium | confirmed | No post-merge guidance in README | fixed | 3e4e27b |
+| UX-F08 | medium | confirmed | csetup doc claims "doesn't modify source code" | fixed | 3e4e27b |
+| UX-E01 | high | confirmed | require_phase errors lack actionable guidance | fixed | 3e4e27b |
+| UX-E02 | medium | confirmed | Setup continues silently without jq | fixed | 3e4e27b |
+| UX-E03 | medium | confirmed | sensitive-file-guard block lacks recovery guidance | fixed | 3e4e27b |
+| UX-E04 | medium | confirmed | fail-closed BLOCKED doesn't name blocked file or diagnose cmd | fixed | 3e4e27b |
+| UX-E05 | medium | confirmed | Corrupt state message gives dead-end recovery path | fixed | 3e4e27b |
+| UX-E06 | medium | confirmed | Main branch error doesn't mention /cquick | fixed | 3e4e27b |
+| UX-E07 | low | confirmed | Override Jaccard message uses jargon | fixed | 3e4e27b |
+| UX-E08 | low | confirmed | No bash version check in setup | fixed | 3e4e27b |
+| UX-E09 | low | confirmed | Setup not-in-git-repo silently uses pwd | fixed | 3e4e27b |
+| UX-E10 | low | confirmed | Setup "then run" syntax error in message | fixed | 3e4e27b |
+| UX-X01 | high | confirmed | No uninstall instructions anywhere | fixed | 3e4e27b |
+| UX-X02 | high | confirmed | No file manifest of what setup creates | deferred | (feature) |
+| UX-X03 | high | confirmed | scripts/ namespace collision with user projects | deferred | (architectural) |
+
+### Deferred (all rounds)
+- QA-011: setup detect_config heredoc JSON injection (deferred since 2026-04-03)
+- QA-016: Adherence state unlocked read-modify-write (deferred since 2026-04-05)
+- R4 test blind spots (TB-001 through TB-014): 14 findings about stub-only test coverage for Phase 3 functions — need functional tests with non-default supervisor stubs
+- R4 security: python3 -c interpreter bypass, symlink resolution, policy hash at override, CORRECTLESS_TRIAGE_FN env var — architectural decisions needed
+- R4 portability: timeout macOS wrapper, sha256sum test fallback
+- UX deferred: scripts/ relocation, tutorial, FAQ, team guide, file manifest, JS/TS detection, /cauto docs, test_new docs, before/after comparison

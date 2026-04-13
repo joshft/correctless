@@ -1,0 +1,10 @@
+{
+  "preset": "qa",
+  "date": "2026-04-12",
+  "round": 6,
+  "specialist_lenses": ["r5-regression-checker"],
+  "findings": [
+    {"id": "R6-001", "severity": "critical", "tier": "confirmed", "agent": "r6-convergence", "title": "R5 regression: 12 new write commands have no target extractors in sensitive-file-guard", "status": "fixed", "fixed_in": "506fa66"}
+  ],
+  "deferred": []
+}

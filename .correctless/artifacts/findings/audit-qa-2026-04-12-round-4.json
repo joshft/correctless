@@ -1,0 +1,26 @@
+{
+  "preset": "qa",
+  "date": "2026-04-12",
+  "round": 4,
+  "specialist_lenses": ["shell-portability", "security-enforcement", "doc-code-consistency", "test-blind-spots"],
+  "findings": [
+    {"id": "R4-S1", "severity": "critical", "tier": "confirmed", "agent": "security-enforcement-auditor", "title": "check_override_retry never called from cmd_override — PRH-006 dead", "status": "fixed", "fixed_in": "61db087"},
+    {"id": "R4-S2", "severity": "high", "tier": "confirmed", "agent": "security-enforcement-auditor", "title": "git write commands bypass both hooks — not in _has_write_pattern", "status": "fixed", "fixed_in": "61db087"},
+    {"id": "R4-S3", "severity": "high", "tier": "confirmed", "agent": "security-enforcement-auditor", "title": "workflow-config.json unprotected between workflows", "status": "fixed", "fixed_in": "61db087"},
+    {"id": "R4-S4", "severity": "high", "tier": "confirmed", "agent": "security-enforcement-auditor", "title": "review_override_issuance skips intent hash verification", "status": "fixed", "fixed_in": "61db087"},
+    {"id": "R4-S5", "severity": "high", "tier": "confirmed", "agent": "security-enforcement-auditor", "title": "Override window allows writes to state/config files", "status": "fixed", "fixed_in": "61db087"},
+    {"id": "R4-D1", "severity": "high", "tier": "confirmed", "agent": "doc-code-consistency-auditor", "title": "CONTRIBUTING.md bash 3.2 contradicts codebase bash 4+ requirement", "status": "fixed", "fixed_in": "61db087"},
+    {"id": "R4-D3", "severity": "medium", "tier": "confirmed", "agent": "doc-code-consistency-auditor", "title": "README/CONTRIBUTING/AGENT_CONTEXT test counts all wrong", "status": "fixed", "fixed_in": "61db087"},
+    {"id": "R4-D4", "severity": "medium", "tier": "confirmed", "agent": "doc-code-consistency-auditor", "title": "AGENT_CONTEXT.md missing 2 hooks", "status": "fixed", "fixed_in": "61db087"},
+    {"id": "R4-D6", "severity": "low", "tier": "confirmed", "agent": "doc-code-consistency-auditor", "title": "README 4 enforcement hooks stale", "status": "fixed", "fixed_in": "61db087"},
+    {"id": "R4-P2", "severity": "medium", "tier": "confirmed", "agent": "shell-portability-auditor", "title": "md5sum without fallback in test-statusline.sh", "status": "fixed", "fixed_in": "61db087"}
+  ],
+  "deferred": [
+    {"id": "R4-TB", "count": 14, "description": "Test blind spots: stub-only coverage for Phase 3 supervisor integration functions"},
+    {"id": "R4-SE-07", "description": "python3 -c interpreter bypass of sensitive-file-guard"},
+    {"id": "R4-SE-08", "description": "No symlink resolution in hooks"},
+    {"id": "R4-SE-09", "description": "Policy hash not checked at override issuance/closure"},
+    {"id": "R4-D5", "description": "README missing /cauto from skills table — needs docs page"},
+    {"id": "R4-P1", "description": "sha256sum without fallback in 2 test files"}
+  ]
+}

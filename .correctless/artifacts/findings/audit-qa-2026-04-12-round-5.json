@@ -1,0 +1,12 @@
+{
+  "preset": "qa",
+  "date": "2026-04-12",
+  "round": 5,
+  "specialist_lenses": ["r4-regression-checker", "security-deep-sweep"],
+  "findings": [
+    {"id": "R5-001", "severity": "critical", "tier": "confirmed", "agent": "r5-regression-checker", "title": "R4 regression: sensitive-file-guard blocks csetup from writing workflow-config.json", "status": "fixed", "fixed_in": "9f233b6"},
+    {"id": "R5-002", "severity": "high", "tier": "confirmed", "agent": "r5-regression-checker", "title": "R4 regression: review_override_issuance missing fail-closed for absent intent file", "status": "fixed", "fixed_in": "9f233b6"},
+    {"id": "R5-003", "severity": "critical", "tier": "confirmed", "agent": "r5-security-contract", "title": "_has_write_pattern misses tar, unzip, touch, scp, chmod + 5 git subcommands", "status": "fixed", "fixed_in": "774f83c"}
+  ],
+  "deferred": []
+}

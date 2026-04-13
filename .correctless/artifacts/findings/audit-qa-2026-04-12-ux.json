@@ -1,0 +1,43 @@
+{
+  "preset": "qa",
+  "date": "2026-04-12",
+  "round": "ux",
+  "specialist_lenses": ["fresh-project-onboarding", "existing-codebase-adoption", "error-messages-recovery"],
+  "findings": [
+    {"id": "UX-F01", "severity": "high", "tier": "confirmed", "agent": "fresh-project-auditor", "title": "Standard Workflow Guide link points to non-existent GitHub Pages site", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-F02", "severity": "high", "tier": "confirmed", "agent": "fresh-project-auditor", "title": "marketplace.json says 26 skills, actual 27", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-F03", "severity": "medium", "tier": "confirmed", "agent": "fresh-project-auditor", "title": "Root AGENT_CONTEXT.md stale counts", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-F04", "severity": "medium", "tier": "confirmed", "agent": "fresh-project-auditor", "title": "Prerequisites jq and bash 4+ not in README Requirements", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-F05", "severity": "medium", "tier": "confirmed", "agent": "fresh-project-auditor", "title": "No opt-in per feature statement in README", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-F06", "severity": "medium", "tier": "confirmed", "agent": "fresh-project-auditor", "title": "No CI interaction guidance in README", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-F07", "severity": "medium", "tier": "confirmed", "agent": "fresh-project-auditor", "title": "No post-merge guidance in README", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-F08", "severity": "medium", "tier": "confirmed", "agent": "fresh-project-auditor", "title": "csetup doc claims doesn't modify source code", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E01", "severity": "high", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "require_phase errors lack actionable guidance", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E02", "severity": "medium", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "Setup continues silently without jq", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E03", "severity": "medium", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "sensitive-file-guard block lacks recovery guidance", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E04", "severity": "medium", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "fail-closed BLOCKED doesn't name file or mention diagnose", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E05", "severity": "medium", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "Corrupt state message gives dead-end recovery path", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E06", "severity": "medium", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "Main branch error doesn't mention /cquick", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E07", "severity": "low", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "Override Jaccard message uses technical jargon", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E08", "severity": "low", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "No bash version check in setup", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E09", "severity": "low", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "Setup not-in-git-repo silently uses pwd", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-E10", "severity": "low", "tier": "confirmed", "agent": "error-recovery-auditor", "title": "Setup then-run syntax error in message", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-X01", "severity": "high", "tier": "confirmed", "agent": "existing-codebase-auditor", "title": "No uninstall instructions anywhere", "status": "fixed", "fixed_in": "3e4e27b"},
+    {"id": "UX-X02", "severity": "high", "tier": "confirmed", "agent": "existing-codebase-auditor", "title": "No file manifest of what setup creates", "status": "deferred"},
+    {"id": "UX-X03", "severity": "high", "tier": "confirmed", "agent": "existing-codebase-auditor", "title": "scripts/ namespace collision with user projects", "status": "deferred"}
+  ],
+  "deferred": [
+    {"id": "UX-X02", "description": "File manifest / setup --dry-run — feature work"},
+    {"id": "UX-X03", "description": "scripts/ namespace collision — move to .correctless/scripts/ — architectural"},
+    {"id": "UX-tutorial", "description": "Tutorial walkthrough for complete feature"},
+    {"id": "UX-faq", "description": "FAQ/troubleshooting page"},
+    {"id": "UX-team", "description": "Team adoption guide"},
+    {"id": "UX-before-after", "description": "Before/after comparison showing ROI"},
+    {"id": "UX-cauto-docs", "description": "/cauto docs page + README entry"},
+    {"id": "UX-test-new", "description": "test_new documentation for slow test suites"},
+    {"id": "UX-flaky", "description": "Flaky test handling documentation"},
+    {"id": "UX-js-ts", "description": "JavaScript vs TypeScript detection in setup"},
+    {"id": "UX-phase-required", "description": "Structural phase_required frontmatter for skills"},
+    {"id": "UX-statusline", "description": "Setup statusline overwrite handling"}
+  ]
+}
