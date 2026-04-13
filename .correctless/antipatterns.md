@@ -15,8 +15,8 @@ When a bug is found (pre-merge by QA, or post-merge by /cpostmortem):
 
 ### AP-001: GNU grep extensions in POSIX scripts
 - **What went wrong**: Scripts used `grep -P` (Perl regex), `\b` (word boundary), or `\s` (whitespace class) which are GNU extensions. On macOS (BSD grep), these silently fail or produce wrong results. In ci-hook-wiring, `grep -oP` for HOOK_TYPE/HOOK_MATCHER silently returned nothing on macOS — zero hooks registered.
-- **How to catch it**: Use `sed -n 's/pattern/replacement/p'` or `grep -E` with POSIX ERE only. Add a CI check that flags `grep -P` in any .sh file. Spec rule: "All grep patterns must use POSIX ERE (`-E`) or basic regex only — no `-P`, `\b`, `\s`."
-- **Frequency**: 5 findings across 2 features (antipattern-scan, ci-hook-wiring)
+- **How to catch it**: Mechanically enforced by `scripts/antipattern-scan.sh` `check_shell()` sections (e) and (f), pattern IDs `gnu-grep-p` and `gnu-grep-ext`. Use `sed -n 's/pattern/replacement/p'` or `grep -E` with POSIX ERE only. Spec rule: "All grep patterns must use POSIX ERE (`-E`) or basic regex only — no `-P`, `\b`, `\s`."
+- **Frequency**: 5 findings across 2 features (antipattern-scan, ci-hook-wiring); 49+ occurrences across 5 test files found in 2026-04-12 audit
 
 ### AP-002: Silent failure in conditional update paths
 - **What went wrong**: Code has an update path guarded by a presence check, but the check passes while the update is unreachable. In ci-hook-wiring, `grep -qF` found the hook path in settings.json (in `permissions.allow`), so `needs_update` stayed false, and the matcher drift correction code never ran. In consolidate, the migration updated hook paths but left matchers narrow — no convergence mechanism.
@@ -124,3 +124,8 @@ When a bug is found (pre-merge by QA, or post-merge by /cpostmortem):
 - **What went wrong**: cauto-lock.sh's R1 fix introduced a `.d` directory alongside the legacy lockfile for atomic locking, but `lock_check_stale` only cleaned the flat file, not the directory. Stale lock recovery was permanently broken — users had to manually delete the `.d` directory.
 - **How to catch it**: When a lock mechanism creates multiple artifacts (file + directory), all cleanup paths (stale detection, release, error recovery) must remove all artifacts. Test stale recovery end-to-end: create lock with dead PID, verify new acquisition succeeds.
 - **Frequency**: 1 finding in 1 feature (qa-audit-2026-04-12 R2, R1 regression)
+
+### AP-022: Dead code in security paths
+- **What went wrong**: `check_override_retry` was defined in `override-scrutiny.sh`, unit-tested (47 tests passed), and never called from `cmd_override` — PRH-006 was structurally inert. The function existed, the tests exercised it in isolation, but the production call chain never invoked it. The security guard was dead code with full test coverage.
+- **How to catch it**: Mechanically enforced by `scripts/antipattern-scan.sh` `check_dead_security_calls()`, pattern ID `dead-security-fn`. Advisory: `skills/ctdd/SKILL.md` test audit check 8 (production call chain) verifies tests exercise the full entry-point to guard chain for security invariants that specify "called from" or "invoked by" patterns. When adding a new security script that doesn't match R-004 filename patterns, tag with `# scanner: security` in the first 5 lines.
+- **Frequency**: 2 findings in 1 feature (qa-audit-2026-04-12 R4)

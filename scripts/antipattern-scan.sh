@@ -49,6 +49,10 @@ declare -A PATTERN_META=(
     ["todo-comment"]="low|TODO/FIXME/HACK comment left in code|code-quality"
     ["todo-macro"]="low|todo!() macro left in code|code-quality"
     ["jq-slurp-jsonl"]="high|jq -s (slurp) on JSONL file — malformed lines cause total parse failure (AP-014)|data-integrity"
+    ["gnu-grep-p"]="high|grep uses Perl regex mode — not portable, fails silently on BSD/macOS (AP-001)|portability"
+    ["gnu-grep-ext"]="medium|GNU grep extension in grep pattern — not POSIX ERE (AP-001)|portability"
+    ["gnu-grep-ext-low"]="low|GNU grep word-boundary extension in grep pattern — more portable but not POSIX (AP-001)|portability"
+    ["dead-security-fn"]="high|Function in security script has zero production callers — structurally inert (AP-022)|security-enforcement"
 )
 
 # ============================================
@@ -437,6 +441,59 @@ check_shell() {
   # (c) TODO / FIXME / HACK
   check_todo_comments "$file" '#[[:space:]]*(TODO|FIXME|HACK)'
 
+  # (e) AP-001: Perl regex mode in grep — not portable, fails silently on BSD/macOS
+  # Detects uses of the Perl-compatible regex flag and --perl-regexp long form
+  while IFS=: read -r line_num _; do
+    [ -n "$line_num" ] || continue
+    add_finding "gnu-grep-p" "$file" "$line_num"
+  done < <(grep -nE "grep[[:space:]]+((-[[:alpha:]]*[P])|--perl-regexp)" "$file" 2>/dev/null || true)
+
+  # (f) AP-001: GNU extensions in grep patterns — not POSIX ERE
+  # Detects backslash-s/w/d/b in grep context with line-scoped POSIX exclusions
+  # Uses printf to build match patterns, avoiding literal non-POSIX sequences in this file
+  local _bs_s _bs_w _bs_d _bs_b
+  _bs_s="$(printf '\\s')"
+  _bs_w="$(printf '\\w')"
+  _bs_d="$(printf '\\d')"
+  _bs_b="$(printf '\\b')"
+
+  while IFS=: read -r line_num line_content; do
+    [ -n "$line_num" ] || continue
+    # Only scan lines that contain grep
+    case "$line_content" in
+      *grep*) ;;
+      *) continue ;;
+    esac
+
+    # Check for backslash-s with POSIX exclusion [[:space:]]
+    if echo "$line_content" | grep -qF "$_bs_s" 2>/dev/null; then
+      if ! echo "$line_content" | grep -qF '[[:space:]]' 2>/dev/null; then
+        add_finding "gnu-grep-ext" "$file" "$line_num"
+      fi
+    fi
+
+    # Check for backslash-w with POSIX exclusion [[:alnum:]]
+    if echo "$line_content" | grep -qF "$_bs_w" 2>/dev/null; then
+      if ! echo "$line_content" | grep -qF '[[:alnum:]]' 2>/dev/null; then
+        add_finding "gnu-grep-ext" "$file" "$line_num"
+      fi
+    fi
+
+    # Check for backslash-d with POSIX exclusion [[:digit:]]
+    if echo "$line_content" | grep -qF "$_bs_d" 2>/dev/null; then
+      if ! echo "$line_content" | grep -qF '[[:digit:]]' 2>/dev/null; then
+        add_finding "gnu-grep-ext" "$file" "$line_num"
+      fi
+    fi
+
+    # Check for backslash-b with POSIX exclusion: grep -w on same line
+    if echo "$line_content" | grep -qF "$_bs_b" 2>/dev/null; then
+      if ! echo "$line_content" | grep -qE 'grep[[:space:]]+-w' 2>/dev/null; then
+        add_finding "gnu-grep-ext-low" "$file" "$line_num"
+      fi
+    fi
+  done < <(grep -nF '\' "$file" 2>/dev/null | grep -E '[\\][swdb]' || true)
+
   # (d) AP-014: jq -s / jq --slurp on JSONL — malformed lines cause total parse failure
   # JSONL consumers must use jq -R with try/catch, never jq -s (ABS-006)
   while IFS=: read -r line_num _; do
@@ -577,6 +634,171 @@ emit_json() {
 }
 
 # ============================================
+# Dead code in security paths (R-004)
+# ============================================
+
+# Security script filename patterns (per spec R-004)
+_is_security_script() {
+  local filepath="$1"
+  local basename
+  basename="$(basename "$filepath")"
+  local dir
+  dir="$(dirname "$filepath")"
+
+  # Only scripts/ directory (hooks/ excluded per spec)
+  case "$dir" in
+    scripts|scripts/*|./scripts|./scripts/*) ;;
+    *) return 1 ;;
+  esac
+
+  # Check filename patterns
+  case "$basename" in
+    workflow-*.sh|*-gate.sh|*-guard.sh|audit-*.sh|review-*.sh|override-*.sh) return 0 ;;
+    *-scrutiny.sh|*-mandate.sh|*-crosscheck.sh) return 0 ;;
+    cauto-lock.sh|intent-hash.sh|auto-policy.sh|decision-*.sh) return 0 ;;
+    security-scan.sh|budget-check.sh) return 0 ;;
+  esac
+
+  # Check tag in first 5 lines
+  if head -5 "$filepath" 2>/dev/null | grep -q '# scanner: security'; then
+    return 0
+  fi
+
+  return 1
+}
+
+_is_library_tagged() {
+  local filepath="$1"
+  head -5 "$filepath" 2>/dev/null | grep -q '# scanner: library'
+}
+
+_is_library_referenced_by_skill() {
+  local filepath="$1"
+  local basename
+  basename="$(basename "$filepath")"
+
+  # Check if any skills/*/SKILL.md references this script's basename
+  if [ -d "skills" ]; then
+    grep -rq "$basename" skills/*/SKILL.md 2>/dev/null && return 0
+  fi
+  return 1
+}
+
+_is_pluggable_function() {
+  local fn_name="$1"
+  local def_line="$2"
+
+  # Functions starting with _default_
+  case "$fn_name" in
+    _default_*) return 0 ;;
+  esac
+
+  # Functions with "pluggable" or "callback" comment on definition line
+  if echo "$def_line" | grep -qi 'pluggable\|callback'; then
+    return 0
+  fi
+
+  return 1
+}
+
+check_dead_security_calls() {
+  # Find all security scripts in the repo
+  local -a security_scripts=()
+  while IFS= read -r script; do
+    [ -z "$script" ] && continue
+    [ ! -f "$script" ] && continue
+
+    # Skip library-tagged scripts that ARE referenced by a skill
+    if _is_library_tagged "$script"; then
+      if _is_library_referenced_by_skill "$script"; then
+        continue
+      fi
+      # Library-tagged but not referenced — fall through to scan it
+    fi
+
+    if _is_security_script "$script" || _is_library_tagged "$script"; then
+      security_scripts+=("$script")
+    fi
+  done < <(find scripts/ -name '*.sh' -type f 2>/dev/null)
+
+  # For each function defined in security scripts
+  for script in "${security_scripts[@]}"; do
+    while IFS= read -r fn_line; do
+      [ -z "$fn_line" ] && continue
+
+      local line_num fn_name full_line
+      line_num="${fn_line%%:*}"
+      full_line="${fn_line#*:}"
+
+      # Extract function name from both syntaxes:
+      # name() { ... and function name { ...
+      if echo "$full_line" | grep -qE '^[[:space:]]*function[[:space:]]+'; then
+        fn_name="$(echo "$full_line" | sed -n 's/^[[:space:]]*function[[:space:]]\+\([a-zA-Z_][a-zA-Z0-9_]*\).*/\1/p')"
+      else
+        fn_name="$(echo "$full_line" | sed -n 's/^[[:space:]]*\([a-zA-Z_][a-zA-Z0-9_]*\)[[:space:]]*().*/\1/p')"
+      fi
+
+      [ -z "$fn_name" ] && continue
+
+      # Skip pluggable/callback functions (R-005)
+      if _is_pluggable_function "$fn_name" "$full_line"; then
+        continue
+      fi
+
+      # Check if any production file calls this function
+      # Production files: hooks/, scripts/, setup, bin/ — excluding tests/
+      local has_caller=false
+
+      # Search production directories for callers (using fixed-string grep)
+      local -a prod_dirs=()
+      [ -d "hooks" ] && prod_dirs+=("hooks/")
+      [ -d "scripts" ] && prod_dirs+=("scripts/")
+      [ -f "setup" ] && prod_dirs+=("setup")
+      [ -d "bin" ] && prod_dirs+=("bin/")
+
+      if [ ${#prod_dirs[@]} -gt 0 ]; then
+        # Grep for the function name in production files, excluding the definition file itself
+        # and excluding test paths
+        local caller_output
+        caller_output="$(grep -rnF "$fn_name" "${prod_dirs[@]}" 2>/dev/null | \
+          grep -v "tests/test-" | \
+          grep -v "/tests/" | \
+          grep -v "^${script}:${line_num}:" || true)"
+
+        # Filter out the function definition line itself (same file, different lines still count)
+        # Also filter out comments-only matches
+        while IFS= read -r caller_line; do
+          [ -z "$caller_line" ] && continue
+          local caller_content
+          caller_content="${caller_line#*:}"
+          caller_content="${caller_content#*:}"
+
+          # Skip comment-only lines
+          local trimmed
+          trimmed="${caller_content#"${caller_content%%[! ]*}"}"
+          trimmed="${trimmed#"${trimmed%%[!	]*}"}"
+          case "$trimmed" in
+            \#*) continue ;;
+          esac
+
+          # Skip the function definition itself (any syntax)
+          if echo "$caller_content" | grep -qE "(^|[[:space:]])(function[[:space:]]+)?${fn_name}[[:space:]]*\(\)|^[[:space:]]*function[[:space:]]+${fn_name}[[:space:]]*\{"; then
+            continue
+          fi
+
+          has_caller=true
+          break
+        done <<< "$caller_output"
+      fi
+
+      if [ "$has_caller" = false ]; then
+        add_finding "dead-security-fn" "$script" "$line_num"
+      fi
+    done < <(grep -nE '^[[:space:]]*(function[[:space:]]+[[:alpha:]_][[:alnum:]_]*[[:space:]]*\{|[[:alpha:]_][[:alnum:]_]*[[:space:]]*\(\)[[:space:]]*\{)' "$script" 2>/dev/null || true)
+  done
+}
+
+# ============================================
 # Main
 # ============================================
 
@@ -639,6 +861,9 @@ main() {
     check_placeholders "$file"
 
   done <<< "$changed_files"
+
+  # Run dead-security-call detection after per-file loop (scans all security scripts)
+  check_dead_security_calls
 
   local output
   output="$(emit_json)"
