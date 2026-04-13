@@ -280,6 +280,68 @@ _extract_bash_targets() {
           continue
         fi
         ;;
+      # touch/chmod/chown/chgrp/mkdir: emit all non-flag arguments (R6 fix)
+      touch|chmod|chown|chgrp|mkdir)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;
+            *) _strip_quotes "${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # tar: emit all non-flag arguments (archive and extracted files)
+      tar)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;
+            *) _strip_quotes "${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # unzip/7z/cpio/ar: emit all non-flag arguments (R6 fix)
+      unzip|7z|cpio|ar)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;
+            *) _strip_quotes "${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # scp/sftp: emit all non-flag arguments (R6 fix)
+      scp|sftp)
+        i=$((i + 1))
+        while [ $i -lt ${#tokens[@]} ]; do
+          case "${tokens[$i]}" in
+            -*) ;;
+            *) _strip_quotes "${tokens[$i]}" ;;
+          esac
+          i=$((i + 1))
+        done
+        continue
+        ;;
+      # git write subcommands: emit all non-flag arguments after the subcommand
+      git)
+        if [[ "$cmd" =~ git[[:space:]]+(checkout|restore|reset|stash|clean|apply|am|merge|rebase|cherry-pick) ]]; then
+          i=$((i + 2))  # skip 'git' and the subcommand
+          while [ $i -lt ${#tokens[@]} ]; do
+            case "${tokens[$i]}" in
+              -*) ;;
+              *) _strip_quotes "${tokens[$i]}" ;;
+            esac
+            i=$((i + 1))
+          done
+          continue
+        fi
+        ;;
       # python/node/ruby: generic interpreters that could write to any file
       # Over-extract all non-flag tokens as potential targets (downstream matching filters)
       python|python3|node|ruby)
