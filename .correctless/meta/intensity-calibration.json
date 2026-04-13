@@ -126,6 +126,24 @@
         "tests/test-auto-review-triage.sh"
       ],
       "timestamp": "2026-04-13T01:00:00Z"
+    },
+    {
+      "feature_slug": "test-evasion-antipatterns",
+      "recommended_intensity": "standard",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 2,
+      "actual_findings_count": 1,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/antipatterns.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/config/workflow-config.json",
+        ".github/workflows/ci.yml",
+        "skills/ctdd/SKILL.md",
+        "tests/test-test-evasion-antipatterns.sh"
+      ],
+      "timestamp": "2026-04-13T02:00:00Z"
     }
   ]
 }

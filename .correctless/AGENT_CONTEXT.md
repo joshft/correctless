@@ -18,7 +18,7 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 27-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 47 test files (~3,480 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components (auto-state-ext, auto-policy, decision-record, auto-agents, auto-budget, auto-safety, auto-report), and Phase 3 components (auto-review-triage, auto-mandate, auto-override, auto-crosscheck, auto-phase3-pipeline, auto-phase3-supervisor) |
+| Tests | `tests/test*.sh` | 48 test files (~3,530 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, and test-evasion antipattern validation |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns

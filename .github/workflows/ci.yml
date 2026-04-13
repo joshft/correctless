@@ -96,6 +96,7 @@ jobs:
           bash tests/test-auto-crosscheck.sh
           bash tests/test-auto-phase3-pipeline.sh
           bash tests/test-auto-phase3-supervisor.sh
+          bash tests/test-test-evasion-antipatterns.sh
 
       - name: Verify sync
         run: |

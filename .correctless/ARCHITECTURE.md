@@ -263,6 +263,18 @@ See `.claude/rules/hooks-pretooluse.md`.
 - **Violated when**: Artifact accessed without hash check, hash mismatch silently ignored, or missing hash tool causes crash
 - **Test**: test-auto-policy.sh (INV-018), test-auto-report.sh (INV-013) — hash compute, tamper detection, enforcement through routing
 
+### PAT-012: Wiring tests over keyword tests (guards AP-003)
+- **Pattern**: Tests for integration rules must exercise the real system path
+- **Rule**: Tests tagged [integration] must call actual functions/endpoints, not grep for keywords in file content. A test that passes because a keyword appears in a comment is not verifying behavior.
+- **Violated when**: An [integration] rule is tested only via file_contains/grep on a skill or agent file
+- **Test**: Test audit BLOCKING finding for any [integration] rule with only keyword-presence tests
+
+### PAT-013: Doc-update invariant on refactoring (guards AP-005)
+- **Pattern**: Every refactoring that renames or deletes components must include doc updates
+- **Rule**: /cdocs must grep all .md files for terms that were renamed/deleted. Stale references are BLOCKING. Every refactoring spec must include a doc-update invariant listing the old names to search for.
+- **Violated when**: Code is refactored but docs still reference old names, deleted files, or removed components
+- **Test**: /cdocs staleness check; per-feature grep for old names in .md files
+
 ## Environment Assumptions
 
 ### ENV-001: Bash 4+ required

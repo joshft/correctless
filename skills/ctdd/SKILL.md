@@ -211,6 +211,12 @@ After the test agent completes and tests exist, run the **test audit** before ad
 >
 > 4. **Spec coverage**: Are there spec rules with NO test at all?
 >
+> 5. **Test-routing (AP-016)**: For each spec rule that cites a specific endpoint, method, function, or path (a spec-named resource), verify at least one test actually calls or references that spec-named resource. Tests that cover auxiliary or simpler paths while avoiding the spec-named resource are a BLOCKING finding — the agent is routing around the requirement.
+>
+> 6. **Hand-rolled mocks (AP-017)**: Flag tests that define mock structs, stub classes, or hand-rolled test doubles that always return success without referencing a mock generator framework (e.g., `go:generate mockgen`, `unittest.mock.patch(spec=)`, `jest.mock`). A hand-rolled mock that can't fail makes failure-mode testing impossible. This is a BLOCKING finding when generated alternatives exist for the language.
+>
+> 7. **Execution evidence (AP-018)**: For tests tagged `[integration]` or `[e2e]`, verify the test was actually executed — not just compiled or listed. Look for execution evidence: real timestamps progressing in test output, actual command stderr/stdout, reasonable test durations. A test that only checks compilation or imports without running is a BLOCKING finding.
+>
 > Report findings as:
 > - **BLOCKING**: Tests that must be strengthened or added before implementation starts. Include the specific test name, the rule it claims to cover, and what's wrong.
 > - **ADVISORY**: Weak tests that should be noted for QA to re-check.
