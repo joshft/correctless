@@ -472,43 +472,61 @@ preserve_override_log() {
       overrides: $overrides
     }' > "$output_file"
 
-  # R-006: Enforce 50-file cap
+  # R-006: Enforce 50-file cap using shared timestamp sort helper
   local file_count
   file_count="$(find "$overrides_dir" -maxdepth 1 -name '*.json' -type f 2>/dev/null | wc -l | tr -d ' ')"
 
   if [ "$file_count" -gt 50 ]; then
     local excess=$((file_count - 50))
-    # Sort files by completed_at timestamp — malformed (missing/invalid) first
-    # Build a list of (timestamp, filepath) pairs, then sort
-    local sorted_files
-    sorted_files="$(
-      for f in "$overrides_dir"/*.json; do
-        [ -f "$f" ] || continue
-        local ts
-        ts="$(jq -r '.completed_at // ""' "$f" 2>/dev/null)" || ts=""
-        if [ -z "$ts" ] || [ "$ts" = "null" ]; then
-          # Malformed — sort earliest (evict first)
-          echo "0000-00-00T00:00:00Z $f"
-        else
-          echo "$ts $f"
-        fi
-      done | sort
-    )"
+    local _sentinel="0000-00-00T00:00:00Z"
 
-    # Evict the oldest N files
-    echo "$sorted_files" | head -n "$excess" | while IFS=' ' read -r _ts filepath; do
-      if [ -f "$filepath" ]; then
-        local basename_f
-        basename_f="$(basename "$filepath")"
-        if [ "$_ts" = "0000-00-00T00:00:00Z" ]; then
-          echo "WARNING: evicting malformed preserved file (missing completed_at): $basename_f" >&2
-        fi
-        rm -f "$filepath"
+    _list_overrides_by_timestamp "$overrides_dir" | head -n "$excess" | while IFS=' ' read -r _ts filepath; do
+      [ -n "$filepath" ] || continue
+      if [ "$_ts" = "$_sentinel" ]; then
+        echo "WARNING: evicting malformed preserved file (missing completed_at): $(basename "$filepath")" >&2
       fi
+      rm -f "$filepath"
     done
   fi
 
   return 0
+}
+
+# ---------------------------------------------------------------------------
+# _list_overrides_by_timestamp — list preserved override files sorted by time
+# ---------------------------------------------------------------------------
+# Usage: _list_overrides_by_timestamp DIR [--reverse] [--limit N]
+# Outputs "timestamp filepath" lines, sorted ascending (oldest first).
+# --reverse: sort descending (newest first). --limit N: output at most N lines.
+# Files with missing/invalid completed_at sort earliest (sentinel).
+_list_overrides_by_timestamp() {
+  local _dir="$1"; shift
+  local _sort_flag="" _limit=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --reverse) _sort_flag="-r" ;;
+      --limit) _limit="$2"; shift ;;
+    esac
+    shift
+  done
+
+  local _sentinel="0000-00-00T00:00:00Z"
+  local _result
+  _result="$(
+    for f in "$_dir"/*.json; do
+      [ -f "$f" ] || continue
+      local ts
+      ts="$(jq -r '.completed_at // ""' "$f" 2>/dev/null)" || ts=""
+      [ -n "$ts" ] && [ "$ts" != "null" ] || ts="$_sentinel"
+      echo "$ts $f"
+    done | sort $_sort_flag
+  )"
+
+  if [ -n "$_limit" ] && [ -n "$_result" ]; then
+    echo "$_result" | head -n "$_limit"
+  else
+    echo "$_result"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -522,25 +540,16 @@ preserve_override_log() {
 check_cross_run_overrides() {
   local _overrides_dir="$1"
   local _override_reason="$2"
+  local _jaccard_threshold=0.4
 
   [ -d "$_overrides_dir" ] || return 0
 
-  local file_count
-  file_count="$(find "$_overrides_dir" -maxdepth 1 -name '*.json' -type f 2>/dev/null | wc -l | tr -d ' ')"
-  [ "$file_count" -gt 0 ] || return 0
-
   # Get last 10 files sorted by completed_at descending
   local recent_files
-  recent_files="$(
-    for f in "$_overrides_dir"/*.json; do
-      [ -f "$f" ] || continue
-      local ts
-      ts="$(jq -r '.completed_at // "0000"' "$f" 2>/dev/null)" || ts="0000"
-      echo "$ts $f"
-    done | sort -r | head -10
-  )"
+  recent_files="$(_list_overrides_by_timestamp "$_overrides_dir" --reverse --limit 10)"
+  [ -n "$recent_files" ] || return 0
 
-  # Check each file for matching override reasons
+  # Check each file for matching override reasons — single jq call per file
   local matching_slugs=()
   local matching_dates=()
   local match_count=0
@@ -548,23 +557,25 @@ check_cross_run_overrides() {
   total_recent="$(echo "$recent_files" | grep -c . 2>/dev/null)" || total_recent="0"
 
   while IFS=' ' read -r _ts filepath; do
-    [ -n "$filepath" ] && [ -f "$filepath" ] || continue
+    [ -n "$filepath" ] || continue
 
-    local task_slug
-    task_slug="$(jq -r '.task_slug // "unknown"' "$filepath" 2>/dev/null)" || task_slug="unknown"
-    local completed_at
-    completed_at="$(jq -r '.completed_at // "unknown"' "$filepath" 2>/dev/null)" || completed_at="unknown"
+    # Single jq call extracts all needed fields
+    local file_data
+    file_data="$(jq -r '"\(.task_slug // "unknown")\t\(.completed_at // "unknown")\t\([.overrides[]?.reason // empty] | join("\n"))"' "$filepath" 2>/dev/null)" || continue
 
-    # Check each override reason in this file
-    local reasons
-    reasons="$(jq -r '.overrides[]?.reason // empty' "$filepath" 2>/dev/null)" || continue
+    local task_slug completed_at reasons
+    task_slug="$(echo "$file_data" | head -1 | cut -f1)"
+    completed_at="$(echo "$file_data" | head -1 | cut -f2)"
+    reasons="$(echo "$file_data" | head -1 | cut -f3-)"
+
+    [ -n "$reasons" ] || continue
 
     while IFS= read -r reason; do
       [ -n "$reason" ] || continue
       local sim
       sim="$(jaccard_similarity "$_override_reason" "$reason" 2>/dev/null)" || continue
 
-      if [ "$(awk -v s="$sim" 'BEGIN { print (s+0 >= 0.4) ? "yes" : "no" }')" = "yes" ]; then
+      if [ "$(awk -v s="$sim" -v t="$_jaccard_threshold" 'BEGIN { print (s+0 >= t) ? "yes" : "no" }')" = "yes" ]; then
         matching_slugs+=("$task_slug")
         matching_dates+=("$completed_at")
         match_count=$((match_count + 1))
@@ -577,9 +588,7 @@ check_cross_run_overrides() {
     # Build the structured escalation message
     local slug_list=""
     for i in "${!matching_slugs[@]}"; do
-      if [ -n "$slug_list" ]; then
-        slug_list="$slug_list, "
-      fi
+      [ -n "$slug_list" ] && slug_list="$slug_list, "
       slug_list="${slug_list}${matching_slugs[$i]} (${matching_dates[$i]})"
     done
 
