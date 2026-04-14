@@ -253,6 +253,81 @@ test_spec_phase_allows_spec_writes() {
 }
 
 # ============================================================================
+# R-022b [integration]: Review phases allow writes to .correctless/specs/
+# ============================================================================
+# Gate bug: spec path exception only covered 'spec' phase, not review/review-spec.
+# Spec files match *.md (source pattern) and were blocked during review, forcing
+# routine overrides for a legitimate operation. This test prevents regression.
+
+test_review_phases_allow_spec_writes() {
+  echo ""
+  echo "=== R-022b: Review phases allow writes to .correctless/specs/ ==="
+
+  setup_test_env
+
+  local result
+
+  # --- Phases where spec edits SHOULD be allowed ---
+
+  # spec phase (baseline — already tested in R-022a but verified here for completeness)
+  set_phase "spec"
+  result="$(run_gate "Edit" ".correctless/specs/my-feature.md")"
+  assert_eq "R-022b: spec phase allows Edit to specs/*.md" "0" "$(extract_exit "$result")"
+
+  # review phase
+  set_phase "review"
+  result="$(run_gate "Edit" ".correctless/specs/my-feature.md")"
+  assert_eq "R-022b: review phase allows Edit to specs/*.md" "0" "$(extract_exit "$result")"
+
+  result="$(run_gate_write ".correctless/specs/my-feature.md" "# Updated spec")"
+  assert_eq "R-022b: review phase allows Write to specs/*.md" "0" "$(extract_exit "$result")"
+
+  # review-spec phase
+  set_phase "review-spec"
+  result="$(run_gate "Edit" ".correctless/specs/my-feature.md")"
+  assert_eq "R-022b: review-spec phase allows Edit to specs/*.md" "0" "$(extract_exit "$result")"
+
+  result="$(run_gate_write ".correctless/specs/my-feature.md" "# Updated spec")"
+  assert_eq "R-022b: review-spec phase allows Write to specs/*.md" "0" "$(extract_exit "$result")"
+
+  # Spec subdirectory
+  set_phase "review-spec"
+  result="$(run_gate_write ".correctless/specs/subsystem/auth.md" "# Auth spec")"
+  assert_eq "R-022b: review-spec allows Write to specs/ subdirectory" "0" "$(extract_exit "$result")"
+
+  # --- Phases where spec edits should be BLOCKED (source classification) ---
+
+  # Create the spec file so it exists for the "exists but no STUB:TDD" check
+  mkdir -p "$TEST_DIR/.correctless/specs"
+  echo "# My Feature Spec" > "$TEST_DIR/.correctless/specs/my-feature.md"
+
+  # tdd-tests — spec file exists, no STUB:TDD, classified as source, blocked
+  set_phase "tdd-tests"
+  result="$(run_gate "Edit" ".correctless/specs/my-feature.md")"
+  assert_eq "R-022b: tdd-tests blocks Edit to specs/*.md (source)" "2" "$(extract_exit "$result")"
+
+  # tdd-qa — source and test blocked
+  set_phase "tdd-qa"
+  result="$(run_gate "Edit" ".correctless/specs/my-feature.md")"
+  assert_eq "R-022b: tdd-qa blocks Edit to specs/*.md (source)" "2" "$(extract_exit "$result")"
+
+  # --- Non-spec .md files still blocked during review ---
+
+  set_phase "review-spec"
+  result="$(run_gate "Edit" "README.md")"
+  assert_eq "R-022b: review-spec still blocks non-spec .md files" "2" "$(extract_exit "$result")"
+
+  result="$(run_gate "Edit" "docs/guide.md")"
+  assert_eq "R-022b: review-spec still blocks docs/*.md files" "2" "$(extract_exit "$result")"
+
+  # --- Post-TDD phases allow everything (exit 0 early) ---
+
+  set_phase "done"
+  result="$(run_gate "Edit" ".correctless/specs/my-feature.md")"
+  assert_eq "R-022b: done phase allows Edit to specs/*.md (exit 0)" "0" "$(extract_exit "$result")"
+}
+
+# ============================================================================
 # R-023 [integration]: Artifacts directory writable in all phases
 # ============================================================================
 
@@ -372,6 +447,7 @@ test_workflow_advance_bash_allowed() {
 
 test_override_uses_locking
 test_spec_phase_allows_spec_writes
+test_review_phases_allow_spec_writes
 test_artifacts_always_writable
 test_multiedit_mixed_paths
 test_workflow_advance_bash_allowed
