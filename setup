@@ -316,16 +316,19 @@ install_hooks() {
     local installed_at
     installed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-    # Start building JSON — collect file entries
-    local files_json="{}"
+    # Collect file entries as tab-delimited lines, then build JSON in one jq call
+    local entries_file
+    entries_file="$(mktemp)"
+    # shellcheck disable=SC2064  # Intentional: expand entries_file now, not at signal time
+    trap "rm -f '$entries_file'" RETURN
+
     for dir_prefix in hooks scripts; do
       local scan_dir="$REPO_ROOT/.correctless/$dir_prefix"
       [ -d "$scan_dir" ] || continue
       for file in "$scan_dir"/*.sh; do
         [ -f "$file" ] || continue
-        local bname rel_path
-        bname="$(basename "$file")"
-        rel_path="$dir_prefix/$bname"
+        local rel_path
+        rel_path="$dir_prefix/$(basename "$file")"
 
         local installed_hash source_hash
         installed_hash="$(sha256_hash_file "$file" 2>/dev/null)" || { manifest_ok=false; break 2; }
@@ -337,26 +340,24 @@ install_hooks() {
           source_hash="$installed_hash"
         fi
 
-        files_json="$(echo "$files_json" | jq \
-          --arg key "$rel_path" \
-          --arg ih "$installed_hash" \
-          --arg sh "$source_hash" \
-          '.[$key] = {"installed_hash": $ih, "source_hash": $sh}')" || { manifest_ok=false; break 2; }
+        printf '%s\t%s\t%s\n' "$rel_path" "$installed_hash" "$source_hash" >> "$entries_file"
       done
     done
 
     if [ "$manifest_ok" = "true" ]; then
-      jq -n \
-        --arg ts "$installed_at" \
-        --arg sd "$SCRIPT_DIR" \
-        --argjson files "$files_json" \
-        '{"installed_at": $ts, "source_dir": $sd, "files": $files}' > "$manifest_tmp" 2>/dev/null \
+      # Single jq call builds the entire manifest from collected entries
+      jq -Rn --arg ts "$installed_at" --arg sd "$SCRIPT_DIR" '
+        {installed_at: $ts, source_dir: $sd, files:
+          [inputs | split("\t") | {key: .[0], value: {installed_hash: .[1], source_hash: .[2]}}]
+          | from_entries
+        }' < "$entries_file" > "$manifest_tmp" 2>/dev/null \
         && mv "$manifest_tmp" "$manifest_file" \
         || { rm -f "$manifest_tmp"; warn "Failed to write install manifest"; }
     else
       rm -f "$manifest_tmp"
       warn "Hash failed — install manifest not written (partial manifests are never saved)"
     fi
+    rm -f "$entries_file"
   fi
 }
 

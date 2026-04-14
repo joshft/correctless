@@ -308,36 +308,37 @@ check_install_freshness() {
     return 0
   fi
 
-  # Parse manifest
+  # Bulk-parse manifest in a single jq call: source_dir + all file entries
+  local manifest_data
+  manifest_data="$(jq -r '
+    (.source_dir // ""),
+    (.files | to_entries[] | "\(.key)\t\(.value.installed_hash)\t\(.value.source_hash)")
+  ' "$manifest" 2>/dev/null)" || { echo "no_manifest"; return 0; }
+
+  # First line is source_dir, remaining lines are file entries
   local source_dir
-  source_dir="$(jq -r '.source_dir // ""' "$manifest" 2>/dev/null)" || source_dir=""
+  source_dir="$(echo "$manifest_data" | head -1)"
+  local file_entries
+  file_entries="$(echo "$manifest_data" | tail -n +2)"
 
   local source_dir_valid=false
-  if [ -n "$source_dir" ] && [ -d "$source_dir" ]; then
-    source_dir_valid=true
-  fi
+  [ -n "$source_dir" ] && [ -d "$source_dir" ] && source_dir_valid=true
 
-  # Track which files we've seen (for new_file detection)
+  # Track manifest files for new_file detection
   local -A manifest_files=()
 
-  # Check each file in the manifest
-  while IFS= read -r rel_path; do
+  # Check each file
+  while IFS=$'\t' read -r rel_path installed_hash_manifest source_hash_manifest; do
     [ -n "$rel_path" ] || continue
     manifest_files["$rel_path"]=1
 
-    local installed_hash_manifest source_hash_manifest
-    installed_hash_manifest="$(jq -r --arg k "$rel_path" '.files[$k].installed_hash' "$manifest" 2>/dev/null)"
-    source_hash_manifest="$(jq -r --arg k "$rel_path" '.files[$k].source_hash' "$manifest" 2>/dev/null)"
-
     local installed_file="$correctless_dir/$rel_path"
 
-    # Check if installed file exists
     if [ ! -f "$installed_file" ]; then
       echo "missing:$rel_path"
       continue
     fi
 
-    # Check install-vs-manifest
     local current_installed_hash
     current_installed_hash="$(sha256_hash_file "$installed_file" 2>/dev/null)" || current_installed_hash=""
 
@@ -346,13 +347,12 @@ check_install_freshness() {
       continue
     fi
 
-    # Check source-ahead-of-install (only if source_dir is valid)
-    if [ "$source_dir_valid" = "true" ]; then
+    # Source-ahead check (only if source_dir is accessible)
+    if [ "$source_dir_valid" = true ]; then
       local source_file="$source_dir/$rel_path"
       if [ -f "$source_file" ]; then
         local current_source_hash
         current_source_hash="$(sha256_hash_file "$source_file" 2>/dev/null)" || current_source_hash=""
-
         if [ "$current_source_hash" != "$source_hash_manifest" ]; then
           echo "source_ahead:$rel_path"
           continue
@@ -361,7 +361,7 @@ check_install_freshness() {
     fi
 
     echo "ok:$rel_path"
-  done < <(jq -r '.files | keys[]' "$manifest" 2>/dev/null)
+  done <<< "$file_entries"
 
   # Scan for new files not in manifest
   for dir_prefix in hooks scripts; do
@@ -369,14 +369,9 @@ check_install_freshness() {
     [ -d "$scan_dir" ] || continue
     for file in "$scan_dir"/*.sh; do
       [ -f "$file" ] || continue
-      local basename_file
-      basename_file="$(basename "$file")"
-      local rel="$dir_prefix/$basename_file"
-      if [ -z "${manifest_files[$rel]+x}" ]; then
-        echo "new_file:$rel"
-      fi
+      local rel
+      rel="$dir_prefix/$(basename "$file")"
+      [ -z "${manifest_files[$rel]+x}" ] && echo "new_file:$rel"
     done
   done
-
-  return 0
 }
