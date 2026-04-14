@@ -98,6 +98,7 @@ jobs:
           bash tests/test-auto-phase3-supervisor.sh
           bash tests/test-test-evasion-antipatterns.sh
           bash tests/test-scripts-namespace-migration.sh
+          bash tests/test-spec-mutation-alerts.sh
 
       - name: Verify sync
         run: |
