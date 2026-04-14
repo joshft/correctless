@@ -92,6 +92,24 @@ review_override_issuance() {
     fi
   fi
 
+  # R-004: Cross-run override pattern check — runs BEFORE per-run scrutiny.
+  # If the same override reason recurs across 2+ recent runs, escalate.
+  local _overrides_dir="${OVERRIDES_DIR:-}"
+  if [ -z "$_overrides_dir" ] && [ -f "$_state_file" ]; then
+    # Derive overrides dir from state file location
+    local _repo
+    _repo="$(cd "$(dirname "$_state_file")/../.." 2>/dev/null && pwd)" || true
+    if [ -n "$_repo" ]; then
+      _overrides_dir="$_repo/.correctless/meta/overrides"
+    fi
+  fi
+  if [ -n "$_overrides_dir" ] && [ -d "$_overrides_dir" ]; then
+    if ! check_cross_run_overrides "$_overrides_dir" "$_override_reason"; then
+      echo "escalate_to_human"
+      return 0
+    fi
+  fi
+
   # BND-006: Validate cross-check evidence is valid JSON
   if ! echo "$_crosscheck_evidence" | jq '.' >/dev/null 2>&1; then
     # Invalid JSON evidence — escalate to human per BND-006
@@ -404,6 +422,171 @@ jaccard_similarity() {
   ')" || { echo "0.0"; return 1; }
 
   echo "$result"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# preserve_override_log — copy filtered override entries to persistent storage
+# ---------------------------------------------------------------------------
+# Usage: preserve_override_log REPO_ROOT TASK_SLUG BRANCH_NAME
+# R-001: Reads override-log.json, filters by branch, writes metadata wrapper
+#        to .correctless/meta/overrides/{task-slug}-{YYYYMMDD}.json.
+# R-006: Enforces 50-file cap — evicts oldest by completed_at, malformed first.
+preserve_override_log() {
+  local _repo_root="$1"
+  local _task_slug="$2"
+  local _branch_name="$3"
+
+  local override_log="$_repo_root/.correctless/artifacts/override-log.json"
+  local overrides_dir="$_repo_root/.correctless/meta/overrides"
+  local date_suffix
+  date_suffix="$(date -u +%Y%m%d 2>/dev/null)" || date_suffix="00000000"
+  local output_file="$overrides_dir/${_task_slug}-${date_suffix}.json"
+  local timestamp
+  timestamp="$(date -u +%FT%TZ 2>/dev/null)" || timestamp="unknown"
+
+  mkdir -p "$overrides_dir"
+
+  # Read and filter override log entries by branch
+  local filtered_json='[]'
+  if [ -f "$override_log" ] && jq empty "$override_log" 2>/dev/null; then
+    filtered_json="$(jq --arg branch "$_branch_name" \
+      '[.[] | select(.branch == $branch)]' "$override_log" 2>/dev/null)" || filtered_json='[]'
+  fi
+
+  local override_count
+  override_count="$(echo "$filtered_json" | jq 'length' 2>/dev/null)" || override_count="0"
+
+  # Write metadata wrapper
+  jq -n \
+    --arg task_slug "$_task_slug" \
+    --arg branch "$_branch_name" \
+    --arg completed_at "$timestamp" \
+    --argjson override_count "$override_count" \
+    --argjson overrides "$filtered_json" \
+    '{
+      task_slug: $task_slug,
+      branch: $branch,
+      completed_at: $completed_at,
+      override_count: $override_count,
+      overrides: $overrides
+    }' > "$output_file"
+
+  # R-006: Enforce 50-file cap
+  local file_count
+  file_count="$(find "$overrides_dir" -maxdepth 1 -name '*.json' -type f 2>/dev/null | wc -l | tr -d ' ')"
+
+  if [ "$file_count" -gt 50 ]; then
+    local excess=$((file_count - 50))
+    # Sort files by completed_at timestamp — malformed (missing/invalid) first
+    # Build a list of (timestamp, filepath) pairs, then sort
+    local sorted_files
+    sorted_files="$(
+      for f in "$overrides_dir"/*.json; do
+        [ -f "$f" ] || continue
+        local ts
+        ts="$(jq -r '.completed_at // ""' "$f" 2>/dev/null)" || ts=""
+        if [ -z "$ts" ] || [ "$ts" = "null" ]; then
+          # Malformed — sort earliest (evict first)
+          echo "0000-00-00T00:00:00Z $f"
+        else
+          echo "$ts $f"
+        fi
+      done | sort
+    )"
+
+    # Evict the oldest N files
+    echo "$sorted_files" | head -n "$excess" | while IFS=' ' read -r _ts filepath; do
+      if [ -f "$filepath" ]; then
+        local basename_f
+        basename_f="$(basename "$filepath")"
+        if [ "$_ts" = "0000-00-00T00:00:00Z" ]; then
+          echo "WARNING: evicting malformed preserved file (missing completed_at): $basename_f" >&2
+        fi
+        rm -f "$filepath"
+      fi
+    done
+  fi
+
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# check_cross_run_overrides — detect recurring override reasons across runs
+# ---------------------------------------------------------------------------
+# Usage: check_cross_run_overrides OVERRIDES_DIR OVERRIDE_REASON
+# R-004: Reads last 10 preserved files (by completed_at), checks if 2+ contain
+#        an override reason matching the incoming one (Jaccard >= 0.4).
+# Returns: 0 if no cross-run pattern (proceed), 1 if pattern detected (escalate).
+# Outputs structured message on stderr when escalating.
+check_cross_run_overrides() {
+  local _overrides_dir="$1"
+  local _override_reason="$2"
+
+  [ -d "$_overrides_dir" ] || return 0
+
+  local file_count
+  file_count="$(find "$_overrides_dir" -maxdepth 1 -name '*.json' -type f 2>/dev/null | wc -l | tr -d ' ')"
+  [ "$file_count" -gt 0 ] || return 0
+
+  # Get last 10 files sorted by completed_at descending
+  local recent_files
+  recent_files="$(
+    for f in "$_overrides_dir"/*.json; do
+      [ -f "$f" ] || continue
+      local ts
+      ts="$(jq -r '.completed_at // "0000"' "$f" 2>/dev/null)" || ts="0000"
+      echo "$ts $f"
+    done | sort -r | head -10
+  )"
+
+  # Check each file for matching override reasons
+  local matching_slugs=()
+  local matching_dates=()
+  local match_count=0
+  local total_recent
+  total_recent="$(echo "$recent_files" | grep -c . 2>/dev/null)" || total_recent="0"
+
+  while IFS=' ' read -r _ts filepath; do
+    [ -n "$filepath" ] && [ -f "$filepath" ] || continue
+
+    local task_slug
+    task_slug="$(jq -r '.task_slug // "unknown"' "$filepath" 2>/dev/null)" || task_slug="unknown"
+    local completed_at
+    completed_at="$(jq -r '.completed_at // "unknown"' "$filepath" 2>/dev/null)" || completed_at="unknown"
+
+    # Check each override reason in this file
+    local reasons
+    reasons="$(jq -r '.overrides[]?.reason // empty' "$filepath" 2>/dev/null)" || continue
+
+    while IFS= read -r reason; do
+      [ -n "$reason" ] || continue
+      local sim
+      sim="$(jaccard_similarity "$_override_reason" "$reason" 2>/dev/null)" || continue
+
+      if [ "$(awk -v s="$sim" 'BEGIN { print (s+0 >= 0.4) ? "yes" : "no" }')" = "yes" ]; then
+        matching_slugs+=("$task_slug")
+        matching_dates+=("$completed_at")
+        match_count=$((match_count + 1))
+        break  # One match per file is enough
+      fi
+    done <<< "$reasons"
+  done <<< "$recent_files"
+
+  if [ "$match_count" -ge 2 ]; then
+    # Build the structured escalation message
+    local slug_list=""
+    for i in "${!matching_slugs[@]}"; do
+      if [ -n "$slug_list" ]; then
+        slug_list="$slug_list, "
+      fi
+      slug_list="${slug_list}${matching_slugs[$i]} (${matching_dates[$i]})"
+    done
+
+    echo "CROSS-RUN OVERRIDE PATTERN DETECTED: This override reason has recurred in $match_count of the last $total_recent runs ($slug_list). This pattern suggests a gate misclassification (AP-023), not an exceptional condition. Fix the underlying gate condition rather than continuing to override." >&2
+    return 1
+  fi
+
   return 0
 }
 

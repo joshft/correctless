@@ -37,6 +37,7 @@ Read everything in the accumulation layer. Skip files that don't exist.
 13. **Git log** — commit history to measure feature velocity and branch durations
 14. **Session meta** — `glob ~/.claude/usage-data/session-meta/*.json` — filter by `project_path` matching the current project root. Contains exact token counts, tool usage, duration, error rates per session.
 15. **Session facets** — `glob ~/.claude/usage-data/facets/*.json` — match by `session_id` to session-meta entries for this project. Contains AI-analyzed session quality: outcome, friction, satisfaction.
+16. **Override history** — `glob .correctless/meta/overrides/*.json` — preserved override logs from completed `/cauto` runs, for Override Health section
 
 ### Derived metrics:
 
@@ -148,6 +149,22 @@ Print to conversation AND write to `.correctless/artifacts/metrics-{date}.md`:
 - **Average feature duration:** {N} days (branch creation to merge)
 - **Features per month:** {N}
 - **Workflow overhead per feature:** ~{N} min estimated
+
+## Override Health
+
+Read all files in `.correctless/meta/overrides/*.json`. Compute:
+
+**(a) Total overrides** across all preserved runs — sum `override_count` from each file.
+
+**(b) Mean overrides per run** — total overrides / count of preserved files.
+
+**(c) Override reason frequency** — group overrides by reason using Jaccard similarity (threshold 0.3, invoked via `Bash(source scripts/override-scrutiny.sh && jaccard_similarity "reason_a" "reason_b")`) to cluster similar reasons. Show up to 3 clusters sorted by count descending; ties broken alphabetically by shortest reason in the cluster.
+
+The clustering threshold (0.3) is intentionally lower than the retry-prevention threshold (0.4 in PRH-006) — clustering for reporting should be loose to surface patterns, while retry prevention should be conservative to avoid blocking legitimate overrides.
+
+If mean overrides per run > 0.5, emit a warning: "Override rate is elevated ({mean}/run). Check the top reasons — this may indicate a gate misclassification (AP-023)."
+
+If `.correctless/meta/overrides/` doesn't exist or is empty, the section says: "No override data yet. Override tracking starts automatically on the next `/cauto` run."
 
 ## ROI Estimate
 - **Issues caught:** {N}

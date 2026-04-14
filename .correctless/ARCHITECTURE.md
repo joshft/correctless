@@ -194,11 +194,18 @@
 - **Test**: test-auto-mandate.sh — INV-028, INV-029, INV-033, INV-034 suites
 
 ### ABS-020: Override scrutiny lifecycle (scripts/override-scrutiny.sh)
-- **What**: Three-phase supervisor review of override windows: (1) issuance — supervisor reviews override reason before it takes effect, (2) per-action — supervisor reviews each action during the window against override reason + drift evidence, (3) closure — supervisor reviews cumulative work with pretext and spec-completeness checks. Separate activation counter (exempt from 20-cap, soft cap at 50). Override log records full review history per override entry.
-- **Invariant**: No override takes effect without supervisor approval. Every action during an active window is reviewed. Window cannot close without final review. Override-window activations tracked separately. Rejected overrides cannot be re-issued (Jaccard similarity ≥ 0.4 detection).
-- **Enforced at**: `scripts/override-scrutiny.sh` (all 10 functions), `scripts/override-crosscheck.sh` (evidence gathering: base-commit verification, file-touch drift, spec completeness)
-- **Violated when**: Override applied without supervisor review, action during window not reviewed, window closes without final review, or rejected override re-issued with similar justification
-- **Test**: test-auto-override.sh — INV-035 through INV-039, PRH-006 suites; test-auto-crosscheck.sh — INV-040 through INV-042, BND-007 suites
+- **What**: Three-phase supervisor review of override windows: (1) issuance — supervisor reviews override reason before it takes effect, (2) per-action — supervisor reviews each action during the window against override reason + drift evidence, (3) closure — supervisor reviews cumulative work with pretext and spec-completeness checks. Separate activation counter (exempt from 20-cap, soft cap at 50). Override log records full review history per override entry. Cross-run pre-check (R-004): before per-run scrutiny, `review_override_issuance` reads `.correctless/meta/overrides/*.json` (last 10 by `completed_at`) and checks if the incoming override reason matches reasons from recent runs (Jaccard >= 0.4). If 2+ recent runs match, escalates to human with structured message identifying the cross-run pattern. This short-circuits the per-run checks — if cross-run escalation fires, per-run scrutiny is skipped.
+- **Invariant**: No override takes effect without supervisor approval. Every action during an active window is reviewed. Window cannot close without final review. Override-window activations tracked separately. Rejected overrides cannot be re-issued (Jaccard similarity ≥ 0.4 detection). Cross-run recurring overrides (2+ matches in last 10 runs) escalate before per-run scrutiny.
+- **Enforced at**: `scripts/override-scrutiny.sh` (all functions including `preserve_override_log`, `check_cross_run_overrides`), `scripts/override-crosscheck.sh` (evidence gathering: base-commit verification, file-touch drift, spec completeness)
+- **Violated when**: Override applied without supervisor review, action during window not reviewed, window closes without final review, rejected override re-issued with similar justification, or cross-run pattern detected but not escalated
+- **Test**: test-auto-override.sh — INV-035 through INV-039, PRH-006 suites; test-auto-crosscheck.sh — INV-040 through INV-042, BND-007 suites; test-override-freq-metrics.sh — R-001 through R-006
+
+### ABS-021: Override history directory (.correctless/meta/overrides/)
+- **What**: Persistent directory storing preserved override logs from completed `/cauto` runs. Each file is a JSON metadata wrapper with `task_slug`, `branch`, `completed_at`, `override_count`, and `overrides` array. Sole writer: `/cauto` (via `preserve_override_log` in `scripts/override-scrutiny.sh`). Readers: `/cmetrics` (Override Health dashboard), `/cdocs` (override count in workflow-history.md), `override-scrutiny.sh` (cross-run pattern detection). Retention: 50-file cap enforced by `preserve_override_log`. Schema: `{task_slug}-{YYYYMMDD}.json`. Gitignored via `.correctless/meta/` entry. Project-level (not branch-scoped) — data persists across branches.
+- **Invariant**: Only `preserve_override_log` writes to this directory. Files follow the metadata wrapper schema. Cap enforced at write time. Malformed files (missing `completed_at`) evicted first.
+- **Enforced at**: `scripts/override-scrutiny.sh` (`preserve_override_log`, `check_cross_run_overrides`), `skills/cauto/SKILL.md` (Step 9.5), `.gitignore` (`.correctless/meta/`)
+- **Violated when**: A tool other than `preserve_override_log` writes to `.correctless/meta/overrides/`, or files exceed the 50-file cap
+- **Test**: test-override-freq-metrics.sh — R-001, R-005, R-006
 
 ## Patterns
 

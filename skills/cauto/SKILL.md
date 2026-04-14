@@ -1,7 +1,7 @@
 ---
 name: cauto
 description: Semi-auto mode. Orchestrates the full implementation pipeline after human-approved spec review. Runs ctdd, simplify, cverify, cupdate-arch, cdocs, then creates a PR.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Edit, Task
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/meta/overrides/*), Edit, Task
 context: fork
 ---
 
@@ -211,6 +211,16 @@ Create a PR according to the `pr_creation` preference from `preferences.md`:
 Log a `preference_applied` audit event with the selected PR creation mode (e.g., "pr_creation: gh", "pr_creation: skip", or "pr_creation: custom").
 
 Log `pipeline_completed` in the audit trail.
+
+### Step 9.5: Preserve Override Log (R-001)
+
+On any terminal state (pipeline completed, escalation, or failure), preserve the override log for cross-run pattern detection. Run:
+
+```bash
+source scripts/override-scrutiny.sh && preserve_override_log "$(git rev-parse --show-toplevel)" "{task-slug}" "$(git branch --show-current)"
+```
+
+This copies override entries for the current branch from `.correctless/artifacts/override-log.json` to `.correctless/meta/overrides/{task-slug}-{YYYYMMDD}.json` with a metadata wrapper. Zero-override runs are preserved (they are data, not absence of data). The 50-file cap (R-006) is enforced automatically by the function.
 
 ### Step 10: Pipeline Summary
 
