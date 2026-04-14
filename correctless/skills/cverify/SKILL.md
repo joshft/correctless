@@ -269,12 +269,20 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
 
 #### Token Summation for actual_tokens
 
-The `actual_tokens` field in the calibration entry is an integer representing total token usage for this feature. Read the branch name from the workflow state file's `.branch` field, then derive the branch_slug using the `branch_slug()` function in scripts/lib.sh (which replaces `/` with `-` and appends a short hash). Use the resulting slug to locate the token log file at `.correctless/artifacts/token-log-{branch-slug}.jsonl`.
+The `actual_tokens` field in the calibration entry is an integer representing total token usage for this feature. Read the branch name from the workflow state file's `.branch` field, then derive the branch_slug by passing that branch name to `branch_slug()` in scripts/lib.sh. Use the resulting slug to locate the token log file at `.correctless/artifacts/token-log-{branch-slug}.jsonl`.
 
-**Use a deterministic jq command** to sum `total_tokens` across all valid lines — do NOT use LLM arithmetic. The command must skip malformed JSONL lines (truncated, invalid JSON) rather than failing the entire summation. Example:
+**Compute the slug and sum tokens with these deterministic commands** — do NOT use LLM arithmetic or hand-construct the slug:
 
 ```bash
-jq -R 'try (fromjson | .total_tokens // 0) catch 0' .correctless/artifacts/token-log-{branch-slug}.jsonl | jq -s 'add // 0'
+# Step 1: Read the branch name from the workflow state file
+FEATURE_BRANCH="$(jq -r '.branch // empty' .correctless/artifacts/workflow-state-*.json 2>/dev/null | head -1)"
+
+# Step 2: Derive the slug using branch_slug() with the branch name parameter
+source scripts/lib.sh
+SLUG="$(branch_slug "$FEATURE_BRANCH")"
+
+# Step 3: Sum total_tokens from the token log
+jq -R 'try (fromjson | .total_tokens // 0) catch 0' ".correctless/artifacts/token-log-${SLUG}.jsonl" | jq -s 'add // 0'
 ```
 
 This reads each line as raw text (`-R`), attempts to parse it as JSON (`fromjson`), extracts `total_tokens` (defaulting to 0), and catches parse errors on malformed lines (outputting 0). The second jq sums all values.

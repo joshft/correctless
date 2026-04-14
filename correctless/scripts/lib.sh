@@ -11,8 +11,12 @@
 
 branch_slug() {
   local branch
-  branch="$(git branch --show-current 2>/dev/null)" || { echo "error: not in a git repository" >&2; return 1; }
-  [ -n "$branch" ] || { echo "error: detached HEAD" >&2; return 1; }
+  if [ -n "${1:-}" ]; then
+    branch="$1"
+  else
+    branch="$(git branch --show-current 2>/dev/null)" || { echo "error: not in a git repository" >&2; return 1; }
+    [ -n "$branch" ] || { echo "error: detached HEAD" >&2; return 1; }
+  fi
   local slug raw_hash
   slug="${branch//[^a-zA-Z0-9]/-}"
   slug="${slug:0:80}"
