@@ -207,6 +207,13 @@
 - **Violated when**: A tool other than `preserve_override_log` writes to `.correctless/meta/overrides/`, or files exceed the 50-file cap
 - **Test**: test-override-freq-metrics.sh — R-001, R-005, R-006
 
+### ABS-022: Install manifest (.correctless/.install-manifest.json)
+- **What**: JSON manifest written by `setup` after installing hooks and scripts, containing SHA-256 checksums for each installed file and its source. Schema: `{"installed_at": "{ISO}", "source_dir": "{abs path}", "files": {"hooks/foo.sh": {"installed_hash": "{sha256}", "source_hash": "{sha256}"}, ...}}`. Sole writer: `setup`. Readers: `check_install_freshness` in `scripts/lib.sh`. Lifecycle: per-install local state, overwritten each setup run. Gitignored.
+- **Invariant**: Only `setup` writes the manifest. `check_install_freshness` is the sole reader. A partial manifest is never written — if any hash fails, setup aborts manifest generation.
+- **Enforced at**: `setup` (atomic write via temp + mv), `scripts/lib.sh` (`check_install_freshness`), `.gitignore` (`.correctless/.install-manifest.json`)
+- **Violated when**: A tool other than `setup` writes the manifest, or a partial manifest exists on disk
+- **Test**: test-stale-hook-detection.sh — R-001, R-002
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.

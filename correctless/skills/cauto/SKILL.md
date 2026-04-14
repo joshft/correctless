@@ -53,6 +53,30 @@ The validation failure is logged in the audit trail with type `artifact_validati
 
 Determine the effective intensity using the computation in the shared constraints (`_shared/constraints.md`). The effective intensity controls pipeline behavior including attempt thresholds and skill activation.
 
+## Install Freshness Check
+
+Before any skill invocation, at pipeline startup (after the phase gate, before invoking any skill), check for stale hooks:
+
+```bash
+source .correctless/scripts/lib.sh
+output="$(check_install_freshness "$(pwd)/.correctless" 2>/dev/null)"
+```
+
+Parse the output and emit warnings by status, in order of severity:
+
+- **`source_ahead`**: "WARNING: {N} source file(s) changed since last setup: {list}. Installed hooks are STALE. Run `setup` to update — you are running outdated hooks that may not include recent fixes." This is the strongest warning (PR #63 failure class).
+- **`modified`**: "WARNING: {N} installed file(s) differ from their install-time checksums: {list}. Run `setup` to re-install, or ignore if intentionally modified."
+- **`missing`**: "WARNING: {N} installed file(s) are missing: {list}. Run `setup` to re-install."
+- **`new_file`**: "WARNING: {N} file(s) in installed directories not in manifest: {list}. These were added after setup."
+- **`no_manifest`**: "Install manifest not found — run `setup` to enable stale-hook detection."
+
+All warnings are advisory, not blocking — the pipeline proceeds. If any non-ok statuses are found, log to the audit trail:
+```json
+{"type": "install_staleness_detected", "timestamp": "...", "skill": "orchestrator", "affected_files": [...], "statuses": {...}}
+```
+
+If all files are `ok`, no output.
+
 ## Upfront Tool Availability Check (R-018)
 
 Before any skill invocation, at pipeline startup, verify tool availability for configured operations:

@@ -299,6 +299,65 @@ install_hooks() {
     done
     chmod +x "$script_dest/antipattern-scan.sh" 2>/dev/null || true
   fi
+
+  # ============================================
+  # Write install manifest with SHA-256 checksums
+  # Sources the source-tree copy of lib.sh for sha256_hash_file.
+  # Dynamic scan: all .sh files in installed hooks/ and scripts/ dirs.
+  # Atomic write via temp file + mv. Abort on any hash failure.
+  # ============================================
+  if [ -f "$SCRIPT_DIR/scripts/lib.sh" ]; then
+    # shellcheck source=scripts/lib.sh
+    source "$SCRIPT_DIR/scripts/lib.sh"
+
+    local manifest_tmp="$REPO_ROOT/.correctless/.install-manifest.json.$$"
+    local manifest_file="$REPO_ROOT/.correctless/.install-manifest.json"
+    local manifest_ok=true
+    local installed_at
+    installed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+    # Start building JSON — collect file entries
+    local files_json="{}"
+    for dir_prefix in hooks scripts; do
+      local scan_dir="$REPO_ROOT/.correctless/$dir_prefix"
+      [ -d "$scan_dir" ] || continue
+      for file in "$scan_dir"/*.sh; do
+        [ -f "$file" ] || continue
+        local bname rel_path
+        bname="$(basename "$file")"
+        rel_path="$dir_prefix/$bname"
+
+        local installed_hash source_hash
+        installed_hash="$(sha256_hash_file "$file" 2>/dev/null)" || { manifest_ok=false; break 2; }
+
+        local source_file="$SCRIPT_DIR/$rel_path"
+        if [ -f "$source_file" ]; then
+          source_hash="$(sha256_hash_file "$source_file" 2>/dev/null)" || { manifest_ok=false; break 2; }
+        else
+          source_hash="$installed_hash"
+        fi
+
+        files_json="$(echo "$files_json" | jq \
+          --arg key "$rel_path" \
+          --arg ih "$installed_hash" \
+          --arg sh "$source_hash" \
+          '.[$key] = {"installed_hash": $ih, "source_hash": $sh}')" || { manifest_ok=false; break 2; }
+      done
+    done
+
+    if [ "$manifest_ok" = "true" ]; then
+      jq -n \
+        --arg ts "$installed_at" \
+        --arg sd "$SCRIPT_DIR" \
+        --argjson files "$files_json" \
+        '{"installed_at": $ts, "source_dir": $sd, "files": $files}' > "$manifest_tmp" 2>/dev/null \
+        && mv "$manifest_tmp" "$manifest_file" \
+        || { rm -f "$manifest_tmp"; warn "Failed to write install manifest"; }
+    else
+      rm -f "$manifest_tmp"
+      warn "Hash failed — install manifest not written (partial manifests are never saved)"
+    fi
+  fi
 }
 
 # ---------------------------------------------------------------------------
