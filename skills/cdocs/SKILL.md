@@ -150,10 +150,16 @@ Each entry is one paragraph:
 
 ```
 ### {date} — {feature name}
-Branch: {branch}. Rules: {count}. QA rounds: {N}. Findings fixed: {N}. {one-line description}.
+Branch: {branch}. Rules: {count}. QA rounds: {N}. Findings fixed: {N}. Overrides: {N}. {one-line description}.
 ```
 
+The `Overrides: {N}.` field is included only if the override count is greater than 0. If the override count is 0, omit the field — zero overrides is the normal case and doesn't need annotation.
+
 Read the workflow state file (`.correctless/artifacts/workflow-state-{branch-slug}.json`): use `.branch` for the branch name, `.qa_rounds` for QA round count, `.spec_file` for the spec path. Count rules from the spec file (count lines matching `R-[0-9]` or `INV-[0-9]`). Count fixed findings from `.correctless/artifacts/qa-findings-{task-slug}.json` if it exists (count entries where `.status == "fixed"`). Use today's date and the feature name from the spec's `# Spec: {title}` heading.
+
+#### Override Count Source (R-002)
+
+Read the override count from the preserved file at `.correctless/meta/overrides/{task-slug}-*.json` (most recent by filename sort if multiple exist). If no preserved file exists, fall back to the ephemeral override log at `.correctless/artifacts/override-log.json` (filter entries by current branch and count). If neither file exists, the override count is 0.
 
 ### Convention Learning
 
