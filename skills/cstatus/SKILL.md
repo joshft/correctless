@@ -146,7 +146,24 @@ State management:
 
 Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is set to high+ or above, also highlight intensity-gated commands: `/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`
 
-### 5. Detect Problems
+### 5. Install Freshness
+
+Check install freshness and display as a single status line:
+
+```bash
+source .correctless/scripts/lib.sh
+output="$(check_install_freshness "$(pwd)/.correctless" 2>/dev/null)"
+```
+
+Parse the output and display one line:
+- If all lines are `ok:*`: **"Install: current"**
+- If any line is `source_ahead:*`: **"Install: STALE — {N} source files changed since last setup (run setup)"** where N is the count of `source_ahead` lines.
+- If any line is `modified:*` or `missing:*` (without `source_ahead`): **"Install: STALE ({N} files differ — run setup)"** where N is the count of `modified` + `missing` lines.
+- If output is `no_manifest`: **"Install: unknown (no manifest — run setup)"**
+
+This is a single line in the status output, not a separate section.
+
+### 6. Detect Problems
 
 After showing phase and commands, proactively check for issues:
 
@@ -173,7 +190,7 @@ This check is dormant by design: it fires only when the post-merge measurement w
 
 **No active workflow**: "No active workflow on this branch. You can edit freely — the gate only blocks during active workflows. To start a structured workflow: `git checkout -b feature/my-feature` then `/cspec`."
 
-### 6. Health Check (if requested)
+### 7. Health Check (if requested)
 
 If the human asks "is everything set up correctly?" or similar, validate:
 - Hooks registered in `.claude/settings.json`

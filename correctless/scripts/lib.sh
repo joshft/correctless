@@ -287,3 +287,91 @@ sha256_hash_file() {
 
   return 1
 }
+
+# ---------------------------------------------------------------------------
+# check_install_freshness — detect stale hooks by comparing installed files
+#   against the install manifest and source files
+# ---------------------------------------------------------------------------
+# Usage: check_install_freshness CORRECTLESS_DIR
+# CORRECTLESS_DIR is the absolute path to the .correctless/ directory.
+# Reads .install-manifest.json from that directory.
+# Outputs one line per file as status:relative/path to stdout.
+# Statuses: ok, modified, missing, source_ahead, new_file, no_manifest
+
+check_install_freshness() {
+  local correctless_dir="$1"
+  local manifest="$correctless_dir/.install-manifest.json"
+
+  # No manifest — single-line output
+  if [ ! -f "$manifest" ]; then
+    echo "no_manifest"
+    return 0
+  fi
+
+  # Bulk-parse manifest in a single jq call: source_dir + all file entries
+  local manifest_data
+  manifest_data="$(jq -r '
+    (.source_dir // ""),
+    (.files | to_entries[] | "\(.key)\t\(.value.installed_hash)\t\(.value.source_hash)")
+  ' "$manifest" 2>/dev/null)" || { echo "no_manifest"; return 0; }
+
+  # First line is source_dir, remaining lines are file entries
+  local source_dir
+  source_dir="$(echo "$manifest_data" | head -1)"
+  local file_entries
+  file_entries="$(echo "$manifest_data" | tail -n +2)"
+
+  local source_dir_valid=false
+  [ -n "$source_dir" ] && [ -d "$source_dir" ] && source_dir_valid=true
+
+  # Track manifest files for new_file detection
+  local -A manifest_files=()
+
+  # Check each file
+  while IFS=$'\t' read -r rel_path installed_hash_manifest source_hash_manifest; do
+    [ -n "$rel_path" ] || continue
+    manifest_files["$rel_path"]=1
+
+    local installed_file="$correctless_dir/$rel_path"
+
+    if [ ! -f "$installed_file" ]; then
+      echo "missing:$rel_path"
+      continue
+    fi
+
+    local current_installed_hash
+    current_installed_hash="$(sha256_hash_file "$installed_file" 2>/dev/null)" || current_installed_hash=""
+
+    if [ "$current_installed_hash" != "$installed_hash_manifest" ]; then
+      echo "modified:$rel_path"
+      continue
+    fi
+
+    # Source-ahead check (only if source_dir is accessible)
+    if [ "$source_dir_valid" = true ]; then
+      local source_file="$source_dir/$rel_path"
+      if [ -f "$source_file" ]; then
+        local current_source_hash
+        current_source_hash="$(sha256_hash_file "$source_file" 2>/dev/null)" || current_source_hash=""
+        if [ "$current_source_hash" != "$source_hash_manifest" ]; then
+          echo "source_ahead:$rel_path"
+          continue
+        fi
+      fi
+    fi
+
+    echo "ok:$rel_path"
+  done <<< "$file_entries"
+
+  # Scan for new files not in manifest
+  for dir_prefix in hooks scripts; do
+    local scan_dir="$correctless_dir/$dir_prefix"
+    [ -d "$scan_dir" ] || continue
+    for file in "$scan_dir"/*.sh; do
+      [ -f "$file" ] || continue
+      local rel
+      rel="$dir_prefix/$(basename "$file")"
+      [ -z "${manifest_files[$rel]+x}" ] && echo "new_file:$rel"
+    done
+  done
+}

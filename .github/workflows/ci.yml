@@ -100,6 +100,7 @@ jobs:
           bash tests/test-scripts-namespace-migration.sh
           bash tests/test-spec-mutation-alerts.sh
           bash tests/test-override-freq-metrics.sh
+          bash tests/test-stale-hook-detection.sh
 
       - name: Verify sync
         run: |

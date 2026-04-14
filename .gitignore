@@ -30,6 +30,9 @@ Thumbs.db
 IMPLEMENTATION_PLAN.md
 ROADMAP.md
 
+# Correctless — install manifest (per-install local state)
+.correctless/.install-manifest.json
+
 # Correctless — transient workflow state
 .claude/artifacts/
 .claude/projects/
