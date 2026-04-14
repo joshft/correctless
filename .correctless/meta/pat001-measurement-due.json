@@ -1,7 +1,11 @@
 {
   "feature": "path-scoped-rules-pat001-migration",
   "due_at_pr_count": 3,
+  "actual_pr_count": 4,
   "created_at_commit": "206d68c05772bfca30d3a0f1dcf8ee063c3f3820",
-  "measurement_completed_at": null,
-  "result": null
+  "measurement_completed_at": "587f00a",
+  "measurement_date": "2026-04-14",
+  "result": "prevention_observed",
+  "confidence": "qualified",
+  "report": ".correctless/verification/path-scoped-rules-pat001-measurement.md"
 }

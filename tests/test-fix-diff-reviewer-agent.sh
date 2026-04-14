@@ -1692,6 +1692,26 @@ check_inv018() {
   else
     fail "INV-018(parser)" "step 6a missing a paths: frontmatter parser reference"
   fi
+
+  # DRIFT-006 (QA-018): patterns 4 and 5 must be proximal — the section
+  # heading and the fence must not drift into different code paths.
+  local p4_ln p5_ln p4p5_delta
+  p4_ln="$(printf '%s\n' "$block_no_bq" | grep -nF 'Path-scoped rules applying to this diff' | head -n 1 | cut -d: -f1)"
+  p5_ln="$(printf '%s\n' "$block_no_bq" | grep -nF '<UNTRUSTED_RULES>' | head -n 1 | cut -d: -f1)"
+  if [ -n "$p4_ln" ] && [ -n "$p5_ln" ]; then
+    if [ "$p5_ln" -gt "$p4_ln" ]; then
+      p4p5_delta=$((p5_ln - p4_ln))
+    else
+      p4p5_delta=$((p4_ln - p5_ln))
+    fi
+    if [ "$p4p5_delta" -le 20 ]; then
+      pass "INV-018(proximity)" "pattern 4-5 proximity: $p4p5_delta lines apart (<=20)"
+    else
+      fail "INV-018(proximity)" "pattern 4-5 proximity: $p4p5_delta lines apart (>20) — heading and fence have drifted"
+    fi
+  else
+    fail "INV-018(proximity)" "cannot locate pattern 4 (p4=$p4_ln) or pattern 5 (p5=$p5_ln) for proximity check"
+  fi
 }
 
 # ============================================================================
@@ -1772,13 +1792,16 @@ check_prh003() {
   fi
 
   # (a) Cardinality: exact one occurrence in the whole file.
+  # DRIFT-007 (QA-019): use regex (FAIL-CLOSED:.*round) instead of literal
+  # substring to tolerate minor phrasing changes while still enforcing the
+  # fail-closed marker's presence and uniqueness.
   local marker_count
-  marker_count="$(grep -cF "$EXPECTED_CANONICAL_MARKER" "$CAUDIT_SKILL" 2>/dev/null)" || marker_count=0
+  marker_count="$(grep -cE 'FAIL-CLOSED:.*round' "$CAUDIT_SKILL" 2>/dev/null)" || marker_count=0
   marker_count="${marker_count:-0}"
   if [ "$marker_count" -eq 1 ]; then
-    pass "PRH-003(a)" "canonical marker appears exactly once in $CAUDIT_SKILL"
+    pass "PRH-003(a)" "canonical fail-closed marker (regex) appears exactly once in $CAUDIT_SKILL"
   else
-    fail "PRH-003(a)" "canonical marker appears $marker_count time(s) in $CAUDIT_SKILL (expected exactly 1)"
+    fail "PRH-003(a)" "canonical fail-closed marker (regex) appears $marker_count time(s) in $CAUDIT_SKILL (expected exactly 1)"
   fi
 
   # (b) Invocation presence: exactly one namespaced Task invocation inside
@@ -2123,10 +2146,10 @@ check_bnd004() {
     else
       delta=$((kb_ln - marker_ln))
     fi
-    if [ "$delta" -le 10 ]; then
-      pass "BND-004(b)" "canonical marker is $delta lines from '100 KB' mention (<=10)"
+    if [ "$delta" -le 5 ]; then
+      pass "BND-004(b)" "canonical marker is $delta lines from '100 KB' mention (<=5)"
     else
-      fail "BND-004(b)" "canonical marker is $delta lines from '100 KB' mention (>10)"
+      fail "BND-004(b)" "canonical marker is $delta lines from '100 KB' mention (>5)"
     fi
   else
     fail "BND-004(b)" "cannot locate both '100 KB' and canonical marker lines (kb=$kb_ln marker=$marker_ln)"
@@ -2161,7 +2184,7 @@ check_bnd004() {
   if [ -n "$measure_ln" ]; then
     local window cmp_present exit_present has_var has_gt
     # Window: measure_ln .. measure_ln+10 inside the block
-    window="$(printf '%s\n' "$block" | awk -v s="$measure_ln" 'NR >= s && NR <= s+10')"
+    window="$(printf '%s\n' "$block" | awk -v s="$measure_ln" 'NR >= s && NR <= s+5')"
     cmp_present=0
     exit_present=0
     has_var=0
@@ -2172,9 +2195,9 @@ check_bnd004() {
     [ "$has_var" -eq 1 ] && [ "$has_gt" -eq 1 ] && cmp_present=1
     printf '%s\n' "$window" | grep -qE -- '(^|[[:space:]])exit[[:space:]]+2($|[[:space:]])' && exit_present=1
     if [ "$cmp_present" -eq 1 ] && [ "$exit_present" -eq 1 ]; then
-      pass "BND-004(d)" "byte-count measurement feeds 'PROMPT_BYTES -gt 102400' comparison AND 'exit 2' within 10 lines"
+      pass "BND-004(d)" "byte-count measurement feeds 'PROMPT_BYTES -gt 102400' comparison AND 'exit 2' within 5 lines"
     else
-      fail "BND-004(d)" "byte-count measurement is not wired to control flow (has_var=$has_var has_gt=$has_gt exit_present=$exit_present) within 10 lines of wc -c"
+      fail "BND-004(d)" "byte-count measurement is not wired to control flow (has_var=$has_var has_gt=$has_gt exit_present=$exit_present) within 5 lines of wc -c"
     fi
   else
     fail "BND-004(d)" "no byte-counting op line — cannot verify control-flow wiring"

@@ -1848,6 +1848,53 @@ check_no_tmp_paths_in_skills
 run_negative_cases
 
 # ============================================================================
+# AP-005: Mechanical enforcement of documented counts
+# Prevents stale count claims in README.md and CONTRIBUTING.md.
+# ============================================================================
+
+check_ap005_stale_counts() {
+  local root
+  root="$(repo_root)"
+
+  # Test file count in CONTRIBUTING.md
+  local claimed_tests actual_tests
+  claimed_tests="$(grep -oP '\d+(?= test files)' "$root/CONTRIBUTING.md" 2>/dev/null | head -1)" || claimed_tests=""
+  actual_tests="$(find "$root/tests" -maxdepth 1 -name 'test-*.sh' -type f | wc -l | tr -d ' ')"
+  if [ -n "$claimed_tests" ] && [ "$claimed_tests" -eq "$actual_tests" ]; then
+    pass "AP-005(tests)" "CONTRIBUTING.md claims $claimed_tests test files, actual is $actual_tests"
+  elif [ -n "$claimed_tests" ]; then
+    fail "AP-005(tests)" "CONTRIBUTING.md claims $claimed_tests test files, actual is $actual_tests"
+  else
+    pass "AP-005(tests)" "no test count claim found in CONTRIBUTING.md (nothing to drift)"
+  fi
+
+  # Skill count in CONTRIBUTING.md
+  local claimed_skills actual_skills
+  claimed_skills="$(grep -oP '\d+(?= SKILL\.md files)' "$root/CONTRIBUTING.md" 2>/dev/null | head -1)" || claimed_skills=""
+  actual_skills="$(find "$root/skills" -name 'SKILL.md' -type f | wc -l | tr -d ' ')"
+  if [ -n "$claimed_skills" ] && [ "$claimed_skills" -eq "$actual_skills" ]; then
+    pass "AP-005(skills)" "CONTRIBUTING.md claims $claimed_skills skills, actual is $actual_skills"
+  elif [ -n "$claimed_skills" ]; then
+    fail "AP-005(skills)" "CONTRIBUTING.md claims $claimed_skills skills, actual is $actual_skills"
+  else
+    pass "AP-005(skills)" "no skill count claim found in CONTRIBUTING.md (nothing to drift)"
+  fi
+
+  # Skill count in README.md badge
+  local readme_skills
+  readme_skills="$(grep -oP '(?<=skills-)\d+' "$root/README.md" 2>/dev/null | head -1)" || readme_skills=""
+  if [ -n "$readme_skills" ] && [ "$readme_skills" -eq "$actual_skills" ]; then
+    pass "AP-005(readme-badge)" "README badge claims $readme_skills skills, actual is $actual_skills"
+  elif [ -n "$readme_skills" ]; then
+    fail "AP-005(readme-badge)" "README badge claims $readme_skills skills, actual is $actual_skills"
+  else
+    pass "AP-005(readme-badge)" "no skill badge found in README.md (nothing to drift)"
+  fi
+}
+
+check_ap005_stale_counts
+
+# ============================================================================
 # Summary
 # ============================================================================
 
