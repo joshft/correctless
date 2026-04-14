@@ -312,10 +312,13 @@ _check_path_exceptions() {
   # R-023: .correctless/artifacts/ always writable (non-protected files)
   case "$rel" in .correctless/artifacts/*) return 0 ;; esac
 
-  # R-022: spec phase allows .correctless/specs/ writes
-  if [ "$PHASE" = "spec" ]; then
-    case "$rel" in .correctless/specs/*) return 0 ;; esac
-  fi
+  # R-022: spec/review phases allow .correctless/specs/ writes
+  # Review skills must edit the spec to incorporate approved findings.
+  # Without this, spec files match *.md (source pattern) and get blocked
+  # during review, forcing routine overrides for a legitimate operation.
+  case "$PHASE" in
+    spec|review|review-spec) case "$rel" in .correctless/specs/*) return 0 ;; esac ;;
+  esac
 
   return 1
 }

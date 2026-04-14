@@ -125,6 +125,12 @@ When a bug is found (pre-merge by QA, or post-merge by /cpostmortem):
 - **How to catch it**: When a lock mechanism creates multiple artifacts (file + directory), all cleanup paths (stale detection, release, error recovery) must remove all artifacts. Test stale recovery end-to-end: create lock with dead PID, verify new acquisition succeeds.
 - **Frequency**: 1 finding in 1 feature (qa-audit-2026-04-12 R2, R1 regression)
 
+### AP-023: Override as routine plumbing
+- **What went wrong**: The workflow gate's spec path exception only covered the `spec` phase, not `review` or `review-spec`. Spec files matched `*.md` (source pattern) and were blocked during review. Every pipeline run required overrides to edit specs during review — the escape hatch became routine plumbing for a gate misconfiguration. Three consecutive `/cauto` runs required overrides for mechanically identical reasons, but no alert fired because override frequency wasn't monitored.
+- **How to catch it**: Track override count per pipeline run over a rolling window. If mean > 0.5 overrides per run, flag as gate misclassification rather than legitimate exceptional use. Investigate the common override reason and fix the underlying gate condition. Override frequency should be surfaced in `/cmetrics` as a leading indicator of gate problems. The fix was a one-line path exception extension (`spec|review|review-spec` instead of just `spec`), but the monitoring gap — that routine overrides were invisible to QA, verification, and audit — is the lasting lesson.
+- **Frequency**: 3 pipeline runs with routine overrides (2026-04-13 session)
+- **Source**: Post-session override investigation, 2026-04-13
+
 ### AP-022: Dead code in security paths
 - **What went wrong**: `check_override_retry` was defined in `override-scrutiny.sh`, unit-tested (47 tests passed), and never called from `cmd_override` — PRH-006 was structurally inert. The function existed, the tests exercised it in isolation, but the production call chain never invoked it. The security guard was dead code with full test coverage.
 - **How to catch it**: Mechanically enforced by `scripts/antipattern-scan.sh` `check_dead_security_calls()`, pattern ID `dead-security-fn`. Advisory: `skills/ctdd/SKILL.md` test audit check 8 (production call chain) verifies tests exercise the full entry-point to guard chain for security invariants that specify "called from" or "invoked by" patterns. When adding a new security script that doesn't match R-004 filename patterns, tag with `# scanner: security` in the first 5 lines.
