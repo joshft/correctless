@@ -28,11 +28,6 @@ set -euo pipefail
 
 ARCH_FILE="${1:-.correctless/ARCHITECTURE.md}"
 
-if [ ! -f "$ARCH_FILE" ]; then
-  echo "Error: File not found: $ARCH_FILE" >&2
-  exit 1
-fi
-
 # ============================================
 # STEP 2: Extract content between markers
 # ============================================
@@ -40,9 +35,10 @@ fi
 START_MARKER="correctless:entrypoints:start"
 END_MARKER="correctless:entrypoints:end"
 
-# Check markers exist
-if ! grep -q "$START_MARKER" "$ARCH_FILE"; then
-  echo "Error: Start marker '$START_MARKER' not found in $ARCH_FILE" >&2
+# sed will fail naturally if the file doesn't exist (set -e catches it).
+# Marker checks provide specific error messages rather than opaque sed output.
+if ! grep -q "$START_MARKER" "$ARCH_FILE" 2>/dev/null; then
+  echo "Error: Start marker '$START_MARKER' not found in ${ARCH_FILE}" >&2
   exit 1
 fi
 
@@ -51,7 +47,6 @@ if ! grep -q "$END_MARKER" "$ARCH_FILE"; then
   exit 1
 fi
 
-# Extract between markers, strip code fence lines
 _extracted=$(sed -n "/$START_MARKER/,/$END_MARKER/p" "$ARCH_FILE" \
   | grep -v "$START_MARKER" \
   | grep -v "$END_MARKER" \

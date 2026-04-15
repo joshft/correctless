@@ -112,7 +112,7 @@ The user sees the sampling, not just the conclusions. This transparency is manda
 
 ### Inconsistency Handling
 
-When you detect inconsistencies in the codebase, present them as enumerated groups:
+When you detect inconsistent patterns in the codebase, present them as enumerated groups:
 
 > "X handlers do A, Y handlers do B — which is canonical?"
 
@@ -132,9 +132,7 @@ Detected patterns are batched by confidence:
 
 Patterns the user rejects are not documented. Patterns confirmed are documented with representative files as examples.
 
-**Cap**: At most 10 patterns per session. If more are detected, rank by coverage percentage and defer the rest with: "N additional patterns detected — run `/carchitect --continue` to review the next batch."
-
-The `--continue` flag works within a session only — cross-session continuation is not supported (pattern state is ephemeral, not persisted to an artifact).
+**Cap**: At most 10 patterns per session. If more are detected, rank by coverage percentage and defer the rest with: "N additional patterns detected — run `/carchitect --continue` to review the next batch." (See `--continue` flag description above for session-scope limitation.)
 
 ### User Confirmation
 
