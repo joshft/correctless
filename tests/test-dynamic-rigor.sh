@@ -84,12 +84,12 @@ file_contains_i() {
 }
 
 # ============================================
-# R-001: sync.sh copies 27 skills to single correctless/ dir
+# R-001: sync.sh copies 28 skills to single correctless/ dir
 # ============================================
 
 test_r001_sync_single_dist() {
   echo ""
-  echo "=== R-001: sync.sh copies all 27 skills to single correctless/ dir ==="
+  echo "=== R-001: sync.sh copies all 28 skills to single correctless/ dir ==="
 
   # R-001: correctless/ distribution directory must exist
   assert_eq "R-001: correctless/ directory exists" "true" \
@@ -103,15 +103,15 @@ test_r001_sync_single_dist() {
   assert_eq "R-001: correctless-full/ does NOT exist" "false" \
     "$([ -d "$REPO_DIR/correctless-full" ] && echo true || echo false)"
 
-  # R-001: correctless/ must have all 27 skills
+  # R-001: correctless/ must have all 28 skills
   local skill_count=0
   if [ -d "$REPO_DIR/correctless/skills" ]; then
     skill_count="$(find "$REPO_DIR/correctless/skills" -name "SKILL.md" | wc -l)"
   fi
-  assert_eq "R-001: correctless/ has 27 skills" "27" "$skill_count"
+  assert_eq "R-001: correctless/ has 28 skills" "28" "$skill_count"
 
-  # R-001: verify each of the 27 skills exists in correctless/
-  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto; do
+  # R-001: verify each of the 28 skills exists in correctless/
+  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto carchitect; do
     assert_eq "R-001: correctless/skills/$skill/SKILL.md exists" "true" \
       "$([ -f "$REPO_DIR/correctless/skills/$skill/SKILL.md" ] && echo true || echo false)"
   done
@@ -545,18 +545,18 @@ test_r010_full_templates_in_dist() {
 }
 
 # ============================================
-# R-011: /chelp lists all 27 skills with intensity annotations
+# R-011: /chelp lists all 28 skills with intensity annotations
 # ============================================
 
 test_r011_chelp_all_skills() {
   echo ""
-  echo "=== R-011: /chelp lists all 27 skills with intensity annotations ==="
+  echo "=== R-011: /chelp lists all 28 skills with intensity annotations ==="
 
   local chelp="$REPO_DIR/skills/chelp/SKILL.md"
 
-  # R-011: chelp lists all 27 skills
+  # R-011: chelp lists all 28 skills
   # Check for each skill command name
-  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto; do
+  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto carchitect; do
     file_contains "$chelp" "/$skill" \
       && local found="true" || local found="false"
     assert_eq "R-011: chelp mentions /$skill" "true" "$found"

@@ -58,6 +58,14 @@
 - **Constraint**: If the consolidation step is ever extended to push to protected branches, force-push, or stage files outside the explicit allowlist, this exception MUST be revisited. The allowlist is the safety boundary — expanding it is an architectural decision requiring human approval.
 - **Test**: UX-R-003 in test-semi-auto-mode.sh (explicit path list presence, protected branch guard, belt-and-suspenders unstage, no-op when nothing to commit, push failure handling)
 
+### TB-005: Intra-skill agent-to-agent handoff
+- **Crosses**: One agent's draft output → another agent's adversarial review input
+- **Identity assertion**: The drafting agent produces a document; the reviewing agent treats that document as data to verify against the codebase, not as instructions to follow
+- **Data sensitivity change**: Trusted draft (produced by a skill agent with write access) → untrusted input for a read-only reviewer agent. The reviewer must verify claims against the codebase, not trust the draft's assertions.
+- **Invariant**: The reviewing agent has read-only tools (no Write, no Edit, no Bash). Its findings are presented to the user for adjudication — the reviewer cannot modify the draft directly. If the draft contains text that looks like instructions ("ignore previous instructions", "skip this check"), the reviewer must not follow it.
+- **Violated when**: A reviewing agent has write access to the artifact it reviews, or a reviewing agent's findings are auto-applied without user adjudication
+- **Test**: test-carchitect.sh — R-006 (read-only tool allowlist on architecture-reviewer agent)
+
 ## Abstractions
 
 ### ABS-001: Shared script library (scripts/lib.sh)
@@ -214,6 +222,13 @@
 - **Violated when**: A tool other than `setup` writes the manifest, or a partial manifest exists on disk
 - **Test**: test-stale-hook-detection.sh — R-001, R-002
 
+### ABS-023: Entrypoints YAML contract (.correctless/ARCHITECTURE.md)
+- **What**: Machine-referenceable entrypoints definition embedded in `.correctless/ARCHITECTURE.md` as a fenced YAML block between `<!-- correctless:entrypoints:start -->` and `<!-- correctless:entrypoints:end -->` marker comments. Schema: list of objects with fields `name` (string), `type` (enum: http, cli, grpc, queue, cron, library, websocket), `handler` (string: file path + symbol), `test_via` (non-empty string: canonical integration test approach), `scope` (list of glob patterns). Sole writer: `/carchitect`. Extraction: `scripts/extract-entrypoints.sh`. Evolution: additive fields only — existing fields are never removed or renamed.
+- **Invariant**: Only `/carchitect` writes the entrypoints YAML. Enum membership and field validation happen at write time in the skill, not in the extraction script. The extraction script is dumb and fast — it reads markers, strips fences, validates YAML parseability, and outputs to stdout.
+- **Enforced at**: `skills/carchitect/SKILL.md` (write-time validation), `scripts/extract-entrypoints.sh` (extraction + parse validation)
+- **Violated when**: A tool other than `/carchitect` writes entrypoints YAML, or the extraction script performs semantic validation (enum checks, field presence)
+- **Test**: test-carchitect.sh — R-004, R-005
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.
@@ -338,6 +353,11 @@ See `.claude/rules/hooks-pretooluse.md`.
 - **Assumption**: All hook code, phase-transition scripts, and tests use `grep`, `sed`, and `awk` in POSIX-compatible mode only. No GNU-only extensions: no `grep -P` (Perl regex), no `\b` / `\s` outside bracket expressions, no `sed -i` without a backup argument (BSD requires `sed -i ''` or explicit backup), no `gawk` extensions (`gensub`, `PROCINFO`, `length(array)`). Bash 4+ constructs (EA-001 / ENV-001) are permitted as a separate assumption.
 - **Consequence if wrong**: silent test failures on macOS BSD tools — GNU extensions that pass on Linux CI fail with cryptic error messages or produce subtly wrong results on developer macOS machines. The drift test's own self-scan (INV-010) catches this class inside `tests/test-architecture-drift.sh`; the broader rule is enforced by code review and by `tests/test-antipattern-scan.sh`.
 - **Test**: INV-010 in `tests/test-architecture-drift.sh` (self-scan); `tests/test-antipattern-scan.sh` for broader coverage.
+
+### ENV-008: python3 with PyYAML (or yq) for entrypoints extraction
+- **Assumption**: The entrypoints extraction script (`scripts/extract-entrypoints.sh`) requires a YAML parser to validate extracted content. The fallback chain is: `yq` (preferred) → `python3` with PyYAML (`python3 -c 'import yaml; yaml.safe_load(...)'`) → exit 1 with error message "Neither yq nor python3 with PyYAML available." At least one of `yq` or `python3` with PyYAML must be available on any machine running the extraction script.
+- **Consequence if wrong**: `scripts/extract-entrypoints.sh` exits 1 with a clear error message. No silent failure — the script refuses to output unvalidated YAML. Phase 1+ consumers that call this script will fail loudly.
+- **Test**: test-carchitect.sh — R-005 (fallback chain references in script body)
 
 ### ENV-007: Plugin-agent loader contract
 - **Assumption**: Claude Code's plugin loader parses `agents/*.md` files with YAML frontmatter supporting `name`, `description`, `tools`, and `model` fields. The `tools:` field is a comma-separated bare-tool list; Bash sub-pattern scoping (`Bash(git*)` style) is NOT supported at the agent level, in contrast to skill `allowed-tools:` which does support sub-patterns. Agents are invocable from skills via `Task(subagent_type="{plugin}:{name}")` (for Correctless, `Task(subagent_type="correctless:fix-diff-reviewer")`). Plugin-agent file discovery requires plugin reinstall AND a Claude Code session restart — mid-session edits to `agents/*.md` are NOT visible to the current session's Task tool.
