@@ -530,6 +530,19 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+# ============================================================================
+# /carchitect Phase 0 structural test — enforces the carchitect-phase0 spec
+# (R-001..R-015). Runs before the summary so its pass/fail feeds into the
+# aggregate count.
+# ============================================================================
+if (cd "$REPO_DIR" && bash tests/test-carchitect.sh); then
+  echo "  PASS: carchitect phase 0 structural test"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: carchitect phase 0 structural test — see output above"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "======================"
 echo "Results: $PASS passed, $FAIL failed"

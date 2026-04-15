@@ -95,6 +95,7 @@ Other:
   /crelease      Version bumping, changelog, release tagging
   /cexplain      Guided codebase exploration with diagrams
   /cauto         Semi-auto pipeline — orchestrates ctdd through PR   [standard+]
+  /carchitect    Architecture definition — reverse-engineer or greenfield
 ```
 
 ### 4. Show Current Status
