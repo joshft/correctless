@@ -5,7 +5,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Skills: 27](https://img.shields.io/badge/skills-28-blue.svg)](docs/skills/)
+[![Skills: 28](https://img.shields.io/badge/skills-28-blue.svg)](docs/skills/)
 [![Version: 3.0.0](https://img.shields.io/badge/version-3.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
@@ -207,6 +207,7 @@ graph LR
 | [`/ctdd`](docs/skills/ctdd.md) | After review approves spec | RED, test audit, GREEN, /simplify, QA — all enforced |
 | [`/cverify`](docs/skills/cverify.md) | After /ctdd completes | Spec-to-code verification, drift detection |
 | [`/cdocs`](docs/skills/cdocs.md) | After /cverify | Update README, AGENT_CONTEXT, ARCHITECTURE, feature docs |
+| [`/carchitect`](docs/skills/carchitect.md) | New project or missing architecture doc | Structured ARCHITECTURE.md — reverse-engineer or greenfield, entrypoints YAML |
 | [`/cauto`](docs/skills/cauto.md) | After spec review approved | Orchestrate full pipeline: TDD, verify, docs, PR — with flexible phase resume |
 | [`/crelease`](docs/skills/crelease.md) | Ready to tag a version | Version bump, changelog, sanity checks, annotated tag |
 
