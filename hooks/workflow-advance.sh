@@ -583,15 +583,7 @@ cmd_fix() {
   info "Fix round — address QA findings, then advance to QA again"
 }
 
-cmd_verify() {
-  # Full mode: tdd-qa → tdd-verify (additional verification phase)
-  check_branch_match
-  require_phase "tdd-qa"
-
-  if ! is_full_mode; then
-    die "The 'verify' transition is for Full mode. In Lite, use 'done' to complete."
-  fi
-
+_require_min_qa_rounds() {
   local min_rounds
   min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
   [ "$min_rounds" = "null" ] && min_rounds=1
@@ -602,6 +594,18 @@ cmd_verify() {
   if [ "$qa_rounds" -lt "$min_rounds" ]; then
     die "Only $qa_rounds QA round(s) completed, minimum is $min_rounds. Run another QA round."
   fi
+}
+
+cmd_verify() {
+  # Full mode: tdd-qa → tdd-verify (additional verification phase)
+  check_branch_match
+  require_phase "tdd-qa"
+
+  if ! is_full_mode; then
+    die "The 'verify' transition is for Full mode. In Lite, use 'done' to complete."
+  fi
+
+  _require_min_qa_rounds
 
   info "Checking that tests pass..."
   tests_pass
@@ -614,17 +618,7 @@ cmd_audit_mini() {
   # Mini-audit phase: tdd-qa or tdd-impl (recheck after fix) → tdd-audit
   check_branch_match
   require_phase_oneof "tdd-qa" "tdd-impl"
-
-  local min_rounds
-  min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
-  [ "$min_rounds" = "null" ] && min_rounds=1
-  [[ "$min_rounds" =~ ^[0-9]+$ ]] || die "workflow.min_qa_rounds must be a non-negative integer, got: '$min_rounds'"
-  local qa_rounds
-  qa_rounds="$(read_state | jq -r '.qa_rounds // 0')"
-
-  if [ "$qa_rounds" -lt "$min_rounds" ]; then
-    die "Only $qa_rounds QA round(s) completed, minimum is $min_rounds. Run another QA round."
-  fi
+  _require_min_qa_rounds
 
   info "Checking that tests pass..."
   tests_pass
@@ -639,17 +633,7 @@ cmd_done() {
   # Accept tdd-qa (Lite, or Full skipping verify-phase), tdd-verify (Full recommended path),
   # or tdd-audit (mini-audit at high+ intensity)
   require_phase_oneof "tdd-qa" "tdd-verify" "tdd-audit"
-
-  local min_rounds
-  min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
-  [ "$min_rounds" = "null" ] && min_rounds=1
-  [[ "$min_rounds" =~ ^[0-9]+$ ]] || die "workflow.min_qa_rounds must be a non-negative integer, got: '$min_rounds'"
-  local qa_rounds
-  qa_rounds="$(read_state | jq -r '.qa_rounds // 0')"
-
-  if [ "$qa_rounds" -lt "$min_rounds" ]; then
-    die "Only $qa_rounds QA round(s) completed, minimum is $min_rounds. Run another QA round."
-  fi
+  _require_min_qa_rounds
 
   info "Checking that tests still pass..."
   tests_pass

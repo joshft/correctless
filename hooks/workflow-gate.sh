@@ -544,13 +544,10 @@ case "$PHASE" in
   tdd-qa|tdd-verify|tdd-audit)
     # QA, verify, and mini-audit phases: no source or test edits
     if [ "$FILE_CLASS" = "source" ] || [ "$FILE_CLASS" = "test" ]; then
-      if [ "$PHASE" = "tdd-qa" ]; then
-        block "QA phase — code is frozen while the QA agent reviews.
-  Source and test files are locked. Report findings as text, don't edit code.
-  If issues found: .correctless/hooks/workflow-advance.sh fix  (returns to implementation)
-  If clean: .correctless/hooks/workflow-advance.sh done  (completes the workflow)"
-      elif [ "$PHASE" = "tdd-audit" ]; then
-        block "Mini-audit phase — code is frozen while specialist agents review.
+      if [ "$PHASE" = "tdd-qa" ] || [ "$PHASE" = "tdd-audit" ]; then
+        _label="QA phase"
+        [ "$PHASE" = "tdd-audit" ] && _label="Mini-audit phase"
+        block "$_label — code is frozen while agents review.
   Source and test files are locked. Report findings as text, don't edit code.
   If issues found: .correctless/hooks/workflow-advance.sh fix  (returns to implementation)
   If clean: .correctless/hooks/workflow-advance.sh done  (completes the workflow)"

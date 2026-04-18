@@ -165,7 +165,7 @@ fi
 
 # R-001i: audit-mini checks min QA rounds (same gate as done)
 if grep -q 'cmd_audit_mini' "$WORKFLOW_ADVANCE"; then
-  if awk '/^cmd_audit_mini\(\)/,/^}$/' "$WORKFLOW_ADVANCE" | grep -q 'min_qa_rounds\|min_rounds\|qa_rounds'; then
+  if awk '/^cmd_audit_mini\(\)/,/^}$/' "$WORKFLOW_ADVANCE" | grep -q '_require_min_qa_rounds\|min_qa_rounds'; then
     pass "R-001i" "audit-mini checks QA rounds requirement"
   else
     fail "R-001i" "audit-mini does not check QA rounds"
@@ -197,8 +197,8 @@ else
 fi
 
 # R-001m: audit-mini listed in usage/help text of workflow-advance.sh
-if grep -q 'audit-mini' "$WORKFLOW_ADVANCE" && grep -qE 'audit.mini|tdd-audit' "$WORKFLOW_ADVANCE"; then
-  pass "R-001m" "audit-mini documented in workflow-advance.sh"
+if awk '/echo.*Usage:.*workflow-advance/,/esac/' "$WORKFLOW_ADVANCE" | grep -q 'audit-mini'; then
+  pass "R-001m" "audit-mini documented in workflow-advance.sh help text"
 else
   fail "R-001m" "audit-mini not documented in workflow-advance.sh help text"
 fi
