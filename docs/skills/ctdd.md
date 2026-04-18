@@ -76,6 +76,18 @@ Agent: Spawning test-writing agent — reading spec (5 rules),
 | | `.correctless/artifacts/checkpoint-ctdd-{slug}.json` |
 | | `.correctless/artifacts/token-log-{slug}.json` |
 
+## Contract Verification in Test Audit
+
+When specs include Entry/Through/Exit integration test contracts (written by `/cspec`, see ABS-024), the test audit verifies that tests satisfy these contracts using tiered severity:
+
+| Check | Type | Severity |
+|-------|------|----------|
+| Entry | Mechanical | BLOCKING — test must use the specified entrypoint |
+| Through | Semi-mechanical | BLOCKING or UNCERTAIN — test must not mock prohibited components |
+| Exit | Semantic | BLOCKING (definite mismatch) or ADVISORY (uncertain) |
+
+For `[integration]` rules without contracts, the audit notes the gap without gating.
+
 ## Intensity Levels
 
 Same at all intensity levels for the RED → test audit → GREEN → QA pipeline with agent separation. At high/critical intensity, git commit trailers (`Spec:`, `Rules-covered:`, `Phase:`) are added for traceability, and the workflow transitions to a verify phase before marking done.

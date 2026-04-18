@@ -103,6 +103,7 @@ jobs:
           bash tests/test-stale-hook-detection.sh
           bash tests/test-carchitect.sh
           bash tests/test-tdd-mini-audit.sh
+          bash tests/test-integration-test-contracts.sh
 
       - name: Verify sync
         run: |

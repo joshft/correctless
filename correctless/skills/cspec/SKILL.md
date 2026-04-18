@@ -358,6 +358,36 @@ Template categories:
 
 Walk through applicable template items with the human. Relevant items become draft invariants. Skip irrelevant items with a noted reason.
 
+### Step 4a: Integration Test Contracts
+
+For each rule tagged `[integration]`, define an integration test contract with Entry/Through/Exit constraints. This step requires ABS-023 (entrypoints YAML contract) and ABS-024 (Entry/Through/Exit contract format) from `.correctless/ARCHITECTURE.md`.
+
+**Prerequisite check**: Before writing integration test contracts, check whether `.correctless/ARCHITECTURE.md` exists and contains entrypoints (the `<!-- correctless:entrypoints:start -->` / `<!-- correctless:entrypoints:end -->` markers exist and the block is non-empty). If the file does not exist or no entrypoints are defined: "ARCHITECTURE.md has no entrypoints defined. Integration test contracts require entrypoints to derive Entry fields. Run `/carchitect` to define them, or skip integration contracts for this spec." If the user chooses to skip, `[integration]` rules are written without Entry/Through/Exit blocks — the existing behavior. The spec agent does NOT attempt to infer entrypoints from the codebase during spec writing.
+
+**Entrypoint matching**: Read the entrypoints YAML from `.correctless/ARCHITECTURE.md` (via `scripts/extract-entrypoints.sh` or by reading the fenced YAML directly). For each `[integration]` rule, match it to an entrypoint whose `scope` globs overlap with the rule's affected files, and use that entrypoint's `test_via` field as the Entry value. The spec agent infers affected files from the rule's description text, the feature scope in the spec's What section, and files referenced by other rules in the same spec. This is LLM judgment — the human confirms or corrects during spec review.
+
+If no entrypoint matches: "No matching entrypoint for R-xxx — the Entry field is unresolved. Consider adding an entrypoint via `/carchitect`."
+
+**Multi-entrypoint split**: If a rule's scope spans multiple entrypoints, split the rule into one `[integration]` rule per entrypoint, each with its own Entry/Through/Exit contract sharing the same Exit constraint. Present the split to the human: "R-003 spans 3 entrypoints — splitting into R-003, R-004, R-005 with separate contracts." Split rules use sequential IDs (the standard R-NNN format), not suffixed IDs. A comment on each split rule notes the original: "(split from original R-003 — HTTP path)" so the lineage is traceable. Subsequent rules are renumbered.
+
+For each `[integration]` rule, append an Entry/Through/Exit block:
+
+```
+- **R-003** [integration]: Config values reach the runtime handler
+  Entry: httptest.NewServer(handler) — real server, real middleware chain
+  Through: request passes through auth middleware and config-injection middleware; auth middleware and ConfigService must NOT be mocked, must be exercised
+  Exit: response body contains the config-sourced value; no mock of ConfigService
+```
+
+The three fields are:
+- **Entry**: which entrypoint the test must use (derived from `.correctless/ARCHITECTURE.md` `test_via` field for the matching entrypoint)
+- **Through**: which components must be exercised on the real path, and which must NOT be mocked. The "must not mock" list is the critical constraint — it tells the TDD agent what it is not allowed to fake.
+- **Exit**: what observable behavior must hold at the end of the test. Must be expressible as a test assertion without accessing internal state.
+
+**Exit field guidance**: The Exit field specifies observable behavior, not implementation details. Positive example (observable assertion): "response body contains the config-sourced value." Negative example (implementation-detail assertion): "Function Y was called" — this tests implementation, not behavior.
+
+**Unit rules excluded**: Rules tagged `[unit]` do NOT get Entry/Through/Exit blocks. The contract format applies only to `[integration]` rules. Unit rules continue to be written as they are today.
+
 ### Step 5: Check Antipatterns
 
 For each AP-xxx entry in `.correctless/antipatterns.md`, ask: does this feature risk repeating this bug class? If yes, add a rule/invariant that prevents it (with `guards_against: AP-xxx` at high+ intensity).

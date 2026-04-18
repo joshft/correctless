@@ -187,6 +187,8 @@ Spawn a **test agent** as a forked subagent with these instructions:
 >
 > You may create **structural stubs** in source files — function signatures, interface definitions, type definitions — but every stub function body MUST contain the comment `STUB:TDD` and only zero-value returns or `panic("not implemented")`. NO implementation logic.
 >
+> **For rules with Entry/Through/Exit contracts**, treat each contract as a self-contained task. The Entry tells you where to start. Through tells you what path to exercise and what you cannot mock. Exit tells you what must be true at the end. Write one test per contract that satisfies all three constraints. If you cannot satisfy a constraint, say so explicitly — do not silently downgrade by mocking a prohibited component or testing through a different entry point. If a contract's Entry or Through constraint seems wrong (e.g., the Through constraint prohibits mocking a component you genuinely need to mock for the test to run), flag it as a contract defect finding rather than silently complying and producing a bad test. A wrong constraint is a spec issue, not a test issue — raise it so the human can fix the spec (TB-004 boundary — escalation to human, not agent override per TB-005).
+>
 > **All test files MUST be created inside the project directory** — never in /tmp, never in external paths. Use the project's standard test directory structure.
 >
 > Read: .correctless/AGENT_CONTEXT.md, the spec, .correctless/ARCHITECTURE.md, `.correctless/antipatterns.md`.
@@ -229,6 +231,18 @@ After the test agent completes and tests exist, run the **test audit** before ad
 > - Lifecycle management (initialization → use → cleanup)
 > - Cross-component communication (events, callbacks, middleware chains)
 > - Any rule where the test constructs its own input rather than using the real system path
+>
+> 9. **Integration test contract verification**: For each `[integration]` rule that has an Entry/Through/Exit contract, verify the test satisfies the contract. The three checks operate at different verification tiers:
+>
+>   | Check | Type | Severity | What it verifies |
+>   |-------|------|----------|-----------------|
+>   | Entry | Mechanical | BLOCKING | Test file contains evidence of using the specified entrypoint (e.g., `httptest.NewServer` if Entry says so). A grep can verify this. |
+>   | Through | Semi-mechanical | BLOCKING or UNCERTAIN | Test does NOT mock/stub components on the "must not mock" list. Language-dependent. If the auditor can mechanically confirm a violation: BLOCKING. If the mock pattern is unfamiliar or ambiguous: UNCERTAIN — flag for human review, do not gate. |
+>   | Exit | Semantic | BLOCKING (definite mismatch) or ADVISORY (uncertain) | Test contains assertions matching the Exit constraint's observable behavior. If the auditor can positively determine the assertion doesn't match: BLOCKING. If uncertain: ADVISORY. The "definitely wrong" bar must be high. |
+>
+>   For `[integration]` rules without contracts (e.g., entrypoints were unavailable), the test audit notes: "R-xxx has no integration contract — test shape not audited" so the user knows the gap exists.
+>
+>   Note: these checks verify test *shape*, not test *behavior*. This is complementary to PAT-012 (wiring tests over keyword tests), not in conflict — PAT-012 governs what the test exercises at runtime, contract verification governs what the test is structurally allowed to fake.
 >
 > Read: .correctless/AGENT_CONTEXT.md, the spec, the test files, .correctless/ARCHITECTURE.md, `.correctless/antipatterns.md`.
 > Write: NOTHING. Return findings as your final text response.
