@@ -242,6 +242,36 @@
         "tests/test-spec-mutation-alerts.sh"
       ],
       "timestamp": "2026-04-13T23:30:00Z"
+    },
+    {
+      "feature_slug": "tdd-mini-audit",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/config/workflow-config.json",
+        ".correctless/specs/tdd-mini-audit.md",
+        ".github/workflows/ci.yml",
+        "CONTRIBUTING.md",
+        "correctless/hooks/token-tracking.sh",
+        "correctless/hooks/workflow-advance.sh",
+        "correctless/hooks/workflow-gate.sh",
+        "correctless/skills/cauto/SKILL.md",
+        "correctless/skills/ctdd/SKILL.md",
+        "docs/skills/ctdd.md",
+        "hooks/token-tracking.sh",
+        "hooks/workflow-advance.sh",
+        "hooks/workflow-gate.sh",
+        "skills/cauto/SKILL.md",
+        "skills/ctdd/SKILL.md",
+        "tests/test-tdd-mini-audit.sh",
+        "tests/test-token-aware-intensity.sh"
+      ],
+      "timestamp": "2026-04-18T20:30:00Z"
     }
   ]
 }

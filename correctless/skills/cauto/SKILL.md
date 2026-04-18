@@ -23,6 +23,7 @@ Before doing anything, read the current workflow state by running `bash .correct
 | `tdd-tests` | Resume from `ctdd` (handles internal TDD phases) → `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
 | `tdd-impl` | Resume from `ctdd` (handles internal TDD phases) → `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
 | `tdd-qa` | Resume from `ctdd` (handles internal TDD phases) → `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
+| `tdd-audit` | Resume from `ctdd` (handles internal TDD phases) → `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
 | `done` | `simplify` → `cverify` → `cupdate-arch` → `cdocs` → consolidation → PR |
 | `verified` | `cupdate-arch` (if high+ intensity) → `cdocs` → consolidation → PR |
 | `documented` | Consolidation → PR only |
@@ -133,11 +134,12 @@ The full transition sequence for a clean run uses these actual phase names in or
 2. `tdd-impl` — GREEN phase: implement to make tests pass
 3. `tdd-qa` — QA phase: independent review of implementation
 4. (loop: `tdd-impl` -> `tdd-qa` if QA finds issues, via the `fix` command which transitions back to `tdd-impl`)
-5. `done` — TDD complete, ready for simplification and verification
-6. `verified` — Post-implementation verification passed
-7. `documented` — Documentation updated, pipeline complete
+5. `tdd-audit` — Mini-audit phase: adversarial specialist review (cross-component, hostile input, resource bounds)
+6. `done` — TDD complete, ready for simplification and verification
+7. `verified` — Post-implementation verification passed
+8. `documented` — Documentation updated, pipeline complete
 
-At high+ intensity, the optional `tdd-verify` phase may occur between `tdd-qa` and `done` (handled internally by `/ctdd`).
+At high+ intensity, the optional `tdd-verify` phase may occur between `tdd-qa` and `tdd-audit` (handled internally by `/ctdd`). The `tdd-audit` phase runs at all intensity levels.
 
 These transitions are managed by `/ctdd` internally for phases 1-5, and by `/cverify` and `/cdocs` for phases 6-7. The orchestrator monitors the phase after each skill completes.
 
@@ -145,7 +147,7 @@ These transitions are managed by `/ctdd` internally for phases 1-5, and by `/cve
 
 ### Step 1: Invoke `/ctdd`
 
-Spawn a sub-agent to execute `/ctdd`. This skill manages the RED -> GREEN -> QA cycle internally and advances the workflow through `tdd-tests`, `tdd-impl`, `tdd-qa`, and `done` phases.
+Spawn a sub-agent to execute `/ctdd`. This skill manages the RED -> GREEN -> QA -> mini-audit cycle internally and advances the workflow through `tdd-tests`, `tdd-impl`, `tdd-qa`, `tdd-audit`, and `done` phases.
 
 Log a `skill_started` audit trail entry before invocation.
 

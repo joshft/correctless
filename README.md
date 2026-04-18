@@ -433,7 +433,7 @@ rm -rf .correctless/
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 28 skills, 3 intensity levels, ~3,970 automated tests, 7 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 28 skills, 3 intensity levels, ~4,496 automated tests, 7 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 

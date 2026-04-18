@@ -223,7 +223,7 @@ fi
 
 # Validate phase is a known value
 case "$PHASE" in
-  spec|review|review-spec|model|tdd-tests|tdd-impl|tdd-qa|tdd-verify|done|verified|documented|audit) ;;
+  spec|review|review-spec|model|tdd-tests|tdd-impl|tdd-qa|tdd-verify|tdd-audit|done|verified|documented|audit) ;;
   *)
     echo "BLOCKED: Invalid or corrupted workflow phase: $PHASE. Run workflow-advance.sh status to check." >&2
     exit 2
@@ -541,11 +541,13 @@ case "$PHASE" in
     # Everything allowed
     ;;
 
-  tdd-qa|tdd-verify)
-    # QA and verify phases: no source or test edits
+  tdd-qa|tdd-verify|tdd-audit)
+    # QA, verify, and mini-audit phases: no source or test edits
     if [ "$FILE_CLASS" = "source" ] || [ "$FILE_CLASS" = "test" ]; then
-      if [ "$PHASE" = "tdd-qa" ]; then
-        block "QA phase — code is frozen while the QA agent reviews.
+      if [ "$PHASE" = "tdd-qa" ] || [ "$PHASE" = "tdd-audit" ]; then
+        _label="QA phase"
+        [ "$PHASE" = "tdd-audit" ] && _label="Mini-audit phase"
+        block "$_label — code is frozen while agents review.
   Source and test files are locked. Report findings as text, don't edit code.
   If issues found: .correctless/hooks/workflow-advance.sh fix  (returns to implementation)
   If clean: .correctless/hooks/workflow-advance.sh done  (completes the workflow)"
