@@ -20,7 +20,7 @@ skills/               # Source skills (28 SKILL.md files)
 hooks/                # Bash hooks (gate, sensitive-file-guard, state machine, statusline, audit trail, auto-format, token-tracking)
 templates/            # Config, doc, and spec templates
 helpers/              # PBT guides per language (high+ intensity)
-tests/                # 53 test files (~4,149 assertions)
+tests/                # 53 test files (~4,496 assertions)
 setup                 # Install script
 sync.sh               # Copies source → correctless/ distribution
 correctless/          # Single distribution (28 skills, intensity-gated)
@@ -88,7 +88,7 @@ Run ShellCheck before submitting: `shellcheck hooks/*.sh`
 ## Testing
 
 ```bash
-# Run all 48 test suites — use the canonical command from workflow-config.json:
+# Run all 54 test suites — use the canonical command from workflow-config.json:
 jq -r '.commands.test' .correctless/config/workflow-config.json | bash
 
 # Quick smoke test (2 suites):
