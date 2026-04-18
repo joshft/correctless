@@ -71,6 +71,16 @@ Agent: Based on our discussion, here's what I understand: rate limiting on
 | `.correctless/artifacts/qa-findings-*.json` | |
 | Git log (recent 20 commits) | |
 
+## Integration Test Contracts
+
+For `[integration]` rules, `/cspec` defines Entry/Through/Exit contract constraints derived from `.correctless/ARCHITECTURE.md` entrypoints (ABS-023). The contract format (ABS-024) tells the TDD agent exactly what the integration test must exercise:
+
+- **Entry**: which entrypoint the test must use (from the entrypoint's `test_via` field)
+- **Through**: which components must be exercised and which must NOT be mocked
+- **Exit**: what observable behavior must hold (expressible as a test assertion without internal state)
+
+If no entrypoints are defined in ARCHITECTURE.md, the skill prompts you to run `/carchitect` first or skip contracts for this spec. Rules tagged `[unit]` are not affected — contracts apply only to `[integration]` rules.
+
 ## Intensity Levels
 
 **Standard intensity** produces 5 sections: What, Rules (R-xxx with test levels), Won't Do, Risks, Open Questions. Simple and fast.

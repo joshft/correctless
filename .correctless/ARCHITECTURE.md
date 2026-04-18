@@ -223,11 +223,18 @@
 - **Test**: test-stale-hook-detection.sh — R-001, R-002
 
 ### ABS-023: Entrypoints YAML contract (.correctless/ARCHITECTURE.md)
-- **What**: Machine-referenceable entrypoints definition embedded in `.correctless/ARCHITECTURE.md` as a fenced YAML block between `<!-- correctless:entrypoints:start -->` and `<!-- correctless:entrypoints:end -->` marker comments. Schema: list of objects with fields `name` (string), `type` (enum: http, cli, grpc, queue, cron, library, websocket), `handler` (string: file path + symbol), `test_via` (non-empty string: canonical integration test approach), `scope` (list of glob patterns). Sole writer: `/carchitect`. Extraction: `scripts/extract-entrypoints.sh`. Evolution: additive fields only — existing fields are never removed or renamed.
+- **What**: Machine-referenceable entrypoints definition embedded in `.correctless/ARCHITECTURE.md` as a fenced YAML block between `<!-- correctless:entrypoints:start -->` and `<!-- correctless:entrypoints:end -->` marker comments. Schema: list of objects with fields `name` (string), `type` (enum: http, cli, grpc, queue, cron, library, websocket), `handler` (string: file path + symbol), `test_via` (non-empty string: canonical integration test approach), `scope` (list of glob patterns). Sole writer: `/carchitect`. Consumers: `/cspec` (reads entrypoints, matches scope globs, uses `test_via` for Entry derivation in integration test contracts), `/ctdd` (transitive consumer — test audit verifies Entry fields derived from `test_via`). Extraction: `scripts/extract-entrypoints.sh`. Evolution: additive fields only — existing fields are never removed or renamed. Existing field semantics (not just names) are stable. The `scope` field remains a list of glob patterns; changing its type or matching semantics is a breaking change requiring a new field.
 - **Invariant**: Only `/carchitect` writes the entrypoints YAML. Enum membership and field validation happen at write time in the skill, not in the extraction script. The extraction script is dumb and fast — it reads markers, strips fences, validates YAML parseability, and outputs to stdout.
 - **Enforced at**: `skills/carchitect/SKILL.md` (write-time validation), `scripts/extract-entrypoints.sh` (extraction + parse validation)
-- **Violated when**: A tool other than `/carchitect` writes entrypoints YAML, or the extraction script performs semantic validation (enum checks, field presence)
+- **Violated when**: A tool other than `/carchitect` writes entrypoints YAML, or the extraction script performs semantic validation (enum checks, field presence), or the `test_via` or `scope` fields are removed or renamed without updating cspec's contract derivation logic
 - **Test**: test-carchitect.sh — R-004, R-005
+
+### ABS-024: Entry/Through/Exit integration test contract format
+- **What**: Cross-skill data contract for integration test constraints. Writer: `/cspec` (appends Entry/Through/Exit blocks to `[integration]` rules during spec writing). Consumer: `/ctdd` test auditor (verifies tests satisfy contracts during the test audit phase). Format: three fields per `[integration]` rule — Entry (entrypoint to use, derived from ABS-023 `test_via`), Through (components to exercise and not mock), Exit (observable behavior assertion). Verification tiers: Entry=mechanical BLOCKING, Through=semi-mechanical BLOCKING or UNCERTAIN, Exit=semantic BLOCKING for definite mismatches or ADVISORY for uncertain.
+- **Invariant**: The three fields (Entry, Through, Exit) and their verification tiers are stable. Adding a field is additive. Changing a verification tier is an architectural decision requiring spec and review.
+- **Enforced at**: `skills/cspec/SKILL.md` (contract writing, Step 4a), `skills/ctdd/SKILL.md` (contract verification in test audit)
+- **Violated when**: A verification tier is changed without architectural review, or Entry/Through/Exit fields are removed from the contract format
+- **Test**: test-integration-test-contracts.sh — R-001, R-007
 
 ## Patterns
 

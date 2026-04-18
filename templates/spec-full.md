@@ -28,6 +28,17 @@
 - **Violated when**: {condition}
 - **Test approach**: unit
 
+### INV-002: {short name} [integration]
+- **Type**: must
+- **Category**: functional
+- **Statement**: {testable statement}
+- **Violated when**: {condition}
+- **Test approach**: integration
+- **Integration contract**:
+  Entry: {entrypoint from test_via — e.g., httptest.NewServer(handler)}
+  Through: {components that must be exercised and must NOT be mocked}
+  Exit: {observable behavior — e.g., response body contains X; no mock of Y}
+
 ## Prohibitions
 
 ### PRH-001: {short name}

@@ -15,6 +15,13 @@
 
 - **R-001** [{test_level}]: {testable statement}
 
+For `[integration]` rules with Entry/Through/Exit contracts (derived from ARCHITECTURE.md entrypoints):
+
+- **R-002** [integration]: {testable statement}
+  Entry: {entrypoint from test_via — e.g., httptest.NewServer(handler)}
+  Through: {components that must be exercised and must NOT be mocked}
+  Exit: {observable behavior — e.g., response body contains X; no mock of Y}
+
 ## Won't Do
 
 - {out of scope item}
