@@ -17,6 +17,7 @@ You are the TDD orchestrator. You manage the RED → GREEN → QA state machine 
 |---|---|---|---|
 | Test audit | Blocking | Strict | Strict + PBT recommendations |
 | QA rounds | 2 max | 3 max | 5 max (convergence, capped) |
+| Mini-audit rounds | 1 | 2 | 3 |
 | Mutation testing | No | Yes | Yes |
 | Calm resets | After 3 failures | After 2 failures | After 2 + supervisor notified |
 
@@ -34,7 +35,7 @@ This workflow optimizes for correctness, not speed. Every step exists because sk
 - At high intensity: QA runs 3 max rounds. Mutation testing is required. Calm resets trigger after 2 failures.
 - At critical intensity: QA runs 5 max rounds (convergence, capped). PBT (property-based testing) recommendations are included in the test audit. Mutation testing is required. Calm resets trigger after 2 failures with supervisor notified.
 
-The full pipeline: **RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge.**
+The full pipeline: **RED → test audit → GREEN → /simplify → QA → mini-audit → done → /cverify → /cdocs → merge.**
 
 ## Progress Visibility (MANDATORY)
 
@@ -47,11 +48,12 @@ The TDD workflow can take 15-30+ minutes. The user must see what's happening at 
 4. /simplify: Clean up code quality
 5. QA: Independent review of tests + implementation
 6. (If QA finds issues: Fix round N → re-QA)
+7. Mini-audit: Adversarial specialist review (cross-component, hostile input, resource bounds)
 
 **Between every phase**, print a mini pipeline diagram showing progress. Mark completed phases with `✓` and the current phase with `▶`:
 
 ```
-  ✓ RED → ✓ audit → ▶ GREEN → simplify → QA
+  ✓ RED → ✓ audit → ▶ GREEN → simplify → QA → mini-audit → done
 ```
 
 Update the diagram each time a phase completes. After QA with fix rounds:
@@ -473,8 +475,99 @@ When the failure involves an unclear root cause (hard-to-understand bug), includ
 
 The orchestrator tracks attempt counts for all calm reset triggers in its own conversation context (working memory), not in persisted state. Attempt counts live entirely in orchestrator memory and clear when a new phase begins. No additional files, state fields, or checkpoint entries are needed — the orchestrator simply observes its own conversation history to determine how many attempts have been made.
 - **If no BLOCKING findings**:
-  - **At standard intensity**: `workflow-advance.sh done`
-  - **At high+ intensity**: `workflow-advance.sh verify-phase` (goes to tdd-verify for final verification, then `done`)
+  - **At standard intensity**: `workflow-advance.sh audit-mini` (mini-audit runs at all intensities)
+  - **At high+ intensity**: `workflow-advance.sh audit-mini` (mini-audit subsumes verify-phase at high+ intensity)
+
+## Phase: Mini-Audit (tdd-audit)
+
+After QA completes with no BLOCKING findings, advance to `tdd-audit` via `workflow-advance.sh audit-mini` and spawn the mini-audit agents. The mini-audit asks "how does this feature break everything else?" — using three adversarial lenses that are structurally absent from the QA agent's perspective. No convergence loop — fixed rounds per intensity level (standard=1, high=2, critical=3).
+
+### Agent Prompts
+
+Each mini-audit round spawns three specialist agents as forked subagents, running in parallel:
+
+1. **Cross-component interaction agent**: "You are testing how this feature interacts with the rest of the system. Read the entrypoints in `.correctless/ARCHITECTURE.md` (look for `correctless:entrypoints:start` / `correctless:entrypoints:end` markers) and the trust boundaries. For each entrypoint whose scope overlaps with the changed files, ask: does this feature change behavior that other components depend on? Does this feature assume invariants that other components could violate? Does this feature introduce state that other components are unaware of? If no entrypoints exist, fall back to `git diff`-scoped analysis: what other files import symbols from the changed files? What callers depend on the changed interfaces?"
+
+2. **Hostile input agent**: "You are an attacker. The feature implementation is in front of you. Read the trust boundaries (TB-xxx) in `.correctless/ARCHITECTURE.md` to identify which inputs cross trust boundaries. For each input this feature accepts (function arguments, config values, file contents, environment variables, network data), find an input that causes incorrect behavior — not just a crash, but a wrong result, a security bypass, or silent data corruption. Constructed test scenarios with clean inputs don't count — find the ugly inputs."
+
+3. **Resource bounds agent**: "You are a reliability engineer. Read the environment assumptions (ENV-xxx) in `.correctless/ARCHITECTURE.md` for resource constraints. For each resource this feature allocates, manages, or depends on (memory, file handles, goroutines, connections, disk space, CPU time), find a scenario where the resource is exhausted, leaked, or contended. What happens at 10x the expected load? What happens when the resource is unavailable? What happens on graceful shutdown during an operation?"
+
+### Agent Context and Tools
+
+Each agent receives as context: the spec, `.correctless/ARCHITECTURE.md` (including entrypoints YAML), `.correctless/AGENT_CONTEXT.md`, `.correctless/antipatterns.md`, the source code changed by this feature (from `git diff` against the base branch), and the test files. Agents have read-only tools: `Read, Grep, Glob, Bash(git diff*, git log*, git show*)`. Agents must not use Edit or file-writing tools.
+
+### Finding Format
+
+Each agent returns findings using the `MA-` prefix (not `QA-`) to distinguish mini-audit findings from QA findings:
+
+```
+FINDING: MA-001
+SEVERITY: CRITICAL|HIGH|MEDIUM|LOW|UNCERTAIN
+LENS: cross-component|hostile-input|resource-bounds
+RULE: R-xxx or null
+DESCRIPTION: [what's wrong]
+INSTANCE_FIX: [fix this specific bug]
+CLASS_FIX: [prevent this category]
+```
+
+The orchestrator persists findings to `.correctless/artifacts/qa-findings-{task-slug}.json` by appending to the existing findings array. The `LENS` field and the `MA-` prefix distinguish mini-audit findings from QA findings.
+
+### UNCERTAIN Severity
+
+When a mini-audit agent cannot determine whether a finding is real, it must label the finding as `UNCERTAIN` severity rather than inflating to HIGH or suppressing entirely. `UNCERTAIN` findings are presented to the user as advisory with a note explaining why the agent is unsure. This is non-blocking. If >50% of findings in a round are UNCERTAIN, the round is flagged as low-confidence and the user is warned.
+
+### Disposition Options
+
+CRITICAL and HIGH findings from the mini-audit are blocking — they must be fixed before `done`. Present each CRITICAL/HIGH finding to the user with disposition options:
+
+```
+  1. Fix now (recommended) — address before proceeding
+  2. Accept risk — document why this is tolerable
+  3. Dispute — explain why this is not an issue
+
+  Or type your own: ___
+```
+
+MEDIUM and LOW findings are advisory — presented to the user but do not block `done`.
+
+### Fix Loop
+
+When CRITICAL/HIGH findings are accepted for fixing, transition back to `tdd-impl` via `workflow-advance.sh fix`, spawn a fix agent that writes both the fix AND a regression test for the fix, then transition directly to `tdd-audit` via `workflow-advance.sh audit-mini` (which accepts `tdd-impl` as a source phase) and re-run only the mini-audit round that produced the finding. A fix without a regression test is incomplete.
+
+### Multi-Round Behavior
+
+At high+ intensity with multiple rounds, round 2+ agents do NOT see previous rounds' findings — they start fresh, preventing anchoring to previous findings. Deduplication happens at the orchestrator level after collection, using file + issue category (not function-level). When two findings describe the same category of issue in the same file, the orchestrator keeps the higher-severity finding and adds a `duplicate_of` field to the lower-severity one.
+
+Each round after the first receives a "raise the bar" prompt:
+> "The previous round's agents were sloppy and missed things. The agents were overconfident and under-thorough. Do better."
+
+### Progress Announcements
+
+Before each round, announce: "Starting mini-audit round {N}/{total} — spawning 3 specialist agents (cross-component, hostile input, resource bounds)."
+
+As each agent completes, announce immediately: "{Agent name} complete — found {N} findings ({C} critical/high, {M} medium/low). {M} agents still running..."
+
+After all agents complete: "Round {N} complete — {N} total findings ({C} blocking, {A} advisory)."
+
+### Agent Failure Handling
+
+If a mini-audit agent fails (context limit, tool error, malformed output, timeout), the round completes with the remaining agents' findings. The orchestrator logs the failure and warns the user which lens was missed: "Warning: {agent name} agent failed ({reason}). Round {N} results are from {remaining lenses} only. The {missing lens} perspective was not evaluated." No automatic retry — retries are expensive and the other two lenses are still valuable.
+
+### Zero Findings / Clean Round
+
+When all three agents in a round return zero findings AND all three agents completed successfully, the orchestrator announces "Mini-audit round {N} clean — no findings across all three lenses." If any agent failed, the round is announced as "incomplete" rather than "clean" — zero findings from failed agents is not the same as zero findings from successful agents.
+
+At multi-round intensity (high/critical), subsequent rounds still run even if earlier rounds were clean — the fresh-context, no-anchoring design means a later round may find what an earlier one missed.
+
+After the final round completes clean, the orchestrator announces "Mini-audit complete — no blocking findings. Ready to advance to done." and waits for the user. It does not auto-transition to `done` — consistent with the shared constraint "never auto-invoke the next skill."
+
+### No Convergence
+
+The mini-audit does NOT use a convergence loop. Each intensity level has a fixed number of rounds (1/2/3). After the final round, all remaining CRITICAL/HIGH findings must be fixed or explicitly accepted as risk. This is a fixed-cost addition to the TDD cycle — `/caudit` handles convergence.
+
+### Token Tracking
+
+Token tracking for the mini-audit follows the shared constraints. Skill-specific values: `skill: "ctdd"`, `phase: "mini-audit-round-N"`, `agent_role: "cross-component|hostile-input|resource-bounds"`. The `tdd-audit` → `ctdd` mapping is in `hooks/token-tracking.sh`.
 
 ## After TDD Completes: Next Steps
 
@@ -510,8 +603,8 @@ See "Progress Visibility" section above — task creation and narration are mand
 
 Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
 - `skill`: "ctdd"
-- `phase`: "{red|test-audit|green|qa|fix-round-N}"
-- `agent_role`: "{test-writer|test-auditor|implementation|qa-agent|fix-agent}"
+- `phase`: "{red|test-audit|green|qa|fix-round-N|mini-audit-round-N}"
+- `agent_role`: "{test-writer|test-auditor|implementation|qa-agent|fix-agent|cross-component|hostile-input|resource-bounds}"
 
 ### /btw Reminder
 When presenting QA findings for the human to review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."
@@ -561,4 +654,4 @@ If `mcp.context7` is `true` in `workflow-config.json`, the test agent (RED phase
 - **The hook enforces phase gating.** Even if you forget, the gate blocks violations.
 - **If `workflow-advance.sh` fails**, read the error message and present it to the human. Common causes: wrong phase, missing precondition, not on a feature branch.
 - **All files created by any agent must be inside the project directory.** Never write to /tmp or external paths.
-- **Never skip workflow steps.** The full pipeline is: RED → test audit → GREEN → /simplify → QA → done → /cverify → /cdocs → merge. Every step runs, every time. No exceptions. "This feature is small" is not a reason to skip. Time is not the constraint — correctness is.
+- **Never skip workflow steps.** The full pipeline is: RED → test audit → GREEN → /simplify → QA → mini-audit → done → /cverify → /cdocs → merge. Every step runs, every time. No exceptions. "This feature is small" is not a reason to skip. Time is not the constraint — correctness is.

@@ -1,6 +1,6 @@
 # Agent Context — Correctless
 
-> Last updated: 2026-04-14
+> Last updated: 2026-04-18
 
 ## What This Project Does
 
@@ -18,13 +18,13 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
 | Distribution | `correctless/` | Single 28-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks, install scripts to `.correctless/scripts/` (migrates from `scripts/` on upgrade), writes install manifest (`.correctless/.install-manifest.json`) with SHA-256 checksums for staleness detection |
-| Tests | `tests/test*.sh` | 53 test files (~4,228 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, test-evasion antipattern validation, scanner expansion (grep portability + dead-security-fn detection), auto-UX improvements (flexible phase entry, scoped consolidation, pipeline summary), scripts namespace migration, spec mutation alerts, override frequency metrics (cross-run pattern detection + preservation + 50-file cap), stale hook detection (install manifest generation + freshness checking), and carchitect skill (entrypoints YAML contract, extraction script, architecture-reviewer agent, mode detection, section structure) |
+| Tests | `tests/test*.sh` | 53 test files (~4,496 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, test-evasion antipattern validation, scanner expansion (grep portability + dead-security-fn detection), auto-UX improvements (flexible phase entry, scoped consolidation, pipeline summary), scripts namespace migration, spec mutation alerts, override frequency metrics (cross-run pattern detection + preservation + 50-file cap), stale hook detection (install manifest generation + freshness checking), carchitect skill (entrypoints YAML contract, extraction script, architecture-reviewer agent, mode detection, section structure), and tdd-mini-audit (workflow phase, gating, token tracking, skill prompt content) |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns
 
 - **Source-to-dist sync** (PAT-001): edit in `skills/`, `hooks/`, `templates/`, `helpers/` only — run `sync.sh` to propagate to `correctless/`
-- **Agent separation** (PAT-002): each TDD phase (RED/GREEN/QA) is a different agent — enforced via `context: fork` and sub-agent spawning
+- **Agent separation** (PAT-002): each TDD phase (RED/GREEN/QA/mini-audit) is a different agent — enforced via `context: fork` and sub-agent spawning
 - **Phase-gated writes** (PAT-003): `workflow-gate.sh` blocks file operations that violate the current phase (RED blocks source, QA blocks everything)
 - **Branch-scoped state** (PAT-004): state lives in `.correctless/artifacts/workflow-state-{branch-slug}.json` — `workflow-advance.sh` is the only writer. Includes spec integrity fields (`spec_hash`, `spec_line_count`) for detecting post-review spec mutations
 - **Effective intensity** (PAT-005): each pipeline skill and gated skill computes `max(project_intensity, feature_intensity)` using ordering `standard < high < critical`. Project intensity from `workflow.intensity` in config, feature intensity from `workflow-advance.sh status`. Fallback: feature_intensity → workflow.intensity → standard
