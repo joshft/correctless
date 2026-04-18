@@ -95,7 +95,7 @@ case "$_PHASE" in
   spec)                                          SKILL_VAL="cspec"    ;;
   model)                                         SKILL_VAL="cmodel"   ;;
   review|review-spec)                            SKILL_VAL="creview"  ;;
-  tdd-tests|tdd-impl|tdd-qa|tdd-verify)          SKILL_VAL="ctdd"    ;;
+  tdd-tests|tdd-impl|tdd-qa|tdd-verify|tdd-audit)  SKILL_VAL="ctdd"    ;;
   done|verified)                                 SKILL_VAL="cverify"  ;;
   documented)                                    SKILL_VAL="cdocs"    ;;
   audit)                                         SKILL_VAL="caudit"   ;;

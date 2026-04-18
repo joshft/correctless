@@ -578,7 +578,7 @@ cmd_qa() {
 
 cmd_fix() {
   check_branch_match
-  require_phase "tdd-qa"
+  require_phase_oneof "tdd-qa" "tdd-audit"
   update_phase "tdd-impl"
   info "Fix round — address QA findings, then advance to QA again"
 }
@@ -610,11 +610,35 @@ cmd_verify() {
   info "Next: final verification (all edits blocked)"
 }
 
+cmd_audit_mini() {
+  # Mini-audit phase: tdd-qa or tdd-impl (recheck after fix) → tdd-audit
+  check_branch_match
+  require_phase_oneof "tdd-qa" "tdd-impl"
+
+  local min_rounds
+  min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
+  [ "$min_rounds" = "null" ] && min_rounds=1
+  [[ "$min_rounds" =~ ^[0-9]+$ ]] || die "workflow.min_qa_rounds must be a non-negative integer, got: '$min_rounds'"
+  local qa_rounds
+  qa_rounds="$(read_state | jq -r '.qa_rounds // 0')"
+
+  if [ "$qa_rounds" -lt "$min_rounds" ]; then
+    die "Only $qa_rounds QA round(s) completed, minimum is $min_rounds. Run another QA round."
+  fi
+
+  info "Checking that tests pass..."
+  tests_pass
+
+  update_phase "tdd-audit"
+  info "Phase: tdd-audit"
+  info "Next: mini-audit review (edits blocked)"
+}
+
 cmd_done() {
   check_branch_match
-  # Accept tdd-qa (Lite, or Full skipping verify-phase) or tdd-verify (Full recommended path)
-  # In Full mode, /ctdd guides users through verify-phase before done, but it is not a hard gate
-  require_phase_oneof "tdd-qa" "tdd-verify"
+  # Accept tdd-qa (Lite, or Full skipping verify-phase), tdd-verify (Full recommended path),
+  # or tdd-audit (mini-audit at high+ intensity)
+  require_phase_oneof "tdd-qa" "tdd-verify" "tdd-audit"
 
   local min_rounds
   min_rounds="$(read_config_field '.workflow.min_qa_rounds' 2>/dev/null || echo "1")"
@@ -1051,7 +1075,7 @@ cmd_diagnose() {
     tdd-impl)
       reason="GREEN phase — all file edits allowed (test edits are logged)"
       ;;
-    tdd-qa|tdd-verify)
+    tdd-qa|tdd-verify|tdd-audit)
       if [ "$classification" = "source" ] || [ "$classification" = "test" ]; then
         decision="BLOCK"
         reason="$phase phase — source and test edits blocked"
@@ -1180,6 +1204,7 @@ case "$cmd" in
   qa)             cmd_qa ;;
   verify-phase)   cmd_verify ;;
   fix)            cmd_fix ;;
+  audit-mini)     cmd_audit_mini ;;
   done)           cmd_done ;;
   verified)       cmd_verified ;;
   documented)     cmd_documented ;;
@@ -1202,8 +1227,9 @@ case "$cmd" in
     echo "  tests              review|review-spec|spec(update) → tdd-tests"
     echo "  impl               tdd-tests → tdd-impl (requires tests fail, not build error)"
     echo "  qa                 tdd-impl → tdd-qa (requires tests pass)"
-    echo "  fix                tdd-qa → tdd-impl (issues found, fix round)"
-    echo "  done               tdd-qa|tdd-verify → done (zero issues, min rounds met)"
+    echo "  fix                tdd-qa|tdd-audit → tdd-impl (issues found, fix round)"
+    echo "  audit-mini         tdd-qa|tdd-impl → tdd-audit (mini-audit at high+ intensity)"
+    echo "  done               tdd-qa|tdd-verify|tdd-audit → done (zero issues, min rounds met)"
     echo "  verified           done → verified (requires /cverify report file exists)"
     echo "  documented         verified → documented (ready to merge)"
     echo "  spec-update \"why\" tdd-* → spec (spec was wrong, preserves TDD state)"
