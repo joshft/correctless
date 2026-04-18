@@ -498,15 +498,10 @@ else
 fi
 
 # R-009d: spec-full.md uses the format within the invariant structure (high-intensity)
-if grep -qi 'Entry\|Through\|Exit' "$SPEC_FULL"; then
-  # More specific: check it's in the test approach or invariant section
-  if grep -qi 'Entry:.*Through:\|integration.*contract\|Entry.*Through.*Exit' "$SPEC_FULL"; then
-    pass "R-009d" "spec-full.md shows contract format within invariant structure"
-  else
-    fail "R-009d" "spec-full.md does not show contract format within invariant structure"
-  fi
+if grep -qi 'Entry:.*Through:\|integration.*contract\|Entry.*Through.*Exit' "$SPEC_FULL"; then
+  pass "R-009d" "spec-full.md shows contract format within invariant structure"
 else
-  fail "R-009d" "spec-full.md has no Entry/Through/Exit references"
+  fail "R-009d" "spec-full.md does not show contract format within invariant structure"
 fi
 
 # ============================================================================
