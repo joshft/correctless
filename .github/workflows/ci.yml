@@ -106,6 +106,7 @@ jobs:
           bash tests/test-integration-test-contracts.sh
           bash tests/test-carchitect-phase1.sh
           bash tests/test-dev-journal.sh
+          bash tests/test-qa-uncertain.sh
 
       - name: Verify sync
         run: |

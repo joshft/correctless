@@ -559,6 +559,14 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+if (cd "$REPO_DIR" && bash tests/test-qa-uncertain.sh); then
+  echo "  PASS: QA UNCERTAIN severity test"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: QA UNCERTAIN severity test — see output above"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "======================"
 echo "Results: $PASS passed, $FAIL failed"
