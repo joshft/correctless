@@ -1895,6 +1895,46 @@ check_ap005_stale_counts() {
 check_ap005_stale_counts
 
 # ============================================================================
+# Test registration guard: every test-*.sh must be in all three registries
+# Catches the recurring gap where new test files are created but not registered
+# in workflow-config.json, ci.yml, and/or tests/test.sh.
+# ============================================================================
+
+check_test_registration() {
+  local root
+  root="$(git rev-parse --show-toplevel)"
+  local config="$root/.correctless/config/workflow-config.json"
+  local ci_yml="$root/.github/workflows/ci.yml"
+  local missing_config="" missing_ci=""
+
+  while IFS= read -r test_file; do
+    local basename
+    basename="$(basename "$test_file")"
+
+    if [ -f "$config" ] && ! grep -q "$basename" "$config" 2>/dev/null; then
+      missing_config="$missing_config $basename"
+    fi
+    if [ -f "$ci_yml" ] && ! grep -q "$basename" "$ci_yml" 2>/dev/null; then
+      missing_ci="$missing_ci $basename"
+    fi
+  done < <(find "$root/tests" -maxdepth 1 -name 'test-*.sh' -type f | sort)
+
+  if [ -z "$missing_config" ]; then
+    pass "REG-001(config)" "all test files registered in workflow-config.json"
+  else
+    fail "REG-001(config)" "missing from workflow-config.json:$missing_config"
+  fi
+
+  if [ -z "$missing_ci" ]; then
+    pass "REG-001(ci)" "all test files registered in ci.yml"
+  else
+    fail "REG-001(ci)" "missing from ci.yml:$missing_ci"
+  fi
+}
+
+check_test_registration
+
+# ============================================================================
 # Summary
 # ============================================================================
 
