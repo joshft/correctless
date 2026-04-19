@@ -171,8 +171,9 @@ EOF
   assert_eq "R-008d: existing audit-trail entry preserved" "yes" "$has_audit"
 
   # Existing PreToolUse entries should be untouched
+  # Filter uses `// ""` to handle agent hooks (which have no command field)
   local has_gate="no"
-  if echo "$settings" | jq -e '.hooks.PreToolUse[] | select(.hooks[]?.command | test("workflow-gate"))' >/dev/null 2>&1; then
+  if echo "$settings" | jq -e '.hooks.PreToolUse[] | select(.hooks[]?.command // "" | test("workflow-gate"))' >/dev/null 2>&1; then
     has_gate="yes"
   fi
   assert_eq "R-008e: existing PreToolUse gate entry preserved" "yes" "$has_gate"

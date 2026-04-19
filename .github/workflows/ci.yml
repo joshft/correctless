@@ -107,6 +107,7 @@ jobs:
           bash tests/test-carchitect-phase1.sh
           bash tests/test-dev-journal.sh
           bash tests/test-qa-uncertain.sh
+          bash tests/test-agent-hooks.sh
 
       - name: Verify sync
         run: |

@@ -416,6 +416,35 @@ register_hooks() {
     esac
   done
 
+  # ============================================
+  # Auto-discover agent hooks from JSON config files
+  # Agent hooks use type: "agent" with a prompt field.
+  # The JSON file is the source of truth — setup reads it
+  # and injects the hook entry into settings.json.
+  # ============================================
+
+  local -a agent_hooks=()
+
+  for agent_hook in "$SCRIPT_DIR"/hooks/*.json; do
+    [ -f "$agent_hook" ] || continue
+
+    local ah_type ah_hook_type ah_matcher ah_prompt ah_timeout
+    ah_type="$(jq -r '.type // ""' "$agent_hook" 2>/dev/null)"
+    ah_hook_type="$(jq -r '.hook_type // ""' "$agent_hook" 2>/dev/null)"
+    ah_matcher="$(jq -r '.matcher // ""' "$agent_hook" 2>/dev/null)"
+    ah_prompt="$(jq -r '.prompt // ""' "$agent_hook" 2>/dev/null)"
+    ah_timeout="$(jq -r '.timeout // 60' "$agent_hook" 2>/dev/null)"
+
+    # Skip files that aren't agent hooks
+    [ "$ah_type" = "agent" ] || continue
+    [ -n "$ah_hook_type" ] || continue
+    [ -n "$ah_matcher" ] || continue
+    [ -n "$ah_prompt" ] || continue
+
+    # Store as JSON for later injection (prompt may contain special chars)
+    agent_hooks+=("$ah_hook_type	$ah_matcher	$ah_timeout	$agent_hook")
+  done
+
   if [ ! -f "$settings" ]; then
     # ============================================
     # Fresh install — generate settings.json from discovered hooks
@@ -437,6 +466,29 @@ register_hooks() {
       local matcher="${entry#*|}"
       post_json="$(echo "$post_json" | jq --arg cmd "$cmd" --arg matcher "$matcher" \
         '. + [{ matcher: $matcher, hooks: [{ type: "command", command: $cmd, timeout_ms: 1000 }] }]')"
+    done
+
+    # Append agent hooks to PreToolUse/PostToolUse arrays
+    # Agent hook entries use tab delimiter (matcher may contain pipes)
+    for entry in "${agent_hooks[@]}"; do
+      local ah_ht ah_mt ah_to ah_src
+      ah_ht="$(printf '%s' "$entry" | cut -f1)"
+      ah_mt="$(printf '%s' "$entry" | cut -f2)"
+      ah_to="$(printf '%s' "$entry" | cut -f3)"
+      ah_src="$(printf '%s' "$entry" | cut -f4)"
+      local ah_prompt_val
+      ah_prompt_val="$(jq -r '.prompt' "$ah_src" 2>/dev/null)"
+
+      case "$ah_ht" in
+        PreToolUse)
+          pre_json="$(echo "$pre_json" | jq --arg matcher "$ah_mt" --arg prompt "$ah_prompt_val" --argjson timeout "$ah_to" \
+            '. + [{ matcher: $matcher, hooks: [{ type: "agent", prompt: $prompt, timeout: $timeout }] }]')"
+          ;;
+        PostToolUse)
+          post_json="$(echo "$post_json" | jq --arg matcher "$ah_mt" --arg prompt "$ah_prompt_val" --argjson timeout "$ah_to" \
+            '. + [{ matcher: $matcher, hooks: [{ type: "agent", prompt: $prompt, timeout: $timeout }] }]')"
+          ;;
+      esac
     done
 
     # Assemble the full settings.json
@@ -511,6 +563,18 @@ register_hooks() {
     done
   fi
 
+  # Check if all agent hooks are registered
+  if [ "$needs_update" = "false" ]; then
+    for entry in "${agent_hooks[@]}"; do
+      local ah_ht
+      ah_ht="$(printf '%s' "$entry" | cut -f1)"
+      if ! echo "$settings_json" | jq -e --arg ht "$ah_ht" '(.hooks[$ht] // [] | any(.hooks[]?.type == "agent"))' >/dev/null 2>&1; then
+        needs_update="true"
+        break
+      fi
+    done
+  fi
+
   # Also check hardcoded entries (INV-007)
   if ! grep -q "workflow-advance" "$settings" 2>/dev/null; then
     needs_update="true"
@@ -559,6 +623,30 @@ register_hooks() {
           (.hooks.PostToolUse // []) + [{
             matcher: $matcher,
             hooks: [{type: "command", command: $cmd, timeout_ms: 1000}]
+          }]
+        end
+      )
+    ')"
+  done
+
+  # Add or update agent hooks (tab-delimited — matcher may contain pipes)
+  for entry in "${agent_hooks[@]}"; do
+    local ah_ht ah_mt ah_to ah_src
+    ah_ht="$(printf '%s' "$entry" | cut -f1)"
+    ah_mt="$(printf '%s' "$entry" | cut -f2)"
+    ah_to="$(printf '%s' "$entry" | cut -f3)"
+    ah_src="$(printf '%s' "$entry" | cut -f4)"
+    local ah_prompt_val
+    ah_prompt_val="$(jq -r '.prompt' "$ah_src" 2>/dev/null)"
+
+    result="$(echo "$result" | jq --arg ht "$ah_ht" --arg matcher "$ah_mt" --arg prompt "$ah_prompt_val" --argjson timeout "$ah_to" '
+      .hooks[$ht] = (
+        if (.hooks[$ht] // [] | any(.hooks[]?.type == "agent")) then
+          [.hooks[$ht][] | if any(.hooks[]?.type; . == "agent") then .matcher = $matcher | .hooks = [.hooks[] | if .type == "agent" then .prompt = $prompt | .timeout = $timeout else . end] else . end]
+        else
+          (.hooks[$ht] // []) + [{
+            matcher: $matcher,
+            hooks: [{type: "agent", prompt: $prompt, timeout: $timeout}]
           }]
         end
       )

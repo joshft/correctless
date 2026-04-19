@@ -64,6 +64,11 @@ for hook in hooks/*.sh; do
     sed '/^# Rule: /d' "$hook" > "$dst"
   fi
 done
+# JSON hook configs (agent hooks like import-guard.json)
+for hook_json in hooks/*.json; do
+  [ -f "$hook_json" ] || continue
+  sync_file "$hook_json" "correctless/hooks/$(basename "$hook_json")"
+done
 [ "$CHECK_ONLY" = false ] && info "Hooks → correctless/"
 
 # --- Setup script ---
@@ -147,6 +152,25 @@ if [ "$CHECK_ONLY" = true ]; then
       done
     fi
   done
+
+  # Hooks: check for stale .json files (agent hooks like import-guard.json)
+  if [ -d "correctless/hooks" ]; then
+    for dist_json in correctless/hooks/*.json; do
+      [ -f "$dist_json" ] || continue
+      if [ ! -f "hooks/$(basename "$dist_json")" ]; then
+        DIRTY=true
+      fi
+    done
+  fi
+  # Hooks: check for missing .json files (source has it, dist doesn't)
+  if [ -d "hooks" ]; then
+    for src_json in hooks/*.json; do
+      [ -f "$src_json" ] || continue
+      if [ ! -f "correctless/hooks/$(basename "$src_json")" ]; then
+        DIRTY=true
+      fi
+    done
+  fi
 
   # Agents: check for stale .md files in both directions.
   # Loop kept as 'for dir in agents' (single-item today) to keep the
