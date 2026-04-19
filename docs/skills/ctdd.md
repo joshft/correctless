@@ -76,6 +76,10 @@ Agent: Spawning test-writing agent — reading spec (5 rules),
 | | `.correctless/artifacts/checkpoint-ctdd-{slug}.json` |
 | | `.correctless/artifacts/token-log-{slug}.json` |
 
+## Entrypoint-Aware Test Writing
+
+The RED phase test agent reads ARCHITECTURE.md entrypoints before writing integration tests. For each `[integration]` rule, the agent matches the rule's scope to an entrypoint's `scope` globs and writes the test through the entrypoint's `test_via` pattern instead of importing internal packages directly. The agent also reads Key Patterns, Layer Conventions, and Trust Boundaries to respect layer access constraints. When no entrypoints are documented, the agent uses the best available entry point and leaves a `No documented entrypoint` comment for visibility.
+
 ## Contract Verification in Test Audit
 
 When specs include Entry/Through/Exit integration test contracts (written by `/cspec`, see ABS-024), the test audit verifies that tests satisfy these contracts using tiered severity:
@@ -87,6 +91,10 @@ When specs include Entry/Through/Exit integration test contracts (written by `/c
 | Exit | Semantic | BLOCKING (definite mismatch) or ADVISORY (uncertain) |
 
 For `[integration]` rules without contracts, the audit notes the gap without gating.
+
+## Internal Import Bypass Detection (Check 10)
+
+The test audit detects when an `[integration]` test imports internal packages directly instead of going through a documented entrypoint. For each entrypoint's `scope` globs, the audit checks whether test imports reference paths covered by that scope. This is language-aware (Go, TypeScript/JavaScript, Python, Rust) with ADVISORY skip for unsupported languages. The check does not flag imports of the entrypoint itself — only packages *within* its scope. When check 10 and check 9 (contract verification) both fire on the same test, they are consolidated into a single finding. When no entrypoints are documented, the check is skipped entirely.
 
 ## Intensity Levels
 

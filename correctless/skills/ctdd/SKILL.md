@@ -189,9 +189,15 @@ Spawn a **test agent** as a forked subagent with these instructions:
 >
 > **For rules with Entry/Through/Exit contracts**, treat each contract as a self-contained task. The Entry tells you where to start. Through tells you what path to exercise and what you cannot mock. Exit tells you what must be true at the end. Write one test per contract that satisfies all three constraints. If you cannot satisfy a constraint, say so explicitly — do not silently downgrade by mocking a prohibited component or testing through a different entry point. If a contract's Entry or Through constraint seems wrong (e.g., the Through constraint prohibits mocking a component you genuinely need to mock for the test to run), flag it as a contract defect finding rather than silently complying and producing a bad test. A wrong constraint is a spec issue, not a test issue — raise it so the human can fix the spec (TB-004 boundary — escalation to human, not agent override per TB-005).
 >
+> **Entrypoint-aware integration tests**: Read the entrypoints section of `.correctless/ARCHITECTURE.md` before starting integration tests. For each `[integration]` rule, identify which entrypoint governs the code under test (match the rule's scope to an entrypoint's `scope` globs). Use that entrypoint's `test_via` pattern — not by importing internal packages directly. If the rule has an Entry/Through/Exit contract, the Entry field already tells you which entrypoint to use.
+>
+> Also read the Key Patterns, Layer Conventions, and Trust Boundaries sections of `.correctless/ARCHITECTURE.md`. Respect layer conventions when creating integration tests — if the architecture says layer A should not be accessed directly by tests (only through an entrypoint), do not import layer A's packages in test files. Use the entrypoint's `test_via` pattern to reach layer A indirectly.
+>
+> If `.correctless/ARCHITECTURE.md` has no entrypoints section (no `correctless:entrypoints:start` markers), use the best available entry point from the codebase for integration tests — but note in a comment (using the project's comment syntax): `No documented entrypoint — using inferred entry point`. This makes the gap visible for the test audit to flag.
+>
 > **All test files MUST be created inside the project directory** — never in /tmp, never in external paths. Use the project's standard test directory structure.
 >
-> Read: .correctless/AGENT_CONTEXT.md, the spec, .correctless/ARCHITECTURE.md, `.correctless/antipatterns.md`.
+> Read: .correctless/AGENT_CONTEXT.md, the spec, .correctless/ARCHITECTURE.md (especially the Entrypoints section and Key Patterns), `.correctless/antipatterns.md`.
 > Write: test files (matching the test_file pattern from workflow-config.json) and stub source files. All files within the project root.
 > Run: the test command to verify tests exist and fail.
 
@@ -244,7 +250,17 @@ After the test agent completes and tests exist, run the **test audit** before ad
 >
 >   Note: these checks verify test *shape*, not test *behavior*. This is complementary to PAT-012 (wiring tests over keyword tests), not in conflict — PAT-012 governs what the test exercises at runtime, contract verification governs what the test is structurally allowed to fake.
 >
-> Read: .correctless/AGENT_CONTEXT.md, the spec, the test files, .correctless/ARCHITECTURE.md, `.correctless/antipatterns.md`.
+> 10. **Internal import bypass detection**: For each `[integration]` test, check whether the test imports or directly references internal packages/modules that are covered by a documented entrypoint's `scope` globs. Read entrypoints from `.correctless/ARCHITECTURE.md` (via the fenced YAML block or `scripts/extract-entrypoints.sh`). For each entrypoint, build a map of scope globs to entrypoint names. For each `[integration]` test file, check whether any import/require/source statement references a path that falls within an entrypoint's scope. The check is language-aware at a basic level: Go `import "pkg/..."`, TypeScript/JavaScript `import ... from '...'` or `require('...')`, Python `from pkg import` or `import pkg`, Rust `use crate::` or `mod`. For languages not in this list, the check is skipped with an ADVISORY note: "Cannot detect internal imports for language {X} — manual review recommended."
+>
+>     If a test imports `pkg/handlers/auth.go` directly, and an entrypoint exists with `scope: ["pkg/handlers/**"]` and `test_via: "httptest.NewServer(handler)"`, then the test is bypassing the entrypoint. This is a **BLOCKING** finding: "Test for R-xxx imports internal package `pkg/handlers/auth` directly. Entrypoint `api-server` covers this path — use `test_via: httptest.NewServer(handler)` instead."
+>
+>     The check does NOT flag imports of the entrypoint itself (e.g., importing `cmd/server/main.go` when that IS the entrypoint handler). It only flags imports of packages *within* the entrypoint's scope that should be reached *through* the entrypoint, not directly. The `test_via` pattern indicates how to reach the entrypoint; the `scope` globs indicate what's behind it.
+>
+>     When check 10 and check 9 (Entry contract verification) both fire on the same test for the same rule, present one consolidated finding rather than two: "Test for R-xxx bypasses entrypoint `api-server`: imports `pkg/handlers/auth` directly instead of using `httptest.NewServer(handler)`." The checks remain independent (check 9 can fire without check 10 and vice versa), but when they converge on the same test, the user sees one thing to fix.
+>
+>     When entrypoints are unavailable (`.correctless/ARCHITECTURE.md` missing or no `correctless:entrypoints:start` markers), the internal import bypass check is skipped entirely. The test audit notes: "No documented entrypoints — internal import bypass check skipped."
+>
+> Read: .correctless/AGENT_CONTEXT.md, the spec, the test files, .correctless/ARCHITECTURE.md (especially the Entrypoints section and Key Patterns), `.correctless/antipatterns.md`.
 > Write: NOTHING. Return findings as your final text response.
 
 **If BLOCKING findings exist**: present each finding to the human with disposition options:
