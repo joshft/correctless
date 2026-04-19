@@ -1,5 +1,17 @@
 # Dev Journal
 
+## 2026-04-18 — Agent Hook for Internal Import Enforcement
+
+This feature introduces the first agent hook in Correctless, establishing a new hook type alongside the existing bash script hooks. The key insight is that some enforcement checks require LLM reasoning — reading ARCHITECTURE.md, parsing YAML entrypoints, matching glob patterns against import paths — which cannot be done deterministically in a bash script. Claude Code's agent hook type (`type: "agent"`) solves this by spawning a lightweight sub-agent (Haiku by default) that can read files and reason about the result.
+
+The implementation is a single JSON file at `hooks/import-guard.json` containing the hook configuration and an embedded prompt. The prompt decomposes the check into six sequential steps: (1) is this a test file? (2) do entrypoints exist in ARCHITECTURE.md? (3) read the `test_helpers` allow-list, (4) parse entrypoints YAML, (5) check imports against scope globs, (6) decide allow/deny. Each step has a clear early-exit path, and the prompt includes language-aware import patterns for Go, TypeScript/JavaScript, Python, and Rust with explicit allow for unsupported languages.
+
+The most interesting design decision was making the deny reason unconditionally include escalation guidance ("ask the user for guidance") rather than tracking retry counts. Agent hooks are stateless — they have no persistent state between invocations. The original spec (R-012) described retry counting, but review correctly identified that this is impossible in the agent hook model. The unconditional guidance means every deny is self-documenting without requiring the hook to track anything.
+
+The setup script was extended with a second hook discovery loop for `hooks/*.json` files. This loop reads `hook_type`, `type`, `matcher`, `prompt`, and `timeout` from the JSON file and constructs the settings.json entry differently from command hooks — `{type: "agent", prompt: ..., timeout: ...}` instead of `{type: "command", command: ..., timeout_ms: ...}`. The idempotency logic checks for existing agent hooks and updates matcher/prompt/timeout on re-run without duplicating entries. Sync.sh was updated with JSON-specific propagation and bidirectional staleness detection (both source-has-but-dist-missing and dist-has-but-source-missing cases).
+
+The `workflow.test_helpers` config field is the escape hatch for false positives. Test helper packages (e.g., `pkg/handlers/testutil/`) that live within an entrypoint's scope but are legitimately imported in tests can be allow-listed via glob patterns. This was the primary risk mitigation from the spec — agent hooks return `{ok: false}` with no override mechanism, so false positives are hard walls. The allow-list plus the deny reason's explicit guidance on how to add to it makes the hook self-correcting.
+
 ## 2026-04-18 — /carchitect Phase 1: Entrypoint-Aware TDD
 
 Phase 1 closes the gap between `/carchitect`'s machine-referenceable entrypoints (Phase 0, ABS-023) and `/ctdd`'s test-writing behavior. Before this feature, the RED phase test agent would read ARCHITECTURE.md but had no specific instruction to use the entrypoints section when writing integration tests. The test audit had no check for tests that bypass entrypoints by importing internal packages directly. PR #70 added Entry/Through/Exit contracts (ABS-024) that tell the test audit *what shape* a test should have — but nothing told the RED phase agent to *write* tests through entrypoints from the start.

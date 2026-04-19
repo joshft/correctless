@@ -236,6 +236,13 @@
 - **Violated when**: A verification tier is changed without architectural review, or Entry/Through/Exit fields are removed from the contract format
 - **Test**: test-integration-test-contracts.sh — R-001, R-007
 
+### ABS-025: Agent hook JSON contract (hooks/*.json)
+- **What**: Agent hooks are JSON config files at `hooks/*.json` defining PreToolUse or PostToolUse hooks with `type: "agent"`. Unlike command hooks (bash scripts with HOOK_TYPE/HOOK_MATCHER metadata headers per ABS-004), agent hooks use JSON fields: `hook_type` (PreToolUse|PostToolUse), `type` ("agent"), `matcher` (pipe-separated tool list), `prompt` (the agent's system prompt), `timeout` (seconds), and optionally `_description` (documentation). Setup reads these files alongside bash hooks and registers them in settings.json with `{type: "agent", prompt: ..., timeout: ...}` instead of `{type: "command", command: ..., timeout_ms: ...}`. Sole writer: human (hook authoring). Consumers: setup (registration), sync.sh (distribution propagation with JSON-specific staleness detection).
+- **Invariant**: Every JSON file in `hooks/` with `type: "agent"` is auto-registered by setup. The JSON file is the sole source of truth for the prompt — setup reads it and injects the prompt into settings.json. No inline agent prompts in setup or other scripts.
+- **Enforced at**: `setup` (register_hooks), `sync.sh` (JSON hook propagation + staleness detection in both directions)
+- **Violated when**: An agent hook is defined as inline prompt text in setup rather than a JSON config file, or a JSON hook file exists in `hooks/` but is not discovered by setup's registration loop
+- **Test**: test-agent-hooks.sh — R-001 (config structure), R-006 (integration: setup registration + idempotency), SYNC-001..SYNC-004 (distribution propagation)
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.
