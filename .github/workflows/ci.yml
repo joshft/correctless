@@ -104,6 +104,8 @@ jobs:
           bash tests/test-carchitect.sh
           bash tests/test-tdd-mini-audit.sh
           bash tests/test-integration-test-contracts.sh
+          bash tests/test-carchitect-phase1.sh
+          bash tests/test-dev-journal.sh
 
       - name: Verify sync
         run: |

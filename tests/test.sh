@@ -551,6 +551,14 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+if (cd "$REPO_DIR" && bash tests/test-carchitect-phase1.sh); then
+  echo "  PASS: carchitect phase 1 structural test"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: carchitect phase 1 structural test — see output above"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "======================"
 echo "Results: $PASS passed, $FAIL failed"
