@@ -161,6 +161,29 @@ Read the workflow state file (`.correctless/artifacts/workflow-state-{branch-slu
 
 Read the override count from the preserved file at `.correctless/meta/overrides/{task-slug}-*.json` (most recent by filename sort if multiple exist). If no preserved file exists, fall back to the ephemeral override log at `.correctless/artifacts/override-log.json` (filter entries by current branch and count). If neither file exists, the override count is 0.
 
+### Dev Journal
+
+Append a dev journal entry to `docs/dev-journal.md`. This file is append-only — never rewrite or delete existing entries. If the file doesn't exist, create it with a `# Dev Journal` header.
+
+Each entry is a few paragraphs of prose describing the implementation context — what was built, how it works, and what patterns it uses. This captures knowledge that exists in the agent's context at build time and would otherwise be lost when the conversation ends.
+
+Entry format:
+
+```markdown
+## {date} — {feature name}
+
+{2-4 paragraphs covering:}
+- What was built and why (plain language, not the spec's rule format)
+- What code was written — files touched, new functions or structures introduced
+- How it works — the actual mechanism, not just what it does
+- Which patterns and conventions it uses (reference PAT-xxx, ABS-xxx where applicable)
+- Design decisions that aren't obvious from the code (why this approach, what was considered and rejected)
+```
+
+Data sources for the entry: the spec (what was intended), `git diff main...HEAD` (what was actually written), `.correctless/ARCHITECTURE.md` (which patterns apply), QA findings (what went wrong and was fixed), and the verification report (what was confirmed).
+
+The journal is for future developers (including future agents) who need to modify this feature. Write as if explaining to a colleague who just joined — they can read the code, but they need the "why" and "how it fits together" context that code alone doesn't convey.
+
 ### Convention Learning
 
 If this is the 3rd or more feature where the same architectural pattern has appeared (check .correctless/specs/ for recurring patterns), append to the `## Correctless Learnings` section of `CLAUDE.md`:
