@@ -407,6 +407,7 @@ Spawn a **QA agent** as a third forked subagent:
 > Report findings as a structured list:
 > - BLOCKING: issues that must be fixed before merge
 > - NON-BLOCKING: issues to be aware of
+> - UNCERTAIN: issues where you cannot confidently determine whether the problem is real. Use this when you can see a potential issue but cannot trace the full code path, don't understand the system well enough to confirm, or the evidence is ambiguous. UNCERTAIN findings are non-blocking and advisory — they are presented to the user with your reasoning about why you're unsure. Do not inflate uncertain issues to BLOCKING — honest uncertainty is a valid output. Do not silently suppress uncertain issues either — flag them so the human can investigate.
 >
 > **For every BLOCKING finding, classify the corrective action:**
 > - **Instance fix**: fixes this specific bug (e.g., "add the missing SetFooConfig call")
@@ -420,7 +421,7 @@ Spawn a **QA agent** as a third forked subagent:
 > **Output format** — use this exact structure so the orchestrator can persist findings:
 > ```
 > FINDING: QA-001
-> SEVERITY: BLOCKING
+> SEVERITY: BLOCKING|NON-BLOCKING|UNCERTAIN
 > RULE: R-003
 > DESCRIPTION: [what's wrong]
 > INSTANCE_FIX: [fix this specific bug]
@@ -441,7 +442,7 @@ The QA agent has `allowed-tools` restricted to: `Read, Grep, Glob, Bash(test com
   "findings": [
     {
       "id": "QA-NNN",  // Use next sequential number from existing findings
-      "severity": "BLOCKING|NON-BLOCKING",
+      "severity": "BLOCKING|NON-BLOCKING|UNCERTAIN",
       "description": "what was found",
       "rule_ref": "R-xxx or null",
       "instance_fix": "fix for this specific bug",
