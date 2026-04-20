@@ -126,15 +126,18 @@ sequenceDiagram
     Note over SL: Statusline renders continuously
 ```
 
-Five hooks run on every tool call:
+Eight hooks enforce the workflow:
 
 | Hook | Type | Purpose |
 |---|---|---|
 | **sensitive-file-guard.sh** | PreToolUse | Blocks writes to `.env`, credentials, keys. Fail-closed, no overrides. |
 | **workflow-gate.sh** | PreToolUse | Enforces phase-specific file restrictions (RED blocks source, QA blocks everything). |
+| **import-guard.json** | PreToolUse (agent) | Detects when tests bypass documented entrypoints. |
 | **audit-trail.sh** | PostToolUse | Logs every file modification with phase context to JSONL. Tracks adherence metrics. |
 | **auto-format.sh** | PostToolUse | Runs the project's formatter on edited files. Allowlist-validated, array-based execution. |
+| **token-tracking.sh** | PostToolUse | Logs subagent token usage, cost, and duration to JSONL. |
 | **statusline.sh** | Statusline | Shows branch, phase, QA round, cost, context %, lines delta. |
+| **workflow-advance.sh** | On command | State machine — validates transitions, enforces gates. |
 
 All PreToolUse hooks follow [PAT-001](https://github.com/joshft/correctless/blob/main/.claude/rules/hooks-pretooluse.md): `set -euo pipefail` + `set -f`, jq check, bulk `eval`+`jq @sh` stdin parse, fast-path exit 0 before loading config.
 

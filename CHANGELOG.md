@@ -2,6 +2,12 @@
 
 All notable changes to Correctless are documented here.
 
+## [Unreleased]
+
+### Added — Skills
+- `/cauto` — Semi-auto pipeline orchestrator: runs /ctdd through PR creation with flexible phase resume, tiered decision architecture, and spec-to-PR orchestration
+- `/carchitect` — Structured architecture definition: reverse-engineer from existing code or greenfield directed discovery, produces machine-referenceable entrypoints YAML
+
 ## [3.0.0] - 2026-04-04
 
 ### Changed — Single Distribution with Dynamic Rigor

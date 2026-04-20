@@ -238,6 +238,13 @@ graph LR
 | [`/cwtf`](docs/skills/cwtf.md) | Suspect agents took shortcuts | Did agents actually follow instructions? |
 | [`/cexplain`](docs/skills/cexplain.md) | Onboarding or exploring a codebase | Guided mermaid diagrams, prose walkthroughs, HTML export |
 
+### Analysis
+
+| Skill | When to Use | What It Does |
+|-------|------------|--------------|
+| [`/cpostmortem`](docs/skills/cpostmortem.md) | After a bug escapes | Trace which phase missed it, add antipattern + class fix |
+| [`/cdevadv`](docs/skills/cdevadv.md) | Periodic deep analysis | Devil's advocate — challenge architecture and strategy |
+
 ### Intensity-Gated
 
 | Skill | Min Intensity | What It Does |
@@ -245,8 +252,6 @@ graph LR
 | [`/caudit`](docs/skills/caudit.md) | high | Olympics convergence audit (QA / Hacker / Performance presets) |
 | [`/creview-spec`](docs/skills/creview-spec.md) | high | 4-agent adversarial spec review |
 | [`/cupdate-arch`](docs/skills/cupdate-arch.md) | high | Keep ARCHITECTURE.md current after features land |
-| [`/cpostmortem`](docs/skills/cpostmortem.md) | standard | Trace which phase missed a bug, add antipattern + class fix |
-| [`/cdevadv`](docs/skills/cdevadv.md) | standard | Devil's advocate — challenge architecture and strategy |
 | [`/cmodel`](docs/skills/cmodel.md) | critical | Alloy formal modeling for state machines and protocols |
 | [`/credteam`](docs/skills/credteam.md) | critical | Live adversarial red team with source code access |
 
@@ -427,13 +432,14 @@ rm -rf .correctless/
 | **Spec** | A document defining what "correct" means for a feature: testable rules, edge cases, security assumptions. A spec that can't be tested is incomplete. |
 | **Invariant** | A rule that must always be true: "auth tokens expire after 24 hours." Specs are lists of invariants. |
 | **Intensity** | The configured rigor level: standard, high, or critical. Higher intensity unlocks more skills but costs more tokens and time. |
+| **Mini-audit** | After QA clears, three adversarial specialist agents (cross-component interaction, hostile input, resource bounds) hunt for issues the QA lens misses. Runs at the end of `/ctdd`. |
 | **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Available at high+ intensity. |
 | **STRIDE** | Threat modeling framework: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege. |
 | **RED / GREEN** | TDD phases. RED = write tests that fail. GREEN = write code to make tests pass. |
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 28 skills, 3 intensity levels, ~4,496 automated tests, 7 enforcement hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 28 skills, 3 intensity levels, ~4,500 automated tests, 8 hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 
