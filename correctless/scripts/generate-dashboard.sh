@@ -569,6 +569,30 @@ cat >> dashboard.html <<'HTMLEOF2'
     app.appendChild(legend);
   }
 
+  // ---- Section 2b: QA Rounds Trend ----
+  app.appendChild(h('h2', null, 'QA Rounds Trend'));
+
+  const featuresWithRounds = data.features.filter(f => f.qa_rounds > 0);
+  if (featuresWithRounds.length === 0) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No QA round data.'));
+  } else {
+    const maxRounds = Math.max(...data.features.map(f => f.qa_rounds), 1);
+    data.features.forEach(f => {
+      const container = h('div', { className: 'bar-container' });
+      const label = h('div', { className: 'bar-label' });
+      label.appendChild(h('span', null, f.feature));
+      label.appendChild(h('span', null, f.qa_rounds + ' rounds'));
+      container.appendChild(label);
+      const track = h('div', { className: 'bar-track' });
+      const pct = f.qa_rounds > 0 ? Math.round((f.qa_rounds / maxRounds) * 100) : 0;
+      if (pct > 0) {
+        track.appendChild(h('div', { className: 'bar-fill bar-qa', style: { width: pct + '%' } }));
+      }
+      container.appendChild(track);
+      app.appendChild(container);
+    });
+  }
+
   // ---- Section 3: Pipeline Phase Distribution ----
   app.appendChild(h('h2', null, 'Pipeline Phase Distribution'));
 
@@ -601,6 +625,29 @@ cat >> dashboard.html <<'HTMLEOF2'
     app.appendChild(phaseLegend);
   }
 
+  // ---- Section 3b: Fix Rate ----
+  app.appendChild(h('h2', null, 'Fix Rate'));
+
+  if (data.findings.length === 0) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No findings data.'));
+  } else {
+    const withStatus = data.findings.filter(f => f.status);
+    if (withStatus.length === 0) {
+      app.appendChild(h('div', { className: 'empty-msg' }, 'Fix status data not available.'));
+    } else {
+      const fixedCount = withStatus.filter(f => f.status === 'fixed').length;
+      const totalWithStatus = withStatus.length;
+      const fixPct = totalWithStatus > 0 ? Math.round((fixedCount / totalWithStatus) * 100) : 0;
+      app.appendChild(h('div', { className: 'health-verdict' },
+        fixedCount + '/' + totalWithStatus + ' findings fixed (' + fixPct + '%)'));
+      const fixTrack = h('div', { className: 'bar-track' });
+      if (fixPct > 0) {
+        fixTrack.appendChild(h('div', { className: 'bar-fill bar-qa', style: { width: fixPct + '%' } }));
+      }
+      app.appendChild(fixTrack);
+    }
+  }
+
   // ---- Section 4: Antipattern Health ----
   app.appendChild(h('h2', null, 'Antipattern Health'));
 
@@ -622,12 +669,28 @@ cat >> dashboard.html <<'HTMLEOF2'
     });
   }
 
-  // ---- Section 5: Intensity Calibration ----
-  app.appendChild(h('h2', null, 'Intensity Calibration'));
+  // ---- Section 5: Intensity Accuracy ----
+  app.appendChild(h('h2', null, 'Intensity Accuracy'));
 
   if (data.calibration.length === 0) {
-    app.appendChild(h('div', { className: 'empty-msg' }, 'No calibration data yet.'));
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No calibration data.'));
   } else {
+    // Compute agreed/raised/lowered summary
+    const intensityOrder = { lite: 0, standard: 1, high: 2, critical: 3 };
+    let agreed = 0, raised = 0, lowered = 0;
+    data.calibration.forEach(c => {
+      const rec = intensityOrder[c.recommended_intensity] !== undefined ? intensityOrder[c.recommended_intensity] : -1;
+      const act = intensityOrder[c.actual_intensity] !== undefined ? intensityOrder[c.actual_intensity] : -1;
+      if (rec === act) agreed++;
+      else if (act > rec) raised++;
+      else lowered++;
+    });
+    const totalCal = agreed + raised + lowered;
+    const agreedPct = totalCal > 0 ? Math.round((agreed / totalCal) * 100) : 0;
+    app.appendChild(h('div', { className: 'health-verdict' },
+      'Agreed: ' + agreed + ', Raised: ' + raised + ', Lowered: ' + lowered + ' (' + agreedPct + '% agreed)'));
+
+    // Detailed calibration table
     const table = h('table');
     const thead = h('thead');
     const hrow = h('tr');
@@ -653,6 +716,33 @@ cat >> dashboard.html <<'HTMLEOF2'
     });
     table.appendChild(tbody);
     app.appendChild(table);
+  }
+
+  // ---- Section 5b: Override Rate ----
+  app.appendChild(h('h2', null, 'Override Rate'));
+
+  const featuresWithOverrides = data.features.filter(f => f.overrides > 0);
+  if (data.features.length === 0 || (featuresWithOverrides.length === 0 && data.override_count === 0)) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No override data.'));
+  } else {
+    const maxOverrides = Math.max(...data.features.map(f => f.overrides), 1);
+    data.features.forEach(f => {
+      const container = h('div', { className: 'bar-container' });
+      const label = h('div', { className: 'bar-label' });
+      label.appendChild(h('span', null, f.feature));
+      label.appendChild(h('span', null, f.overrides + ' overrides'));
+      container.appendChild(label);
+      const track = h('div', { className: 'bar-track' });
+      const pct = f.overrides > 0 ? Math.round((f.overrides / maxOverrides) * 100) : 0;
+      if (pct > 0) {
+        track.appendChild(h('div', { className: 'bar-fill bar-yellow', style: { width: pct + '%', background: 'var(--yellow)' } }));
+      }
+      container.appendChild(track);
+      app.appendChild(container);
+    });
+    const totalOverrides = data.features.reduce((sum, f) => sum + f.overrides, 0);
+    const meanOverrides = data.features.length > 0 ? (totalOverrides / data.features.length).toFixed(1) : '0.0';
+    app.appendChild(h('div', { className: 'trend-note' }, 'Mean: ' + meanOverrides + ' overrides per feature.'));
   }
 
   // ---- Section 6: Cost by Phase ----

@@ -6,7 +6,7 @@
 # Creates temp directories with realistic .correctless/ artifacts,
 # runs the dashboard generator, and verifies output.
 #
-# Covers R-001 through R-009.
+# Covers R-001 through R-009 (original), DI-R001 through DI-R006 (dashboard insights).
 # Run from repo root: bash tests/test-project-dashboard.sh
 
 set -uo pipefail
@@ -32,6 +32,12 @@ fail() {
   echo "  FAIL: $id — $desc"
   FAIL=$((FAIL + 1))
   FAILED_IDS="${FAILED_IDS}${id} "
+}
+
+# Generate dashboard in a directory (runs in subshell to avoid cwd pollution)
+run_dashboard() {
+  local dir="$1"
+  (cd "$dir" && bash "$REPO_DIR/scripts/generate-dashboard.sh" >/dev/null 2>&1)
 }
 
 # Create a temp project directory with realistic .correctless/ artifacts
@@ -270,7 +276,7 @@ test_r002_self_contained() {
   TEST_DIR=$(setup_dashboard_project)
   trap 'rm -rf "$TEST_DIR"' RETURN
 
-  cd "$TEST_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" >/dev/null 2>&1
+  run_dashboard "$TEST_DIR"
 
   if [ ! -f "$TEST_DIR/dashboard.html" ]; then
     fail "R002-a" "dashboard.html not produced (prerequisite failure)"
@@ -315,60 +321,59 @@ test_r003_data_sources() {
   TEST_DIR=$(setup_dashboard_project)
   trap 'rm -rf "$TEST_DIR"' RETURN
 
-  cd "$TEST_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" >/dev/null 2>&1
+  run_dashboard "$TEST_DIR"
 
   if [ ! -f "$TEST_DIR/dashboard.html" ]; then
     fail "R003-a" "dashboard.html not produced (prerequisite failure)"
     return
   fi
 
-  local html
-  html=$(cat "$TEST_DIR/dashboard.html")
+  local _f="$TEST_DIR/dashboard.html"
 
   # Workflow history data embedded
-  if echo "$html" | grep -q 'Feature Alpha'; then
+  if grep -q 'Feature Alpha' "$_f"; then
     pass "R003-a" "Workflow history data (Feature Alpha) embedded"
   else
     fail "R003-a" "Workflow history data not embedded"
   fi
 
   # QA findings data embedded
-  if echo "$html" | grep -q 'BLOCKING\|QA-001'; then
+  if grep -q 'BLOCKING\|QA-001' "$_f"; then
     pass "R003-b" "QA findings data embedded"
   else
     fail "R003-b" "QA findings data not embedded"
   fi
 
   # Antipattern data embedded
-  if echo "$html" | grep -q 'AP-001'; then
+  if grep -q 'AP-001' "$_f"; then
     pass "R003-c" "Antipattern data embedded"
   else
     fail "R003-c" "Antipattern data not embedded"
   fi
 
   # Calibration data embedded
-  if echo "$html" | grep -q 'calibration\|150000\|80000'; then
+  if grep -q 'calibration\|150000\|80000' "$_f"; then
     pass "R003-d" "Calibration data embedded"
   else
     fail "R003-d" "Calibration data not embedded"
   fi
 
   # Drift debt data embedded
-  if echo "$html" | grep -q 'DRIFT-001\|drift'; then
+  if grep -q 'DRIFT-001\|drift' "$_f"; then
     pass "R003-e" "Drift debt data embedded"
   else
     fail "R003-e" "Drift debt data not embedded"
   fi
 
   # Token log data embedded
-  if echo "$html" | grep -q 'token\|8000\|18000'; then
+  if grep -q 'token\|8000\|18000' "$_f"; then
     pass "R003-f" "Token log data embedded"
   else
     fail "R003-f" "Token log data not embedded"
   fi
 
   # Project name from config
-  if echo "$html" | grep -q 'test-project'; then
+  if grep -q 'test-project' "$_f"; then
     pass "R003-g" "Project name from workflow-config embedded"
   else
     fail "R003-g" "Project name not embedded"
@@ -384,81 +389,80 @@ test_r004_sections() {
   TEST_DIR=$(setup_dashboard_project)
   trap 'rm -rf "$TEST_DIR"' RETURN
 
-  cd "$TEST_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" >/dev/null 2>&1
+  run_dashboard "$TEST_DIR"
 
   if [ ! -f "$TEST_DIR/dashboard.html" ]; then
     fail "R004-a" "dashboard.html not produced (prerequisite failure)"
     return
   fi
 
-  local html
-  html=$(cat "$TEST_DIR/dashboard.html")
+  local _f="$TEST_DIR/dashboard.html"
 
   # Section 1: Project Summary
-  if echo "$html" | grep -qi 'project summary'; then
+  if grep -qi 'project summary' "$_f"; then
     pass "R004-a" "Project Summary section present"
   else
     fail "R004-a" "Project Summary section missing"
   fi
 
   # Section 2: Quality Trajectory
-  if echo "$html" | grep -qi 'quality trajectory'; then
+  if grep -qi 'quality trajectory' "$_f"; then
     pass "R004-b" "Quality Trajectory section present"
   else
     fail "R004-b" "Quality Trajectory section missing"
   fi
 
   # Section 3: Pipeline Phase Distribution
-  if echo "$html" | grep -qi 'pipeline.*phase\|phase.*distribution'; then
+  if grep -qi 'pipeline.*phase\|phase.*distribution' "$_f"; then
     pass "R004-c" "Pipeline Phase Distribution section present"
   else
     fail "R004-c" "Pipeline Phase Distribution section missing"
   fi
 
   # Section 4: Antipattern Health
-  if echo "$html" | grep -qi 'antipattern'; then
+  if grep -qi 'antipattern' "$_f"; then
     pass "R004-d" "Antipattern Health section present"
   else
     fail "R004-d" "Antipattern Health section missing"
   fi
 
-  # Section 5: Intensity Calibration
-  if echo "$html" | grep -qi 'intensity.*calibration\|calibration'; then
+  # Section 5: Intensity Calibration (now Intensity Accuracy — grep matches both)
+  if grep -qi 'intensity.*calibration\|intensity.*accuracy\|calibration' "$_f"; then
     pass "R004-e" "Intensity Calibration section present"
   else
     fail "R004-e" "Intensity Calibration section missing"
   fi
 
   # Section 6: Cost by Phase
-  if echo "$html" | grep -qi 'cost.*phase\|token.*usage\|phase.*cost'; then
+  if grep -qi 'cost.*phase\|token.*usage\|phase.*cost' "$_f"; then
     pass "R004-f" "Cost by Phase section present"
   else
     fail "R004-f" "Cost by Phase section missing"
   fi
 
   # Section 7: Drift Debt
-  if echo "$html" | grep -qi 'drift.*debt'; then
+  if grep -qi 'drift.*debt' "$_f"; then
     pass "R004-g" "Drift Debt section present"
   else
     fail "R004-g" "Drift Debt section missing"
   fi
 
   # Section 8: Dev Journal
-  if echo "$html" | grep -qi 'dev.*journal'; then
+  if grep -qi 'dev.*journal' "$_f"; then
     pass "R004-h" "Dev Journal section present"
   else
     fail "R004-h" "Dev Journal section missing"
   fi
 
   # Quality Trajectory has horizontal bars (div with width)
-  if echo "$html" | grep -qE 'width:[0-9]+%|width: [0-9]+%'; then
+  if grep -qE 'width:[0-9]+%|width: [0-9]+%' "$_f"; then
     pass "R004-i" "Quality Trajectory contains horizontal bar elements"
   else
     fail "R004-i" "No horizontal bar elements found"
   fi
 
   # Project summary contains health verdict
-  if echo "$html" | grep -qi 'features.*findings\|findings.*caught'; then
+  if grep -qi 'features.*findings\|findings.*caught' "$_f"; then
     pass "R004-j" "Project Summary contains health verdict"
   else
     fail "R004-j" "Project Summary missing health verdict"
@@ -474,25 +478,24 @@ test_r005_styling() {
   TEST_DIR=$(setup_dashboard_project)
   trap 'rm -rf "$TEST_DIR"' RETURN
 
-  cd "$TEST_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" >/dev/null 2>&1
+  run_dashboard "$TEST_DIR"
 
   if [ ! -f "$TEST_DIR/dashboard.html" ]; then
     fail "R005-a" "dashboard.html not produced (prerequisite failure)"
     return
   fi
 
-  local html
-  html=$(cat "$TEST_DIR/dashboard.html")
+  local _f="$TEST_DIR/dashboard.html"
 
   # prefers-color-scheme media query
-  if echo "$html" | grep -q 'prefers-color-scheme'; then
+  if grep -q 'prefers-color-scheme' "$_f"; then
     pass "R005-a" "Dark/light mode via prefers-color-scheme"
   else
     fail "R005-a" "Missing prefers-color-scheme media query"
   fi
 
   # Severity color coding (red for BLOCKING/CRITICAL)
-  if echo "$html" | grep -qiE 'blocking|critical' && echo "$html" | grep -qE '#[0-9a-fA-F]+|red|rgb'; then
+  if grep -qiE 'blocking|critical' "$_f" && grep -qE '#[0-9a-fA-F]+|red|rgb' "$_f"; then
     pass "R005-b" "Severity color coding present"
   else
     fail "R005-b" "Missing severity color coding"
@@ -546,11 +549,8 @@ WEOF
     return
   fi
 
-  local html
-  html=$(cat "$EMPTY_DIR/dashboard.html")
-
   # Should contain placeholder messages
-  if echo "$html" | grep -qi 'no.*data\|no.*history\|no.*findings\|not yet'; then
+  if grep -qi 'no.*data\|no.*history\|no.*findings\|not yet' "$EMPTY_DIR/dashboard.html"; then
     pass "R007-c" "Empty project shows placeholder messages"
   else
     fail "R007-c" "Empty project missing placeholder messages"
@@ -578,12 +578,10 @@ HEOF2
 { "task": "only", "round": 1, "findings": [{ "id": "QA-001", "severity": "BLOCKING", "description": "issue", "rule_ref": "R-001", "instance_fix": "fix", "class_fix": "test", "status": "fixed" }] }
 QEOF3
 
-  cd "$SINGLE_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" >/dev/null 2>&1
+  run_dashboard "$SINGLE_DIR"
 
   if [ -f "$SINGLE_DIR/dashboard.html" ]; then
-    local single_html
-    single_html=$(cat "$SINGLE_DIR/dashboard.html")
-    if echo "$single_html" | grep -qi 'need more\|single.*feature\|more features\|trend'; then
+    if grep -qi 'need more\|single.*feature\|more features\|trend' "$SINGLE_DIR/dashboard.html"; then
       pass "R007-d" "Single feature shows trend note"
     else
       fail "R007-d" "Single feature missing trend note"
@@ -645,30 +643,29 @@ test_r004_dev_journal() {
   TEST_DIR=$(setup_dashboard_project)
   trap 'rm -rf "$TEST_DIR"' RETURN
 
-  cd "$TEST_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" >/dev/null 2>&1
+  run_dashboard "$TEST_DIR"
 
   if [ ! -f "$TEST_DIR/dashboard.html" ]; then
     fail "R004-DJ-a" "dashboard.html not produced"
     return
   fi
 
-  local html
-  html=$(cat "$TEST_DIR/dashboard.html")
+  local _f="$TEST_DIR/dashboard.html"
 
   # Should include last 3 entries (Gamma, Beta, Alpha) but NOT the 4th (Project Setup)
-  if echo "$html" | grep -q 'Feature Gamma'; then
+  if grep -q 'Feature Gamma' "$_f"; then
     pass "R004-DJ-a" "Dev Journal includes last entry (Gamma)"
   else
     fail "R004-DJ-a" "Dev Journal missing last entry (Gamma)"
   fi
 
-  if echo "$html" | grep -q 'Feature Beta'; then
+  if grep -q 'Feature Beta' "$_f"; then
     pass "R004-DJ-b" "Dev Journal includes 2nd-to-last entry (Beta)"
   else
     fail "R004-DJ-b" "Dev Journal missing 2nd-to-last entry (Beta)"
   fi
 
-  if echo "$html" | grep -q 'Feature Alpha'; then
+  if grep -q 'Feature Alpha' "$_f"; then
     pass "R004-DJ-c" "Dev Journal includes 3rd-to-last entry (Alpha)"
   else
     fail "R004-DJ-c" "Dev Journal missing 3rd-to-last entry (Alpha)"
@@ -691,18 +688,15 @@ test_r004_antipattern_dormancy() {
 REOF
   done
 
-  cd "$TEST_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" >/dev/null 2>&1
+  run_dashboard "$TEST_DIR"
 
   if [ ! -f "$TEST_DIR/dashboard.html" ]; then
     fail "R004-AP-a" "dashboard.html not produced"
     return
   fi
 
-  local html
-  html=$(cat "$TEST_DIR/dashboard.html")
-
   # AP-002 has Status: Structurally enforced -> should be "resolved"
-  if echo "$html" | grep -qi 'resolved\|structurally enforced'; then
+  if grep -qi 'resolved\|structurally enforced' "$TEST_DIR/dashboard.html"; then
     pass "R004-AP-a" "Structurally enforced antipattern shown as resolved"
   else
     fail "R004-AP-a" "Structurally enforced antipattern not shown as resolved"
@@ -718,18 +712,15 @@ test_r004_pipeline_phases() {
   TEST_DIR=$(setup_dashboard_project)
   trap 'rm -rf "$TEST_DIR"' RETURN
 
-  cd "$TEST_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" >/dev/null 2>&1
+  run_dashboard "$TEST_DIR"
 
   if [ ! -f "$TEST_DIR/dashboard.html" ]; then
     fail "R004-PP-a" "dashboard.html not produced"
     return
   fi
 
-  local html
-  html=$(cat "$TEST_DIR/dashboard.html")
-
   # Should distinguish QA- vs MA- prefixed findings
-  if echo "$html" | grep -qi 'QA\|mini.*audit\|MA-'; then
+  if grep -qi 'QA\|mini.*audit\|MA-' "$TEST_DIR/dashboard.html"; then
     pass "R004-PP-a" "Pipeline phase distribution distinguishes QA and MA findings"
   else
     fail "R004-PP-a" "Pipeline phase distribution missing QA/MA distinction"
@@ -754,6 +745,317 @@ test_r001_no_exotic_deps() {
   fi
 }
 
+# ---- DI-R001: QA Rounds Trend section ----
+test_di_r001_qa_rounds_trend() {
+  echo ""
+  echo "--- DI-R001: QA Rounds Trend section ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  if [ ! -f "$TEST_DIR/dashboard.html" ]; then
+    fail "DI-R001-a" "dashboard.html not produced (prerequisite failure)"
+    return
+  fi
+
+  local _f="$TEST_DIR/dashboard.html"
+
+  # Section heading exists
+  if grep -qi 'QA Rounds Trend' "$_f"; then
+    pass "DI-R001-a" "QA Rounds Trend section heading present"
+  else
+    fail "DI-R001-a" "QA Rounds Trend section heading missing"
+  fi
+
+  # Shows per-feature bars (features Alpha, Beta, Gamma have qa_rounds 2, 1, 3)
+  # The JS code renders bar-container and bar-track elements for this section
+  if grep -qi 'QA Rounds Trend' "$_f" && grep -q 'bar-container\|bar-track' "$_f"; then
+    pass "DI-R001-b" "QA Rounds Trend renders horizontal bars"
+  else
+    fail "DI-R001-b" "QA Rounds Trend missing horizontal bar rendering"
+  fi
+}
+
+# ---- DI-R002: Intensity Accuracy section ----
+test_di_r002_intensity_accuracy() {
+  echo ""
+  echo "--- DI-R002: Intensity Accuracy section ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  if [ ! -f "$TEST_DIR/dashboard.html" ]; then
+    fail "DI-R002-a" "dashboard.html not produced (prerequisite failure)"
+    return
+  fi
+
+  local _f="$TEST_DIR/dashboard.html"
+
+  # Section heading exists
+  if grep -qi 'Intensity Accuracy' "$_f"; then
+    pass "DI-R002-a" "Intensity Accuracy section heading present"
+  else
+    fail "DI-R002-a" "Intensity Accuracy section heading missing"
+  fi
+
+  # Shows agreed/raised/lowered summary
+  # Test data: alpha recommended=standard actual=high (raised), beta recommended=standard actual=standard (agreed)
+  if grep -qiE 'agreed.*raised|raised.*lowered' "$_f"; then
+    pass "DI-R002-b" "Intensity Accuracy shows agreed/raised/lowered summary"
+  else
+    fail "DI-R002-b" "Intensity Accuracy missing agreed/raised/lowered summary"
+  fi
+}
+
+# ---- DI-R003: Override Rate section ----
+test_di_r003_override_rate() {
+  echo ""
+  echo "--- DI-R003: Override Rate section ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  if [ ! -f "$TEST_DIR/dashboard.html" ]; then
+    fail "DI-R003-a" "dashboard.html not produced (prerequisite failure)"
+    return
+  fi
+
+  local _f="$TEST_DIR/dashboard.html"
+
+  # Section heading exists
+  if grep -qi 'Override Rate' "$_f"; then
+    pass "DI-R003-a" "Override Rate section heading present"
+  else
+    fail "DI-R003-a" "Override Rate section heading missing"
+  fi
+
+  # Shows mean override summary line
+  if grep -qiE 'mean.*overrides per feature|overrides per feature' "$_f"; then
+    pass "DI-R003-b" "Override Rate shows mean summary"
+  else
+    fail "DI-R003-b" "Override Rate missing mean summary"
+  fi
+}
+
+# ---- DI-R004: Fix Rate section ----
+test_di_r004_fix_rate() {
+  echo ""
+  echo "--- DI-R004: Fix Rate section ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  if [ ! -f "$TEST_DIR/dashboard.html" ]; then
+    fail "DI-R004-a" "dashboard.html not produced (prerequisite failure)"
+    return
+  fi
+
+  local _f="$TEST_DIR/dashboard.html"
+
+  # Section heading exists
+  if grep -qi 'Fix Rate' "$_f"; then
+    pass "DI-R004-a" "Fix Rate section heading present"
+  else
+    fail "DI-R004-a" "Fix Rate section heading missing"
+  fi
+
+  # Shows N/M findings fixed (X%) format via JS rendering
+  # The JS code contains the literal 'findings fixed' string
+  if grep -q 'findings fixed' "$_f"; then
+    pass "DI-R004-b" "Fix Rate renders N/M findings fixed format"
+  else
+    fail "DI-R004-b" "Fix Rate missing findings fixed rendering"
+  fi
+}
+
+# ---- DI-R005: Section ordering ----
+test_di_r005_section_order() {
+  echo ""
+  echo "--- DI-R005: New sections in correct order ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  if [ ! -f "$TEST_DIR/dashboard.html" ]; then
+    fail "DI-R005-a" "dashboard.html not produced (prerequisite failure)"
+    return
+  fi
+
+  local _f="$TEST_DIR/dashboard.html"
+
+  # Extract line numbers of section heading strings in the HTML output
+  local pos_qt pos_qrt pos_ppd pos_fr pos_ah pos_ia pos_or pos_cbp
+
+  pos_qt=$(grep -n 'Quality Trajectory' "$_f" | head -1 | cut -d: -f1)
+  pos_qrt=$(grep -n 'QA Rounds Trend' "$_f" | head -1 | cut -d: -f1)
+  pos_ppd=$(grep -n 'Pipeline Phase Distribution' "$_f" | head -1 | cut -d: -f1)
+  pos_fr=$(grep -n 'Fix Rate' "$_f" | head -1 | cut -d: -f1)
+  pos_ah=$(grep -n 'Antipattern Health' "$_f" | head -1 | cut -d: -f1)
+  pos_ia=$(grep -n 'Intensity Accuracy' "$_f" | head -1 | cut -d: -f1)
+  pos_or=$(grep -n 'Override Rate' "$_f" | head -1 | cut -d: -f1)
+  pos_cbp=$(grep -n 'Cost by Phase' "$_f" | head -1 | cut -d: -f1)
+
+  # Check all positions are set
+  if [ -z "$pos_qrt" ] || [ -z "$pos_fr" ] || [ -z "$pos_ia" ] || [ -z "$pos_or" ]; then
+    fail "DI-R005-a" "One or more new section headings not found in output"
+    return
+  fi
+
+  # Quality Trajectory < QA Rounds Trend
+  if [ "$pos_qt" -lt "$pos_qrt" ]; then
+    pass "DI-R005-a" "Quality Trajectory appears before QA Rounds Trend"
+  else
+    fail "DI-R005-a" "Quality Trajectory should appear before QA Rounds Trend"
+  fi
+
+  # QA Rounds Trend < Pipeline Phase Distribution
+  if [ "$pos_qrt" -lt "$pos_ppd" ]; then
+    pass "DI-R005-b" "QA Rounds Trend appears before Pipeline Phase Distribution"
+  else
+    fail "DI-R005-b" "QA Rounds Trend should appear before Pipeline Phase Distribution"
+  fi
+
+  # Pipeline Phase Distribution < Fix Rate
+  if [ "$pos_ppd" -lt "$pos_fr" ]; then
+    pass "DI-R005-c" "Pipeline Phase Distribution appears before Fix Rate"
+  else
+    fail "DI-R005-c" "Pipeline Phase Distribution should appear before Fix Rate"
+  fi
+
+  # Fix Rate < Antipattern Health
+  if [ "$pos_fr" -lt "$pos_ah" ]; then
+    pass "DI-R005-d" "Fix Rate appears before Antipattern Health"
+  else
+    fail "DI-R005-d" "Fix Rate should appear before Antipattern Health"
+  fi
+
+  # Antipattern Health < Intensity Accuracy
+  if [ "$pos_ah" -lt "$pos_ia" ]; then
+    pass "DI-R005-e" "Antipattern Health appears before Intensity Accuracy"
+  else
+    fail "DI-R005-e" "Antipattern Health should appear before Intensity Accuracy"
+  fi
+
+  # Intensity Accuracy < Override Rate
+  if [ "$pos_ia" -lt "$pos_or" ]; then
+    pass "DI-R005-f" "Intensity Accuracy appears before Override Rate"
+  else
+    fail "DI-R005-f" "Intensity Accuracy should appear before Override Rate"
+  fi
+
+  # Override Rate < Cost by Phase
+  if [ "$pos_or" -lt "$pos_cbp" ]; then
+    pass "DI-R005-g" "Override Rate appears before Cost by Phase"
+  else
+    fail "DI-R005-g" "Override Rate should appear before Cost by Phase"
+  fi
+}
+
+# ---- DI-R006: Graceful degradation for new sections ----
+test_di_r006_graceful_degradation() {
+  echo ""
+  echo "--- DI-R006: Graceful degradation for new sections ---"
+
+  # Create a minimal project with NO qa_rounds, NO calibration, NO overrides, NO findings
+  local EMPTY_DIR
+  EMPTY_DIR=$(mktemp -d)
+  trap 'rm -rf "$EMPTY_DIR"' RETURN
+
+  mkdir -p "$EMPTY_DIR/.correctless/config"
+  cat > "$EMPTY_DIR/.correctless/config/workflow-config.json" <<'WEOF'
+{
+  "project": { "name": "empty-project" },
+  "workflow": { "intensity": "standard" }
+}
+WEOF
+
+  run_dashboard "$EMPTY_DIR"
+
+  if [ ! -f "$EMPTY_DIR/dashboard.html" ]; then
+    fail "DI-R006-a" "dashboard.html not produced for empty project"
+    return
+  fi
+
+  local _f="$EMPTY_DIR/dashboard.html"
+
+  # QA Rounds Trend degrades
+  if grep -qi 'No QA round data' "$_f"; then
+    pass "DI-R006-a" "QA Rounds Trend shows 'No QA round data' when empty"
+  else
+    fail "DI-R006-a" "QA Rounds Trend missing graceful degradation"
+  fi
+
+  # Intensity Accuracy degrades
+  if grep -qi 'No calibration data' "$_f"; then
+    pass "DI-R006-b" "Intensity Accuracy shows 'No calibration data' when empty"
+  else
+    fail "DI-R006-b" "Intensity Accuracy missing graceful degradation"
+  fi
+
+  # Override Rate degrades
+  if grep -qi 'No override data' "$_f"; then
+    pass "DI-R006-c" "Override Rate shows 'No override data' when empty"
+  else
+    fail "DI-R006-c" "Override Rate missing graceful degradation"
+  fi
+
+  # Fix Rate degrades
+  if grep -qi 'No findings data' "$_f"; then
+    pass "DI-R006-d" "Fix Rate shows 'No findings data' when empty"
+  else
+    fail "DI-R006-d" "Fix Rate missing graceful degradation"
+  fi
+
+  # Also test Fix Rate with findings that have NO status field
+  local STATUS_DIR
+  STATUS_DIR=$(mktemp -d)
+
+  mkdir -p "$STATUS_DIR/.correctless/config"
+  cat > "$STATUS_DIR/.correctless/config/workflow-config.json" <<'WEOF2'
+{ "project": { "name": "no-status" }, "workflow": { "intensity": "standard" } }
+WEOF2
+
+  mkdir -p "$STATUS_DIR/.correctless/artifacts"
+  cat > "$STATUS_DIR/.correctless/artifacts/qa-findings-nostatus.json" <<'NSEOF'
+{
+  "task": "nostatus",
+  "round": 1,
+  "findings": [
+    { "id": "QA-001", "severity": "BLOCKING", "description": "issue", "rule_ref": "R-001", "instance_fix": "fix", "class_fix": "test" }
+  ]
+}
+NSEOF
+
+  run_dashboard "$STATUS_DIR"
+
+  if [ -f "$STATUS_DIR/dashboard.html" ]; then
+    if grep -qi 'Fix status data not available' "$STATUS_DIR/dashboard.html"; then
+      pass "DI-R006-e" "Fix Rate shows 'Fix status data not available' when findings lack status"
+    else
+      fail "DI-R006-e" "Fix Rate missing degradation for findings without status"
+    fi
+  else
+    fail "DI-R006-e" "dashboard.html not produced for no-status project"
+  fi
+
+  rm -rf "$STATUS_DIR"
+}
+
 # ============================================================================
 # Run all tests
 # ============================================================================
@@ -771,6 +1073,12 @@ test_r004_dev_journal
 test_r004_antipattern_dormancy
 test_r004_pipeline_phases
 test_r001_no_exotic_deps
+test_di_r001_qa_rounds_trend
+test_di_r002_intensity_accuracy
+test_di_r003_override_rate
+test_di_r004_fix_rate
+test_di_r005_section_order
+test_di_r006_graceful_degradation
 
 echo ""
 echo "========================================="
