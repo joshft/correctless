@@ -1,5 +1,19 @@
 # Dev Journal
 
+## 2026-04-20 — Dashboard Trend Insights
+
+The dashboard started as a data dump — it showed what happened but not whether things are improving. This feature adds four trend sections that answer "is Correctless working?" by transforming raw counts into trajectory views.
+
+The QA Rounds Trend reuses the same horizontal bar visual as Quality Trajectory but maps `QA rounds: N` from workflow-history.md entries. A declining bar length over time means the workflow is learning — fewer QA rounds needed per feature. The data was already parsed in Step 3; the new section just renders it differently.
+
+Intensity Accuracy reads calibration entries (already parsed in Step 7) and compares `recommended_intensity` against `actual_intensity` using an ordinal map. The three buckets (agreed/raised/lowered) surface whether the system's intensity recommendations match human judgment. With 11 calibration entries, the data is starting to be meaningful — alpha was raised from standard to high, everything else agreed or was lowered.
+
+Override Rate shows per-feature override counts as bars with a one-line mean summary. The data comes from workflow-history.md's `Overrides: N` field, which is only present when >0 (per the /cdocs convention). Features with 0 overrides show empty bars. The mean is a simple arithmetic average — useful as a monitoring signal for gate misclassification (AP-023).
+
+Fix Rate reads findings with status fields and computes fixed/total with a percentage bar. The dual degradation (no findings at all vs findings without status fields) matches the spec's R-006 requirement. The `Fix status data not available` message catches older qa-findings files that predate the status field.
+
+Section ordering (R-005) was the most constraint-heavy rule — 7 ordering assertions verify the full narrative flow: Project Summary, Quality Trajectory, QA Rounds Trend, Pipeline Phase Distribution, Fix Rate, Antipattern Health, Intensity Accuracy, Override Rate, Cost by Phase, Drift Debt, Dev Journal. The test extracts line numbers via grep -n and compares numerically.
+
 ## 2026-04-19 — Project Dashboard
 
 The dashboard is the first feature that reads across nearly every artifact Correctless produces — workflow history, QA findings, antipatterns, calibration entries, drift debt, token logs, dev journal, overrides, and project config. Building the parser surface in pure bash (awk for markdown, jq for JSON, grep for pattern matching) was the natural choice given the project's zero-external-dependency stance, but it makes the implementation brittle to format changes. The spec explicitly accepted this risk: if the format changes, the parser breaks visibly (empty sections), not silently (wrong data).
