@@ -84,16 +84,28 @@ TOTAL_FEATURES=$(echo "$FEATURES_JSON" | jq 'length')
 
 QA_FINDINGS_JSON="[]"
 if compgen -G ".correctless/artifacts/qa-findings-*.json" >/dev/null 2>&1; then
-  QA_FINDINGS_JSON=$(jq -s '
-    [.[] | .findings[]? | {
-      id: .id,
-      severity: .severity,
-      description: .description,
-      rule_ref: .rule_ref,
-      status: .status,
-      lens: (.lens // null)
-    }]
-  ' .correctless/artifacts/qa-findings-*.json 2>/dev/null || echo "[]")
+  # Extract findings with task slug from each file
+  _findings_parts=""
+  for _qf in .correctless/artifacts/qa-findings-*.json; do
+    _task_slug=$(basename "$_qf" .json | sed 's/^qa-findings-//')
+    _part=$(jq --arg task "$_task_slug" '
+      [.findings[]? | {
+        id: .id,
+        severity: .severity,
+        description: .description,
+        rule_ref: .rule_ref,
+        status: .status,
+        lens: (.lens // null),
+        task: $task
+      }]
+    ' "$_qf" 2>/dev/null || echo "[]")
+    if [ -z "$_findings_parts" ]; then
+      _findings_parts="$_part"
+    else
+      _findings_parts=$(echo "$_findings_parts" "$_part" | jq -s 'add')
+    fi
+  done
+  QA_FINDINGS_JSON="${_findings_parts:-[]}"
 fi
 
 TOTAL_FINDINGS=$(echo "$QA_FINDINGS_JSON" | jq 'length')
@@ -504,10 +516,29 @@ cat >> dashboard.html <<'HTMLEOF2'
   if (data.features.length === 0) {
     app.appendChild(h('div', { className: 'empty-msg' }, 'No workflow history yet.'));
   } else {
+    // Build per-feature severity counts from real findings data
+    const featureSeverity = {};
+    (data.findings || []).forEach(f => {
+      if (!f.task) return;
+      if (!featureSeverity[f.task]) featureSeverity[f.task] = { blocking: 0, nonblocking: 0 };
+      if (f.severity === 'BLOCKING') featureSeverity[f.task].blocking++;
+      else featureSeverity[f.task].nonblocking++;
+    });
     const maxFindings = Math.max(...data.features.map(f => f.findings_fixed), 1);
     data.features.forEach(f => {
-      const pctBlocking = f.findings_fixed > 0 ? Math.round((f.findings_fixed * 0.5 / maxFindings) * 100) : 0;
-      const pctNonblocking = f.findings_fixed > 0 ? Math.round((f.findings_fixed / maxFindings) * 100) - pctBlocking : 0;
+      // Match feature to findings by normalized slug comparison
+      const slug = f.feature.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const sev = featureSeverity[slug] || null;
+      let pctBlocking, pctNonblocking;
+      if (sev) {
+        const total = sev.blocking + sev.nonblocking;
+        pctBlocking = total > 0 ? Math.round((sev.blocking / maxFindings) * 100) : 0;
+        pctNonblocking = total > 0 ? Math.round((sev.nonblocking / maxFindings) * 100) : 0;
+      } else {
+        // No per-severity data available — show single-color bar with total
+        pctBlocking = 0;
+        pctNonblocking = f.findings_fixed > 0 ? Math.round((f.findings_fixed / maxFindings) * 100) : 0;
+      }
       const container = h('div', { className: 'bar-container' });
       const label = h('div', { className: 'bar-label' });
       label.appendChild(h('span', null, f.feature));
