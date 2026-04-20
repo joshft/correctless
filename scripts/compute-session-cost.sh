@@ -21,6 +21,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib.sh
 source "$SCRIPT_DIR/lib.sh"
 
+# error_json — emit a zero-cost JSON envelope with an error message and exit 0.
+# Used for all graceful-degradation paths so callers always get valid JSON.
+error_json() {
+  local msg="$1"
+  echo "{\"error\":\"$msg\",\"total_cost_usd\":0,\"total_input_tokens\":0,\"total_output_tokens\":0,\"total_cache_write_tokens\":0,\"total_cache_read_tokens\":0,\"by_phase\":[],\"by_subagent\":[],\"pricing_used\":{},\"model_breakdown\":[],\"unknown_models\":[],\"warnings\":[],\"sessions\":[]}"
+  exit 0
+}
+
 # ============================================================================
 # STEP 2: Determine target branch
 # ============================================================================
@@ -29,8 +37,7 @@ TARGET_BRANCH="${1:-}"
 if [ -z "$TARGET_BRANCH" ]; then
   TARGET_BRANCH="$(git branch --show-current 2>/dev/null)" || true
   if [ -z "$TARGET_BRANCH" ]; then
-    echo '{"error":"no branch specified and not in a git repository","total_cost_usd":0,"total_input_tokens":0,"total_output_tokens":0,"total_cache_write_tokens":0,"total_cache_read_tokens":0,"by_phase":[],"by_subagent":[],"pricing_used":{},"model_breakdown":[],"unknown_models":[],"warnings":[],"sessions":[]}'
-    exit 0
+    error_json "no branch specified and not in a git repository"
   fi
 fi
 
@@ -58,21 +65,15 @@ SESSION_DIR=""
 
 if [ -n "$CONFIG_SESSION_DIR" ]; then
   # Config override path — validate per R-002
-  # Must be absolute path
   if [[ "$CONFIG_SESSION_DIR" != /* ]]; then
-    echo '{"error":"workflow.session_dir must be an absolute path","total_cost_usd":0,"total_input_tokens":0,"total_output_tokens":0,"total_cache_write_tokens":0,"total_cache_read_tokens":0,"by_phase":[],"by_subagent":[],"pricing_used":{},"model_breakdown":[],"unknown_models":[],"warnings":[],"sessions":[]}'
-    exit 0
+    error_json "workflow.session_dir must be an absolute path"
   fi
-  # Must exist
   if [ ! -d "$CONFIG_SESSION_DIR" ]; then
-    echo '{"error":"workflow.session_dir does not exist","total_cost_usd":0,"total_input_tokens":0,"total_output_tokens":0,"total_cache_write_tokens":0,"total_cache_read_tokens":0,"by_phase":[],"by_subagent":[],"pricing_used":{},"model_breakdown":[],"unknown_models":[],"warnings":[],"sessions":[]}'
-    exit 0
+    error_json "workflow.session_dir does not exist"
   fi
-  # Must be under ~/.claude/
   local_home="${HOME:-}"
   if [[ "$CONFIG_SESSION_DIR" != "$local_home/.claude/"* ]]; then
-    echo '{"error":"workflow.session_dir must be under ~/.claude/","total_cost_usd":0,"total_input_tokens":0,"total_output_tokens":0,"total_cache_write_tokens":0,"total_cache_read_tokens":0,"by_phase":[],"by_subagent":[],"pricing_used":{},"model_breakdown":[],"unknown_models":[],"warnings":[],"sessions":[]}'
-    exit 0
+    error_json "workflow.session_dir must be under ~/.claude/"
   fi
   SESSION_DIR="$CONFIG_SESSION_DIR"
 else
@@ -83,8 +84,7 @@ else
   if [ -d "$candidate_dir" ]; then
     SESSION_DIR="$candidate_dir"
   else
-    echo "{\"error\":\"session directory not found — set workflow.session_dir in workflow-config.json\",\"total_cost_usd\":0,\"total_input_tokens\":0,\"total_output_tokens\":0,\"total_cache_write_tokens\":0,\"total_cache_read_tokens\":0,\"by_phase\":[],\"by_subagent\":[],\"pricing_used\":{},\"model_breakdown\":[],\"unknown_models\":[],\"warnings\":[],\"sessions\":[]}"
-    exit 0
+    error_json "session directory not found — set workflow.session_dir in workflow-config.json"
   fi
 fi
 
@@ -104,8 +104,7 @@ if [ "$CONFIG_PRICING" != "{}" ] && [ "$CONFIG_PRICING" != "null" ]; then
   ' 2>/dev/null || echo "")
 
   if [ -n "$pricing_error" ]; then
-    echo "{\"error\":\"invalid pricing: $pricing_error\",\"total_cost_usd\":0,\"total_input_tokens\":0,\"total_output_tokens\":0,\"total_cache_write_tokens\":0,\"total_cache_read_tokens\":0,\"by_phase\":[],\"by_subagent\":[],\"pricing_used\":{},\"model_breakdown\":[],\"unknown_models\":[],\"warnings\":[],\"sessions\":[]}"
-    exit 0
+    error_json "invalid pricing: $pricing_error"
   fi
 fi
 
@@ -133,9 +132,7 @@ MEDIAN_MODEL="claude-sonnet-4-6"
 # STEP 7: Discover and scan session transcripts (R-002, R-013)
 # ============================================================================
 
-# Find all JSONL files in session directory
 MATCHING_SESSIONS=()
-# Warnings and unknown models are aggregated in jq output, not bash arrays
 
 # shellcheck disable=SC2044
 if compgen -G "$SESSION_DIR/*.jsonl" >/dev/null 2>&1; then
@@ -182,9 +179,6 @@ fi
 
 # Collect all entries from parent + subagent transcripts
 ALL_ENTRIES_FILE=$(mktemp)
-trap 'rm -f "$ALL_ENTRIES_FILE"' EXIT
-
-# Track subagent metadata for by_subagent breakdown
 SUBAGENT_META_FILE=$(mktemp)
 # shellcheck disable=SC2064
 trap "rm -f '$ALL_ENTRIES_FILE' '$SUBAGENT_META_FILE'" EXIT
@@ -273,13 +267,11 @@ done
 # Build the final result using jq
 # PAT-010: wrap as-bindings in explicit parens for jq 1.7 compatibility
 RESULT=$(jq -n --argjson pricing "$EFFECTIVE_PRICING" --argjson transitions "$PHASE_TRANSITIONS" --arg branch "$TARGET_BRANCH" --arg median "$MEDIAN_MODEL" '
-  [inputs] as $raw |
-  $raw |
+  [inputs] |
   # Step 1: Deduplicate — keep last entry per message.id (R-003)
   group_by(.msg_id) | [.[] | last] |
 
   # Step 2: Separate entries with/without usage (R-003 warning)
-  . as $all |
   [.[] | select(.input_tokens != null)] as $valid |
   [.[] | select(.input_tokens == null)] as $no_usage |
 
@@ -365,8 +357,7 @@ RESULT=$(jq -n --argjson pricing "$EFFECTIVE_PRICING" --argjson transitions "$PH
   }]) as $model_breakdown |
 
   # Step 10: Totals
-  ([$phased[].cost] | add // 0) as $raw_total |
-  (($raw_total * 1000000 | round | . / 1000000)) as $total_cost |
+  (([$phased[].cost] | add // 0) * 1000000 | round | . / 1000000) as $total_cost |
   ([$phased[].input_tokens] | add // 0) as $total_input |
   ([$phased[].output_tokens] | add // 0) as $total_output |
   ([$phased[].cache_write] | add // 0) as $total_cache_write |
@@ -377,9 +368,6 @@ RESULT=$(jq -n --argjson pricing "$EFFECTIVE_PRICING" --argjson transitions "$PH
 
   # Step 12: Warnings
   ([$no_usage[] | "unrecognized transcript format in session \(.session)"] | unique) as $usage_warnings |
-
-  # Step 13: Pricing used (per-million for output)
-  ($pricing) as $pricing_output |
 
   # Build output
   {
@@ -402,7 +390,7 @@ RESULT=$(jq -n --argjson pricing "$EFFECTIVE_PRICING" --argjson transitions "$PH
         end
       ]
     ),
-    pricing_used: $pricing_output,
+    pricing_used: $pricing,
     model_breakdown: $model_breakdown,
     unknown_models: $unknown_models,
     warnings: $usage_warnings

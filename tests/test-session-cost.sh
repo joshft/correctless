@@ -124,14 +124,10 @@ ENTRY
 }
 
 # Write a duplicate streaming entry (same message ID, partial tokens)
-# Used to test R-003 deduplication
+# Used to test R-003 deduplication — delegates to write_transcript_entry
+# with an explicit message ID to produce duplicate entries.
 write_streaming_entry() {
-  local jsonl_path="$1" model="$2" input="$3" output="$4"
-  local cache_write="$5" cache_read="$6" branch="$7" timestamp="$8"
-  local msg_id="$9"
-  cat >> "$jsonl_path" <<ENTRY
-{"type":"assistant","message":{"id":"$msg_id","model":"$model","usage":{"input_tokens":$input,"output_tokens":$output,"cache_creation_input_tokens":$cache_write,"cache_read_input_tokens":$cache_read}},"timestamp":"$timestamp","gitBranch":"$branch"}
-ENTRY
+  write_transcript_entry "$@"
 }
 
 # Write a non-assistant entry (should be ignored)
