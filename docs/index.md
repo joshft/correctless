@@ -1,6 +1,6 @@
 # Correctless Documentation
 
-Correctness-oriented development workflow for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). 27 skills, 5 hooks, enforced TDD with agent separation.
+Correctness-oriented development workflow for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). 28 skills, 8 hooks, enforced TDD with agent separation.
 
 [README](https://github.com/joshft/correctless) | [Standard Workflow Guide](standard-workflow.md) | [Quick Start](https://github.com/joshft/correctless#quick-start) | [Changelog](https://github.com/joshft/correctless/blob/main/CHANGELOG.md)
 
@@ -13,6 +13,8 @@ Correctness-oriented development workflow for [Claude Code](https://docs.anthrop
 - [/ctdd](skills/ctdd.md) — Enforced TDD: RED → test audit → GREEN → QA
 - [/cverify](skills/cverify.md) — Verify implementation matches spec
 - [/cdocs](skills/cdocs.md) — Update documentation
+- [/carchitect](skills/carchitect.md) — Structured architecture definition
+- [/cauto](skills/cauto.md) — Semi-auto pipeline orchestrator
 - [/crelease](skills/crelease.md) — Version bumping, changelog, release tagging
 
 ### Code Quality

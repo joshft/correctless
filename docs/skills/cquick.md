@@ -38,6 +38,14 @@ Agent: Checking branch... on fix/typo-in-readme. Good.
        Committed: "Fix typo in configuration example"
 ```
 
+## What It Reads / Writes
+
+| Reads | Writes |
+|-------|--------|
+| `.correctless/config/workflow-config.json` | Test files (project test directory) |
+| `.correctless/artifacts/workflow-state-{slug}.json` (existence check) | Source files (implementation) |
+| | Git commit |
+
 ## Intensity Levels
 
 `/cquick` works the same at all intensity levels. It deliberately skips all ceremony — that's the point.
