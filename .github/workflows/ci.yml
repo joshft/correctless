@@ -108,6 +108,7 @@ jobs:
           bash tests/test-dev-journal.sh
           bash tests/test-qa-uncertain.sh
           bash tests/test-agent-hooks.sh
+          bash tests/test-project-dashboard.sh
 
       - name: Verify sync
         run: |
