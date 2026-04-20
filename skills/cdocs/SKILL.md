@@ -1,7 +1,7 @@
 ---
 name: cdocs
 description: Update project documentation after a feature lands. Updates README, .correctless/AGENT_CONTEXT.md, .correctless/ARCHITECTURE.md, and feature docs. Run before merging.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md), Write(.claude/rules/*.md)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(*compute-session-cost.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md), Write(.claude/rules/*.md)
 context: fork
 ---
 
@@ -212,6 +212,16 @@ Procedure (for each matching file):
 5. Do NOT create the file if it does not exist. Only back-fill existing files.
 
 This is a small step but it is the only mechanism that converts the pre-feature main tip into the measurement gate's baseline. Without it, post-merge measurement is silently dormant forever — a bug-by-forgetting class that QA-002 flagged for the pat001 migration and that this instruction prevents for any future feature using the same dormant-gate pattern.
+
+### Session Cost Computation
+
+As the last step before advancing the state machine, run `scripts/compute-session-cost.sh` to compute USD cost for the current feature:
+
+```bash
+bash .correctless/scripts/compute-session-cost.sh
+```
+
+This reads Claude Code session transcripts and writes a cost artifact to `.correctless/artifacts/cost-{branch-slug}.json`. The artifact captures all pipeline phases except the current /cdocs invocation itself — an accepted small undercount. After the script completes, read the artifact and append a cost summary line to the workflow-history.md entry: `Cost: ${total_cost_usd} (phase breakdown)`. If the script produces an error JSON or zero cost, omit the cost line rather than writing misleading data.
 
 ### Advance Workflow
 

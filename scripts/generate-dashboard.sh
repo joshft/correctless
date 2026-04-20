@@ -256,6 +256,23 @@ TOKEN_BY_SKILL=$(echo "$TOKEN_JSON" | jq '
 TOTAL_TOKENS=$(echo "$TOKEN_JSON" | jq '[.[] | .total_tokens] | add // 0')
 
 # ============================================================================
+# STEP 9b: Parse cost artifacts (R-007 session-cost-analysis)
+# ============================================================================
+
+COST_JSON="[]"
+HAS_COST_ARTIFACTS=false
+COST_UNKNOWN_MODELS=false
+COST_WARNINGS="[]"
+if compgen -G ".correctless/artifacts/cost-*.json" >/dev/null 2>&1; then
+  HAS_COST_ARTIFACTS=true
+  COST_JSON=$(jq -n '[inputs]' .correctless/artifacts/cost-*.json 2>/dev/null || echo "[]")
+  # Check for unknown models across all cost artifacts
+  COST_UNKNOWN_MODELS=$(echo "$COST_JSON" | jq '[.[] | (.unknown_models // []) | length] | add // 0 | . > 0' 2>/dev/null || echo "false")
+  # Collect warnings
+  COST_WARNINGS=$(echo "$COST_JSON" | jq '[.[] | (.warnings // [])[]] | unique' 2>/dev/null || echo "[]")
+fi
+
+# ============================================================================
 # STEP 10: Parse overrides
 # ============================================================================
 
@@ -340,6 +357,10 @@ DASHBOARD_DATA=$(jq -n \
   --argjson total_tokens "$TOTAL_TOKENS" \
   --argjson override_count "$OVERRIDE_COUNT" \
   --argjson journal "$JOURNAL_JSON" \
+  --argjson cost_artifacts "$COST_JSON" \
+  --argjson has_cost_artifacts "$HAS_COST_ARTIFACTS" \
+  --argjson cost_unknown_models "$COST_UNKNOWN_MODELS" \
+  --argjson cost_warnings "$COST_WARNINGS" \
   '{
     project_name: $project_name,
     intensity_floor: $intensity_floor,
@@ -359,7 +380,11 @@ DASHBOARD_DATA=$(jq -n \
     token_by_skill: $token_by_skill,
     total_tokens: $total_tokens,
     override_count: $override_count,
-    journal: $journal
+    journal: $journal,
+    cost_artifacts: $cost_artifacts,
+    has_cost_artifacts: $has_cost_artifacts,
+    cost_unknown_models: $cost_unknown_models,
+    cost_warnings: $cost_warnings
   }')
 
 # ============================================================================
@@ -748,9 +773,53 @@ cat >> dashboard.html <<'HTMLEOF2'
   // ---- Section 6: Cost by Phase ----
   app.appendChild(h('h2', null, 'Cost by Phase'));
 
-  if (data.token_by_skill.length === 0) {
+  if (data.has_cost_artifacts && data.cost_artifacts.length > 0) {
+    // Render USD cost from cost artifacts (R-007)
+    const allPhases = data.cost_artifacts.flatMap(a => a.by_phase || []);
+    const totalCost = data.cost_artifacts.reduce((s, a) => s + (a.total_cost_usd || 0), 0);
+    // Merge phases across artifacts
+    const phaseMap = {};
+    allPhases.forEach(p => {
+      if (!phaseMap[p.phase]) phaseMap[p.phase] = { phase: p.phase, cost_usd: 0, turns: 0 };
+      phaseMap[p.phase].cost_usd += p.cost_usd || 0;
+      phaseMap[p.phase].turns += p.turns || 0;
+    });
+    const phases = Object.values(phaseMap).sort((a, b) => b.cost_usd - a.cost_usd);
+
+    const costTable = h('table');
+    const cthead = h('thead');
+    const chr = h('tr');
+    ['Phase', 'Cost (USD)', '% of Total', 'Turns'].forEach(col => {
+      chr.appendChild(h('th', null, col));
+    });
+    cthead.appendChild(chr);
+    costTable.appendChild(cthead);
+    const ctbody = h('tbody');
+    phases.forEach(p => {
+      const row = h('tr');
+      row.appendChild(h('td', null, p.phase));
+      row.appendChild(h('td', null, '$' + p.cost_usd.toFixed(2)));
+      const pct = totalCost > 0 ? Math.round((p.cost_usd / totalCost) * 100) : 0;
+      row.appendChild(h('td', null, pct + '%'));
+      row.appendChild(h('td', null, String(p.turns)));
+      ctbody.appendChild(row);
+    });
+    costTable.appendChild(ctbody);
+    app.appendChild(costTable);
+    app.appendChild(h('div', { className: 'trend-note' }, 'Total: $' + totalCost.toFixed(2)));
+    if (data.cost_unknown_models) {
+      app.appendChild(h('div', { className: 'trend-note' }, '* includes estimated pricing for unrecognized models.'));
+    }
+    if (data.cost_warnings.length > 0) {
+      data.cost_warnings.forEach(w => {
+        app.appendChild(h('div', { className: 'trend-note' }, 'Warning: ' + w));
+      });
+    }
+  } else if (data.token_by_skill.length === 0) {
     app.appendChild(h('div', { className: 'empty-msg' }, 'No token data yet.'));
   } else {
+    // Fallback: token-log data only (no cost artifacts)
+    app.appendChild(h('div', { className: 'trend-note' }, '(token count only — run /cdocs to compute USD cost)'));
     const tokenTable = h('table');
     const tthead = h('thead');
     const the = h('tr');

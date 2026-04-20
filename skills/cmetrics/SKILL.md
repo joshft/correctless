@@ -223,7 +223,7 @@ Read all `.correctless/artifacts/token-log-*.jsonl` files. Correlate token spend
 
 ### Metrics to Compute
 
-**1. Cost per bug caught**: Total tokens across all features / total distinct findings. "Across {N} features, you spent {T} tokens and caught {B} bugs — {T/B} tokens per bug caught pre-merge."
+**1. Cost per bug caught**: When cost artifacts exist (`.correctless/artifacts/cost-*.json`), compute actual USD cost: "Across {N} features, you spent ${X} and caught {B} bugs — ${X/B} per bug caught pre-merge." Falls back to token-count-based estimates when cost artifacts are missing: "Across {N} features, you spent {T} tokens and caught {B} bugs — {T/B} tokens per bug caught pre-merge."
 
 **2. Tokens per feature by phase**: Group all token log entries by the `feature` field and sum `total_tokens` per feature. Show as a table:
 
