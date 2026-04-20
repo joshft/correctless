@@ -249,6 +249,7 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
       "actual_qa_rounds": "number — read from the workflow state file (qa_rounds field)",
       "actual_findings_count": "number — count of BLOCKING findings only from qa-findings-{slug}.json (not MEDIUM/LOW)",
       "actual_tokens": "integer — sum of total_tokens from the token log JSONL file (see below)",
+      "actual_cost_usd": "number or absent — read from cost artifact if it exists (see below)",
       "actual_spec_updates": "number — read from the workflow state file (spec_updates field)",
       "file_paths_touched": ["array of file paths from git diff against the default branch"],
       "timestamp": "ISO 8601 string"
@@ -264,6 +265,7 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
 - `actual_spec_updates`: Read from the workflow state file (`spec_updates` field).
 - `actual_findings_count`: Count only BLOCKING findings from `qa-findings-{slug}.json`. MEDIUM and LOW findings indicate thorough QA, not insufficient intensity.
 - `actual_tokens`: Sum of `total_tokens` from the token log JSONL file for this branch. See "Token Summation for actual_tokens" below.
+- `actual_cost_usd`: Read `total_cost_usd` from the cost artifact at `.correctless/artifacts/cost-{branch-slug}.json` if it exists. If the cost artifact does not exist (e.g., /cdocs hasn't run yet), omit `actual_cost_usd` from the calibration entry entirely — do not set it to 0, just leave it absent. The cost artifact is the canonical source of USD cost data (ABS-026).
 - `file_paths_touched`: Collect from `git diff {default_branch}...HEAD --name-only`.
 - `timestamp`: Current ISO 8601 timestamp.
 

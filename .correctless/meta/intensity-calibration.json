@@ -272,6 +272,35 @@
         "tests/test-token-aware-intensity.sh"
       ],
       "timestamp": "2026-04-18T20:30:00Z"
+    },
+    {
+      "feature_slug": "session-cost-analysis",
+      "recommended_intensity": "standard",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 2,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/config/workflow-config.json",
+        ".correctless/specs/session-cost-analysis.md",
+        ".github/workflows/ci.yml",
+        "CONTRIBUTING.md",
+        "correctless/scripts/compute-session-cost.sh",
+        "correctless/scripts/generate-dashboard.sh",
+        "correctless/skills/cdocs/SKILL.md",
+        "correctless/skills/cmetrics/SKILL.md",
+        "correctless/skills/cverify/SKILL.md",
+        "scripts/compute-session-cost.sh",
+        "scripts/generate-dashboard.sh",
+        "skills/cdocs/SKILL.md",
+        "skills/cmetrics/SKILL.md",
+        "skills/cverify/SKILL.md",
+        "tests/test-session-cost.sh"
+      ],
+      "timestamp": "2026-04-20T06:00:00Z"
     }
   ]
 }
