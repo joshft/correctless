@@ -1,5 +1,15 @@
 # Dev Journal
 
+## 2026-04-19 — Project Dashboard
+
+The dashboard is the first feature that reads across nearly every artifact Correctless produces — workflow history, QA findings, antipatterns, calibration entries, drift debt, token logs, dev journal, overrides, and project config. Building the parser surface in pure bash (awk for markdown, jq for JSON, grep for pattern matching) was the natural choice given the project's zero-external-dependency stance, but it makes the implementation brittle to format changes. The spec explicitly accepted this risk: if the format changes, the parser breaks visibly (empty sections), not silently (wrong data).
+
+The most interesting section is antipattern dormancy detection. It cross-references AP-xxx IDs against the last 5 qa-findings files to determine whether an antipattern is still firing. Antipatterns with `Status: Structurally enforced` are marked resolved. This closes the loop on the antipattern lifecycle — you can now see which antipatterns were caught early and stopped recurring because the workflow learned from them.
+
+The HTML generation uses a small vanilla JS DOM builder (`h(tag, attrs, ...children)`) instead of template literals or string concatenation. This keeps the inline script readable and avoids the escaping nightmares that come with embedding data-derived content in HTML strings. The data is injected as a JSON blob in a `<script type="application/json">` tag, parsed once, and rendered entirely client-side.
+
+Dark/light mode via `prefers-color-scheme` CSS custom properties. Horizontal bars via inline `<div>` widths. No charting libraries, no CDN links, no fetch calls. The file opens correctly via `file://` protocol, which matters because this is a local development tool, not a hosted dashboard.
+
 ## 2026-04-18 — Agent Hook for Internal Import Enforcement
 
 This feature introduces the first agent hook in Correctless, establishing a new hook type alongside the existing bash script hooks. The key insight is that some enforcement checks require LLM reasoning — reading ARCHITECTURE.md, parsing YAML entrypoints, matching glob patterns against import paths — which cannot be done deterministically in a bash script. Claude Code's agent hook type (`type: "agent"`) solves this by spawning a lightweight sub-agent (Haiku by default) that can read files and reason about the result.

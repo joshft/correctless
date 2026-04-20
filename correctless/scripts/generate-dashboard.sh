@@ -1,0 +1,730 @@
+#!/usr/bin/env bash
+# Correctless — Project Dashboard Generator
+#
+# Reads .correctless/ artifacts and generates a self-contained dashboard.html
+# in the current directory. No external dependencies — just bash, jq, and
+# standard Unix tools (sed, awk, grep, find, date).
+#
+# Usage: bash .correctless/scripts/generate-dashboard.sh
+#   (or from the repo root: bash scripts/generate-dashboard.sh)
+#
+# The generated HTML is self-contained — all CSS, JS, and data inline.
+# Opens correctly via file:// protocol.
+
+set -euo pipefail
+
+# ============================================================================
+# STEP 1: Locate data sources
+# ============================================================================
+
+# Resolve paths — works from repo root or installed project
+CONFIG_FILE=".correctless/config/workflow-config.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+  echo "Error: $CONFIG_FILE not found. Run from a project root with Correctless installed." >&2
+  exit 1
+fi
+
+# ============================================================================
+# STEP 2: Read project config
+# ============================================================================
+
+PROJECT_NAME=$(jq -r '.project.name // "Unknown Project"' "$CONFIG_FILE")
+INTENSITY_FLOOR=$(jq -r '.workflow.intensity // "standard"' "$CONFIG_FILE")
+
+# ============================================================================
+# STEP 3: Parse workflow history
+# ============================================================================
+
+HISTORY_FILE="docs/workflow-history.md"
+HISTORY_JSON="[]"
+if [ -f "$HISTORY_FILE" ]; then
+  HISTORY_JSON=$(awk '
+    /^### [0-9]{4}-[0-9]{2}-[0-9]{2} — / {
+      if (date != "") {
+        gsub(/"/, "\\\"", body)
+        printf "%s{\"date\":\"%s\",\"feature\":\"%s\",\"body\":\"%s\"}", sep, date, feature, body
+        sep=","
+      }
+      # Extract date and feature name
+      line = $0
+      sub(/^### /, "", line)
+      date = substr(line, 1, 10)
+      sub(/^[0-9-]+ — /, "", line)
+      feature = line
+      gsub(/"/, "\\\"", feature)
+      body = ""
+      next
+    }
+    date != "" && /^[^#]/ {
+      gsub(/"/, "\\\"", $0)
+      if (body != "") body = body " "
+      body = body $0
+    }
+    END {
+      if (date != "") {
+        gsub(/"/, "\\\"", body)
+        printf "%s{\"date\":\"%s\",\"feature\":\"%s\",\"body\":\"%s\"}", sep, date, feature, body
+      }
+    }
+    BEGIN { sep="" }
+  ' "$HISTORY_FILE")
+  HISTORY_JSON="[$HISTORY_JSON]"
+fi
+
+# Extract structured fields from history body text
+FEATURES_JSON=$(echo "$HISTORY_JSON" | jq '
+  [.[] | {
+    date: .date,
+    feature: .feature,
+    rules: ((.body | capture("Rules: (?<n>[0-9]+)") | .n | tonumber) // 0),
+    qa_rounds: ((.body | capture("QA rounds: (?<n>[0-9]+)") | .n | tonumber) // 0),
+    findings_fixed: ((.body | capture("Findings fixed: (?<n>[0-9]+)") | .n | tonumber) // 0),
+    overrides: ((.body | capture("Overrides: (?<n>[0-9]+)") | .n | tonumber) // 0),
+    branch: ((.body | capture("Branch: (?<b>[^ .]+)") | .b) // "")
+  }]
+')
+
+TOTAL_FEATURES=$(echo "$FEATURES_JSON" | jq 'length')
+
+# ============================================================================
+# STEP 4: Parse QA findings
+# ============================================================================
+
+QA_FINDINGS_JSON="[]"
+if compgen -G ".correctless/artifacts/qa-findings-*.json" >/dev/null 2>&1; then
+  QA_FINDINGS_JSON=$(jq -s '
+    [.[] | .findings[]? | {
+      id: .id,
+      severity: .severity,
+      description: .description,
+      rule_ref: .rule_ref,
+      status: .status,
+      lens: (.lens // null)
+    }]
+  ' .correctless/artifacts/qa-findings-*.json 2>/dev/null || echo "[]")
+fi
+
+TOTAL_FINDINGS=$(echo "$QA_FINDINGS_JSON" | jq 'length')
+
+# Count by phase prefix
+QA_COUNT=$(echo "$QA_FINDINGS_JSON" | jq '[.[] | select(.id | startswith("QA-"))] | length')
+MA_COUNT=$(echo "$QA_FINDINGS_JSON" | jq '[.[] | select(.id | startswith("MA-"))] | length')
+BLOCKING_COUNT=$(echo "$QA_FINDINGS_JSON" | jq '[.[] | select(.severity == "BLOCKING")] | length')
+NONBLOCKING_COUNT=$(echo "$QA_FINDINGS_JSON" | jq '[.[] | select(.severity != "BLOCKING")] | length')
+
+# ============================================================================
+# STEP 5: Parse review decisions (optional, Phase 3 only)
+# ============================================================================
+
+REVIEW_COUNT=0
+if compgen -G ".correctless/artifacts/review-decisions-*.json" >/dev/null 2>&1; then
+  REVIEW_COUNT=$(jq -s '[.[] | .decisions[]?] | length' .correctless/artifacts/review-decisions-*.json 2>/dev/null || echo "0")
+fi
+
+# ============================================================================
+# STEP 6: Parse antipatterns
+# ============================================================================
+
+ANTIPATTERNS_JSON="[]"
+if [ -f ".correctless/antipatterns.md" ]; then
+  ANTIPATTERNS_JSON=$(awk '
+    /^### AP-[0-9]+:/ {
+      if (id != "") {
+        gsub(/"/, "\\\"", title)
+        gsub(/"/, "\\\"", freq)
+        printf "%s{\"id\":\"%s\",\"title\":\"%s\",\"frequency\":\"%s\",\"resolved\":%s}", sep, id, title, freq, resolved
+        sep=","
+      }
+      line = $0
+      sub(/^### /, "", line)
+      # Extract AP-xxx
+      match(line, /AP-[0-9]+/)
+      id = substr(line, RSTART, RLENGTH)
+      sub(/AP-[0-9]+: */, "", line)
+      title = line
+      freq = ""
+      resolved = "false"
+      next
+    }
+    /\*\*Frequency\*\*/ {
+      line = $0
+      sub(/.*\*\*Frequency\*\*: */, "", line)
+      freq = line
+      gsub(/"/, "\\\"", freq)
+    }
+    /\*\*Status\*\*:.*[Ss]tructurally [Ee]nforced/ {
+      resolved = "true"
+    }
+    END {
+      if (id != "") {
+        gsub(/"/, "\\\"", title)
+        gsub(/"/, "\\\"", freq)
+        printf "%s{\"id\":\"%s\",\"title\":\"%s\",\"frequency\":\"%s\",\"resolved\":%s}", sep, id, title, freq, resolved
+      }
+    }
+    BEGIN { sep="" }
+  ' ".correctless/antipatterns.md")
+  ANTIPATTERNS_JSON="[$ANTIPATTERNS_JSON]"
+fi
+
+# Cross-reference dormancy: check last 5 qa-findings files for AP-xxx references
+DORMANCY_JSON="{}"
+if [ "$ANTIPATTERNS_JSON" != "[]" ] && compgen -G ".correctless/artifacts/qa-findings-*.json" >/dev/null 2>&1; then
+  # Get the 5 most recent qa-findings files (by filename sort)
+  RECENT_FILES=$(ls -1 .correctless/artifacts/qa-findings-*.json 2>/dev/null | sort | tail -5)
+  if [ -n "$RECENT_FILES" ]; then
+    # shellcheck disable=SC2086
+    DORMANCY_JSON=$(jq -s '
+      [.[] | .findings[]? | (.rule_ref // "", .description // "")] | join(" ")
+    ' $RECENT_FILES 2>/dev/null | jq -R '
+      split(" ") |
+      reduce .[] as $word ({};
+        if ($word | test("^AP-[0-9]+$")) then .[$word] = true else . end
+      )
+    ' 2>/dev/null || echo "{}")
+  fi
+fi
+
+# Enrich antipatterns with dormancy status
+ANTIPATTERNS_ENRICHED=$(jq -n \
+  --argjson aps "$ANTIPATTERNS_JSON" \
+  --argjson dorm "$DORMANCY_JSON" '
+  [$aps[] | . + {
+    status: (
+      if .resolved then "resolved"
+      elif ($dorm[.id] // false) then "active"
+      else "dormant"
+      end
+    )
+  }]
+')
+
+# ============================================================================
+# STEP 7: Parse intensity calibration
+# ============================================================================
+
+CALIBRATION_JSON="[]"
+if [ -f ".correctless/meta/intensity-calibration.json" ]; then
+  CALIBRATION_JSON=$(jq '.calibration_entries // []' ".correctless/meta/intensity-calibration.json" 2>/dev/null || echo "[]")
+fi
+
+# ============================================================================
+# STEP 8: Parse drift debt
+# ============================================================================
+
+DRIFT_JSON='{"open":0,"resolved":0,"wont_fix":0,"items":[]}'
+if [ -f ".correctless/meta/drift-debt.json" ]; then
+  DRIFT_JSON=$(jq '{
+    open: [(.items // [])[] | select(.status == "open")] | length,
+    resolved: [(.items // [])[] | select(.status == "resolved")] | length,
+    wont_fix: [(.items // [])[] | select(.status == "wont-fix")] | length,
+    items: (.items // [])
+  }' ".correctless/meta/drift-debt.json" 2>/dev/null || echo '{"open":0,"resolved":0,"wont_fix":0,"items":[]}')
+fi
+
+# ============================================================================
+# STEP 9: Parse token logs
+# ============================================================================
+
+TOKEN_JSON="[]"
+if compgen -G ".correctless/artifacts/token-log-*.jsonl" >/dev/null 2>&1; then
+  TOKEN_JSON=$(cat .correctless/artifacts/token-log-*.jsonl 2>/dev/null | jq -R '
+    try (fromjson | {
+      phase: (.phase // "unknown"),
+      skill: (.skill // "unknown"),
+      total_tokens: (.total_tokens // 0),
+      input_tokens: (.input_tokens // 0),
+      output_tokens: (.output_tokens // 0)
+    }) catch empty
+  ' | jq -s '.')
+fi
+
+# Aggregate tokens by skill
+TOKEN_BY_SKILL=$(echo "$TOKEN_JSON" | jq '
+  group_by(.skill) |
+  [.[] | {
+    skill: .[0].skill,
+    total_tokens: (map(.total_tokens) | add),
+    count: length
+  }] | sort_by(-.total_tokens)
+')
+
+TOTAL_TOKENS=$(echo "$TOKEN_JSON" | jq '[.[] | .total_tokens] | add // 0')
+
+# ============================================================================
+# STEP 10: Parse overrides
+# ============================================================================
+
+OVERRIDE_COUNT=0
+if compgen -G ".correctless/meta/overrides/*.json" >/dev/null 2>&1; then
+  OVERRIDE_COUNT=$(jq -s '[.[] | (.overrides // []) | length] | add // 0' .correctless/meta/overrides/*.json 2>/dev/null || echo "0")
+fi
+
+# ============================================================================
+# STEP 11: Parse dev journal (last 3 entries)
+# ============================================================================
+
+JOURNAL_JSON="[]"
+if [ -f "docs/dev-journal.md" ]; then
+  JOURNAL_JSON=$(awk '
+    /^### [0-9]{4}-[0-9]{2}-[0-9]{2} — / {
+      if (date != "") {
+        gsub(/"/, "\\\"", body)
+        printf "%s{\"date\":\"%s\",\"title\":\"%s\",\"body\":\"%s\"}", sep, date, title, body
+        sep=","
+      }
+      line = $0
+      sub(/^### /, "", line)
+      date = substr(line, 1, 10)
+      sub(/^[0-9-]+ — /, "", line)
+      title = line
+      gsub(/"/, "\\\"", title)
+      body = ""
+      next
+    }
+    date != "" && /^[^#]/ && !/^$/ {
+      gsub(/"/, "\\\"", $0)
+      if (body != "") body = body "\\n"
+      body = body $0
+    }
+    END {
+      if (date != "") {
+        gsub(/"/, "\\\"", body)
+        printf "%s{\"date\":\"%s\",\"title\":\"%s\",\"body\":\"%s\"}", sep, date, title, body
+      }
+    }
+    BEGIN { sep="" }
+  ' "docs/dev-journal.md")
+  JOURNAL_JSON="[$JOURNAL_JSON]"
+  # Take last 3 (they are in file order, most recent first)
+  JOURNAL_JSON=$(echo "$JOURNAL_JSON" | jq '.[0:3]')
+fi
+
+# ============================================================================
+# STEP 12: Read test count from CONTRIBUTING.md
+# ============================================================================
+
+TEST_COUNT="N/A"
+if [ -f "CONTRIBUTING.md" ]; then
+  TEST_COUNT=$(grep -oE '[0-9]+ test files' CONTRIBUTING.md 2>/dev/null | grep -oE '[0-9]+' | head -1 || echo "N/A")
+  if [ -z "$TEST_COUNT" ]; then
+    TEST_COUNT="N/A"
+  fi
+fi
+
+# ============================================================================
+# STEP 13: Build the unified data JSON
+# ============================================================================
+
+DASHBOARD_DATA=$(jq -n \
+  --arg project_name "$PROJECT_NAME" \
+  --arg intensity_floor "$INTENSITY_FLOOR" \
+  --argjson total_features "$TOTAL_FEATURES" \
+  --argjson total_findings "$TOTAL_FINDINGS" \
+  --arg test_count "$TEST_COUNT" \
+  --argjson features "$FEATURES_JSON" \
+  --argjson findings "$QA_FINDINGS_JSON" \
+  --argjson qa_count "$QA_COUNT" \
+  --argjson ma_count "$MA_COUNT" \
+  --argjson review_count "$REVIEW_COUNT" \
+  --argjson blocking_count "$BLOCKING_COUNT" \
+  --argjson nonblocking_count "$NONBLOCKING_COUNT" \
+  --argjson antipatterns "$ANTIPATTERNS_ENRICHED" \
+  --argjson calibration "$CALIBRATION_JSON" \
+  --argjson drift "$DRIFT_JSON" \
+  --argjson token_by_skill "$TOKEN_BY_SKILL" \
+  --argjson total_tokens "$TOTAL_TOKENS" \
+  --argjson override_count "$OVERRIDE_COUNT" \
+  --argjson journal "$JOURNAL_JSON" \
+  '{
+    project_name: $project_name,
+    intensity_floor: $intensity_floor,
+    total_features: $total_features,
+    total_findings: $total_findings,
+    test_count: $test_count,
+    features: $features,
+    findings: $findings,
+    qa_count: $qa_count,
+    ma_count: $ma_count,
+    review_count: $review_count,
+    blocking_count: $blocking_count,
+    nonblocking_count: $nonblocking_count,
+    antipatterns: $antipatterns,
+    calibration: $calibration,
+    drift: $drift,
+    token_by_skill: $token_by_skill,
+    total_tokens: $total_tokens,
+    override_count: $override_count,
+    journal: $journal
+  }')
+
+# ============================================================================
+# STEP 14: Generate HTML
+# ============================================================================
+
+cat > dashboard.html <<'HTMLEOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Correctless Dashboard</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a2e;
+    --card-bg: #f8f9fa;
+    --border: #dee2e6;
+    --accent: #4361ee;
+    --red: #e63946;
+    --yellow: #f4a261;
+    --green: #2a9d8f;
+    --muted: #6c757d;
+    --journal-bg: #f0f0f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --fg: #c9d1d9;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --accent: #58a6ff;
+      --red: #f85149;
+      --yellow: #d29922;
+      --green: #3fb950;
+      --muted: #8b949e;
+      --journal-bg: #1c2128;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.3rem; margin-top: 2.5rem; margin-bottom: 1rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.3rem; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  .health-verdict { background: var(--card-bg); padding: 1rem; border-radius: 6px; border-left: 4px solid var(--accent); margin-bottom: 1rem; font-size: 0.95rem; }
+  .stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .stat { background: var(--card-bg); padding: 0.75rem 1rem; border-radius: 6px; flex: 1; min-width: 120px; }
+  .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 1.4rem; font-weight: 700; }
+  .bar-container { margin-bottom: 0.75rem; }
+  .bar-label { font-size: 0.85rem; margin-bottom: 0.25rem; display: flex; justify-content: space-between; }
+  .bar-track { background: var(--card-bg); border-radius: 4px; height: 24px; overflow: hidden; display: flex; }
+  .bar-fill { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #fff; min-width: 2px; transition: width 0.3s; }
+  .bar-blocking { background: var(--red); }
+  .bar-nonblocking { background: var(--yellow); }
+  .bar-qa { background: var(--accent); }
+  .bar-ma { background: var(--green); }
+  .bar-review { background: var(--yellow); }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.75rem; font-weight: 600; }
+  .badge-blocking, .badge-critical { background: var(--red); color: #fff; }
+  .badge-nonblocking, .badge-medium { background: var(--yellow); color: #000; }
+  .badge-resolved, .badge-clean { background: var(--green); color: #fff; }
+  .badge-dormant { background: var(--muted); color: #fff; }
+  .badge-active { background: var(--red); color: #fff; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.85rem; }
+  th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+  th { font-weight: 600; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
+  .ap-item { margin-bottom: 0.75rem; padding: 0.5rem 0.75rem; background: var(--card-bg); border-radius: 4px; }
+  .ap-header { display: flex; justify-content: space-between; align-items: center; }
+  .ap-title { font-weight: 600; font-size: 0.9rem; }
+  .ap-freq { font-size: 0.8rem; color: var(--muted); }
+  .journal-section { background: var(--journal-bg); padding: 1.5rem; border-radius: 6px; margin-top: 0.5rem; }
+  .journal-entry { margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  .journal-entry:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .journal-date { font-size: 0.8rem; color: var(--muted); }
+  .journal-title { font-weight: 600; font-size: 0.95rem; }
+  .journal-body { font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; white-space: pre-wrap; }
+  .empty-msg { color: var(--muted); font-style: italic; padding: 1rem 0; }
+  .trend-note { color: var(--muted); font-size: 0.85rem; font-style: italic; margin-top: 0.25rem; }
+  .stacked-bar { display: flex; height: 32px; border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem; }
+  .stacked-segment { display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #fff; }
+  .legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem; margin-bottom: 1rem; }
+  .legend-item { display: flex; align-items: center; gap: 0.3rem; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 2px; }
+  footer { margin-top: 3rem; text-align: center; color: var(--muted); font-size: 0.75rem; }
+</style>
+</head>
+<body>
+<script id="dashboard-data" type="application/json">
+HTMLEOF
+
+# Inject the data JSON
+echo "$DASHBOARD_DATA" >> dashboard.html
+
+cat >> dashboard.html <<'HTMLEOF2'
+</script>
+
+<div id="app"></div>
+
+<script>
+(function() {
+  const data = JSON.parse(document.getElementById('dashboard-data').textContent);
+  const app = document.getElementById('app');
+
+  function h(tag, attrs, ...children) {
+    const el = document.createElement(tag);
+    if (attrs) Object.entries(attrs).forEach(([k, v]) => {
+      if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+      else if (k === 'className') el.className = v;
+      else if (k === 'innerHTML') el.innerHTML = v;
+      else el.setAttribute(k, v);
+    });
+    children.flat().forEach(c => {
+      if (typeof c === 'string') el.appendChild(document.createTextNode(c));
+      else if (c) el.appendChild(c);
+    });
+    return el;
+  }
+
+  // ---- Section 1: Project Summary ----
+  app.appendChild(h('h1', null, data.project_name + ' Dashboard'));
+  app.appendChild(h('div', { className: 'subtitle' }, 'Generated ' + new Date().toISOString().slice(0, 10)));
+
+  const verdict = data.total_features + ' features, ' +
+    data.total_findings + ' findings caught pre-merge, ' +
+    data.antipatterns.length + ' antipatterns catalogued.';
+  app.appendChild(h('div', { className: 'health-verdict' }, verdict));
+
+  const stats = h('div', { className: 'stat-row' });
+  [{l:'Features Shipped', v:data.total_features},
+   {l:'Findings Caught', v:data.total_findings},
+   {l:'Test Count', v:data.test_count},
+   {l:'Intensity Floor', v:data.intensity_floor}
+  ].forEach(s => {
+    const st = h('div', { className: 'stat' });
+    st.appendChild(h('div', { className: 'stat-label' }, s.l));
+    st.appendChild(h('div', { className: 'stat-value' }, String(s.v)));
+    stats.appendChild(st);
+  });
+  app.appendChild(stats);
+
+  // ---- Section 2: Quality Trajectory ----
+  app.appendChild(h('h2', null, 'Quality Trajectory'));
+
+  if (data.features.length === 0) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No workflow history yet.'));
+  } else {
+    const maxFindings = Math.max(...data.features.map(f => f.findings_fixed), 1);
+    data.features.forEach(f => {
+      const pctBlocking = f.findings_fixed > 0 ? Math.round((f.findings_fixed * 0.5 / maxFindings) * 100) : 0;
+      const pctNonblocking = f.findings_fixed > 0 ? Math.round((f.findings_fixed / maxFindings) * 100) - pctBlocking : 0;
+      const container = h('div', { className: 'bar-container' });
+      const label = h('div', { className: 'bar-label' });
+      label.appendChild(h('span', null, f.feature));
+      label.appendChild(h('span', null, f.findings_fixed + ' findings'));
+      container.appendChild(label);
+      const track = h('div', { className: 'bar-track' });
+      if (pctBlocking > 0) {
+        track.appendChild(h('div', { className: 'bar-fill bar-blocking', style: { width: pctBlocking + '%' } }));
+      }
+      if (pctNonblocking > 0) {
+        track.appendChild(h('div', { className: 'bar-fill bar-nonblocking', style: { width: pctNonblocking + '%' } }));
+      }
+      container.appendChild(track);
+      app.appendChild(container);
+    });
+
+    if (data.features.length === 1) {
+      app.appendChild(h('div', { className: 'trend-note' }, 'Need more features to show a trend.'));
+    }
+
+    const legend = h('div', { className: 'legend' });
+    [{c:'bar-blocking', l:'BLOCKING'}, {c:'bar-nonblocking', l:'NON-BLOCKING'}].forEach(item => {
+      const li = h('div', { className: 'legend-item' });
+      li.appendChild(h('div', { className: 'legend-dot ' + item.c }));
+      li.appendChild(h('span', null, item.l));
+      legend.appendChild(li);
+    });
+    app.appendChild(legend);
+  }
+
+  // ---- Section 3: Pipeline Phase Distribution ----
+  app.appendChild(h('h2', null, 'Pipeline Phase Distribution'));
+
+  const phaseTotal = data.qa_count + data.ma_count + data.review_count;
+  if (phaseTotal === 0) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No findings data yet.'));
+  } else {
+    const bar = h('div', { className: 'stacked-bar' });
+    if (data.qa_count > 0) {
+      const pct = Math.round((data.qa_count / phaseTotal) * 100);
+      bar.appendChild(h('div', { className: 'stacked-segment bar-qa', style: { width: pct + '%' } }, 'QA ' + data.qa_count));
+    }
+    if (data.ma_count > 0) {
+      const pct = Math.round((data.ma_count / phaseTotal) * 100);
+      bar.appendChild(h('div', { className: 'stacked-segment bar-ma', style: { width: pct + '%' } }, 'Mini-audit ' + data.ma_count));
+    }
+    if (data.review_count > 0) {
+      const pct = Math.round((data.review_count / phaseTotal) * 100);
+      bar.appendChild(h('div', { className: 'stacked-segment bar-review', style: { width: pct + '%' } }, 'Review ' + data.review_count));
+    }
+    app.appendChild(bar);
+
+    const phaseLegend = h('div', { className: 'legend' });
+    [{c:'bar-qa', l:'QA (QA- prefix)'}, {c:'bar-ma', l:'Mini-audit (MA- prefix)'}, {c:'bar-review', l:'Review'}].forEach(item => {
+      const li = h('div', { className: 'legend-item' });
+      li.appendChild(h('div', { className: 'legend-dot ' + item.c }));
+      li.appendChild(h('span', null, item.l));
+      phaseLegend.appendChild(li);
+    });
+    app.appendChild(phaseLegend);
+  }
+
+  // ---- Section 4: Antipattern Health ----
+  app.appendChild(h('h2', null, 'Antipattern Health'));
+
+  if (data.antipatterns.length === 0) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No antipatterns catalogued yet.'));
+  } else {
+    data.antipatterns.forEach(ap => {
+      const item = h('div', { className: 'ap-item' });
+      const header = h('div', { className: 'ap-header' });
+      header.appendChild(h('span', { className: 'ap-title' }, ap.id + ': ' + ap.title));
+      const badgeClass = ap.status === 'resolved' ? 'badge-resolved' :
+                         ap.status === 'dormant' ? 'badge-dormant' : 'badge-active';
+      header.appendChild(h('span', { className: 'badge ' + badgeClass }, ap.status));
+      item.appendChild(header);
+      if (ap.frequency) {
+        item.appendChild(h('div', { className: 'ap-freq' }, ap.frequency));
+      }
+      app.appendChild(item);
+    });
+  }
+
+  // ---- Section 5: Intensity Calibration ----
+  app.appendChild(h('h2', null, 'Intensity Calibration'));
+
+  if (data.calibration.length === 0) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No calibration data yet.'));
+  } else {
+    const table = h('table');
+    const thead = h('thead');
+    const hrow = h('tr');
+    ['Feature', 'Recommended', 'Actual', 'QA Rounds', 'Tokens'].forEach(col => {
+      hrow.appendChild(h('th', null, col));
+    });
+    thead.appendChild(hrow);
+    table.appendChild(thead);
+    const tbody = h('tbody');
+    data.calibration.forEach(c => {
+      const row = h('tr');
+      row.appendChild(h('td', null, c.feature_slug));
+      row.appendChild(h('td', null, c.recommended_intensity));
+      const actualTd = h('td', null, c.actual_intensity);
+      if (c.recommended_intensity !== c.actual_intensity) {
+        actualTd.style.fontWeight = '700';
+        actualTd.style.color = 'var(--yellow)';
+      }
+      row.appendChild(actualTd);
+      row.appendChild(h('td', null, String(c.actual_qa_rounds)));
+      row.appendChild(h('td', null, c.actual_tokens ? c.actual_tokens.toLocaleString() : '-'));
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    app.appendChild(table);
+  }
+
+  // ---- Section 6: Cost by Phase ----
+  app.appendChild(h('h2', null, 'Cost by Phase'));
+
+  if (data.token_by_skill.length === 0) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No token data yet.'));
+  } else {
+    const tokenTable = h('table');
+    const tthead = h('thead');
+    const the = h('tr');
+    ['Skill', 'Total Tokens', '% of Total', 'Calls'].forEach(col => {
+      the.appendChild(h('th', null, col));
+    });
+    tthead.appendChild(the);
+    tokenTable.appendChild(tthead);
+    const ttbody = h('tbody');
+    data.token_by_skill.forEach(t => {
+      const row = h('tr');
+      row.appendChild(h('td', null, t.skill));
+      row.appendChild(h('td', null, t.total_tokens.toLocaleString()));
+      const pct = data.total_tokens > 0 ? Math.round((t.total_tokens / data.total_tokens) * 100) : 0;
+      row.appendChild(h('td', null, pct + '%'));
+      row.appendChild(h('td', null, String(t.count)));
+      ttbody.appendChild(row);
+    });
+    tokenTable.appendChild(ttbody);
+    app.appendChild(tokenTable);
+  }
+
+  // ---- Section 7: Drift Debt ----
+  app.appendChild(h('h2', null, 'Drift Debt'));
+
+  if (data.drift.items.length === 0) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No drift debt items.'));
+  } else {
+    const driftStats = h('div', { className: 'stat-row' });
+    [{l:'Open', v:data.drift.open}, {l:'Resolved', v:data.drift.resolved}, {l:'Won\'t Fix', v:data.drift.wont_fix}].forEach(s => {
+      const st = h('div', { className: 'stat' });
+      st.appendChild(h('div', { className: 'stat-label' }, s.l));
+      st.appendChild(h('div', { className: 'stat-value' }, String(s.v)));
+      driftStats.appendChild(st);
+    });
+    app.appendChild(driftStats);
+
+    const driftTable = h('table');
+    const dthead = h('thead');
+    const dhrow = h('tr');
+    ['ID', 'Description', 'Status'].forEach(col => {
+      dhrow.appendChild(h('th', null, col));
+    });
+    dthead.appendChild(dhrow);
+    driftTable.appendChild(dthead);
+    const dtbody = h('tbody');
+    data.drift.items.forEach(d => {
+      const row = h('tr');
+      row.appendChild(h('td', null, d.id));
+      row.appendChild(h('td', null, d.description));
+      const badgeClass = d.status === 'resolved' ? 'badge-resolved' :
+                         d.status === 'open' ? 'badge-active' : 'badge-dormant';
+      const statusTd = h('td');
+      statusTd.appendChild(h('span', { className: 'badge ' + badgeClass }, d.status));
+      row.appendChild(statusTd);
+      dtbody.appendChild(row);
+    });
+    driftTable.appendChild(dtbody);
+    app.appendChild(driftTable);
+  }
+
+  // ---- Section 8: Dev Journal ----
+  app.appendChild(h('h2', null, 'Dev Journal'));
+
+  if (data.journal.length === 0) {
+    app.appendChild(h('div', { className: 'empty-msg' }, 'No dev journal entries yet.'));
+  } else {
+    const section = h('div', { className: 'journal-section' });
+    data.journal.forEach(j => {
+      const entry = h('div', { className: 'journal-entry' });
+      entry.appendChild(h('div', { className: 'journal-date' }, j.date));
+      entry.appendChild(h('div', { className: 'journal-title' }, j.title));
+      if (j.body) {
+        entry.appendChild(h('div', { className: 'journal-body' }, j.body));
+      }
+      section.appendChild(entry);
+    });
+    app.appendChild(section);
+  }
+
+  // ---- Footer ----
+  app.appendChild(h('footer', null, 'Generated by Correctless — correctless.dev'));
+
+})();
+</script>
+</body>
+</html>
+HTMLEOF2
+
+echo "Dashboard generated: dashboard.html"

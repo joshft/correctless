@@ -415,3 +415,5 @@ Use TaskCreate/TaskUpdate:
 - **Don't compare to other projects.** Each project's metrics only compare to its own history.
 - **The "issues caught" number includes deduplication.** If review and QA both caught the same issue, count it once at the earliest phase.
 - **Redact if sharing.** If this output will be shared externally, apply redaction rules from `templates/redaction-rules.md` first.
+
+For a full project dashboard, run `bash .correctless/scripts/generate-dashboard.sh` and open `dashboard.html`.
