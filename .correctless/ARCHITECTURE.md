@@ -79,7 +79,7 @@
 ### ABS-001: Shared script library (scripts/lib.sh)
 - **What**: Shared bash utilities sourced by hooks and phase-transition scripts. Provides path helpers (branch_slug, repo_root, config_file, artifacts_dir), file classification (classify_file, read_patterns, read_intensity), state file locking (ABS-003), and write pattern detection (_has_write_pattern, get_target_file).
 - **Invariant**: Functions in lib.sh have a single definition. Scripts must source lib.sh rather than duplicating functions locally.
-- **Enforced at**: scripts/lib.sh (source), hooks/workflow-advance.sh (consumer), hooks/workflow-gate.sh (consumer), hooks/sensitive-file-guard.sh (consumer), hooks/audit-trail.sh (consumer), scripts/antipattern-scan.sh (consumer)
+- **Enforced at**: scripts/lib.sh (source), hooks/workflow-advance.sh (consumer), hooks/workflow-gate.sh (consumer), hooks/sensitive-file-guard.sh (consumer), hooks/audit-trail.sh (consumer), scripts/antipattern-scan.sh (consumer), scripts/compute-session-cost.sh (consumer)
 - **Violated when**: A hook or script defines branch_slug(), classify_file(), _has_write_pattern(), _acquire_state_lock(), or any other lib.sh function locally instead of sourcing the library
 - **Test**: R-019e in antipattern-scan tests (verifies workflow-advance.sh does not define branch_slug locally), R-021 in test-lib-locking.sh (no flock dependency)
 

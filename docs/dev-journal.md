@@ -1,5 +1,17 @@
 # Dev Journal
 
+## 2026-04-20 — Session Cost Analysis
+
+The token-tracking PostToolUse hook has been writing zeros for `total_cost_usd` and token counts since it was introduced. The fields don't exist in Claude Code's PostToolUse contract (tracked as [#11008](https://github.com/anthropics/claude-code/issues/11008)). Every /cmetrics dashboard, every calibration entry, every "cost by phase" section has been showing zeros or deriving cost from nothing. This feature replaces the phantom data with real USD cost computed from Claude Code's session transcripts.
+
+The key insight is that Claude Code already records everything needed — session transcripts in `~/.claude/projects/` contain per-turn model, token counts (input, output, cache write, cache read), and branch context. The challenge is deduplication: streaming produces ~3.14x inflation with multiple JSONL entries per API call sharing the same `message.id`. Taking the last entry per unique ID (the final streaming response with complete token counts) eliminates the inflation cleanly.
+
+Phase attribution was the most interesting design decision. The script reads the audit trail for phase transitions and assigns each transcript turn to the phase active at its timestamp. Subagents spawned during GREEN that complete during QA are attributed to QA (completion-time, not spawn-time) — spawn-time attribution would require correlating parent tool_use IDs with subagent transcript IDs, adding complexity for marginal accuracy gain. The script always undercounts by the invoking /cdocs session's cost since it runs before the session ends.
+
+The adversarial review (F-02) caught a significant design flaw: the original spec included a cross-project fallback scan that would search all `~/.claude/projects/` directories for matching cwd patterns. This creates information leakage between projects. The fix was clean — two discovery paths only: candidate derivation from repo root, plus a config override for non-standard layouts.
+
+The pricing validation ($500/M ceiling) catches a likely confusion between per-token and per-million-token values. The 6-decimal precision invariant (`total_cost_usd == sum(by_phase) == sum(by_subagent)`) ensures the two orthogonal breakdowns account for 100% of cost without floating-point drift.
+
 ## 2026-04-20 — Dashboard Trend Insights
 
 The dashboard started as a data dump — it showed what happened but not whether things are improving. This feature adds four trend sections that answer "is Correctless working?" by transforming raw counts into trajectory views.

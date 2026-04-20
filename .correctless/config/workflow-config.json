@@ -26,7 +26,8 @@
     "git_trailers": false,
     "git_notes": false,
     "branching_strategy": "feature-branches",
-    "merge_strategy": "squash"
+    "merge_strategy": "squash",
+    "session_dir": "/home/josh/.claude/projects/-home-josh-Projects-correctless"
   },
   "mcp": {
     "serena": false,
