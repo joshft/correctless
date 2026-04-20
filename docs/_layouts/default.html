@@ -7,8 +7,29 @@
 
 {% seo %}
     <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
+    <style>
+      [data-theme="dark"] { background-color: #0d1117; color: #c9d1d9; }
+      [data-theme="dark"] .markdown-body { color: #c9d1d9; }
+      [data-theme="dark"] .markdown-body h1,
+      [data-theme="dark"] .markdown-body h2,
+      [data-theme="dark"] .markdown-body h3,
+      [data-theme="dark"] .markdown-body h4 { color: #e6edf3; }
+      [data-theme="dark"] .markdown-body a { color: #58a6ff; }
+      [data-theme="dark"] .markdown-body code { background-color: #161b22; color: #c9d1d9; }
+      [data-theme="dark"] .markdown-body pre { background-color: #161b22; }
+      [data-theme="dark"] .markdown-body table th,
+      [data-theme="dark"] .markdown-body table td { border-color: #30363d; }
+      [data-theme="dark"] .markdown-body table tr { background-color: #0d1117; border-color: #30363d; }
+      [data-theme="dark"] .markdown-body table tr:nth-child(2n) { background-color: #161b22; }
+      [data-theme="dark"] .markdown-body blockquote { color: #8b949e; border-left-color: #30363d; }
+      [data-theme="dark"] .markdown-body hr { background-color: #30363d; }
+      [data-theme="dark"] .footer { border-color: #30363d !important; }
+      .theme-toggle { position: fixed; top: 12px; right: 16px; z-index: 100; background: none; border: 1px solid #d0d7de; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 18px; line-height: 1; }
+      [data-theme="dark"] .theme-toggle { border-color: #30363d; }
+    </style>
   </head>
   <body>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
     <div class="container-lg px-3 my-5 markdown-body">
       {% if site.title and site.title != page.title %}
       <h1><a href="{{ "/" | absolute_url }}">{{ site.title }}</a></h1>
@@ -27,7 +48,8 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function () {
-        mermaid.initialize({ startOnLoad: false, theme: 'default' });
+        var isDark = document.body.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default' });
         document.querySelectorAll('code.language-mermaid').forEach(function (el) {
           var pre = el.parentElement;
           var container = document.createElement('div');
@@ -37,6 +59,19 @@
         });
         mermaid.run();
       });
+    </script>
+    <script>
+      (function() {
+        var btn = document.getElementById('theme-toggle');
+        var saved = localStorage.getItem('theme');
+        var preferred = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        if (preferred === 'dark') { document.body.setAttribute('data-theme', 'dark'); btn.textContent = '\u2600\uFE0F'; }
+        btn.addEventListener('click', function() {
+          var isDark = document.body.getAttribute('data-theme') === 'dark';
+          if (isDark) { document.body.removeAttribute('data-theme'); btn.textContent = '\uD83C\uDF19'; localStorage.setItem('theme', 'light'); }
+          else { document.body.setAttribute('data-theme', 'dark'); btn.textContent = '\u2600\uFE0F'; localStorage.setItem('theme', 'dark'); }
+        });
+      })();
     </script>
     {% if site.google_analytics %}
     <script>
