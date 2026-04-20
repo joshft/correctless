@@ -38,37 +38,29 @@ INTENSITY_FLOOR=$(jq -r '.workflow.intensity // "standard"' "$CONFIG_FILE")
 HISTORY_FILE="docs/workflow-history.md"
 HISTORY_JSON="[]"
 if [ -f "$HISTORY_FILE" ]; then
-  HISTORY_JSON=$(awk '
-    /^### [0-9]{4}-[0-9]{2}-[0-9]{2} — / {
-      if (date != "") {
-        gsub(/"/, "\\\"", body)
-        printf "%s{\"date\":\"%s\",\"feature\":\"%s\",\"body\":\"%s\"}", sep, date, feature, body
-        sep=","
-      }
-      # Extract date and feature name
-      line = $0
-      sub(/^### /, "", line)
-      date = substr(line, 1, 10)
-      sub(/^[0-9-]+ — /, "", line)
-      feature = line
-      gsub(/"/, "\\\"", feature)
-      body = ""
-      next
-    }
-    date != "" && /^[^#]/ {
-      gsub(/"/, "\\\"", $0)
-      if (body != "") body = body " "
-      body = body $0
-    }
-    END {
-      if (date != "") {
-        gsub(/"/, "\\\"", body)
-        printf "%s{\"date\":\"%s\",\"feature\":\"%s\",\"body\":\"%s\"}", sep, date, feature, body
-      }
-    }
-    BEGIN { sep="" }
-  ' "$HISTORY_FILE")
-  HISTORY_JSON="[$HISTORY_JSON]"
+  # Parse workflow history entries, using jq for safe JSON string escaping
+  HISTORY_JSON="[]"
+  _date="" _feature="" _body=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [[ "$line" =~ ^###\ ([0-9]{4}-[0-9]{2}-[0-9]{2})\ —\ (.*) ]]; then
+      # Emit previous entry if exists
+      if [ -n "$_date" ]; then
+        HISTORY_JSON=$(echo "$HISTORY_JSON" | jq --arg d "$_date" --arg f "$_feature" --arg b "$_body" \
+          '. + [{"date": $d, "feature": $f, "body": $b}]')
+      fi
+      _date="${BASH_REMATCH[1]}"
+      _feature="${BASH_REMATCH[2]}"
+      _body=""
+    elif [ -n "$_date" ] && [[ "$line" =~ ^[^#] ]] && [ -n "$line" ]; then
+      [ -n "$_body" ] && _body="$_body "
+      _body="$_body$line"
+    fi
+  done < "$HISTORY_FILE"
+  # Emit last entry
+  if [ -n "$_date" ]; then
+    HISTORY_JSON=$(echo "$HISTORY_JSON" | jq --arg d "$_date" --arg f "$_feature" --arg b "$_body" \
+      '. + [{"date": $d, "feature": $f, "body": $b}]')
+  fi
 fi
 
 # Extract structured fields from history body text
