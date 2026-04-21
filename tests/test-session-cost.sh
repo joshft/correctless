@@ -8,32 +8,14 @@
 # Run from repo root: bash tests/test-session-cost.sh
 
 # shellcheck disable=SC1090
-set -uo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.." || { echo "FATAL: cannot cd to repo root" >&2; exit 2; }
+source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 
-REPO_DIR="$(pwd)"
 SCRIPT="$REPO_DIR/scripts/compute-session-cost.sh"
 LIB_SH="$REPO_DIR/scripts/lib.sh"
-PASS=0
-FAIL=0
-FAILED_IDS=""
 
 # ============================================================================
-# Helpers
+# Helpers (file-specific assert functions — call harness pass/fail)
 # ============================================================================
-
-pass() {
-  local id="$1" desc="$2"
-  echo "  PASS: $id — $desc"
-  PASS=$((PASS + 1))
-}
-
-fail() {
-  local id="$1" desc="$2"
-  echo "  FAIL: $id — $desc"
-  FAIL=$((FAIL + 1))
-  FAILED_IDS="${FAILED_IDS}${id} "
-}
 
 assert_eq() {
   local id="$1" desc="$2" expected="$3" actual="$4"

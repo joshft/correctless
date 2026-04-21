@@ -4,11 +4,7 @@
 # RED phase: these tests MUST FAIL — implementation does not exist yet.
 # Run from repo root: bash tests/test-auto-policy.sh
 
-set -uo pipefail
-
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PASS=0
-FAIL=0
+source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 
 # ============================================
 # Helpers (matching project test conventions)

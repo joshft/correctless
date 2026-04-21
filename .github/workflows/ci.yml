@@ -110,6 +110,7 @@ jobs:
           bash tests/test-agent-hooks.sh
           bash tests/test-project-dashboard.sh
           bash tests/test-session-cost.sh
+          bash tests/test-test-harness-extraction.sh
 
       - name: Verify sync
         run: |

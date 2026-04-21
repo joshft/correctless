@@ -1,5 +1,15 @@
 # Dev Journal
 
+## 2026-04-19 — Test Harness Extraction
+
+The 14 newest test files all had the same ~30-line boilerplate block: `pass()`, `fail()`, `section()`, `skip()`, counter variables, color definitions, preamble (`set -uo pipefail`, cd to repo root), and `summary()`. The duplication was a natural consequence of each test file being authored by a fresh TDD agent that couldn't know about helpers that didn't exist yet. Once the pattern stabilized across enough files, extraction became purely mechanical.
+
+The interesting part was the variant classification. Not all 14 files duplicated the same subset. Variant A files (8 files like test-carchitect.sh and test-session-cost.sh) had the full boilerplate — complete pass/fail/section/skip functions, counter init, colors, and preamble. Variant B files (test-dev-journal.sh, test-qa-uncertain.sh) had minimal one-liner pass/fail and counters but no section/skip/colors. Variant C files (test-sensitive-file-guard.sh, test-auto-policy.sh, test-allowed-tools-check.sh) never defined pass/fail at all — they used file-specific assert helpers (assert_eq, file_contains) that directly incremented PASS/FAIL. These files only needed the harness for the preamble and counter initialization.
+
+The variable normalization in test-architecture-drift.sh was a minor surprise — it used `FAILED_INVS` (invariants) instead of the standard `FAILED_IDS`, an artifact of being written before the naming convention settled. The harness uses `FAILED_IDS`, so the migration required updating references in both the fail() calls and the summary function.
+
+The registration guard updates (QA-001) were the most consequential QA finding. test-ci-hook-wiring.sh and test-architecture-drift.sh both enumerate `test-*.sh` files and expect every match to be registered in CI and workflow-config.json. But test-helpers.sh is a sourced helper, not a standalone test — running it directly would just define functions and exit. Both guards now explicitly skip it. This is the same naming-convention tension noted in the QA class fix: `test-helpers.sh` matches `test-*.sh` but is semantically different from the test files it serves. A naming convention like `helpers-test.sh` would avoid this, but changing it now would break the 14 source lines that already reference the path.
+
 ## 2026-04-20 — Session Cost Analysis
 
 The token-tracking PostToolUse hook has been writing zeros for `total_cost_usd` and token counts since it was introduced. The fields don't exist in Claude Code's PostToolUse contract (tracked as [#11008](https://github.com/anthropics/claude-code/issues/11008)). Every /cmetrics dashboard, every calibration entry, every "cost by phase" section has been showing zeros or deriving cost from nothing. This feature replaces the phantom data with real USD cost computed from Claude Code's session transcripts.

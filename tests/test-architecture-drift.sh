@@ -24,15 +24,14 @@
 # migration twice — that is the GREEN agent's job, not a merge-time
 # drift check. This file does not enforce INV-022 directly.
 
-set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 
 # ============================================================================
 # Bootstrap — source scripts/lib.sh for repo_root (INV-020 / ABS-001)
 # Do NOT locally re-implement repo_root, branch_slug, classify_file, etc.
 # ============================================================================
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_SH="${SCRIPT_DIR}/../scripts/lib.sh"
+LIB_SH="$REPO_DIR/scripts/lib.sh"
 
 if [ ! -f "$LIB_SH" ]; then
   echo "FATAL: scripts/lib.sh not found at $LIB_SH" >&2
@@ -43,28 +42,6 @@ fi
 . "$LIB_SH"
 
 REPO_ROOT="$(repo_root)"
-cd "$REPO_ROOT" || { echo "FATAL: cannot cd to repo root" >&2; exit 2; }
-
-PASS=0
-FAIL=0
-FAILED_INVS=""
-
-# ============================================================================
-# Result helpers
-# ============================================================================
-
-pass() {
-  local id="$1" desc="$2"
-  echo "  PASS: $id: $desc"
-  PASS=$((PASS + 1))
-}
-
-fail() {
-  local id="$1" desc="$2"
-  echo "  FAIL: $id: $desc"
-  FAIL=$((FAIL + 1))
-  FAILED_INVS="${FAILED_INVS}${id} "
-}
 
 # ============================================================================
 # Constants — file paths
@@ -1911,6 +1888,10 @@ check_test_registration() {
     local basename
     basename="$(basename "$test_file")"
 
+    # Skip test-helpers.sh — it is a shared harness sourced by other tests,
+    # not a standalone test file. It should NOT be registered in CI or config.
+    [ "$basename" = "test-helpers.sh" ] && continue
+
     if [ -f "$config" ] && ! grep -q "$basename" "$config" 2>/dev/null; then
       missing_config="$missing_config $basename"
     fi
@@ -1942,8 +1923,8 @@ echo ""
 echo "===================================="
 echo "  PASS: $PASS"
 echo "  FAIL: $FAIL"
-if [ -n "$FAILED_INVS" ]; then
-  echo "  Failed invariants: $FAILED_INVS"
+if [ -n "$FAILED_IDS" ]; then
+  echo "  Failed invariants: $FAILED_IDS"
 fi
 echo "===================================="
 

@@ -4,25 +4,7 @@
 # a skill to write to a path or run a command not in its allowed-tools.
 # Run from repo root: bash tests/test-allowed-tools-check.sh
 
-set -uo pipefail
-
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PASS=0
-FAIL=0
-
-# ============================================
-# Helpers
-# ============================================
-
-pass() {
-  echo "  PASS: $1"
-  PASS=$((PASS + 1))
-}
-
-fail() {
-  echo "  FAIL: $1"
-  FAIL=$((FAIL + 1))
-}
+source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 
 # ============================================
 # Part 1: cspec SKILL.md has Step 5a
@@ -35,37 +17,37 @@ cspec="$REPO_DIR/skills/cspec/SKILL.md"
 
 # Step 5a section exists
 if grep -q "Step 5a" "$cspec" 2>/dev/null; then
-  pass "AP-008-01: cspec has Step 5a section"
+  pass "AP-008-01" "cspec has Step 5a section"
 else
-  fail "AP-008-01: cspec missing Step 5a section"
+  fail "AP-008-01" "cspec missing Step 5a section"
 fi
 
 # Step 5a references AP-008
 if grep -q "AP-008" "$cspec" 2>/dev/null; then
-  pass "AP-008-02: cspec Step 5a references AP-008"
+  pass "AP-008-02" "cspec Step 5a references AP-008"
 else
-  fail "AP-008-02: cspec Step 5a does not reference AP-008"
+  fail "AP-008-02" "cspec Step 5a does not reference AP-008"
 fi
 
 # Step 5a mentions allowed-tools cross-check
 if grep -qi "allowed.tools.*cross.check\|cross.check.*allowed.tools\|allowed-tools.*frontmatter" "$cspec" 2>/dev/null; then
-  pass "AP-008-03: cspec Step 5a describes allowed-tools cross-check"
+  pass "AP-008-03" "cspec Step 5a describes allowed-tools cross-check"
 else
-  fail "AP-008-03: cspec Step 5a missing allowed-tools cross-check description"
+  fail "AP-008-03" "cspec Step 5a missing allowed-tools cross-check description"
 fi
 
 # Step 5a mentions Write() and Bash() patterns
 if grep -qi "Write(" "$cspec" 2>/dev/null && grep -qi "Bash(" "$cspec" 2>/dev/null; then
-  pass "AP-008-04: cspec Step 5a covers both Write() and Bash() permissions"
+  pass "AP-008-04" "cspec Step 5a covers both Write() and Bash() permissions"
 else
-  fail "AP-008-04: cspec Step 5a missing Write() or Bash() coverage"
+  fail "AP-008-04" "cspec Step 5a missing Write() or Bash() coverage"
 fi
 
 # Step 5a mentions skipping unrestricted skills
 if grep -qi 'Bash(\*)\|Write(\*)\|unrestricted' "$cspec" 2>/dev/null; then
-  pass "AP-008-05: cspec Step 5a handles unrestricted permissions"
+  pass "AP-008-05" "cspec Step 5a handles unrestricted permissions"
 else
-  fail "AP-008-05: cspec Step 5a missing unrestricted permission handling"
+  fail "AP-008-05" "cspec Step 5a missing unrestricted permission handling"
 fi
 
 # ============================================
@@ -109,7 +91,7 @@ for skill_dir in "$skills_dir"/*/; do
       # Check if it mentions writing but is actually read-only (e.g., cspec reads calibration)
       # Only flag if the skill has explicit write instructions (not just "read")
       if grep -qi "write.*calibration.*entry\|append.*calibration\|create.*calibration" "$skill_file" 2>/dev/null; then
-        fail "AP-008-structural: $skill_name writes to .correctless/meta/ but allowed-tools missing Write(.correctless/meta/*)"
+        fail "AP-008-structural" "$skill_name writes to .correctless/meta/ but allowed-tools missing Write(.correctless/meta/*)"
         structural_issues=$((structural_issues + 1))
       fi
     fi
@@ -126,7 +108,7 @@ for skill_dir in "$skills_dir"/*/; do
       if echo "$allowed" | grep -qF "Bash(jq"; then
         : # covered
       else
-        fail "AP-008-structural: $skill_name has jq commands but allowed-tools missing Bash(jq*)"
+        fail "AP-008-structural" "$skill_name has jq commands but allowed-tools missing Bash(jq*)"
         structural_issues=$((structural_issues + 1))
       fi
     fi
@@ -134,7 +116,7 @@ for skill_dir in "$skills_dir"/*/; do
 done
 
 if [ "$structural_issues" -eq 0 ]; then
-  pass "AP-008-structural: all skills' allowed-tools cover their Write/Bash instructions"
+  pass "AP-008-structural" "all skills' allowed-tools cover their Write/Bash instructions"
 fi
 
 # ============================================
@@ -162,9 +144,9 @@ for skill_dir in "$skills_dir"/*/; do
   # If skill mentions writing to ARCHITECTURE.md
   if grep -qi "write.*ARCHITECTURE\.md\|ARCHITECTURE\.md.*write\|add.*ARCHITECTURE\.md\|append.*ARCHITECTURE" "$skill_file" 2>/dev/null; then
     if echo "$allowed" | grep -qF "Write(.correctless/ARCHITECTURE.md)"; then
-      pass "AP-008-arch: $skill_name has Write(.correctless/ARCHITECTURE.md)"
+      pass "AP-008-arch" "$skill_name has Write(.correctless/ARCHITECTURE.md)"
     else
-      fail "AP-008-arch: $skill_name writes to ARCHITECTURE.md but missing Write(.correctless/ARCHITECTURE.md)"
+      fail "AP-008-arch" "$skill_name writes to ARCHITECTURE.md but missing Write(.correctless/ARCHITECTURE.md)"
     fi
   fi
 done
@@ -181,3 +163,4 @@ echo "============================================="
 if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
+exit 0

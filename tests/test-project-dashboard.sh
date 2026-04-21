@@ -9,30 +9,7 @@
 # Covers R-001 through R-009 (original), DI-R001 through DI-R006 (dashboard insights).
 # Run from repo root: bash tests/test-project-dashboard.sh
 
-set -uo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.." || { echo "FATAL: cannot cd to repo root" >&2; exit 2; }
-
-REPO_DIR="$(pwd)"
-PASS=0
-FAIL=0
-FAILED_IDS=""
-
-# ============================================================================
-# Helpers
-# ============================================================================
-
-pass() {
-  local id="$1" desc="$2"
-  echo "  PASS: $id — $desc"
-  PASS=$((PASS + 1))
-}
-
-fail() {
-  local id="$1" desc="$2"
-  echo "  FAIL: $id — $desc"
-  FAIL=$((FAIL + 1))
-  FAILED_IDS="${FAILED_IDS}${id} "
-}
+source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 
 # Generate dashboard in a directory (runs in subshell to avoid cwd pollution)
 run_dashboard() {
