@@ -230,7 +230,6 @@ fi
 
 section "R-006: Setup script registers agent hook"
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIR="/tmp/correctless-test-agent-hooks-$$"
 
 cleanup() {
