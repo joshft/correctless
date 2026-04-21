@@ -7,14 +7,7 @@
 #
 # Run from repo root: bash tests/test-dev-journal.sh
 
-set -uo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.." || { echo "FATAL: cannot cd to repo root" >&2; exit 2; }
-
-PASS=0 FAIL=0
-FAILED_IDS=""
-
-pass() { PASS=$((PASS + 1)); echo "  PASS: $1 — $2"; }
-fail() { FAIL=$((FAIL + 1)); FAILED_IDS="$FAILED_IDS $1"; echo "  FAIL: $1 — $2"; }
+source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 
 CDOCS_SKILL="skills/cdocs/SKILL.md"
 

@@ -8,59 +8,8 @@
 #
 # Run from repo root: bash tests/test-agent-hooks.sh
 
-set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 set -f
-
-cd "$(dirname "${BASH_SOURCE[0]}")/.." || { echo "FATAL: cannot cd to repo root" >&2; exit 2; }
-
-# ============================================================================
-# Colors (only if stdout is a terminal)
-# ============================================================================
-
-if [ -t 1 ]; then
-  GREEN=$'\033[0;32m'
-  RED=$'\033[0;31m'
-  YELLOW=$'\033[0;33m'
-  RESET=$'\033[0m'
-else
-  GREEN=""
-  RED=""
-  YELLOW=""
-  RESET=""
-fi
-
-PASS=0
-FAIL=0
-SKIPPED=0
-FAILED_IDS=""
-
-# ============================================================================
-# Result helpers
-# ============================================================================
-
-pass() {
-  local id="$1" desc="$2"
-  echo "  ${GREEN}PASS${RESET}: $id: $desc"
-  PASS=$((PASS + 1))
-}
-
-fail() {
-  local id="$1" desc="$2"
-  echo "  ${RED}FAIL${RESET}: $id: $desc"
-  FAIL=$((FAIL + 1))
-  FAILED_IDS="${FAILED_IDS}${id} "
-}
-
-skip() {
-  local id="$1" desc="$2"
-  echo "  ${YELLOW}SKIP${RESET}: $id: $desc"
-  SKIPPED=$((SKIPPED + 1))
-}
-
-section() {
-  echo ""
-  echo "--- Testing: $1 ---"
-}
 
 # ============================================================================
 # File paths

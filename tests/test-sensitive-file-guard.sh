@@ -4,12 +4,9 @@
 # INV-001 through INV-010, PRH-001 through PRH-003, BND-001 through BND-004
 # Run from repo root: bash tests/test-sensitive-file-guard.sh
 
-set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOOK="$REPO_DIR/hooks/sensitive-file-guard.sh"
-PASS=0
-FAIL=0
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -124,10 +124,12 @@ test_inv001_ci_runs_all_test_suites() {
   local ci_file="$REPO_DIR/.github/workflows/ci.yml"
   local config_file="$REPO_DIR/.correctless/config/workflow-config.json"
 
-  # Collect all test files on disk
+  # Collect all test files on disk (skip test-helpers.sh — shared harness, not a standalone test)
   local -a disk_tests=()
   while IFS= read -r f; do
-    disk_tests+=("$(basename "$f")")
+    local _bn; _bn="$(basename "$f")"
+    [ "$_bn" = "test-helpers.sh" ] && continue
+    disk_tests+=("$_bn")
   done < <(find "$REPO_DIR/tests" -maxdepth 1 -name 'test*.sh' -type f | sort)
 
   # Parse commands.test from config — extract individual "bash tests/test-xxx.sh" entries
@@ -788,10 +790,12 @@ test_prh002_no_missing_test_suites() {
   local ci_file="$REPO_DIR/.github/workflows/ci.yml"
   local config_file="$REPO_DIR/.correctless/config/workflow-config.json"
 
-  # Collect all test files on disk
+  # Collect all test files on disk (skip test-helpers.sh — shared harness, not a standalone test)
   local -a disk_tests=()
   while IFS= read -r f; do
-    disk_tests+=("$(basename "$f")")
+    local _bn; _bn="$(basename "$f")"
+    [ "$_bn" = "test-helpers.sh" ] && continue
+    disk_tests+=("$_bn")
   done < <(find "$REPO_DIR/tests" -maxdepth 1 -name 'test*.sh' -type f | sort)
 
   # Parse commands.test from config
