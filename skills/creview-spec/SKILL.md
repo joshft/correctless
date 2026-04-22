@@ -77,7 +77,7 @@ After each major phase completes, write/update the checkpoint:
 Clean up the checkpoint file when the review completes and state advances.
 
 1. Read `.correctless/AGENT_CONTEXT.md` for project context.
-2. Read the spec artifact.
+2. Check current workflow state: `bash .correctless/hooks/workflow-advance.sh status`. Read the spec artifact at the path shown in the `Spec:` line of the status output.
 3. Read `.correctless/ARCHITECTURE.md`.
 4. Read `.correctless/antipatterns.md`.
 5. Read `.correctless/config/workflow-config.json` for intensity level and external review settings.
