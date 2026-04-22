@@ -111,6 +111,7 @@ jobs:
           bash tests/test-project-dashboard.sh
           bash tests/test-session-cost.sh
           bash tests/test-test-harness-extraction.sh
+          bash tests/test-upgrade-compatibility-lens.sh
 
       - name: Verify sync
         run: |
