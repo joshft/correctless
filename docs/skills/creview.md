@@ -5,7 +5,7 @@
 ## When to Use
 
 - After `/cspec` produces an approved spec — this is the mandatory next step at standard intensity
-- At high/critical intensity, for a quick single-pass review on low-risk features (use `/creview-spec` for the full 4-agent adversarial review)
+- At high/critical intensity, for a quick single-pass review on low-risk features (use `/creview-spec` for the full 5-agent adversarial review)
 - **Not for:** reviewing code or pull requests (use `/cpr-review`), reviewing implementation after TDD (use `/cverify`)
 
 ## How It Fits in the Workflow
@@ -64,7 +64,7 @@ Agent: Assumptions check complete — found 2 unstated assumptions.
 
 At **standard** intensity, `/creview` is the standard review — a single-agent skeptical pass covering assumptions, testability, edge cases, antipatterns, integration test levels, and security. This is what most projects use.
 
-At **high/critical** intensity, `/creview` is available as a quick 3-minute review for low-risk features. For higher-risk features, use `/creview-spec` instead, which runs a 4-agent adversarial review team. Users at high/critical intensity can choose either based on the feature's risk profile.
+At **high/critical** intensity, `/creview` is available as a quick 3-minute review for low-risk features. For higher-risk features, use `/creview-spec` instead, which runs a 5-agent adversarial review team. Users at high/critical intensity can choose either based on the feature's risk profile.
 
 ## Common Issues
 

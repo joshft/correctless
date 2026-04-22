@@ -19,7 +19,7 @@ You are a separate agent from the spec author. Do not assume the spec is correct
 
 | | Standard | High | Critical |
 |---|---|---|---|
-| Agents | 1 + security checklist | Routes to /creview-spec (4-agent adversarial) | Routes to /creview-spec + external model |
+| Agents | 1 + security checklist | Routes to /creview-spec (5-agent adversarial) | Routes to /creview-spec + external model |
 | Finding threshold | Disposition required | All addressed | Zero unresolved |
 
 ## Effective Intensity
@@ -30,7 +30,7 @@ Determine the effective intensity using the computation in the shared constraint
 
 **If effective intensity is high:**
 
-> This feature's effective intensity is high. Run `/creview-spec` instead for the 4-agent adversarial review. To proceed with single-pass review anyway, confirm below.
+> This feature's effective intensity is high. Run `/creview-spec` instead for the 5-agent adversarial review. To proceed with single-pass review anyway, confirm below.
 
 Present numbered options:
 1. Switch to /creview-spec (recommended)
@@ -40,7 +40,7 @@ If the user chooses option 2, proceed with the standard single-pass review (all 
 
 **If effective intensity is critical:**
 
-> This feature's effective intensity is critical. Run `/creview-spec` instead — it includes 4-agent adversarial review plus external model verification.
+> This feature's effective intensity is critical. Run `/creview-spec` instead — it includes 5-agent adversarial review plus external model verification.
 
 Present the same numbered options:
 1. Switch to /creview-spec (recommended)

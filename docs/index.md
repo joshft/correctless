@@ -37,7 +37,7 @@ Correctness-oriented development workflow for [Claude Code](https://docs.anthrop
 
 ### High+ Intensity
 - [/cmodel](skills/cmodel.md) — Alloy formal modeling `[critical+]`
-- [/creview-spec](skills/creview-spec.md) — 4-agent adversarial review `[high+]`
+- [/creview-spec](skills/creview-spec.md) — 5-agent adversarial review `[high+]`
 - [/caudit](skills/caudit.md) — Olympics convergence audit `[high+]`
 - [/cupdate-arch](skills/cupdate-arch.md) — Maintain ARCHITECTURE.md `[high+]`
 - [/cpostmortem](skills/cpostmortem.md) — Post-merge bug analysis

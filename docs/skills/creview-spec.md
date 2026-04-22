@@ -1,6 +1,6 @@
 # /creview-spec — Multi-Agent Adversarial Spec Review
 
-> Spawn 4 adversarial agents in parallel to tear apart a spec before any code is written.
+> Spawn 5 adversarial agents in parallel to tear apart a spec before any code is written.
 
 ## When to Use
 
@@ -10,18 +10,19 @@
 
 ## How It Fits in the Workflow
 
-Sits between spec/model and TDD. This is the last gate before code gets written. Four hostile reviewers examine the spec simultaneously, each looking through a different lens. The goal is to find problems in the design, not in code that does not exist yet.
+Sits between spec/model and TDD. This is the last gate before code gets written. Five hostile reviewers examine the spec simultaneously (at high+ intensity), each looking through a different lens. The goal is to find problems in the design, not in code that does not exist yet.
 
 **Requires high intensity or above.**
 
 ## What It Does
 
 - Spawns a self-assessment subagent that reads the spec cold (independent of the author)
-- Launches 4 adversarial agents in parallel, each with the self-assessment as input:
+- Launches 5 adversarial agents in parallel (at high+ intensity), each with the self-assessment as input:
   - **Red Team Agent** — finds attack paths, bypass vectors, and failure modes the spec ignores
   - **Assumptions Auditor** — surfaces every unstated assumption (OS, network, clock, DNS)
   - **Testability Auditor** — flags vague invariants that cannot be turned into pass/fail tests
   - **Design Contract Checker** — verifies the spec composes correctly with ARCHITECTURE.md abstractions and patterns
+  - **Upgrade Compatibility Auditor** — checks what happens to existing users upgrading from a prior version (installation gaps, missing config defaults, schema backward compatibility, migration paths, graceful degradation)
 - Synthesizes findings: unanimous agreement is auto-incorporated; disagreements go to the human
 - Optionally routes flagged invariants to external models for cross-validation
 
@@ -60,7 +61,7 @@ Intensity scales with risk:
 |-----------|---------------|----------|
 | `low` | Assumptions + Testability only | ~5 min |
 | `standard` | + Red Team | ~10 min |
-| `high` / `critical` | All 4 agents | 10-20 min |
+| `high` / `critical` | All 5 agents | 10-20 min |
 
 Intensity is set in `.correctless/config/workflow-config.json`.
 

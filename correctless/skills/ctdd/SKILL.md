@@ -511,17 +511,19 @@ The orchestrator tracks attempt counts for all calm reset triggers in its own co
 
 ## Phase: Mini-Audit (tdd-audit)
 
-After QA completes with no BLOCKING findings, advance to `tdd-audit` via `workflow-advance.sh audit-mini` and spawn the mini-audit agents. The mini-audit asks "how does this feature break everything else?" — using three adversarial lenses that are structurally absent from the QA agent's perspective. No convergence loop — fixed rounds per intensity level (standard=1, high=2, critical=3).
+After QA completes with no BLOCKING findings, advance to `tdd-audit` via `workflow-advance.sh audit-mini` and spawn the mini-audit agents. The mini-audit asks "how does this feature break everything else?" — using four adversarial lenses that are structurally absent from the QA agent's perspective. No convergence loop — fixed rounds per intensity level (standard=1, high=2, critical=3).
 
 ### Agent Prompts
 
-Each mini-audit round spawns three specialist agents as forked subagents, running in parallel:
+Each mini-audit round spawns four specialist agents as forked subagents, running in parallel:
 
 1. **Cross-component interaction agent**: "You are testing how this feature interacts with the rest of the system. Read the entrypoints in `.correctless/ARCHITECTURE.md` (look for `correctless:entrypoints:start` / `correctless:entrypoints:end` markers) and the trust boundaries. For each entrypoint whose scope overlaps with the changed files, ask: does this feature change behavior that other components depend on? Does this feature assume invariants that other components could violate? Does this feature introduce state that other components are unaware of? If no entrypoints exist, fall back to `git diff`-scoped analysis: what other files import symbols from the changed files? What callers depend on the changed interfaces?"
 
 2. **Hostile input agent**: "You are an attacker. The feature implementation is in front of you. Read the trust boundaries (TB-xxx) in `.correctless/ARCHITECTURE.md` to identify which inputs cross trust boundaries. For each input this feature accepts (function arguments, config values, file contents, environment variables, network data), find an input that causes incorrect behavior — not just a crash, but a wrong result, a security bypass, or silent data corruption. Constructed test scenarios with clean inputs don't count — find the ugly inputs."
 
 3. **Resource bounds agent**: "You are a reliability engineer. Read the environment assumptions (ENV-xxx) in `.correctless/ARCHITECTURE.md` for resource constraints. For each resource this feature allocates, manages, or depends on (memory, file handles, goroutines, connections, disk space, CPU time), find a scenario where the resource is exhausted, leaked, or contended. What happens at 10x the expected load? What happens when the resource is unavailable? What happens on graceful shutdown during an operation?"
+
+4. **Upgrade compatibility agent**: "An existing user has this project's tooling installed from a prior version. They update to the version with these changes. Your job is to mechanically check the implementation (git diff against base branch) against the 5-item checklist below — do not hallucinate what the project looked like before; work from what the diff adds, changes, or removes. (1) Does the install/setup mechanism install all new files? Verify glob patterns, not hardcoded lists (AP-024/PMB-003). (2) Do new config keys have fallback defaults in the code that reads them? (3) Do new artifact schemas include version markers or graceful parsing for old formats? (4) Do removed or renamed files have migration paths? (5) Do new features that depend on artifacts from other new features degrade gracefully when those artifacts don't exist yet? For each issue, report it as a finding with the MA- prefix and LENS: upgrade-compatibility."
 
 ### Agent Context and Tools
 
@@ -534,7 +536,7 @@ Each agent returns findings using the `MA-` prefix (not `QA-`) to distinguish mi
 ```
 FINDING: MA-001
 SEVERITY: CRITICAL|HIGH|MEDIUM|LOW|UNCERTAIN
-LENS: cross-component|hostile-input|resource-bounds
+LENS: cross-component|hostile-input|resource-bounds|upgrade-compatibility
 RULE: R-xxx or null
 DESCRIPTION: [what's wrong]
 INSTANCE_FIX: [fix this specific bug]
@@ -574,7 +576,7 @@ Each round after the first receives a "raise the bar" prompt:
 
 ### Progress Announcements
 
-Before each round, announce: "Starting mini-audit round {N}/{total} — spawning 3 specialist agents (cross-component, hostile input, resource bounds)."
+Before each round, announce: "Starting mini-audit round {N}/{total} — spawning 4 specialist agents (cross-component, hostile input, resource bounds, upgrade compatibility)."
 
 As each agent completes, announce immediately: "{Agent name} complete — found {N} findings ({C} critical/high, {M} medium/low). {M} agents still running..."
 
@@ -582,11 +584,11 @@ After all agents complete: "Round {N} complete — {N} total findings ({C} block
 
 ### Agent Failure Handling
 
-If a mini-audit agent fails (context limit, tool error, malformed output, timeout), the round completes with the remaining agents' findings. The orchestrator logs the failure and warns the user which lens was missed: "Warning: {agent name} agent failed ({reason}). Round {N} results are from {remaining lenses} only. The {missing lens} perspective was not evaluated." No automatic retry — retries are expensive and the other two lenses are still valuable.
+If a mini-audit agent fails (context limit, tool error, malformed output, timeout), the round completes with the remaining agents' findings. The orchestrator logs the failure and warns the user which lens was missed: "Warning: {agent name} agent failed ({reason}). Round {N} results are from {remaining lenses} only. The {missing lens} perspective was not evaluated." No automatic retry — retries are expensive and the other three lenses are still valuable.
 
 ### Zero Findings / Clean Round
 
-When all three agents in a round return zero findings AND all three agents completed successfully, the orchestrator announces "Mini-audit round {N} clean — no findings across all three lenses." If any agent failed, the round is announced as "incomplete" rather than "clean" — zero findings from failed agents is not the same as zero findings from successful agents.
+When all four agents in a round return zero findings AND all four agents completed successfully, the orchestrator announces "Mini-audit round {N} clean — no findings across all four lenses." If any agent failed, the round is announced as "incomplete" rather than "clean" — zero findings from failed agents is not the same as zero findings from successful agents.
 
 At multi-round intensity (high/critical), subsequent rounds still run even if earlier rounds were clean — the fresh-context, no-anchoring design means a later round may find what an earlier one missed.
 
@@ -598,7 +600,7 @@ The mini-audit does NOT use a convergence loop. Each intensity level has a fixed
 
 ### Token Tracking
 
-Token tracking for the mini-audit follows the shared constraints. Skill-specific values: `skill: "ctdd"`, `phase: "mini-audit-round-N"`, `agent_role: "cross-component|hostile-input|resource-bounds"`. The `tdd-audit` → `ctdd` mapping is in `hooks/token-tracking.sh`.
+Token tracking for the mini-audit follows the shared constraints. Skill-specific values: `skill: "ctdd"`, `phase: "mini-audit-round-N"`, `agent_role: "cross-component|hostile-input|resource-bounds|upgrade-compatibility"`. The `tdd-audit` → `ctdd` mapping is in `hooks/token-tracking.sh`.
 
 ## After TDD Completes: Next Steps
 
@@ -635,7 +637,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
 - `skill`: "ctdd"
 - `phase`: "{red|test-audit|green|qa|fix-round-N|mini-audit-round-N}"
-- `agent_role`: "{test-writer|test-auditor|implementation|qa-agent|fix-agent|cross-component|hostile-input|resource-bounds}"
+- `agent_role`: "{test-writer|test-auditor|implementation|qa-agent|fix-agent|cross-component|hostile-input|resource-bounds|upgrade-compatibility}"
 
 ### /btw Reminder
 When presenting QA findings for the human to review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."

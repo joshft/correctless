@@ -23,7 +23,7 @@ This skill requires effective intensity `high` or above. Compute effective inten
   - Then **do not proceed** with the skill body. Stop here.
 - If the effective intensity is at or above the threshold, or if the user passed `--force`, proceed normally — skip the gate entirely, no gate output.
 
-**When to use:** This is the standard review at high+ intensity. Spawns 4 adversarial agents (10-20 min). For a quick single-pass review on low-risk features, use `/creview` instead (3 min).
+**When to use:** This is the standard review at high+ intensity. Spawns 5 adversarial agents (10-20 min). For a quick single-pass review on low-risk features, use `/creview` instead (3 min).
 
 You are the review-spec lead agent. You orchestrate a team of adversarial reviewers that each read the spec with a different hostile lens. You did NOT write this spec.
 
@@ -37,14 +37,15 @@ This review spawns multiple parallel agents and can take 10-20 minutes. The user
 3. Assumptions Auditor
 4. Testability Auditor
 5. Design Contract Checker
-6. Synthesis and deduplication
-7. Present findings
+6. Upgrade Compatibility Auditor
+7. Synthesis and deduplication
+8. Present findings
 
-**When spawning agents**, tell the user: "Spawning 4 adversarial agents in parallel: Red Team, Assumptions Auditor, Testability Auditor, Design Contract Checker. Each reads the spec with a different hostile lens."
+**When spawning agents**, tell the user: "Spawning 5 adversarial agents in parallel: Red Team, Assumptions Auditor, Testability Auditor, Design Contract Checker, Upgrade Compatibility Auditor. Each reads the spec with a different hostile lens."
 
 **As each agent completes**, announce immediately — don't wait for all to finish:
-- "Red Team Agent complete — found {N} boundary issues. Still waiting on 3 agents..."
-- "Assumptions Auditor complete — found {N} unstated assumptions. 2 agents still running..."
+- "Red Team Agent complete — found {N} boundary issues. Still waiting on 4 agents..."
+- "Assumptions Auditor complete — found {N} unstated assumptions. 3 agents still running..."
 - "All agents complete. Synthesizing findings..."
 
 Mark each task complete as agents return results.
@@ -57,7 +58,7 @@ Mark each task complete as agents return results.
 
 After reading the spec artifact (step 2 below), check for `.correctless/artifacts/checkpoint-creview-spec-{slug}.json` (derive slug from the spec file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
-- **If found and <24 hours old**: Read `completed_phases`. Phases: `self-assessment`, `red-team`, `assumptions`, `testability`, `design-contract`. For parallel agents, checkpoint only after ALL 4 complete, not individually — partial agent results are not useful without synthesis. Verification is weak here (agent output lives in conversation context, not artifacts), so if the checkpoint says agents completed but you cannot access their findings: "Checkpoint found but agent outputs are not recoverable. Restarting agent team." Re-spawning is safer than skipping.
+- **If found and <24 hours old**: Read `completed_phases`. Phases: `self-assessment`, `red-team`, `assumptions`, `testability`, `design-contract`, `upgrade-compatibility`. For parallel agents, checkpoint only after ALL 5 complete, not individually — partial agent results are not useful without synthesis. Verification is weak here (agent output lives in conversation context, not artifacts), so if the checkpoint says agents completed but you cannot access their findings: "Checkpoint found but agent outputs are not recoverable. Restarting agent team." Re-spawning is safer than skipping.
   If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}."
 - **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
 - **If not found**: Start from the beginning as normal.
@@ -68,7 +69,7 @@ After each major phase completes, write/update the checkpoint:
   "skill": "creview-spec",
   "slug": "{task-slug}",
   "branch": "{current-branch}",
-  "completed_phases": ["self-assessment", "red-team", "assumptions", "testability", "design-contract"],
+  "completed_phases": ["self-assessment", "red-team", "assumptions", "testability", "design-contract", "upgrade-compatibility"],
   "current_phase": "synthesis",
   "timestamp": "ISO"
 }
@@ -128,9 +129,12 @@ Spawn these agents in parallel each as a forked subagent:
 ### 4. Design Contract Checker
 > You are a design contract auditor. Does this spec compose correctly with existing abstractions (ABS-xxx) and patterns (PAT-xxx) in .correctless/ARCHITECTURE.md? Any conflicts? Any new abstractions that should be documented?
 
+### 5. Upgrade Compatibility Auditor
+> An existing user has this project's tooling installed from a prior version. A new version ships with the changes described in this spec. Your job is to mechanically check the spec against the 5-item checklist below — do not hallucinate what the project looked like before; work from what the spec adds, changes, or removes. (1) New scripts or hooks that setup/install must propagate — does the spec account for installation? Is the installation mechanism complete (glob vs hardcoded list, see AP-024/PMB-003)? (2) New config keys — does the spec require defaults so old configs still work? (3) Schema changes in state files, artifacts, or config — does the spec address backward compatibility for old consumers? (4) Removed or renamed files — does the spec include a migration path? (5) New features that depend on artifacts old versions don't produce — does the spec require graceful degradation? For each finding, state what the upgrade user experiences (error, silent degradation, or crash) and what the spec should add to prevent it.
+
 At `low` intensity: spawn only assumptions + testability auditors.
 At `standard`: add red team.
-At `high`/`critical`: spawn all four.
+At `high`/`critical`: spawn all five.
 
 ## Step 2: Collect and Synthesize
 
@@ -163,7 +167,8 @@ Organize findings by category:
 3. Unstated assumptions
 4. Untestable invariants (with rewrites)
 5. Design contract conflicts
-6. External model findings (if any)
+6. Upgrade compatibility findings
+7. External model findings (if any)
 
 For each finding, present the disposition options:
 
@@ -262,7 +267,7 @@ See "Progress Visibility" section above — task creation and agent announcement
 Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
 - `skill`: "creview-spec"
 - `phase`: "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|external-{model}}"
-- `agent_role`: "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|external-{model}}"
+- `agent_role`: "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|upgrade-compatibility|external-{model}}"
 
 ### Context Enforcement
 **Context enforcement (mandatory):** Before spawning the agent team, check context usage. If above 70%: the agents run forked (clean context) but the orchestrator needs to synthesize findings. Warn: "Context at {N}%. Run `/compact` before I spawn the review team — synthesis quality degrades with full context." If above 85%: stop and require /compact.
