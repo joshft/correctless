@@ -1791,6 +1791,80 @@ check_no_tmp_paths_in_skills() {
 }
 
 # ============================================================================
+# Path Discovery Guard (R-005 from skill-path-discovery spec)
+#
+# Skills that reference "Read the spec artifact" must include explicit path
+# discovery instructions. PMB-004 proved agents hallucinate wrong paths without
+# them. This guard maintains two lists:
+#   MUST_HAVE_DISCOVERY — skills that need at least one discovery token
+#   EXCLUDED_FROM_DISCOVERY — skills that don't need single-spec discovery
+# Any skill directory not in either list causes the test to fail, forcing
+# the author to classify every new skill.
+# ============================================================================
+
+check_path_discovery_guard() {
+  # Skills that MUST have at least one path discovery token in their body
+  MUST_HAVE_DISCOVERY="creview-spec creview ctdd cverify cpostmortem csummary cdocs cmodel"
+
+  # Skills excluded from the path discovery requirement — they don't reference
+  # a single spec artifact or use directory-scan patterns instead
+  EXCLUDED_FROM_DISCOVERY="crelease cupdate-arch carchitect csetup chelp cstatus cquick cexplain cdebug crefactor ccontribute cmaintain cpr-review credteam caudit cdevadv cauto cwtf cmetrics cspec"
+
+  # Valid discovery tokens (checked as extended regex against the skill body)
+  local discovery_pattern="workflow-advance\.sh status|spec_file|path from workflow|\.correctless/specs/"
+
+  # Helper: extract everything after YAML frontmatter
+  local_skill_body() {
+    awk '
+      BEGIN { state = 0 }
+      NR == 1 && /^---/ { state = 1; next }
+      state == 1 && /^---/ { state = 0; next }
+      state == 0 { print }
+    ' "$1"
+  }
+
+  # Part 1: verify every MUST_HAVE skill contains at least one discovery token
+  local skill skill_file body
+  for skill in $MUST_HAVE_DISCOVERY; do
+    skill_file="skills/$skill/SKILL.md"
+    if [ ! -f "$skill_file" ]; then
+      fail "DISC-001-$skill" "MUST_HAVE_DISCOVERY skill file not found: $skill_file"
+      continue
+    fi
+    body="$(local_skill_body "$skill_file")"
+    if grep -qE "$discovery_pattern" <<< "$body"; then
+      pass "DISC-001-$skill" "$skill has path discovery token"
+    else
+      fail "DISC-001-$skill" "Skill $skill in MUST_HAVE_DISCOVERY but has no path discovery token"
+    fi
+  done
+
+  # Part 2: verify every skill directory is classified in one of the two lists
+  local skill_dir skill_name in_must in_excluded m e
+  for skill_dir in skills/*/; do
+    [ -d "$skill_dir" ] || continue
+    skill_name="$(basename "$skill_dir")"
+    # Skip _shared — it's not a skill
+    [ "$skill_name" = "_shared" ] && continue
+
+    in_must=0
+    in_excluded=0
+    for m in $MUST_HAVE_DISCOVERY; do
+      [ "$skill_name" = "$m" ] && in_must=1 && break
+    done
+    for e in $EXCLUDED_FROM_DISCOVERY; do
+      [ "$skill_name" = "$e" ] && in_excluded=1 && break
+    done
+
+    if [ "$in_must" = "0" ] && [ "$in_excluded" = "0" ]; then
+      fail "DISC-002-$skill_name" "Skill $skill_name not classified in path-discovery guard — add to MUST_HAVE_DISCOVERY or EXCLUDED_FROM_DISCOVERY list"
+    else
+      pass "DISC-002-$skill_name" "Skill $skill_name classified in path-discovery guard"
+    fi
+  done
+}
+
+# ============================================================================
 # Run all checks
 # ============================================================================
 
@@ -1821,6 +1895,7 @@ check_qa_001_class
 check_qa_002_class
 check_no_inline_branch_slug
 check_no_tmp_paths_in_skills
+check_path_discovery_guard
 
 run_negative_cases
 

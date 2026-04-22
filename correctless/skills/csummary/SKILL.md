@@ -32,7 +32,7 @@ Read these files to build the summary. Skip any that don't exist.
 
 ### Step 1: Identify the Feature
 
-Read the workflow state file to get the task name, spec path, and branch. If no active workflow, ask the human which feature to summarize and look for the spec and artifacts by slug.
+Run `bash .correctless/hooks/workflow-advance.sh status` to get the task name, spec path, and branch. If no active workflow, ask the human which feature to summarize and search `.correctless/specs/` by slug.
 
 ### Step 2: Gather Review Findings
 

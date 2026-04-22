@@ -109,3 +109,7 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 ### 2026-04-21 — Postmortem: Hardcoded file list in setup silently skips new scripts
 - Setup installs hooks via glob (correct) but scripts via a hardcoded 2-file list (incorrect). 16 of 18 scripts were never installed on user projects. The list was correct when written (PR #30, only 2 scripts existed) but silently went stale across 5 PRs that added scripts. Silent failure: hooks work (source lib.sh), but features needing other scripts degrade with no error. Class fix: glob all `scripts/*.sh` (matching hook pattern), add structural test verifying installed count matches source count. See AP-024.
 - Source: PMB-003
+
+### 2026-04-22 — Postmortem: Skill says "Read the spec artifact" without path discovery
+- `/creview-spec` step 2 says "Read the spec artifact" with no path and no `workflow-advance.sh status` call. Works on correctless (conversation context has the path from /cspec). Fails on other projects in fresh sessions — agent hallucinates wrong paths. `/creview` and `/ctdd` both say "path from workflow state" — /creview-spec missed this pattern. Class: skills must discover artifact paths via workflow state, not assume conversation context. See AP-025.
+- Source: PMB-004

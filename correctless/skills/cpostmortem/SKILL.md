@@ -47,8 +47,8 @@ Mark each task complete as it finishes.
 
 1. Read `.correctless/meta/workflow-effectiveness.json` for existing bug history.
 2. Read `.correctless/antipatterns.md` to check if this bug class is already tracked.
-3. Identify the spec artifact for the feature where the bug was introduced.
-4. Read the verification report for that feature if it exists.
+3. Identify the spec artifact for the feature. If the feature has an active workflow, read the path from `workflow-advance.sh status`. If no active workflow exists (post-merge postmortem), search `.correctless/specs/` by slug.
+4. Read the verification report at `.correctless/verification/{task-slug}-verification.md` (if it exists).
 5. Read `.correctless/artifacts/debug-investigation-*.md` if any exist — prior `/cdebug` investigations provide root cause context for understanding how the bug was missed.
 
 ## Behavior
@@ -63,7 +63,7 @@ Ask the human (batch where appropriate):
 
 ### Step 2: Analyze the Miss
 
-Read the spec and verification report (if they exist):
+Read the spec (path from step 3) and verification report at `.correctless/verification/{task-slug}-verification.md` (if they exist):
 - Did a spec invariant cover this bug class? If yes, why didn't the test catch it?
 - If no invariant covered it, should one have existed? Which category?
 - Which workflow phase should have caught this? (spec, review/review-spec, tdd-qa, tdd-verify/cverify, audit)
