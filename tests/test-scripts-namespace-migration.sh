@@ -578,6 +578,37 @@ test_integration_upgrade_then_hooks() {
 }
 
 # ---------------------------------------------------------------------------
+# PMB-003: All source scripts installed (AP-024 structural guard)
+# ---------------------------------------------------------------------------
+
+test_pmb003_all_scripts_installed() {
+  echo ""
+  echo "=== PMB-003: Setup installs ALL scripts from source (AP-024) ==="
+
+  setup_test_project
+  .claude/skills/workflow/setup >/dev/null 2>&1
+
+  # Count .sh files in the plugin's scripts/ directory (source of truth)
+  local source_count installed_count
+  source_count="$(find .claude/skills/workflow/scripts -maxdepth 1 -name '*.sh' -type f | wc -l | tr -d ' ')"
+  installed_count="$(find "$TEST_DIR/.correctless/scripts" -maxdepth 1 -name '*.sh' -type f | wc -l | tr -d ' ')"
+
+  assert_eq "PMB-003: installed script count ($installed_count) matches source ($source_count)" \
+    "$source_count" "$installed_count"
+
+  # Verify each source script has a corresponding installed copy
+  for src in .claude/skills/workflow/scripts/*.sh; do
+    [ -f "$src" ] || continue
+    local name
+    name="$(basename "$src")"
+    assert_file_exists "PMB-003: $name installed" \
+      "$TEST_DIR/.correctless/scripts/$name"
+  done
+
+  cleanup
+}
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
@@ -598,6 +629,7 @@ test_r007_readme_updated
 test_r007_agent_context_source_refs_unchanged
 test_integration_hooks_find_lib_after_setup
 test_integration_upgrade_then_hooks
+test_pmb003_all_scripts_installed
 
 echo ""
 echo "======================"
