@@ -1804,24 +1804,16 @@ check_no_tmp_paths_in_skills() {
 
 check_path_discovery_guard() {
   # Skills that MUST have at least one path discovery token in their body
-  MUST_HAVE_DISCOVERY="creview-spec creview ctdd cverify cpostmortem csummary cdocs cmodel"
+  local MUST_HAVE_DISCOVERY="creview-spec creview ctdd cverify cpostmortem csummary cdocs cmodel"
 
   # Skills excluded from the path discovery requirement — they don't reference
   # a single spec artifact or use directory-scan patterns instead
-  EXCLUDED_FROM_DISCOVERY="crelease cupdate-arch carchitect csetup chelp cstatus cquick cexplain cdebug crefactor ccontribute cmaintain cpr-review credteam caudit cdevadv cauto cwtf cmetrics cspec"
+  local EXCLUDED_FROM_DISCOVERY="crelease cupdate-arch carchitect csetup chelp cstatus cquick cexplain cdebug crefactor ccontribute cmaintain cpr-review credteam caudit cdevadv cauto cwtf cmetrics cspec"
 
   # Valid discovery tokens (checked as extended regex against the skill body)
   local discovery_pattern="workflow-advance\.sh status|spec_file|path from workflow|\.correctless/specs/"
 
-  # Helper: extract everything after YAML frontmatter
-  local_skill_body() {
-    awk '
-      BEGIN { state = 0 }
-      NR == 1 && /^---/ { state = 1; next }
-      state == 1 && /^---/ { state = 0; next }
-      state == 0 { print }
-    ' "$1"
-  }
+  # skill_body() is provided by test-helpers.sh
 
   # Part 1: verify every MUST_HAVE skill contains at least one discovery token
   local skill skill_file body
@@ -1831,7 +1823,7 @@ check_path_discovery_guard() {
       fail "DISC-001-$skill" "MUST_HAVE_DISCOVERY skill file not found: $skill_file"
       continue
     fi
-    body="$(local_skill_body "$skill_file")"
+    body="$(skill_body "$skill_file")"
     if grep -qE "$discovery_pattern" <<< "$body"; then
       pass "DISC-001-$skill" "$skill has path discovery token"
     else

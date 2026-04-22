@@ -12,21 +12,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 echo "Correctless Skill Path Discovery Tests"
 echo "======================================="
 
-# ============================================================================
-# Helper: extract skill body (everything after YAML frontmatter)
+# skill_body() is provided by test-helpers.sh
 # Uses herestrings (<<<) instead of pipes to avoid SIGPIPE with pipefail
 # when grep -q exits early on large skill files.
-# ============================================================================
-
-skill_body() {
-  local file="$1"
-  awk '
-    BEGIN { state = 0 }
-    NR == 1 && /^---/ { state = 1; next }
-    state == 1 && /^---/ { state = 0; next }
-    state == 0 { print }
-  ' "$file"
-}
 
 # ============================================================================
 # R-001 [unit]: /creview-spec step 2 has workflow-advance.sh status call
