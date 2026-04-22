@@ -1,5 +1,15 @@
 # Dev Journal
 
+## 2026-04-22 — Skill Path Discovery
+
+PMB-004 surfaced a class of bug where skills reference workflow artifacts by concept ("Read the spec artifact") without specifying how to discover the file path. This works on the Correctless repo itself because conversation context from a preceding `/cspec` run carries the path forward. On other projects in fresh sessions, the agent hallucinates paths -- `/creview-spec` tried three wrong locations before giving up. The fix is straightforward: each skill now calls `workflow-advance.sh status` and reads the `Spec:` line, matching the pattern already used by `/creview` and `/ctdd`.
+
+Four skills were fixed: `/creview-spec` (step 2 replaced entirely), `/cverify` (removed the vague "from workflow state or `.correctless/specs/`" fallback), `/cpostmortem` (added workflow state lookup with a `.correctless/specs/` fallback for post-merge postmortems), and `/csummary` (added `workflow-advance.sh status` call to replace state file reading). The changes are text-only -- prompt edits, not code. The distribution copies were synced via `sync.sh`.
+
+The structural guard in `test-architecture-drift.sh` is the more interesting contribution. It maintains two explicit lists -- `MUST_HAVE_DISCOVERY` (8 skills that must have at least one path discovery token) and `EXCLUDED_FROM_DISCOVERY` (20 skills that don't need single-spec discovery). Every skill directory that isn't `_shared` must appear in exactly one list, or the test fails. This is the same list-based classification pattern used by REG-001 (test registration guard) -- a new skill being added to `skills/` will fail the drift test until the author decides whether it needs path discovery. The `skill_body()` helper was extracted to `test-helpers.sh` (shared harness) since both `test-skill-path-discovery.sh` and `test-architecture-drift.sh` need it to strip YAML frontmatter before checking skill content.
+
+AP-025 was added to antipatterns.md documenting the bug class. The Correctless Learnings in CLAUDE.md got a PMB-004 entry. No new architecture patterns were introduced -- this feature applies existing conventions (PAT-001 source-to-dist sync, structural guard classification) to a new context.
+
 ## 2026-04-19 — Test Harness Extraction
 
 The 14 newest test files all had the same ~30-line boilerplate block: `pass()`, `fail()`, `section()`, `skip()`, counter variables, color definitions, preamble (`set -uo pipefail`, cd to repo root), and `summary()`. The duplication was a natural consequence of each test file being authored by a fresh TDD agent that couldn't know about helpers that didn't exist yet. Once the pattern stabilized across enough files, extraction became purely mechanical.
