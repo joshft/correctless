@@ -290,15 +290,12 @@ install_hooks() {
   ok "Installed hooks to .correctless/hooks/"
 
   # Install phase-transition scripts (sourced by hooks and invoked by skills)
-  if [ -d "$SCRIPT_DIR/scripts" ]; then
-    # QA-R2-003: Always copy scripts (same as hooks — generated code, not user-edited)
-    for script in lib.sh antipattern-scan.sh; do
-      if [ -f "$SCRIPT_DIR/scripts/$script" ]; then
-        cp "$SCRIPT_DIR/scripts/$script" "$script_dest/$script"
-      fi
-    done
-    chmod +x "$script_dest/antipattern-scan.sh" 2>/dev/null || true
-  fi
+  # PMB-003 / AP-024: glob all .sh files — never use a hardcoded list (matches hook pattern above)
+  for script in "$SCRIPT_DIR"/scripts/*.sh; do
+    [ -f "$script" ] || continue
+    cp "$script" "$script_dest/$(basename "$script")"
+    chmod +x "$script_dest/$(basename "$script")" 2>/dev/null || true
+  done
 
   # ============================================
   # Write install manifest with SHA-256 checksums
