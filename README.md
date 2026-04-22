@@ -120,7 +120,7 @@ Each box is a separate agent. The test writer doesn't know the implementation pl
 ```mermaid
 graph LR
     A["/cspec<br/>Typed invariants"] --> B["/cmodel<br/>Alloy modeling"]
-    B --> C["/creview-spec<br/>4-agent adversarial"]
+    B --> C["/creview-spec<br/>5-agent adversarial"]
     C --> D["/ctdd<br/>+ mutation testing"]
     D --> E["/cverify<br/>+ drift detection"]
     E --> F["/cupdate-arch"]
@@ -250,7 +250,7 @@ graph LR
 | Skill | Min Intensity | What It Does |
 |-------|---------------|--------------|
 | [`/caudit`](docs/skills/caudit.md) | high | Olympics convergence audit (QA / Hacker / Performance presets) |
-| [`/creview-spec`](docs/skills/creview-spec.md) | high | 4-agent adversarial spec review |
+| [`/creview-spec`](docs/skills/creview-spec.md) | high | 5-agent adversarial spec review |
 | [`/cupdate-arch`](docs/skills/cupdate-arch.md) | high | Keep ARCHITECTURE.md current after features land |
 | [`/cmodel`](docs/skills/cmodel.md) | critical | Alloy formal modeling for state machines and protocols |
 | [`/credteam`](docs/skills/credteam.md) | critical | Live adversarial red team with source code access |
@@ -432,7 +432,7 @@ rm -rf .correctless/
 | **Spec** | A document defining what "correct" means for a feature: testable rules, edge cases, security assumptions. A spec that can't be tested is incomplete. |
 | **Invariant** | A rule that must always be true: "auth tokens expire after 24 hours." Specs are lists of invariants. |
 | **Intensity** | The configured rigor level: standard, high, or critical. Higher intensity unlocks more skills but costs more tokens and time. |
-| **Mini-audit** | After QA clears, three adversarial specialist agents (cross-component interaction, hostile input, resource bounds) hunt for issues the QA lens misses. Runs at the end of `/ctdd`. |
+| **Mini-audit** | After QA clears, four adversarial specialist agents (cross-component interaction, hostile input, resource bounds, upgrade compatibility) hunt for issues the QA lens misses. Runs at the end of `/ctdd`. |
 | **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Available at high+ intensity. |
 | **STRIDE** | Threat modeling framework: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege. |
 | **RED / GREEN** | TDD phases. RED = write tests that fail. GREEN = write code to make tests pass. |
