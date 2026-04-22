@@ -47,14 +47,14 @@ else
   fail "R-001c" "Checklist item 2 (config keys / defaults) not found in creview-spec"
 fi
 
-# R-001d: Item 3: "Schema changes" and "backward compatibility"
+# R-001d: Item 3: "backward compatibility"
 if grep -qi 'backward compatibility' "$CREVIEW_SPEC_SKILL"; then
   pass "R-001d" "Checklist item 3 (backward compatibility) present in creview-spec"
 else
   fail "R-001d" "Checklist item 3 (backward compatibility) not found in creview-spec"
 fi
 
-# R-001e: Item 4: "Removed or renamed" and "migration path"
+# R-001e: Item 4: "migration path"
 if grep -qi 'migration path' "$CREVIEW_SPEC_SKILL"; then
   pass "R-001e" "Checklist item 4 (migration path) present in creview-spec"
 else
@@ -256,17 +256,11 @@ else
   fail "R-006c" "'spawn all five' not found (still says 'spawn all four'?)"
 fi
 
-# R-006d: Task list has the Upgrade Compatibility Auditor as an item
-# (should appear between Design Contract Checker and Synthesis)
-if grep -qi 'Upgrade Compatibility Auditor' "$CREVIEW_SPEC_SKILL"; then
-  # Check it's in the task list (numbered items)
-  if grep -qE '^\s*[0-9]+\.\s*Upgrade Compatibility' "$CREVIEW_SPEC_SKILL"; then
-    pass "R-006d" "Upgrade Compatibility Auditor in task list"
-  else
-    fail "R-006d" "Upgrade Compatibility Auditor exists but not in numbered task list"
-  fi
+# R-006d: Upgrade Compatibility Auditor appears as a numbered task list item
+if grep -qE '^\s*[0-9]+\.\s*Upgrade Compatibility' "$CREVIEW_SPEC_SKILL"; then
+  pass "R-006d" "Upgrade Compatibility Auditor in numbered task list"
 else
-  fail "R-006d" "Upgrade Compatibility Auditor not found in creview-spec"
+  fail "R-006d" "Upgrade Compatibility Auditor not in numbered task list"
 fi
 
 # R-006e: "Present to Human" category list has upgrade compatibility findings
@@ -276,16 +270,11 @@ else
   fail "R-006e" "Upgrade compatibility findings not in Present to Human categories"
 fi
 
-# R-006f: checkpoint completed_phases includes upgrade-compatibility
-if grep -q 'upgrade-compatibility' "$CREVIEW_SPEC_SKILL"; then
-  # Check it's in the completed_phases JSON example
-  if grep -qE 'completed_phases.*upgrade-compatibility' "$CREVIEW_SPEC_SKILL"; then
-    pass "R-006f" "upgrade-compatibility in checkpoint completed_phases"
-  else
-    fail "R-006f" "upgrade-compatibility not in checkpoint completed_phases JSON"
-  fi
+# R-006f: checkpoint completed_phases JSON includes upgrade-compatibility
+if grep -qE 'completed_phases.*upgrade-compatibility' "$CREVIEW_SPEC_SKILL"; then
+  pass "R-006f" "upgrade-compatibility in checkpoint completed_phases"
 else
-  fail "R-006f" "upgrade-compatibility not found in creview-spec"
+  fail "R-006f" "upgrade-compatibility not in checkpoint completed_phases JSON"
 fi
 
 # R-006g: token tracking agent_role includes upgrade-compatibility
@@ -296,7 +285,6 @@ else
 fi
 
 # R-006h: Standard intensity still says 3 agents (upgrade not spawned at standard)
-# We need to verify that the standard intensity is NOT changed
 if grep -qi 'standard.*3\|standard.*spawn.*3\|add red team' "$CREVIEW_SPEC_SKILL"; then
   pass "R-006h" "Standard intensity still references 3 agents"
 else
