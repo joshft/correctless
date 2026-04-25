@@ -79,6 +79,21 @@ cleanup_test_repo() {
   cd "$REPO_DIR" || true
 }
 
+# Derive the branch slug for the current test repo's branch.
+# Sets TEST_SLUG; returns 1 on failure.
+derive_test_slug() {
+  TEST_SLUG=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || TEST_SLUG=""
+  [ -n "$TEST_SLUG" ]
+}
+
+# Write a workflow state file for branch "main" in the test repo.
+# Arguments: JSON body (heredoc-friendly)
+write_state_file() {
+  local state_file
+  state_file="$(state_filename "main")"
+  cat > "$TEST_DIR/$state_file"
+}
+
 # Create a cost cache file for the test repo
 # Arguments: $1=branch-slug, $2=total_cost_usd, $3=current_phase_cost_usd, $4=age_seconds (0=fresh)
 create_cost_cache() {
@@ -118,9 +133,7 @@ section "R-001: Cost display omission"
 # section should include a dollar amount like $47.23
 test_r001_cost_shown_when_available() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -129,16 +142,9 @@ test_r001_cost_shown_when_available() {
 }
 SFJSON
 
-  # Get the branch slug the same way the statusline does
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  if [ -z "$slug" ]; then
-    fail "R001-a" "Could not derive branch slug for test setup"
-    cleanup_test_repo
-    return
-  fi
+  derive_test_slug || { fail "R001-a" "Could not derive branch slug for test setup"; cleanup_test_repo; return; }
 
-  create_cost_cache "$slug" 47.23 12.50 0
+  create_cost_cache "$TEST_SLUG" 47.23 12.50 0
 
   local out
   out=$(run_sl "$(integration_json)")
@@ -156,9 +162,7 @@ SFJSON
 # Tests R-001 [unit]: When total_cost_usd is 0 in the cache, cost display is omitted
 test_r001_cost_omitted_when_zero() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -166,11 +170,9 @@ test_r001_cost_omitted_when_zero() {
 }
 SFJSON
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  [ -n "$slug" ] || { fail "R001-b" "branch_slug failed"; cleanup_test_repo; return; }
+  derive_test_slug || { fail "R001-b" "branch_slug failed"; cleanup_test_repo; return; }
 
-  create_cost_cache "$slug" 0 0 0
+  create_cost_cache "$TEST_SLUG" 0 0 0
 
   local out
   out=$(run_sl "$(integration_json)")
@@ -192,9 +194,7 @@ SFJSON
 # Tests R-001 [unit]: When cache file doesn't exist, cost display is omitted
 test_r001_cost_omitted_when_no_cache() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -233,9 +233,7 @@ section "R-002: Cache reading and staleness"
 # (.correctless/artifacts/cost-cache-{branch-slug}.json)
 test_r002_cache_path() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -243,12 +241,10 @@ test_r002_cache_path() {
 }
 SFJSON
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  [ -n "$slug" ] || { fail "R002-a" "branch_slug failed"; cleanup_test_repo; return; }
+  derive_test_slug || { fail "R002-a" "branch_slug failed"; cleanup_test_repo; return; }
 
   # Create cache with a distinctive cost value
-  create_cost_cache "$slug" 99.88 0 0
+  create_cost_cache "$TEST_SLUG" 99.88 0 0
 
   local out
   out=$(run_sl "$(integration_json)")
@@ -298,9 +294,7 @@ test_r002_staleness_detection() {
 # Tests R-002 [unit]: Stale cache (>30s old) triggers background refresh
 test_r002_stale_cache_triggers_refresh() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -308,12 +302,10 @@ test_r002_stale_cache_triggers_refresh() {
 }
 SFJSON
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  [ -n "$slug" ] || { fail "R002-d" "branch_slug failed"; cleanup_test_repo; return; }
+  derive_test_slug || { fail "R002-d" "branch_slug failed"; cleanup_test_repo; return; }
 
   # Create a cache that's 60 seconds old (stale per 30-second threshold)
-  create_cost_cache "$slug" 10.00 5.00 60
+  create_cost_cache "$TEST_SLUG" 10.00 5.00 60
 
   # Run statusline and capture stderr (background spawn might log)
   # The statusline should still display the stale cost (reads first, refreshes in background)
@@ -405,9 +397,7 @@ test_r003_atomic_write() {
 # Tests R-003 [unit]: Stale lock (PID not running) is auto-cleaned
 test_r003_stale_lock_cleanup() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -415,12 +405,10 @@ test_r003_stale_lock_cleanup() {
 }
 SFJSON
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  [ -n "$slug" ] || { fail "R003-f" "branch_slug failed"; cleanup_test_repo; return; }
+  derive_test_slug || { fail "R003-f" "branch_slug failed"; cleanup_test_repo; return; }
 
   # Create a stale cache to trigger refresh
-  create_cost_cache "$slug" 5.00 1.00 60
+  create_cost_cache "$TEST_SLUG" 5.00 1.00 60
 
   # Create a stale lock file with a non-existent PID
   echo "99999999" > "$TEST_DIR/.correctless/artifacts/cost-cache.lock"
@@ -472,9 +460,7 @@ section "R-004: Cost display format"
 # when both total and phase cost are available
 test_r004_full_format() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -483,11 +469,9 @@ test_r004_full_format() {
 }
 SFJSON
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  [ -n "$slug" ] || { fail "R004-a" "branch_slug failed"; cleanup_test_repo; return; }
+  derive_test_slug || { fail "R004-a" "branch_slug failed"; cleanup_test_repo; return; }
 
-  create_cost_cache "$slug" 47.23 12.50 0
+  create_cost_cache "$TEST_SLUG" 47.23 12.50 0
 
   local out
   out=$(run_sl "$(integration_json)")
@@ -512,9 +496,7 @@ SFJSON
 # Tests R-004 [unit]: When current_phase_cost_usd is 0, only total is shown
 test_r004_total_only_when_phase_zero() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -522,11 +504,9 @@ test_r004_total_only_when_phase_zero() {
 }
 SFJSON
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  [ -n "$slug" ] || { fail "R004-c" "branch_slug failed"; cleanup_test_repo; return; }
+  derive_test_slug || { fail "R004-c" "branch_slug failed"; cleanup_test_repo; return; }
 
-  create_cost_cache "$slug" 47.23 0 0
+  create_cost_cache "$TEST_SLUG" 47.23 0 0
 
   local out
   out=$(run_sl "$(integration_json)")
@@ -550,9 +530,7 @@ SFJSON
 # Tests R-004 [unit]: When current_phase_cost_usd is null, only total is shown
 test_r004_total_only_when_phase_null() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-qa",
   "task": "add-auth",
@@ -560,12 +538,10 @@ test_r004_total_only_when_phase_null() {
 }
 SFJSON
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  [ -n "$slug" ] || { fail "R004-e" "branch_slug failed"; cleanup_test_repo; return; }
+  derive_test_slug || { fail "R004-e" "branch_slug failed"; cleanup_test_repo; return; }
 
   # Cache without current_phase_cost_usd field (null)
-  local cache_path="$TEST_DIR/.correctless/artifacts/cost-cache-${slug}.json"
+  local cache_path="$TEST_DIR/.correctless/artifacts/cost-cache-${TEST_SLUG}.json"
   cat > "$cache_path" <<CACHE
 {
   "total_cost_usd": 33.50,
@@ -607,9 +583,7 @@ section "R-005: Section 3 session cost unchanged"
 # is still visible when feature cost is also displayed in Section 4
 test_r005_both_costs_visible() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -617,11 +591,9 @@ test_r005_both_costs_visible() {
 }
 SFJSON
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  [ -n "$slug" ] || { fail "R005-a" "branch_slug failed"; cleanup_test_repo; return; }
+  derive_test_slug || { fail "R005-a" "branch_slug failed"; cleanup_test_repo; return; }
 
-  create_cost_cache "$slug" 25.00 10.00 0
+  create_cost_cache "$TEST_SLUG" 25.00 10.00 0
 
   local out
   out=$(run_sl "$(integration_json)")
@@ -999,11 +971,9 @@ test_r009_no_workflow_no_cost() {
   setup_test_repo
   # No state file created — no active workflow
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  if [ -n "$slug" ]; then
+  if derive_test_slug; then
     # Create a cost cache file even though no workflow exists
-    create_cost_cache "$slug" 50.00 20.00 0
+    create_cost_cache "$TEST_SLUG" 50.00 20.00 0
   fi
 
   local out
@@ -1066,9 +1036,7 @@ section "Integration: statusline always exits 0"
 # Tests that the statusline exits 0 even with cost-related edge cases
 test_exit_0_with_corrupt_cache() {
   setup_test_repo
-  local state_file
-  state_file="$(state_filename "main")"
-  cat > "$TEST_DIR/$state_file" <<SFJSON
+  write_state_file <<SFJSON
 {
   "phase": "tdd-impl",
   "task": "add-auth",
@@ -1076,12 +1044,10 @@ test_exit_0_with_corrupt_cache() {
 }
 SFJSON
 
-  local slug
-  slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug 2>/dev/null) || slug=""
-  [ -n "$slug" ] || { fail "INT-a" "branch_slug failed"; cleanup_test_repo; return; }
+  derive_test_slug || { fail "INT-a" "branch_slug failed"; cleanup_test_repo; return; }
 
   # Write corrupt JSON to the cache file
-  echo "NOT VALID JSON {{{" > "$TEST_DIR/.correctless/artifacts/cost-cache-${slug}.json"
+  echo "NOT VALID JSON {{{" > "$TEST_DIR/.correctless/artifacts/cost-cache-${TEST_SLUG}.json"
 
   local exit_code=0
   printf '%s' "$(integration_json)" | bash "$STATUSLINE" 2>/dev/null >/dev/null || exit_code=$?
