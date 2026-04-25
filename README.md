@@ -302,7 +302,7 @@ The statusline shows your workflow state at a glance:
 ```
 project/  feature/auth  Opus  34%  RED  QA:R0  $0.42  +87/-12
 ```
-Phase (color-coded), QA round count, session cost, lines delta, context usage with warnings at 70%.
+Phase (color-coded), QA round count, session cost, feature cost (background-cached), lines delta, context usage with warnings at 70%.
 
 ### Real-Time Adherence Feedback
 

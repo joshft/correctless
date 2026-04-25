@@ -1,5 +1,15 @@
 # Dev Journal
 
+## 2026-04-25 — Statusline Live Cost
+
+The session cost analysis feature (compute-session-cost.sh) takes ~2 seconds to run -- far too slow for the statusline's 50ms budget. This feature bridges the gap with a background-refresh cache: the statusline reads a lightweight JSON cache file synchronously (<5ms), and when the cache is stale (>30 seconds), spawns compute-session-cost.sh in the background to regenerate it.
+
+The background refresh mechanism uses three defenses against concurrency bugs. First, a lock file (`.correctless/artifacts/cost-cache.lock`) containing the PID of the background process prevents double spawns -- if a second render fires while a computation is running, it sees the lock, checks `kill -0`, and skips the refresh. Second, a `trap EXIT` in the background subshell ensures the lock file is cleaned up even if the process dies abnormally. Third, atomic writes via `mktemp` + `mv` prevent the statusline from reading a half-written cache file. The lock file is written by the statusline *before* `disown` but after `&` -- the `$!` PID is only available after the background spawn, creating a minimal TOCTOU gap that QA-001 acknowledged as inherent to bash semantics.
+
+Two helpers were extracted to support the display: `phase_display_name()` converts raw workflow phases (`tdd-impl` -> `GREEN`) and was factored out of the existing phase display logic (which used inline case branches), and `fmt_cost_nonzero()` uses awk to format a decimal only when non-zero. The cost display format -- `$47.23 ($12.50 in GREEN)` -- appends to the existing Section 4 content after QA rounds and duration. When cost is zero or the cache doesn't exist, the cost portion is omitted entirely, keeping the statusline clean during early workflow phases before any cost accrues.
+
+The `compute-session-cost.sh` extensions (`--cache` and `--phase` flags) follow a clean separation: `--cache` changes the output format (lightweight JSON to stdout instead of full artifact to file), and `--phase` computes `current_phase_cost_usd` by filtering the `by_phase` array. The caller (statusline background subshell) handles file placement, maintaining the script's single-responsibility as a computation engine per ABS-026 (cost artifact contract).
+
 ## 2026-04-22 — Skill Path Discovery
 
 PMB-004 surfaced a class of bug where skills reference workflow artifacts by concept ("Read the spec artifact") without specifying how to discover the file path. This works on the Correctless repo itself because conversation context from a preceding `/cspec` run carries the path forward. On other projects in fresh sessions, the agent hallucinates paths -- `/creview-spec` tried three wrong locations before giving up. The fix is straightforward: each skill now calls `workflow-advance.sh status` and reads the `Spec:` line, matching the pattern already used by `/creview` and `/ctdd`.

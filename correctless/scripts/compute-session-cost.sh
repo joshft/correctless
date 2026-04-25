@@ -30,8 +30,32 @@ error_json() {
 }
 
 # ============================================================================
-# STEP 2: Determine target branch
+# STEP 2: Parse flags and determine target branch
 # ============================================================================
+
+CACHE_MODE=false
+CACHE_PHASE=""
+
+# Parse flags before positional args
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --cache)
+      CACHE_MODE=true
+      shift
+      ;;
+    --phase)
+      CACHE_PHASE="${2:-}"
+      shift 2
+      ;;
+    -*)
+      # Unknown flag — skip
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 
 TARGET_BRANCH="${1:-}"
 if [ -z "$TARGET_BRANCH" ]; then
@@ -420,9 +444,25 @@ fi
 # STEP 12: Write artifact and output (R-001)
 # ============================================================================
 
-mkdir -p "$ARTIFACT_DIR"
-ARTIFACT_PATH="$ARTIFACT_DIR/cost-${BRANCH_SLUG}.json"
-echo "$RESULT" | jq '.' > "$ARTIFACT_PATH" 2>/dev/null || true
+if [ "$CACHE_MODE" = true ]; then
+  # --cache mode: output lightweight JSON to stdout (caller handles file placement)
+  # Extract: total_cost_usd, by_phase, computed_at, current_phase_cost_usd
+  echo "$RESULT" | jq --arg phase "$CACHE_PHASE" '{
+    total_cost_usd: .total_cost_usd,
+    by_phase: .by_phase,
+    computed_at: .computed_at,
+    current_phase_cost_usd: (
+      if ($phase | length) > 0 then
+        ([.by_phase[] | select(.phase == $phase) | .cost_usd] | add // 0)
+      else 0 end
+    )
+  }' 2>/dev/null
+  # No artifact file written in --cache mode
+else
+  mkdir -p "$ARTIFACT_DIR"
+  ARTIFACT_PATH="$ARTIFACT_DIR/cost-${BRANCH_SLUG}.json"
+  echo "$RESULT" | jq '.' > "$ARTIFACT_PATH" 2>/dev/null || true
 
-# Output to stdout
-echo "$RESULT"
+  # Output to stdout
+  echo "$RESULT"
+fi

@@ -113,6 +113,7 @@ jobs:
           bash tests/test-test-harness-extraction.sh
           bash tests/test-upgrade-compatibility-lens.sh
           bash tests/test-skill-path-discovery.sh
+          bash tests/test-statusline-live-cost.sh
 
       - name: Verify sync
         run: |

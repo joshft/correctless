@@ -71,6 +71,24 @@ fmt_duration() {
   fi
 }
 
+# --- Helper: phase name → display label (tdd-impl → GREEN, etc.) ---
+# Used by both the phase indicator and the cost breakdown display.
+phase_display_name() {
+  case "$1" in
+    tdd-tests)  echo "RED" ;;
+    tdd-impl)   echo "GREEN" ;;
+    tdd-qa)     echo "QA" ;;
+    tdd-verify) echo "VERIFY" ;;
+    *)          echo "$1" ;;
+  esac
+}
+
+# --- Helper: format a decimal cost if non-zero, empty otherwise ---
+# Usage: fmt_cost_nonzero "12.50" → "12.50", fmt_cost_nonzero "0" → ""
+fmt_cost_nonzero() {
+  awk -v c="$1" 'BEGIN { if (c+0 == 0) exit 1; printf "%.2f", c }' 2>/dev/null
+}
+
 # --- Section 1: Repo state ---
 
 sec1=""
@@ -207,24 +225,21 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
       fi
 
       # Color-coded phase
+      _phase_label="$(phase_display_name "$PHASE")"
       phase_display=""
       case "$PHASE" in
         spec|review|review-spec|model)
-          phase_display=$(printf "${CYAN}%s${NC}" "$PHASE") ;;
+          phase_display=$(printf "${CYAN}%s${NC}" "$_phase_label") ;;
         tdd-tests)
-          phase_display=$(printf "${RED}RED${NC}") ;;
+          phase_display=$(printf "${RED}%s${NC}" "$_phase_label") ;;
         tdd-impl)
-          phase_display=$(printf "${GREEN}GREEN${NC}") ;;
-        tdd-qa)
-          phase_display=$(printf "${YELLOW}QA${NC}") ;;
-        tdd-verify)
-          phase_display=$(printf "${YELLOW}VERIFY${NC}") ;;
-        done|verified|documented)
-          phase_display=$(printf "${GRAY}%s${NC}" "$PHASE") ;;
+          phase_display=$(printf "${GREEN}%s${NC}" "$_phase_label") ;;
+        tdd-qa|tdd-verify)
+          phase_display=$(printf "${YELLOW}%s${NC}" "$_phase_label") ;;
         audit)
-          phase_display=$(printf "${ORANGE}AUDIT${NC}") ;;
+          phase_display=$(printf "${ORANGE}%s${NC}" "$_phase_label") ;;
         *)
-          phase_display=$(printf "${GRAY}%s${NC}" "$PHASE") ;;
+          phase_display=$(printf "${GRAY}%s${NC}" "$_phase_label") ;;
       esac
 
       # QA rounds
@@ -256,7 +271,87 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
         warnings+=" ⚠spec×${SPEC_UPDATES}"
       fi
 
-      sec4="⚙ ${task_display} · ${phase_display}${qa_display}${time_display}${warnings}"
+      # --- Feature cost from cache (R-001 through R-010) ---
+      cost_display=""
+      COST_CACHE_FILE=".correctless/artifacts/cost-cache-${_slug}.json"
+      COST_LOCK_FILE=".correctless/artifacts/cost-cache.lock"
+      CACHE_MAX_AGE=30  # seconds — hardcoded for v1 (R-010)
+
+      if [ -f "$COST_CACHE_FILE" ]; then
+        # Single jq call to extract both fields (R-002, R-008)
+        eval "$(jq -r '
+          @sh "FEATURE_COST=\(.total_cost_usd // 0)",
+          @sh "PHASE_COST=\(.current_phase_cost_usd // 0)"
+        ' "$COST_CACHE_FILE" 2>/dev/null)" 2>/dev/null || true
+
+        # Build cost display (R-001, R-004)
+        cost_fmt=$(fmt_cost_nonzero "${FEATURE_COST:-0}") && {
+          cost_display=" · \$${cost_fmt}"
+          # Add phase cost if non-zero (R-004)
+          phase_cost_fmt=$(fmt_cost_nonzero "${PHASE_COST:-0}") && {
+            cost_display+=" (\$${phase_cost_fmt} in $(phase_display_name "$PHASE"))"
+          }
+        }
+
+        # Staleness check for background refresh (R-002, R-003)
+        # Default to stale; override only when we can determine the real age
+        cache_age=$((CACHE_MAX_AGE + 1))
+        cache_mtime=$(stat -c %Y "$COST_CACHE_FILE" 2>/dev/null || stat -f %m "$COST_CACHE_FILE" 2>/dev/null || echo "")
+        if [ -n "$cache_mtime" ]; then
+          cache_age=$((NOW_EPOCH - cache_mtime))
+        else
+          # Fallback: parse computed_at from cache JSON (R-002)
+          computed_at_str=$(jq -r '.computed_at // empty' "$COST_CACHE_FILE" 2>/dev/null || echo "")
+          computed_epoch=""
+          if [ -n "$computed_at_str" ]; then
+            computed_epoch=$(date -d "$computed_at_str" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$computed_at_str" +%s 2>/dev/null || echo "")
+          fi
+          if [ -n "$computed_epoch" ]; then
+            cache_age=$((NOW_EPOCH - computed_epoch))
+          fi
+        fi
+      else
+        cache_age=$((CACHE_MAX_AGE + 1))  # No cache file — treat as stale (R-001: omit cost)
+      fi
+
+      # Background refresh when stale (R-003)
+      if [ "${cache_age:-0}" -gt "$CACHE_MAX_AGE" ]; then
+        # Check lock file — only one background computation at a time
+        _spawn_refresh=true
+        if [ -f "$COST_LOCK_FILE" ]; then
+          _lock_pid=$(cat "$COST_LOCK_FILE" 2>/dev/null || echo "")
+          if [ -n "$_lock_pid" ] && kill -0 "$_lock_pid" 2>/dev/null; then
+            _spawn_refresh=false  # Already running
+          else
+            rm -f "$COST_LOCK_FILE"  # Stale lock — auto-clean
+          fi
+        fi
+
+        if [ "$_spawn_refresh" = true ]; then
+          # Resolve compute-session-cost.sh path
+          _COST_SCRIPT=""
+          if [ -n "${_LIB_DIR:-}" ] && [ -f "${_LIB_DIR}/compute-session-cost.sh" ]; then
+            _COST_SCRIPT="${_LIB_DIR}/compute-session-cost.sh"
+          elif [ -f ".correctless/scripts/compute-session-cost.sh" ]; then
+            _COST_SCRIPT=".correctless/scripts/compute-session-cost.sh"
+          fi
+
+          if [ -n "$_COST_SCRIPT" ]; then
+            # Spawn background refresh (R-003): atomic write via temp + mv
+            (
+              trap 'rm -f "'"$COST_LOCK_FILE"'"' EXIT
+              _tmp_cache=$(mktemp ".correctless/artifacts/cost-cache-tmp-XXXXXX")
+              bash "$_COST_SCRIPT" --cache --phase "$PHASE" "$branch" > "$_tmp_cache" 2>/dev/null
+              mv "$_tmp_cache" "$COST_CACHE_FILE" 2>/dev/null || rm -f "$_tmp_cache"
+            ) &
+            # Write lock file BEFORE disown, containing the background PID (R-003)
+            echo "$!" > "$COST_LOCK_FILE" 2>/dev/null || true
+            disown 2>/dev/null || true
+          fi
+        fi
+      fi
+
+      sec4="⚙ ${task_display} · ${phase_display}${qa_display}${time_display}${cost_display}${warnings}"
     fi
   fi
 fi
