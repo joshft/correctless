@@ -256,7 +256,105 @@ if [ -n "$branch" ] && [ -d ".correctless/artifacts" ]; then
         warnings+=" ⚠spec×${SPEC_UPDATES}"
       fi
 
-      sec4="⚙ ${task_display} · ${phase_display}${qa_display}${time_display}${warnings}"
+      # --- Feature cost from cache (R-001 through R-010) ---
+      cost_display=""
+      COST_CACHE_FILE=".correctless/artifacts/cost-cache-${_slug}.json"
+      COST_LOCK_FILE=".correctless/artifacts/cost-cache.lock"
+      CACHE_MAX_AGE=30  # seconds — hardcoded for v1 (R-010)
+
+      if [ -f "$COST_CACHE_FILE" ]; then
+        # Single jq call to extract both fields (R-002, R-008)
+        eval "$(jq -r '
+          @sh "FEATURE_COST=\(.total_cost_usd // 0)",
+          @sh "PHASE_COST=\(.current_phase_cost_usd // 0)"
+        ' "$COST_CACHE_FILE" 2>/dev/null)" 2>/dev/null || true
+
+        # Build cost display (R-001, R-004)
+        if [ -n "$FEATURE_COST" ] && [ "$FEATURE_COST" != "0" ] && [ "$FEATURE_COST" != "null" ]; then
+          # Check for non-zero via awk (handles decimals)
+          if awk -v c="$FEATURE_COST" 'BEGIN { exit (c+0 == 0) }' 2>/dev/null; then
+            cost_fmt=$(awk -v c="$FEATURE_COST" 'BEGIN { printf "%.2f", c }')
+            cost_display=" · \$${cost_fmt}"
+
+            # Add phase cost if non-zero (R-004)
+            if [ -n "$PHASE_COST" ] && [ "$PHASE_COST" != "0" ] && [ "$PHASE_COST" != "null" ]; then
+              if awk -v c="$PHASE_COST" 'BEGIN { exit (c+0 == 0) }' 2>/dev/null; then
+                phase_cost_fmt=$(awk -v c="$PHASE_COST" 'BEGIN { printf "%.2f", c }')
+                # Map phase name to display name for cost context
+                phase_label=""
+                case "$PHASE" in
+                  tdd-tests) phase_label="RED" ;;
+                  tdd-impl)  phase_label="GREEN" ;;
+                  tdd-qa)    phase_label="QA" ;;
+                  tdd-verify) phase_label="VERIFY" ;;
+                  *)         phase_label="$PHASE" ;;
+                esac
+                cost_display+=" (\$${phase_cost_fmt} in ${phase_label})"
+              fi
+            fi
+          fi
+        fi
+
+        # Staleness check for background refresh (R-002, R-003)
+        cache_mtime=$(stat -c %Y "$COST_CACHE_FILE" 2>/dev/null || stat -f %m "$COST_CACHE_FILE" 2>/dev/null || echo "")
+        if [ -n "$cache_mtime" ]; then
+          cache_age=$((NOW_EPOCH - cache_mtime))
+        else
+          # Fallback: parse computed_at from cache JSON (R-002)
+          computed_at_str=$(jq -r '.computed_at // empty' "$COST_CACHE_FILE" 2>/dev/null || echo "")
+          if [ -n "$computed_at_str" ]; then
+            computed_epoch=$(date -d "$computed_at_str" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$computed_at_str" +%s 2>/dev/null || echo "")
+            if [ -n "$computed_epoch" ]; then
+              cache_age=$((NOW_EPOCH - computed_epoch))
+            else
+              cache_age=$((CACHE_MAX_AGE + 1))  # Treat as stale
+            fi
+          else
+            cache_age=$((CACHE_MAX_AGE + 1))  # Treat as stale
+          fi
+        fi
+      else
+        cache_age=$((CACHE_MAX_AGE + 1))  # No cache file — treat as stale (R-001: omit cost)
+      fi
+
+      # Background refresh when stale (R-003)
+      if [ "${cache_age:-0}" -gt "$CACHE_MAX_AGE" ]; then
+        # Check lock file — only one background computation at a time
+        _spawn_refresh=true
+        if [ -f "$COST_LOCK_FILE" ]; then
+          _lock_pid=$(cat "$COST_LOCK_FILE" 2>/dev/null || echo "")
+          if [ -n "$_lock_pid" ] && kill -0 "$_lock_pid" 2>/dev/null; then
+            _spawn_refresh=false  # Already running
+          else
+            rm -f "$COST_LOCK_FILE"  # Stale lock — auto-clean
+          fi
+        fi
+
+        if [ "$_spawn_refresh" = true ]; then
+          # Resolve compute-session-cost.sh path
+          _COST_SCRIPT=""
+          if [ -n "${_LIB_DIR:-}" ] && [ -f "${_LIB_DIR}/compute-session-cost.sh" ]; then
+            _COST_SCRIPT="${_LIB_DIR}/compute-session-cost.sh"
+          elif [ -f ".correctless/scripts/compute-session-cost.sh" ]; then
+            _COST_SCRIPT=".correctless/scripts/compute-session-cost.sh"
+          fi
+
+          if [ -n "$_COST_SCRIPT" ]; then
+            # Spawn background refresh (R-003): atomic write via temp + mv
+            (
+              trap 'rm -f "'"$COST_LOCK_FILE"'"' EXIT
+              _tmp_cache=$(mktemp ".correctless/artifacts/cost-cache-tmp-XXXXXX")
+              bash "$_COST_SCRIPT" --cache --phase "$PHASE" "$branch" > "$_tmp_cache" 2>/dev/null
+              mv "$_tmp_cache" "$COST_CACHE_FILE" 2>/dev/null || rm -f "$_tmp_cache"
+            ) &
+            # Write lock file BEFORE disown, containing the background PID (R-003)
+            echo "$!" > "$COST_LOCK_FILE" 2>/dev/null || true
+            disown 2>/dev/null || true
+          fi
+        fi
+      fi
+
+      sec4="⚙ ${task_display} · ${phase_display}${qa_display}${time_display}${cost_display}${warnings}"
     fi
   fi
 fi
