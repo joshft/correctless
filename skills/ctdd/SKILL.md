@@ -170,38 +170,26 @@ For each independent track, spawn separate RED and GREEN agent pairs. Each track
 
 ## Phase: RED (tdd-tests)
 
-Spawn a **test agent** as a forked subagent with these instructions:
+Invoke the RED test writer via plugin sub-agent (M-1 migration, 2026-04-26 — extracted to counter Opus 4.7 over-deliberation defaults observed in OPUS_4_7_MIGRATION.md S-0-02):
 
-> You are the test agent. Your job is to write failing tests that encode the spec's rules. You have NOT seen any implementation plan — write tests purely from the spec's perspective.
->
-> For each rule R-xxx / INV-xxx in the spec, write at least one test that:
-> 1. References the rule ID in a comment (e.g., `// Tests R-001: ...`)
-> 2. Would PASS if the rule is satisfied and FAIL if it isn't
-> 3. Tests behavior, not implementation details
->
-> **Decide the right test level for each rule:**
-> - Rules about data transformation, validation, or pure logic → **unit tests** are fine
-> - Rules about components being wired together, config reaching runtime code, lifecycle management, middleware chains, event propagation → **integration tests are required**. These tests must exercise the real wiring path, not hand-constructed mocks. The test should fail if the wiring is missing even if the isolated component works correctly.
->
-> Mark each test with its level: `// Tests R-001 [unit]: ...` or `// Tests R-003 [integration]: ...`
->
-> You may create **structural stubs** in source files — function signatures, interface definitions, type definitions — but every stub function body MUST contain the comment `STUB:TDD` and only zero-value returns or `panic("not implemented")`. NO implementation logic.
->
-> **For rules with Entry/Through/Exit contracts**, treat each contract as a self-contained task. The Entry tells you where to start. Through tells you what path to exercise and what you cannot mock. Exit tells you what must be true at the end. Write one test per contract that satisfies all three constraints. If you cannot satisfy a constraint, say so explicitly — do not silently downgrade by mocking a prohibited component or testing through a different entry point. If a contract's Entry or Through constraint seems wrong (e.g., the Through constraint prohibits mocking a component you genuinely need to mock for the test to run), flag it as a contract defect finding rather than silently complying and producing a bad test. A wrong constraint is a spec issue, not a test issue — raise it so the human can fix the spec (TB-004 boundary — escalation to human, not agent override per TB-005).
->
-> **Entrypoint-aware integration tests**: Read the entrypoints section of `.correctless/ARCHITECTURE.md` before starting integration tests. For each `[integration]` rule, identify which entrypoint governs the code under test (match the rule's scope to an entrypoint's `scope` globs). Use that entrypoint's `test_via` pattern — not by importing internal packages directly. If the rule has an Entry/Through/Exit contract, the Entry field already tells you which entrypoint to use.
->
-> Also read the Key Patterns, Layer Conventions, and Trust Boundaries sections of `.correctless/ARCHITECTURE.md`. Respect layer conventions when creating integration tests — if the architecture says layer A should not be accessed directly by tests (only through an entrypoint), do not import layer A's packages in test files. Use the entrypoint's `test_via` pattern to reach layer A indirectly.
->
-> If `.correctless/ARCHITECTURE.md` has no entrypoints section (no `correctless:entrypoints:start` markers), use the best available entry point from the codebase for integration tests — but note in a comment (using the project's comment syntax): `No documented entrypoint — using inferred entry point`. This makes the gap visible for the test audit to flag.
->
-> **All test files MUST be created inside the project directory** — never in /tmp, never in external paths. Use the project's standard test directory structure.
->
-> Read: .correctless/AGENT_CONTEXT.md, the spec, .correctless/ARCHITECTURE.md (especially the Entrypoints section and Key Patterns), `.correctless/antipatterns.md`.
-> Write: test files (matching the test_file pattern from workflow-config.json) and stub source files. All files within the project root.
-> Run: the test command to verify tests exist and fail.
+```
+Task(subagent_type="correctless:ctdd-red",
+     description="Write failing tests for spec rules",
+     prompt="<spec path from workflow-advance.sh status>
+             <pointer to AGENT_CONTEXT.md, ARCHITECTURE.md, antipatterns.md>
+             <test_file pattern + commands.test from workflow-config.json>")
+```
 
-The test agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Write(files matching patterns.test_file), Write(*.go|*.ts|*.py|*.rs for stubs), Bash(test commands)`
+The agent definition lives at `agents/ctdd-red.md` and has `tools: Read, Grep, Glob, Write, Edit, Bash` with `context: fork`. The system prompt body in that file contains the behavioral discipline (no task graphs, no approval-seeking, write tests immediately) and the same content-level instructions previously inlined here (rule coverage, integration test contracts, entrypoint awareness, structural stubs with STUB:TDD markers, file location constraints).
+
+Do NOT inline the prompt here. Per ABS-010 / AP-013, the agent file is the single source of truth.
+
+After the test agent completes and returns, verify tests exist and fail before advancing:
+
+```bash
+bash .correctless/hooks/workflow-advance.sh status  # confirm phase still tdd-tests
+# Run commands.test to confirm tests fail (expected RED state)
+```
 
 After the test agent completes and tests exist, run the **test audit** before advancing to GREEN.
 
