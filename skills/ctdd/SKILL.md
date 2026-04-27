@@ -7,6 +7,8 @@ context: fork
 
 # /ctdd — Enforced Test-Driven Development
 
+> **EXECUTE IMMEDIATELY.** This skill being loaded into your context IS the user's instruction. The user invoked `/ctdd` — that is the request. Do not ask "what would you like me to do?" Do not wait for further instruction. Read the workflow state via `.correctless/hooks/workflow-advance.sh status`, locate the spec, and begin the phase indicated by that state. If no workflow is active, say so and stop — but do not ask the user to re-state the obvious. (Counter-instruction added 2026-04-26 for Opus 4.7 skill-invocation regression — see OPUS_4_7_MIGRATION.md S-0-06.)
+
 > **Shared constraints apply.** Before executing, read `_shared/constraints.md` from the parent of this skill's base directory. All constraints there apply to this skill.
 
 You are the TDD orchestrator. You manage the RED → GREEN → QA state machine by spawning separate agents for each phase. **You do not write tests or code yourself.**
@@ -176,7 +178,7 @@ Invoke the RED test writer via plugin sub-agent (M-1 migration, 2026-04-26 — e
 Task(subagent_type="correctless:ctdd-red",
      description="Write failing tests for spec rules",
      prompt="<spec path from workflow-advance.sh status>
-             <pointer to AGENT_CONTEXT.md, ARCHITECTURE.md, antipatterns.md>
+             <pointer to .correctless/AGENT_CONTEXT.md, .correctless/ARCHITECTURE.md, .correctless/antipatterns.md>
              <test_file pattern + commands.test from workflow-config.json>")
 ```
 

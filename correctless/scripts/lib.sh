@@ -3,6 +3,92 @@
 # Sourced by hooks and scripts that need common utilities.
 
 # ---------------------------------------------------------------------------
+# get_current_session_id — stable identifier for the current shell process
+# ---------------------------------------------------------------------------
+# Used by harness-fingerprint.sh and any future per-session dedup logic.
+# Cross-platform: prefers `ps -o lstart=` (Linux/macOS/BSD), falls back to
+# /proc/{pid}/stat (Linux), then to PID-only with a one-line warning.
+#
+# The output is a string that is stable WITHIN a single shell process and
+# distinct between processes. It is NOT cryptographic — it's derived from
+# pid + start time and used as a flag-file path component.
+#
+# BND-003 (harness-fingerprint spec):
+#   - canonical: ps -o lstart= -p $$
+#   - fallback 1: /proc/{pid}/stat field 22 (boot-relative starttime)
+#   - fallback 2: PID-only + stderr warning
+# Output is sanitized for filesystem safety (alnum + dash + underscore only).
+
+get_current_session_id() {
+  local pid="$$"
+  local raw="" sid=""
+
+  if command -v ps >/dev/null 2>&1; then
+    raw="$(ps -o lstart= -p "$pid" 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//')" || raw=""
+  fi
+
+  if [ -z "$raw" ] && [ -r "/proc/$pid/stat" ]; then
+    # Field 22 of /proc/PID/stat is starttime (clock ticks since boot)
+    raw="$(awk '{print $22}' "/proc/$pid/stat" 2>/dev/null)" || raw=""
+  fi
+
+  if [ -z "$raw" ]; then
+    echo "warning: get_current_session_id falling back to PID-only (no ps, no /proc)" >&2
+    sid="pid${pid}"
+  else
+    # Sanitize: alnum + dash + underscore only
+    sid="pid${pid}_$(echo "$raw" | tr -c 'A-Za-z0-9_-' '_' | sed 's/_*$//')"
+  fi
+
+  echo "$sid"
+}
+
+# ---------------------------------------------------------------------------
+# locked_update_file — generic locked read-modify-write for arbitrary file paths
+# ---------------------------------------------------------------------------
+# Mirrors locked_update_state but works for any file (not only state files).
+# Used by harness-fingerprint.sh for the fingerprint store write
+# (BND-002, ME-4 round-2 disposition).
+# Usage: locked_update_file FILE_PATH JQ_FILTER [--arg key val ...]
+# Behavior:
+#   * Acquires lock at FILE_PATH.lock
+#   * If FILE_PATH does not exist, treats input as the empty object {}
+#   * Runs jq with filter, writes via temp file + atomic mv
+#   * Releases lock via EXIT trap (matches locked_update_state)
+
+locked_update_file() {
+  local target_file="$1"
+  local jq_filter="$2"
+  shift 2
+  local rc=0
+
+  _acquire_state_lock "$target_file" || return 1
+  # shellcheck disable=SC2064
+  trap "$(printf '_release_state_lock %q; rm -f %q' "$target_file" "${target_file}.$$.tmp")" EXIT
+
+  local tmp_file="${target_file}.$$.tmp"
+  local jq_ok=0
+  if [ -f "$target_file" ]; then
+    jq "$@" "$jq_filter" "$target_file" > "$tmp_file" 2>/dev/null && jq_ok=1
+  else
+    # Missing file → seed jq with the empty object via -n so the filter has a
+    # `.` to mutate. jq -n binds --arg/--argjson the same as the file form.
+    jq -n "$@" "$jq_filter" > "$tmp_file" 2>/dev/null && jq_ok=1
+  fi
+
+  if [ "$jq_ok" = "1" ]; then
+    mv "$tmp_file" "$target_file" || { rm -f "$tmp_file"; rc=1; }
+  else
+    rm -f "$tmp_file"
+    rc=1
+  fi
+
+  _release_state_lock "$target_file"
+  trap - EXIT
+  return "$rc"
+}
+
+# ---------------------------------------------------------------------------
 # branch_slug — filesystem-safe slug from current branch name
 # ---------------------------------------------------------------------------
 # Non-alphanumeric characters replaced by hyphens, truncated to 80 chars,

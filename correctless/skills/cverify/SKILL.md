@@ -251,12 +251,15 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
       "actual_tokens": "integer — sum of total_tokens from the token log JSONL file (see below)",
       "actual_cost_usd": "number or absent — read from cost artifact if it exists (see below)",
       "actual_spec_updates": "number — read from the workflow state file (spec_updates field)",
+      "harness_version": "integer or absent — current HARNESS_VERSION constant from scripts/harness-fingerprint.sh (BND-005 of harness-fingerprint spec)",
       "file_paths_touched": ["array of file paths from git diff against the default branch"],
       "timestamp": "ISO 8601 string"
     }
   ]
 }
 ```
+
+**`harness_version` field (BND-005 of harness-fingerprint spec)**: extract the current `HARNESS_VERSION` constant from `scripts/harness-fingerprint.sh` (or `.correctless/scripts/harness-fingerprint.sh` in installed projects). Read with: `grep -E '^HARNESS_VERSION=' scripts/harness-fingerprint.sh | head -1 | sed 's/HARNESS_VERSION=//'`. Include the integer in every new calibration entry so `/cmodelupgrade`'s three-tier bootstrap lookup (exact-match pool / pre-fingerprint pool / no-baseline) can distinguish entries by harness generation. If the script is missing, omit the field — do not error.
 
 **Field sources:**
 - `recommended_intensity`: Read from the spec's `Recommended-intensity` metadata field. This is the pre-override system suggestion written by `/cspec`.

@@ -19,6 +19,10 @@ set -f
 
 CTDD_SKILL="skills/ctdd/SKILL.md"
 CTDD_DIST="correctless/skills/ctdd/SKILL.md"
+# Post-M-1 (2026-04-26): RED-phase prompt content lives in agents/ctdd-red.md
+# (single source of truth per ABS-010). Tests checking RED-phase guidance must
+# search both files — content may legitimately live in either.
+CTDD_RED_AGENT="agents/ctdd-red.md"
 DOCS_CTDD="docs/skills/ctdd.md"
 AGENT_CONTEXT=".correctless/AGENT_CONTEXT.md"
 CONTRIBUTING_MD="CONTRIBUTING.md"
@@ -51,7 +55,8 @@ else
 fi
 
 # R-001d: Instruction explicitly says not to import internal packages directly
-if grep -qi 'not.*import.*internal.*direct\|not by importing internal' "$CTDD_SKILL"; then
+# Post-M-1: search the agent file (canonical) AND SKILL.md (orchestrator-side audit checks may reference it).
+if grep -qi 'not.*import.*internal.*direct\|not by importing internal' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-001d" "RED phase prompt warns against direct internal imports"
 else
   fail "R-001d" "RED phase prompt does not warn against direct internal imports"
@@ -72,21 +77,21 @@ else
 fi
 
 # R-002b: Prompt mentions Layer Conventions
-if grep -q 'Layer Conventions' "$CTDD_SKILL"; then
+if grep -q 'Layer Conventions' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-002b" "RED phase prompt references Layer Conventions"
 else
   fail "R-002b" "RED phase prompt does not reference Layer Conventions"
 fi
 
 # R-002c: Prompt mentions Trust Boundaries
-if grep -q 'Trust Boundaries' "$CTDD_SKILL"; then
+if grep -q 'Trust Boundaries' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-002c" "RED phase prompt references Trust Boundaries"
 else
   fail "R-002c" "RED phase prompt does not reference Trust Boundaries"
 fi
 
 # R-002d: Instruction mentions layer access constraints for tests
-if grep -qi 'layer.*should not.*access\|should not be accessed directly' "$CTDD_SKILL"; then
+if grep -qi 'layer.*should not.*access\|should not be accessed directly' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-002d" "RED phase prompt includes layer access constraints"
 else
   fail "R-002d" "RED phase prompt does not include layer access constraints"
@@ -133,7 +138,7 @@ else
 fi
 
 # R-004c: Fallback mentions using best available entry point
-if grep -qi 'best available entry point\|inferred entry point' "$CTDD_SKILL"; then
+if grep -qi 'best available entry point\|inferred entry point' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-004c" "Fallback mentions using best available/inferred entry point"
 else
   fail "R-004c" "Fallback does not mention using best available/inferred entry point"

@@ -278,6 +278,26 @@ After writing MCP configs, update the existing `mcp` section in `workflow-config
 
 Set each flag to `true` only for the servers the user chose to install. Skills read `mcp.serena` and `mcp.context7` as feature flags — boolean values only, no version numbers, no server URLs, no connection details. If the user skipped both, leave the flags as `false`.
 
+## Step 2.6: Scaffold test-features baseline.md (idempotent)
+
+Copy `templates/test-features/baseline.md` from the Correctless distribution to `.correctless/test-features/baseline.md` if and only if the destination does not already exist. This template is consumed by `/cmodelupgrade --capture-baseline` (harness-fingerprint spec) as the controlled-baseline reference feature.
+
+```bash
+mkdir -p .correctless/test-features
+if [ ! -f .correctless/test-features/baseline.md ]; then
+  src=""
+  for candidate in \
+    "$SCRIPT_DIR/../templates/test-features/baseline.md" \
+    "$SCRIPT_DIR/templates/test-features/baseline.md" \
+    "$REPO_ROOT/.correctless/templates/test-features/baseline.md"; do
+    if [ -f "$candidate" ]; then src="$candidate"; break; fi
+  done
+  [ -n "$src" ] && cp "$src" .correctless/test-features/baseline.md
+fi
+```
+
+Idempotency is mandatory — never overwrite an existing baseline.md the user may have customized.
+
 ## Step 3: Confirm Configuration
 
 Read the generated `.correctless/config/workflow-config.json`. Present the detected config as a single summary — not field-by-field:

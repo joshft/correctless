@@ -114,6 +114,7 @@ jobs:
           bash tests/test-upgrade-compatibility-lens.sh
           bash tests/test-skill-path-discovery.sh
           bash tests/test-statusline-live-cost.sh
+          bash tests/test-harness-fingerprint.sh
 
       - name: Verify sync
         run: |

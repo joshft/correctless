@@ -692,32 +692,32 @@ else
   fail "R-011-b" "Docs file missing at $DOCS_FILE"
 fi
 
-# Check README skill count updated (should be 28 not 27)
-if grep -qE 'skills-28|28 skills' "$README_MD"; then
-  pass "R-011-c" "README.md skill count updated to 28"
+# Check README skill count updated (cmodelupgrade addition 2026-04-26 → 29)
+if grep -qE 'skills-29|29 skills' "$README_MD"; then
+  pass "R-011-c" "README.md skill count updated to 29"
 else
-  fail "R-011-c" "README.md skill count not updated to 28"
+  fail "R-011-c" "README.md skill count not updated to 29"
 fi
 
 # Check CONTRIBUTING skill count updated
-if grep -qE '\b28\b.*skill|skills.*\b28\b' "$CONTRIBUTING_MD"; then
-  pass "R-011-d" "CONTRIBUTING.md skill count updated to 28"
+if grep -qE '\b29\b.*skill|skills.*\b29\b' "$CONTRIBUTING_MD"; then
+  pass "R-011-d" "CONTRIBUTING.md skill count updated to 29"
 else
-  fail "R-011-d" "CONTRIBUTING.md skill count not updated to 28"
+  fail "R-011-d" "CONTRIBUTING.md skill count not updated to 29"
 fi
 
 # Check sync.sh comment updated
-if grep -qE 'All 28 skills|28 skills' "$SYNC_SH"; then
-  pass "R-011-e" "sync.sh comment updated to 28 skills"
+if grep -qE 'All 29 skills|29 skills' "$SYNC_SH"; then
+  pass "R-011-e" "sync.sh comment updated to 29 skills"
 else
-  fail "R-011-e" "sync.sh comment not updated to 28 skills"
+  fail "R-011-e" "sync.sh comment not updated to 29 skills"
 fi
 
 # Check AGENT_CONTEXT skill count updated
-if grep -qE '\b28\b.*skill|skills.*\b28\b|28 skill' "$AGENT_CONTEXT"; then
-  pass "R-011-f" "AGENT_CONTEXT.md skill count updated to 28"
+if grep -qE '\b29\b.*skill|skills.*\b29\b|29 skill' "$AGENT_CONTEXT"; then
+  pass "R-011-f" "AGENT_CONTEXT.md skill count updated to 29"
 else
-  fail "R-011-f" "AGENT_CONTEXT.md skill count not updated to 28"
+  fail "R-011-f" "AGENT_CONTEXT.md skill count not updated to 29"
 fi
 
 # Check distribution directory exists

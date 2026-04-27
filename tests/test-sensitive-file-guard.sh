@@ -1058,6 +1058,63 @@ test_da003_fail_closed_on_jq_failure
 test_da004_hook_allowlist_sync
 
 # ---------------------------------------------------------------------------
+# Harness fingerprint protection (PRH-002 / PRH-006 — harness-fingerprint spec)
+# ---------------------------------------------------------------------------
+test_hf002_harness_meta_protection() {
+  echo ""
+  echo "=== HF-002: Harness fingerprint store and baseline file structurally protected ==="
+
+  local test_dir="/tmp/correctless-sfg-hf002-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result
+
+  # Edit on harness-fingerprint.json blocked
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":".correctless/meta/harness-fingerprint.json","old_string":"a","new_string":"b"}}')"
+  assert_eq "HF-002: Edit harness-fingerprint.json blocked" "2" "$(extract_exit "$result")"
+
+  # Write on model-baselines.json blocked
+  result="$(run_hook_capture '{"tool_name":"Write","tool_input":{"file_path":".correctless/meta/model-baselines.json","content":"x"}}')"
+  assert_eq "HF-002: Write model-baselines.json blocked" "2" "$(extract_exit "$result")"
+
+  # Bash redirect to harness-fingerprint.json blocked
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x > .correctless/meta/harness-fingerprint.json"}}')"
+  assert_eq "HF-002: redirect > harness-fingerprint.json blocked" "2" "$(extract_exit "$result")"
+
+  # Bash tee on model-baselines.json blocked
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x | tee .correctless/meta/model-baselines.json"}}')"
+  assert_eq "HF-002: tee model-baselines.json blocked" "2" "$(extract_exit "$result")"
+
+  # Append redirect blocked
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x >> .correctless/meta/harness-fingerprint.json"}}')"
+  assert_eq "HF-002: append >> harness-fingerprint.json blocked" "2" "$(extract_exit "$result")"
+
+  rm -rf "$test_dir"
+}
+
+test_hf006_script_protection() {
+  echo ""
+  echo "=== HF-006: scripts/harness-fingerprint.sh protected from autonomous edits ==="
+
+  local test_dir="/tmp/correctless-sfg-hf006-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"scripts/harness-fingerprint.sh","old_string":"HARNESS_VERSION=1","new_string":"HARNESS_VERSION=2"}}')"
+  assert_eq "HF-006: Edit on harness-fingerprint.sh blocked" "2" "$(extract_exit "$result")"
+
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":".correctless/scripts/harness-fingerprint.sh","old_string":"HARNESS_VERSION=1","new_string":"HARNESS_VERSION=2"}}')"
+  assert_eq "HF-006: Edit on .correctless/scripts/harness-fingerprint.sh blocked" "2" "$(extract_exit "$result")"
+
+  rm -rf "$test_dir"
+}
+
+test_hf002_harness_meta_protection
+test_hf006_script_protection
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 

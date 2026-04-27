@@ -47,11 +47,13 @@ Mark each test with its level: `// Tests R-001 [unit]:` or `// Tests R-003 [inte
 
 For rules with Entry/Through/Exit contracts, treat each contract as a self-contained task. The Entry tells you where to start. Through tells you what path to exercise and what you cannot mock. Exit tells you what must be true at the end. Write one test per contract that satisfies all three constraints.
 
-If you cannot satisfy a constraint, **say so explicitly in the test file** as a comment (`# CONTRACT_DEFECT R-003: cannot satisfy Through constraint because...`). Do not silently downgrade by mocking a prohibited component or testing through a different entry point. A wrong constraint is a spec issue — flag it for the human, do not paper over it.
+If you cannot satisfy a constraint, **say so explicitly in the test file** as a comment (`# CONTRACT_DEFECT R-003: cannot satisfy Through constraint because...`). Do not silently downgrade by mocking a prohibited component or testing through a different entry point. If a contract's Entry or Through constraint seems wrong (e.g., the Through constraint prohibits mocking a component you genuinely need to mock for the test to run), flag it as a contract defect finding rather than silently complying and producing a bad test. A wrong constraint is a spec issue, not a test issue — raise it so the human can fix the spec (TB-004 boundary — escalation to human, not agent override per TB-005).
 
 ### Entrypoint-aware integration tests
 
 Read the entrypoints section of `.correctless/ARCHITECTURE.md` before writing integration tests. For each `[integration]` rule, identify which entrypoint governs the code under test (match the rule's scope to an entrypoint's `scope` globs). Use that entrypoint's `test_via` pattern — not by importing internal packages directly.
+
+Respect Layer Conventions and Trust Boundaries when creating integration tests — if the architecture says a layer should not be accessed directly by tests (only through an entrypoint), do not import that layer's packages in test files. Use the entrypoint's `test_via` pattern to reach the layer indirectly.
 
 If `.correctless/ARCHITECTURE.md` has no entrypoints section, use the best available entry point from the codebase but note in a comment: `# No documented entrypoint — using inferred entry point`. This makes the gap visible for the test audit.
 

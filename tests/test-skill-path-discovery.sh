@@ -217,7 +217,7 @@ for skill_dir in "$REPO_DIR"/skills/*/; do
 done
 
 # The MUST_HAVE list
-must_have="creview-spec creview ctdd cverify cpostmortem csummary cdocs cmodel"
+must_have="creview-spec creview ctdd cverify cpostmortem csummary cdocs cmodel cmodelupgrade"
 
 # The EXCLUDED list from the spec
 excluded="crelease cupdate-arch carchitect csetup chelp cstatus cquick cexplain cdebug crefactor ccontribute cmaintain cpr-review credteam caudit cdevadv cauto cwtf cmetrics cspec"

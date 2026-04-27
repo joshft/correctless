@@ -1601,6 +1601,18 @@ check_inv027() {
   else
     fail "INV-027(c)" "ARCHITECTURE.md missing ### ENV-006: heading"
   fi
+  # ABS-027: Harness fingerprint store contract (harness-fingerprint feature INV-013)
+  if grep -qE '^### ABS-027:' "$ARCH_FILE"; then
+    pass "INV-027(e)" "ARCHITECTURE.md has ### ABS-027: heading"
+  else
+    fail "INV-027(e)" "ARCHITECTURE.md missing ### ABS-027: heading"
+  fi
+  # ABS-027 body must reference the harness fingerprint store
+  if grep -A 30 '^### ABS-027:' "$ARCH_FILE" | grep -qE 'harness[ -]fingerprint|harness-fingerprint\.json'; then
+    pass "INV-027(f)" "ABS-027 body references harness fingerprint store"
+  else
+    fail "INV-027(f)" "ABS-027 body missing harness fingerprint references"
+  fi
   # A-009 fix: blockquote containing ABS-009 must appear strictly between
   # `## Patterns` and `### PAT-001:` — not anywhere in the file.
   if awk '
@@ -1804,7 +1816,7 @@ check_no_tmp_paths_in_skills() {
 
 check_path_discovery_guard() {
   # Skills that MUST have at least one path discovery token in their body
-  local MUST_HAVE_DISCOVERY="creview-spec creview ctdd cverify cpostmortem csummary cdocs cmodel"
+  local MUST_HAVE_DISCOVERY="creview-spec creview ctdd cverify cpostmortem csummary cdocs cmodel cmodelupgrade"
 
   # Skills excluded from the path discovery requirement — they don't reference
   # a single spec artifact or use directory-scan patterns instead

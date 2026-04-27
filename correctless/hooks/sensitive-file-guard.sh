@@ -404,7 +404,11 @@ id_ed25519.*
 .correctless/config/auto-policy.json
 .correctless/artifacts/intent-*.md
 .correctless/artifacts/workflow-state-*.json
-.correctless/artifacts/decision-record-*.md"
+.correctless/artifacts/decision-record-*.md
+.correctless/meta/harness-fingerprint.json
+.correctless/meta/model-baselines.json
+scripts/harness-fingerprint.sh
+.correctless/scripts/harness-fingerprint.sh"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)

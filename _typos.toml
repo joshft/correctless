@@ -5,6 +5,8 @@ anual = "anual"
 elease = "elease"
 ibrary = "ibrary"
 # BLOCKINGs is the plural of BLOCKING (severity level) — typos sees BLOCKIN as a misspelling
+# and separately wants to "correct" BLOCKINGs → BLOCKINGGs. Whitelist both forms.
 BLOCKIN = "BLOCKIN"
+BLOCKINGs = "BLOCKINGs"
 # grep prefix pattern matching both "promote" and "promotion" in test assertions
 promot = "promot"
