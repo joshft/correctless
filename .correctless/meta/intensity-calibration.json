@@ -358,6 +358,42 @@
         "tests/test-skill-path-discovery.sh"
       ],
       "timestamp": "2026-04-26T23:44:43Z"
+    },
+    {
+      "feature_slug": "harness-fingerprint-r2-hardening",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 0,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "harness_version": 1,
+      "file_paths_touched": [
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/config/workflow-config.json",
+        ".correctless/specs/harness-fingerprint-r2-hardening.md",
+        ".github/workflows/ci.yml",
+        "CONTRIBUTING.md",
+        ".claude/rules/canonicalize-path.md",
+        "correctless/hooks/sensitive-file-guard.sh",
+        "correctless/scripts/harness-fingerprint.sh",
+        "correctless/scripts/lib.sh",
+        "correctless/setup",
+        "hooks/sensitive-file-guard.sh",
+        "scripts/harness-fingerprint.sh",
+        "scripts/lib.sh",
+        "setup",
+        "tests/harness-fingerprint-test-helpers.sh",
+        "tests/test-architecture-drift.sh",
+        "tests/test-canonicalize-path.sh",
+        "tests/test-harness-fingerprint.sh",
+        "tests/test-hook-sync.sh",
+        "tests/test-sensitive-file-guard.sh",
+        "tests/test-stale-hook-detection.sh",
+        "tests/test-workflow-gate.sh"
+      ],
+      "timestamp": "2026-04-28T03:12:46Z"
     }
   ]
 }

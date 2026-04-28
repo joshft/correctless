@@ -808,6 +808,58 @@ test_other_files_allowed
 test_empty_patterns_blocked
 
 # ---------------------------------------------------------------------------
+# INV-013a: workflow-gate.sh consumes the same extended _has_write_pattern
+# from .correctless/scripts/lib.sh. Interpreter-chain commands must be treated
+# as writes in the RED (tdd-tests) phase. This is the regression test that
+# catches a silent local redefinition of _has_write_pattern in workflow-gate.sh.
+# ---------------------------------------------------------------------------
+
+test_inv013a_workflow_gate_consumes_extended_pattern() {
+  echo ""
+  echo "=== INV-013a: workflow-gate consumes extended _has_write_pattern ==="
+
+  setup_test_env
+  # 'spec' phase blocks all Bash writes to source files — isolates the
+  # extended-pattern question from RED's separate Bash-on-new-source gap.
+  set_phase "spec"
+
+  local result
+  # Each fixture surfaces the target as a clean bash token; quoted-string
+  # forms are covered by the guard's INV-013 tests, not here.
+  for cmd in \
+    "bash -c 'echo x > src/feature.ts'" \
+    "perl -i -pe 's/x/y/' src/feature.ts" \
+    "/usr/bin/env perl -i -pe 's/x/y/' src/feature.ts" \
+    "python3 src/feature.ts" \
+    "ruby src/feature.ts"
+  do
+    result="$(run_gate_bash "$cmd")"
+    local exit_code
+    exit_code="$(extract_exit "$result")"
+    assert_eq "INV-013a: '$cmd' classified as write in spec phase" "2" "$exit_code"
+  done
+}
+
+# ---------------------------------------------------------------------------
+# INV-013a [structural]: _has_write_pattern is the single shared source —
+# no local redefinition in workflow-gate.sh
+# ---------------------------------------------------------------------------
+test_inv013a_no_local_redefinition() {
+  echo ""
+  echo "=== INV-013a [structural]: no local _has_write_pattern in workflow-gate.sh ==="
+
+  local gate="$REPO_DIR/hooks/workflow-gate.sh"
+  local found="absent"
+  if grep -nE '^[[:space:]]*_has_write_pattern[[:space:]]*\(\)' "$gate" | grep -v '^[[:space:]]*#' >/dev/null; then
+    found="present"
+  fi
+  assert_eq "INV-013a-shared: no local _has_write_pattern() in workflow-gate.sh" "absent" "$found"
+}
+
+test_inv013a_workflow_gate_consumes_extended_pattern
+test_inv013a_no_local_redefinition
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 

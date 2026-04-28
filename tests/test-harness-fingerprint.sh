@@ -5,6 +5,9 @@
 # Run from repo root: bash tests/test-harness-fingerprint.sh
 
 source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
+# Feature-specific helper for HARNESS_VERSION injection (INV-010 / Finding #8)
+# shellcheck source=harness-fingerprint-test-helpers.sh
+source "$(dirname "${BASH_SOURCE[0]}")/harness-fingerprint-test-helpers.sh"
 
 # ============================================================================
 # Paths to tested artifacts
@@ -79,6 +82,25 @@ run_script() {
   echo "$err"
 }
 
+# Drop-in replacement for `run_script ... --version $N ...` after INV-009
+# stripped --version from production. Builds a tmpdir copy of the harness
+# script with the requested HARNESS_VERSION constant, then delegates to
+# run_script with that copy via SCRIPT override. Spec: INV-010, BND-003.
+run_script_v() {
+  local version="$1"; shift
+  mkdir -p "$WORK_BASE"
+  local err_file helper_script
+  err_file="$(mktemp)"
+  helper_script="$(make_test_harness_script "$version" "$WORK_BASE" 2>"$err_file")" || helper_script=""
+  if [ -z "$helper_script" ] || [ ! -f "$helper_script" ]; then
+    printf 'EXIT=1\n--STDOUT--\n\n--STDERR--\n%s\n' "$(cat "$err_file" 2>/dev/null || true)"
+    rm -f "$err_file"
+    return
+  fi
+  rm -f "$err_file"
+  SCRIPT="$helper_script" run_script "$@"
+}
+
 extract_field() {
   # Extract a key=value or JSON field from script output blob
   local blob="$1" field="$2"
@@ -127,7 +149,7 @@ test_inv001_literal_fingerprint() {
   # Test-audit fix (assertion strength): pass an explicit version and assert the
   # fingerprint contains EXACTLY that version, not just "any integer".
   local out
-  out=$(run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv001__" --model "claude-test-model" --version 42 check)
+  out=$(run_script_v 42 --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv001__" --model "claude-test-model" check)
   local fp
   fp=$(extract_field "$out" "fingerprint")
   if [ "$fp" = "claude-test-model|42" ]; then
@@ -170,13 +192,13 @@ test_inv002_version_bump() {
 
   # First run captures baseline fingerprint
   local out1
-  out1=$(run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv002a__" --model "claude-x" --version 1 check)
+  out1=$(run_script_v 1 --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv002a__" --model "claude-x" check)
   local fp1
   fp1=$(extract_field "$out1" "fingerprint")
 
   # Second run with bumped version
   local out2
-  out2=$(run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv002b__" --model "claude-x" --version 2 check)
+  out2=$(run_script_v 2 --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv002b__" --model "claude-x" check)
   local fp2 status2
   fp2=$(extract_field "$out2" "fingerprint")
   status2=$(extract_status "$out2")
@@ -206,12 +228,12 @@ test_inv003_session_dedup() {
   d=$(mkworkdir inv003)
 
   # First run creates baseline AT version 1
-  run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv003__" --model "claude-x" --version 1 check >/dev/null
+  run_script_v 1 --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv003__" --model "claude-x" check >/dev/null
 
   # Bump version to trigger notification
   local out1 out2
-  out1=$(run_script --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_inv003__" --model "claude-x" --version 2 check)
-  out2=$(run_script --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_inv003__" --model "claude-x" --version 2 check)
+  out1=$(run_script_v 2 --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_inv003__" --model "claude-x" check)
+  out2=$(run_script_v 2 --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_inv003__" --model "claude-x" check)
 
   local notified1 notified2
   notified1=$(extract_field "$out1" "notified")
@@ -248,13 +270,13 @@ test_inv004_perf_budget() {
   local d
   d=$(mkworkdir inv004)
   # Pre-seed baseline so we measure the unchanged-path
-  run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv004_seed__" --model "claude-x" --version 1 check >/dev/null
+  run_script_v 1 --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv004_seed__" --model "claude-x" check >/dev/null
 
   local i max_ms=200 over=0 worst=0
   for i in 1 2 3 4 5; do
     local start_ns end_ns ms sid="__test_session_inv004_${i}_x__"
     start_ns=$(date +%s%N)
-    bash "$SCRIPT" --meta-dir "$d/.correctless/meta" --session-id "$sid" --model "claude-x" --version 1 check >/dev/null 2>&1 || true
+    bash "$(make_test_harness_script 1 "$WORK_BASE")" --meta-dir "$d/.correctless/meta" --session-id "$sid" --model "claude-x" check >/dev/null 2>&1 || true
     end_ns=$(date +%s%N)
     ms=$(( (end_ns - start_ns) / 1000000 ))
     if [ "$ms" -gt "$worst" ]; then worst=$ms; fi
@@ -279,7 +301,7 @@ test_inv005_first_run_silent() {
   local d
   d=$(mkworkdir inv005)
   local out
-  out=$(run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv005__" --model "claude-x" --version 1 check)
+  out=$(run_script_v 1 --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv005__" --model "claude-x" check)
   local code status err
   code=$(extract_exit "$out")
   status=$(extract_status "$out")
@@ -323,7 +345,7 @@ test_inv006_corruption_recovery() {
   echo "{ this is not valid JSON :" > "$d/.correctless/meta/harness-fingerprint.json"
 
   local out code status err
-  out=$(run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv006__" --model "claude-x" --version 1 check)
+  out=$(run_script_v 1 --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv006__" --model "claude-x" check)
   code=$(extract_exit "$out")
   status=$(extract_status "$out")
   err=$(extract_stderr "$out")
@@ -575,7 +597,7 @@ section "INV-011: Fingerprint file schema has all four required fields"
 test_inv011_file_schema() {
   local d
   d=$(mkworkdir inv011)
-  run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv011__" --model "claude-x" --version 7 check >/dev/null
+  run_script_v 7 --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv011__" --model "claude-x" check >/dev/null
   local f="$d/.correctless/meta/harness-fingerprint.json"
   if [ ! -f "$f" ]; then
     fail "INV-011" "fingerprint file not created"
@@ -797,7 +819,7 @@ test_inv017_pat003_conformance() {
   # Output must be parseable: either JSON (jq -e .) on a single line, or k=v lines
   local d out blob
   d=$(mkworkdir inv017)
-  out=$(run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv017__" --model "claude-x" --version 1 check)
+  out=$(run_script_v 1 --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv017__" --model "claude-x" check)
   blob=$(echo "$out" | sed -n '/^--STDOUT--$/,/^--STDERR--$/p' | grep -v '^--')
   if echo "$blob" | jq -e . >/dev/null 2>&1 \
      || echo "$blob" | grep -qE '^[a-z_]+=' ; then
@@ -820,9 +842,9 @@ test_inv018_cli_flags() {
 
   # Sentinel prefixed session-id must be honored verbatim
   local out flag_count
-  run_script --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_inv018x__" --model "claude-x" --version 1 check >/dev/null
+  run_script_v 1 --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_inv018x__" --model "claude-x" check >/dev/null
   # Trigger notification with version bump in same sentinel session — should write flag file with sentinel in name
-  run_script --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_inv018x__" --model "claude-x" --version 2 check >/dev/null
+  run_script_v 2 --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_inv018x__" --model "claude-x" check >/dev/null
 
   if compgen -G "$d/.correctless/artifacts/harness-notified-*__test_session_inv018x__*.flag" >/dev/null \
      || compgen -G "$d/.correctless/artifacts/*__test_session_inv018x__*.flag" >/dev/null; then
@@ -864,7 +886,8 @@ test_ma_hi_003_no_infinite_loop() {
   local d
   d=$(mkworkdir ma_hi_003)
   local flag
-  for flag in --version --meta-dir --artifacts-dir --session-id --model; do
+  # --version was removed in INV-009/PRH-003; remaining flags still tested.
+  for flag in --meta-dir --artifacts-dir --session-id --model; do
     timeout 3 bash "$SCRIPT" --meta-dir "$d/.correctless/meta" "$flag" >/dev/null 2>&1
     local rc=$?
     if [ "$rc" = "124" ]; then
@@ -939,7 +962,7 @@ test_prh001_advisory_only() {
   d=$(mkworkdir prh001)
   rm -rf "$d/.correctless/meta"  # delete meta dir entirely
   local out code
-  out=$(run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_prh001__" --model "claude-x" --version 1 check 2>&1 || true)
+  out=$(run_script_v 1 --meta-dir "$d/.correctless/meta" --session-id "__test_session_prh001__" --model "claude-x" check 2>&1 || true)
   code=$(extract_exit "$out")
   if [ "$code" = "0" ]; then
     pass "PRH-001b" "script exits 0 even with missing meta dir (advisory)"
@@ -1075,7 +1098,7 @@ section "PRH-004: meta files contain only schema-allowed fields"
 test_prh004_data_minimization() {
   local d
   d=$(mkworkdir prh004)
-  run_script --meta-dir "$d/.correctless/meta" --session-id "__test_session_prh004__" --model "claude-x" --version 1 check >/dev/null
+  run_script_v 1 --meta-dir "$d/.correctless/meta" --session-id "__test_session_prh004__" --model "claude-x" check >/dev/null
 
   local f="$d/.correctless/meta/harness-fingerprint.json"
   if [ -f "$f" ]; then
@@ -1387,7 +1410,7 @@ test_ma_hi_001_session_id_sanitization() {
   # 1. Path-traversal session-id must NOT create files outside the artifacts dir
   local hostile="../../../etc/escaped"
   local out
-  out=$(run_script --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "$hostile" --model "test-model" --version 1 check)
+  out=$(run_script_v 1 --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "$hostile" --model "test-model" check)
   local code
   code=$(extract_exit "$out")
   if [ "$code" = "0" ]; then
@@ -1409,7 +1432,7 @@ test_ma_hi_001_session_id_sanitization() {
   # 2. Trigger a version_bump so notification path runs (writes the flag file)
   # First write establishes baseline; second invocation with bumped version
   # writes the flag file under the sanitized session-id.
-  out=$(run_script --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "$hostile" --model "test-model" --version 2 check)
+  out=$(run_script_v 2 --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "$hostile" --model "test-model" check)
 
   # The flag file should exist under ARTIFACTS_DIR with sanitized name (no slashes/dots from input)
   local flag_files
@@ -1442,7 +1465,7 @@ test_ma_uc_001_schema_version() {
   local d
   d=$(mkworkdir ma_uc_001)
 
-  run_script --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_ma_uc_001__" --model "test-model" --version 1 check >/dev/null
+  run_script_v 1 --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_ma_uc_001__" --model "test-model" check >/dev/null
 
   local fp_file="$d/.correctless/meta/harness-fingerprint.json"
   if [ ! -f "$fp_file" ]; then
@@ -1459,7 +1482,7 @@ test_ma_uc_001_schema_version() {
   fi
 
   # On rewrite (version_bumped), schema_version must persist
-  run_script --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_ma_uc_001__" --model "test-model" --version 2 check >/dev/null
+  run_script_v 2 --meta-dir "$d/.correctless/meta" --artifacts-dir "$d/.correctless/artifacts" --session-id "__test_session_ma_uc_001__" --model "test-model" check >/dev/null
   sv=$(jq -r '.schema_version // empty' "$fp_file" 2>/dev/null)
   if [ "$sv" = "1" ]; then
     pass "MA-UC-001b" "schema_version preserved across version_bumped rewrite"
@@ -1468,5 +1491,235 @@ test_ma_uc_001_schema_version() {
   fi
 }
 test_ma_uc_001_schema_version
+
+# ===========================================================================
+# R2 Hardening tests — harness-fingerprint-r2-hardening spec
+# INV-009, INV-010, INV-011, BND-003
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# INV-009 [structural]: HARNESS_VERSION constant is the sole production input.
+# No --version flag, no env-var override, no defaulting form.
+# Greps below run on non-comment lines only (M-11 false-match avoidance).
+# ---------------------------------------------------------------------------
+test_inv009_no_override_surface() {
+  local non_comment
+  non_comment="$(grep -v '^[[:space:]]*#' "$SCRIPT")"
+  local fail_count=0
+
+  for pat in '--version' '--harness-version' 'VERSION_OVERRIDE' '\$\{HARNESS_VERSION:-' '\$\{HARNESS_VERSION:=' ':[[:space:]]*\$\{HARNESS_VERSION:='; do
+    if printf '%s' "$non_comment" | grep -qE -e "$pat"; then
+      echo "  INV-009: forbidden pattern found: $pat" >&2
+      fail_count=$((fail_count + 1))
+    fi
+  done
+
+  if [ "$fail_count" -eq 0 ]; then
+    pass "INV-009-structural" "no --version / VERSION_OVERRIDE / env-default surface in production script"
+  else
+    fail "INV-009-structural" "$fail_count override-surface patterns remain"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# INV-009 [integration]: invocation ignores override attempts
+# ---------------------------------------------------------------------------
+test_inv009_invocation_ignores_override() {
+  local d
+  d=$(mkworkdir inv009)
+
+  # The literal HARNESS_VERSION in the file (only set by spec-controlled commit)
+  local literal_v
+  literal_v="$(grep -E '^HARNESS_VERSION=' "$SCRIPT" | head -1 | sed 's/^HARNESS_VERSION=//')"
+
+  # (a) --version 99 must be silently dropped (unknown flag), fingerprint reflects literal
+  local out fp
+  out=$(bash "$SCRIPT" --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv009a__" --model "claude-x" --version 99 check 2>/dev/null || true)
+  fp=$(echo "$out" | grep -E '^fingerprint=' | head -1 | sed 's/^fingerprint=//')
+  if [ -n "$fp" ] && echo "$fp" | grep -q "|${literal_v}\(|\|$\)"; then
+    pass "INV-009a" "--version 99 ignored; fingerprint still reflects literal HARNESS_VERSION=${literal_v}"
+  elif [ -n "$fp" ] && echo "$fp" | grep -q "|99\(|\|$\)"; then
+    fail "INV-009a" "--version 99 escape hatch ACTIVE — fingerprint reflects 99 instead of ${literal_v}"
+  else
+    fail "INV-009a" "could not determine fingerprint version (got: '$fp')"
+  fi
+
+  # (b) HARNESS_VERSION=99 env-var must NOT override
+  out=$(HARNESS_VERSION=99 bash "$SCRIPT" --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv009b__" --model "claude-x" check 2>/dev/null || true)
+  fp=$(echo "$out" | grep -E '^fingerprint=' | head -1 | sed 's/^fingerprint=//')
+  if [ -n "$fp" ] && echo "$fp" | grep -q "|${literal_v}\(|\|$\)"; then
+    pass "INV-009b" "HARNESS_VERSION=99 env-var ignored; literal preserved"
+  else
+    fail "INV-009b" "HARNESS_VERSION=99 env-var escape hatch ACTIVE (got fp='$fp', literal=${literal_v})"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# INV-010 [structural]: no --version invocations of $SCRIPT in tests
+# (asserts the test migration completed)
+# ---------------------------------------------------------------------------
+test_inv010_no_version_flag_in_tests() {
+  # Find call sites of $SCRIPT or run_script that pass --version directly.
+  # The R2-hardening tests intentionally pass --version to verify it is
+  # ignored (INV-009 verification) — those are the only legitimate
+  # post-migration uses, and we exclude them by test-function name.
+  local count
+  count="$(awk '
+    /^test_inv009_invocation_ignores_override\(\)/ { skip = 1 }
+    /^test_inv010_no_version_flag_in_tests\(\)/ { skip = 1 }
+    /^\}$/ { skip = 0 }
+    !skip { print }
+  ' "$REPO_DIR/tests/test-harness-fingerprint.sh" \
+    | grep -nE '\$SCRIPT[^|]*--version|"\$SCRIPT".*--version|run_script[^)]*--version' \
+    | grep -vE '^[[:space:]]*[0-9]+:[[:space:]]*#' \
+    | wc -l)"
+  if [ "$count" -eq 0 ]; then
+    pass "INV-010-no-flag-in-tests" "no --version invocations of \$SCRIPT in test-harness-fingerprint.sh"
+  else
+    fail "INV-010-no-flag-in-tests" "$count test invocations still pass --version directly to \$SCRIPT"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# INV-010 [structural]: helper lives in feature-specific helper file
+# (NOT in shared tests/test-helpers.sh per Finding #8)
+# ---------------------------------------------------------------------------
+test_inv010_helper_in_feature_file() {
+  local feat="$REPO_DIR/tests/harness-fingerprint-test-helpers.sh"
+  local shared="$REPO_DIR/tests/test-helpers.sh"
+  local fail_count=0
+
+  if [ ! -f "$feat" ]; then
+    fail "INV-010-helper-file" "tests/harness-fingerprint-test-helpers.sh does not exist"
+    fail_count=$((fail_count + 1))
+  elif ! grep -qE '^[[:space:]]*make_test_harness_script[[:space:]]*\(\)' "$feat"; then
+    fail "INV-010-helper-file" "make_test_harness_script not defined in feature-specific helper file"
+    fail_count=$((fail_count + 1))
+  fi
+
+  if grep -qE '^[[:space:]]*make_test_harness_script[[:space:]]*\(\)' "$shared"; then
+    fail "INV-010-helper-file" "make_test_harness_script leaked into shared test-helpers.sh (Finding #8 regression)"
+    fail_count=$((fail_count + 1))
+  fi
+
+  if [ "$fail_count" -eq 0 ]; then
+    pass "INV-010-helper-file" "helper lives in harness-fingerprint-test-helpers.sh, not shared test-helpers.sh"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# INV-010 [integration]: helper produces a script with the injected version
+# ---------------------------------------------------------------------------
+test_inv010_helper_produces_correct_version() {
+  local feat="$REPO_DIR/tests/harness-fingerprint-test-helpers.sh"
+  if [ ! -f "$feat" ]; then
+    fail "INV-010-helper-runtime" "feature helper file missing — cannot test runtime"
+    return
+  fi
+  # shellcheck disable=SC1090
+  if ! ( source "$feat" && declare -f make_test_harness_script >/dev/null 2>&1 ); then
+    fail "INV-010-helper-runtime" "make_test_harness_script not loadable from feature helper file"
+    return
+  fi
+
+  local d
+  d=$(mkworkdir inv010_runtime)
+  local script_path
+  # shellcheck disable=SC1090
+  script_path="$( source "$feat" && make_test_harness_script 42 "$d" 2>/dev/null )"
+  if [ -z "$script_path" ] || [ ! -f "$script_path" ]; then
+    fail "INV-010-helper-runtime" "helper did not produce a usable script path (got: '$script_path')"
+    return
+  fi
+
+  # Filename pattern check
+  local base
+  base="$(basename "$script_path")"
+  case "$base" in
+    harness-fp-test-*.sh) pass "INV-010-filename" "destination filename matches harness-fp-test-*.sh ($base)" ;;
+    *) fail "INV-010-filename" "destination filename does not match harness-fp-test-*.sh (got: '$base')" ;;
+  esac
+
+  # The destination must NOT contain a 'scripts/' parent component
+  case "$script_path" in
+    */scripts/*) fail "INV-010-no-scripts-parent" "destination has a 'scripts/' parent ($script_path) — would match protected pattern" ;;
+    *) pass "INV-010-no-scripts-parent" "destination has no 'scripts/' parent component" ;;
+  esac
+
+  # Run the produced script — fingerprint must reflect 42
+  local out fp
+  out=$(bash "$script_path" --meta-dir "$d/.correctless/meta" --session-id "__test_session_inv010__" --model "claude-x" check 2>/dev/null || true)
+  fp=$(echo "$out" | grep -E '^fingerprint=' | head -1 | sed 's/^fingerprint=//')
+  if [ -n "$fp" ] && echo "$fp" | grep -q "|42\(|\|$\)"; then
+    pass "INV-010-injected-version" "produced script's fingerprint reflects injected version=42"
+  else
+    fail "INV-010-injected-version" "fingerprint does not reflect injected version (got: '$fp')"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# BND-003: helper destination not protected; helper output byte-equal to
+# production source except the HARNESS_VERSION= line.
+# ---------------------------------------------------------------------------
+test_bnd003_helper_destination_not_protected() {
+  local feat="$REPO_DIR/tests/harness-fingerprint-test-helpers.sh"
+  if [ ! -f "$feat" ]; then
+    fail "BND-003-not-protected" "feature helper file missing — cannot test"
+    return
+  fi
+  local d
+  d=$(mkworkdir bnd003_protected)
+  local script_path
+  # shellcheck disable=SC1090
+  script_path="$( source "$feat" && make_test_harness_script 7 "$d" 2>/dev/null )"
+  if [ -z "$script_path" ]; then
+    fail "BND-003-not-protected" "helper did not produce a path"
+    return
+  fi
+  case "$script_path" in
+    */scripts/harness-fingerprint.sh)
+      fail "BND-003-not-protected" "destination path matches protected pattern ($script_path)" ;;
+    *)
+      pass "BND-003-not-protected" "destination does NOT match */scripts/harness-fingerprint.sh" ;;
+  esac
+}
+
+test_bnd003_helper_byte_equal_except_version() {
+  local feat="$REPO_DIR/tests/harness-fingerprint-test-helpers.sh"
+  if [ ! -f "$feat" ]; then
+    fail "BND-003-byte-equal" "feature helper file missing — cannot test"
+    return
+  fi
+  local d
+  d=$(mkworkdir bnd003_byteq)
+  local script_path
+  # shellcheck disable=SC1090
+  script_path="$( source "$feat" && make_test_harness_script 13 "$d" 2>/dev/null )"
+  if [ -z "$script_path" ] || [ ! -f "$script_path" ]; then
+    fail "BND-003-byte-equal" "helper did not produce a usable script"
+    return
+  fi
+  local literal_v
+  literal_v="$(grep -E '^HARNESS_VERSION=' "$SCRIPT" | head -1 | sed 's/^HARNESS_VERSION=//')"
+
+  # Re-substitute the helper output back to the production version constant,
+  # then diff against the production source. Only difference must be... nothing.
+  local resub
+  resub="$d/resub.sh"
+  sed -E 's/^HARNESS_VERSION=.*$/HARNESS_VERSION='"$literal_v"'/' "$script_path" > "$resub"
+  if diff -q "$resub" "$SCRIPT" >/dev/null 2>&1; then
+    pass "BND-003-byte-equal" "helper output byte-equal to production source modulo HARNESS_VERSION line"
+  else
+    fail "BND-003-byte-equal" "helper output diverges from production source beyond HARNESS_VERSION line"
+  fi
+}
+
+test_inv009_no_override_surface
+test_inv009_invocation_ignores_override
+test_inv010_no_version_flag_in_tests
+test_inv010_helper_in_feature_file
+test_inv010_helper_produces_correct_version
+test_bnd003_helper_destination_not_protected
+test_bnd003_helper_byte_equal_except_version
 
 summary "Harness Fingerprint"

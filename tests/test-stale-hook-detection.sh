@@ -874,6 +874,64 @@ test_r004_unknown_no_manifest
 test_r005_manifest_gitignored
 
 # ============================================================================
+# INV-014: setup detects pre-R2 install of harness-fingerprint.sh and
+# force-reinstalls (closes the upgrade-path break Finding #7 surfaced)
+# ============================================================================
+
+test_inv014_pre_r2_force_reinstall() {
+  echo ""
+  echo "=== INV-014: pre-R2 harness-fingerprint.sh force-reinstall ==="
+
+  local target_dir="$TEST_DIR/inv014-target"
+  rm -rf "$target_dir"
+  mkdir -p "$target_dir/.correctless/scripts" "$target_dir/.correctless/hooks" "$target_dir/.correctless/config"
+
+  # Make $target_dir a git repo so setup's REPO_ROOT detection (git toplevel)
+  # picks it up rather than the outer correctless repo.
+  ( cd "$target_dir" && git init -q && git commit --allow-empty -q -m init ) >/dev/null 2>&1
+
+  # Stage a fake pre-R2 harness-fingerprint.sh containing the now-removed
+  # VERSION_OVERRIDE marker. setup must detect this and force-reinstall.
+  cat > "$target_dir/.correctless/scripts/harness-fingerprint.sh" <<'PRE_R2'
+#!/usr/bin/env bash
+# Pre-R2 stub for INV-014 detection
+HARNESS_VERSION=1
+VERSION_OVERRIDE=""
+PRE_R2
+
+  # Setup uses REPO_ROOT from the current working directory's git toplevel
+  # (or pwd fallback). cd into target_dir so REPO_ROOT resolves correctly,
+  # while invoking the setup script from the source repo via $SETUP_SCRIPT.
+  local stderr_out
+  stderr_out="$(cd "$target_dir" && bash "$SETUP_SCRIPT" 2>&1 >/dev/null)" || true
+
+  # (a)+(b): notice present in stderr
+  local got_notice="no"
+  if echo "$stderr_out" | grep -qE 'pre-R2|VERSION_OVERRIDE|INV-014|INV-009'; then
+    got_notice="yes"
+  fi
+  assert_eq "INV-014: setup emits pre-R2 detection notice" "yes" "$got_notice"
+
+  # (c): post-install file does NOT contain VERSION_OVERRIDE
+  local installed="$target_dir/.correctless/scripts/harness-fingerprint.sh"
+  local has_override="yes"
+  if [ -f "$installed" ] && ! grep -q 'VERSION_OVERRIDE' "$installed"; then
+    has_override="no"
+  fi
+  assert_eq "INV-014: post-install file has no VERSION_OVERRIDE" "no" "$has_override"
+
+  # (d): manifest hash entry exists for harness-fingerprint.sh
+  local manifest="$target_dir/.correctless/.install-manifest.json"
+  local manifest_ok="no"
+  if [ -f "$manifest" ] && jq -e '.files["scripts/harness-fingerprint.sh"]' "$manifest" >/dev/null 2>&1; then
+    manifest_ok="yes"
+  fi
+  assert_eq "INV-014-manifest: install manifest contains entry" "yes" "$manifest_ok"
+}
+
+test_inv014_pre_r2_force_reinstall
+
+# ============================================================================
 # Summary
 # ============================================================================
 

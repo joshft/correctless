@@ -14,7 +14,11 @@
 #     [--artifacts-dir PATH]  (default: .correctless/artifacts)
 #     [--session-id ID]       (default: get_current_session_id from lib.sh)
 #     [--model NAME]          (default: from CLAUDE_CODE_MODEL env, then "unknown")
-#     [--version N]           (default: HARNESS_VERSION constant below)
+#
+# NOTE: --version was removed in harness-fingerprint-r2-hardening (INV-009 /
+# PRH-003 — closes AUTH-R2-001). Tests inject specific HARNESS_VERSION values
+# via tests/harness-fingerprint-test-helpers.sh's make_test_harness_script —
+# never via a runtime flag.
 #
 # Output (k=v lines on stdout):
 #   fingerprint=...
@@ -73,7 +77,6 @@ META_DIR=""
 ARTIFACTS_DIR=""
 SESSION_ID=""
 MODEL=""
-VERSION_OVERRIDE=""
 
 # Guarded `shift 2` for paired flags: if a flag is the last arg with no value,
 # we still need to consume the flag itself (single shift) and continue —
@@ -85,17 +88,16 @@ while [ $# -gt 0 ]; do
     --artifacts-dir)   ARTIFACTS_DIR="${2:-}"; shift; [ $# -gt 0 ] && shift ;;
     --session-id)      SESSION_ID="${2:-}"; shift; [ $# -gt 0 ] && shift ;;
     --model)           MODEL="${2:-}"; shift; [ $# -gt 0 ] && shift ;;
-    --version)         VERSION_OVERRIDE="${2:-}"; shift; [ $# -gt 0 ] && shift ;;
     check|help)        CMD="$1"; shift ;;
     -h|--help)         CMD="help"; shift ;;
-    *)                 shift ;;  # ignore unknown flags — fail-open
+    *)                 shift ;;  # ignore unknown flags — fail-open per INV-009 / PRH-003
   esac
 done
 
 [ -z "$CMD" ] && CMD="check"
 
 if [ "$CMD" = "help" ]; then
-  echo "Usage: harness-fingerprint.sh check [--meta-dir PATH] [--artifacts-dir PATH] [--session-id ID] [--model NAME] [--version N]"
+  echo "Usage: harness-fingerprint.sh check [--meta-dir PATH] [--artifacts-dir PATH] [--session-id ID] [--model NAME]"
   exit 0
 fi
 
@@ -138,11 +140,8 @@ if [ -z "$MODEL" ]; then
   MODEL="${CLAUDE_CODE_MODEL:-${CLAUDE_MODEL:-${ANTHROPIC_MODEL:-unknown}}}"
 fi
 
-# Effective version
+# Effective version — HARNESS_VERSION is the sole production input (INV-009).
 EFFECTIVE_VERSION="$HARNESS_VERSION"
-if [ -n "$VERSION_OVERRIDE" ] && [[ "$VERSION_OVERRIDE" =~ ^[0-9]+$ ]]; then
-  EFFECTIVE_VERSION="$VERSION_OVERRIDE"
-fi
 
 # ============================================================================
 # STEP 4: Compute literal fingerprint (INV-001 — no hashing)

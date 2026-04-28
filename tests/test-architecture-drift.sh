@@ -1995,6 +1995,80 @@ check_test_registration() {
 check_test_registration
 
 # ============================================================================
+# PAT-017 / canonicalize-path rule file (harness-fingerprint-r2-hardening)
+# Mirrors the PAT-001 rule-file invariants for the new
+# .claude/rules/canonicalize-path.md (paths: [scripts/lib.sh])
+# ============================================================================
+
+CANON_RULE_FILE=".claude/rules/canonicalize-path.md"
+CANON_EXPECTED_PATH="scripts/lib.sh"
+
+check_canonicalize_rule_file_exists() {
+  echo ""
+  echo "=== PAT-017 (a): rule file exists with non-empty body ==="
+  local f="$REPO_DIR/$CANON_RULE_FILE"
+  if [ ! -f "$f" ]; then
+    fail "PAT-017(a)" "$CANON_RULE_FILE does not exist"
+    return
+  fi
+  local lines
+  lines="$(wc -l < "$f")"
+  if [ "$lines" -lt 5 ]; then
+    fail "PAT-017(a)" "$CANON_RULE_FILE body too short ($lines lines)"
+  else
+    pass "PAT-017(a)" "$CANON_RULE_FILE exists with substantive body ($lines lines)"
+  fi
+}
+
+check_canonicalize_rule_paths_frontmatter() {
+  echo ""
+  echo "=== PAT-017 (b): paths frontmatter set-equal to [scripts/lib.sh] ==="
+  local f="$REPO_DIR/$CANON_RULE_FILE"
+  if [ ! -f "$f" ]; then
+    fail "PAT-017(b)" "$CANON_RULE_FILE missing — cannot check frontmatter"
+    return
+  fi
+  if grep -E '^paths:[[:space:]]*\[[^]]*scripts/lib\.sh[^]]*\]' "$f" >/dev/null \
+    || awk '/^paths:[[:space:]]*$/,/^[^[:space:]-]/' "$f" | grep -E '^[[:space:]]*-[[:space:]]+scripts/lib\.sh[[:space:]]*$' >/dev/null; then
+    pass "PAT-017(b)" "paths frontmatter contains $CANON_EXPECTED_PATH"
+  else
+    fail "PAT-017(b)" "paths frontmatter does not list $CANON_EXPECTED_PATH"
+  fi
+}
+
+check_canonicalize_rule_see_link_resolves() {
+  echo ""
+  echo "=== PAT-017 (c): See-link from ARCHITECTURE.md resolves ==="
+  local arch="$REPO_DIR/.correctless/ARCHITECTURE.md"
+  local f="$REPO_DIR/$CANON_RULE_FILE"
+  if [ ! -f "$f" ]; then
+    fail "PAT-017(c)" "rule file missing — See-link cannot resolve"
+    return
+  fi
+  if grep -qF "See \`.claude/rules/canonicalize-path.md\`" "$arch"; then
+    pass "PAT-017(c)" "ARCHITECTURE.md contains See-link to canonicalize-path rule"
+  else
+    fail "PAT-017(c)" "ARCHITECTURE.md missing See-link to canonicalize-path rule"
+  fi
+}
+
+check_canonicalize_pointer_in_lib_sh() {
+  echo ""
+  echo "=== PAT-017 (d): scripts/lib.sh contains in-file pointer to rule ==="
+  local lib="$REPO_DIR/scripts/lib.sh"
+  if grep -qF '.claude/rules/canonicalize-path.md' "$lib"; then
+    pass "PAT-017(d)" "scripts/lib.sh references the canonicalize-path rule file"
+  else
+    fail "PAT-017(d)" "scripts/lib.sh missing pointer comment to .claude/rules/canonicalize-path.md (ABS-009 INV-021)"
+  fi
+}
+
+check_canonicalize_rule_file_exists
+check_canonicalize_rule_paths_frontmatter
+check_canonicalize_rule_see_link_resolves
+check_canonicalize_pointer_in_lib_sh
+
+# ============================================================================
 # Summary
 # ============================================================================
 

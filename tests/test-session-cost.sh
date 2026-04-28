@@ -1436,11 +1436,14 @@ test_r018_agent_context() {
 
   local agent_ctx="$REPO_DIR/.correctless/AGENT_CONTEXT.md"
 
-  # Tests R-018 [unit]: script count updated (17->18)
-  if grep -q '18 ' "$agent_ctx" && grep -qi 'script' "$agent_ctx"; then
-    pass "R018-a" "AGENT_CONTEXT.md mentions 18 scripts"
+  # Tests R-018 [unit]: script count matches actual scripts/*.sh
+  local _actual_count
+  _actual_count="$(find "$REPO_DIR/scripts" -maxdepth 1 -name '*.sh' -type f | wc -l)"
+  # Match "<count> shared scripts" / "<count> scripts" (lowercase per AGENT_CONTEXT.md prose)
+  if grep -qE "${_actual_count} (shared )?scripts" "$agent_ctx"; then
+    pass "R018-a" "AGENT_CONTEXT.md mentions ${_actual_count} scripts (matches scripts/*.sh count)"
   else
-    fail "R018-a" "AGENT_CONTEXT.md does not mention 18 scripts"
+    fail "R018-a" "AGENT_CONTEXT.md does not mention ${_actual_count} scripts (count drift)"
   fi
 
   # Tests R-018 [unit]: compute-session-cost.sh in scripts description

@@ -1114,6 +1114,418 @@ test_hf006_script_protection() {
 test_hf002_harness_meta_protection
 test_hf006_script_protection
 
+# ===========================================================================
+# R2 Hardening tests — harness-fingerprint-r2-hardening spec
+# INV-005, INV-005a, INV-006, INV-006a, INV-007, INV-007a, INV-008, INV-013, PRH-005
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# INV-005 [structural]: canonicalize_path is the sole normalizer at the
+# matcher boundary in sensitive-file-guard.sh. Every call site of
+# _check_file_against_patterns must be preceded (within 5 lines) by a
+# canonicalize_path reference.
+# ---------------------------------------------------------------------------
+test_inv005_canonical_only_at_matcher() {
+  echo ""
+  echo "=== INV-005 [structural]: canonical-only at matcher boundary ==="
+
+  local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
+  local violations=0
+  # awk: for every line containing _check_file_against_patterns, look back 5 lines
+  # for a canonicalize_path token in the same context.
+  local report
+  # Scan call sites only — skip the function-definition line and any line
+  # inside the function body itself (the function precondition documents the
+  # contract; the actual canonicalize_path application happens at call sites).
+  report="$(awk '
+    /^_check_file_against_patterns[[:space:]]*\(\)/ { in_def = 1 }
+    in_def && /^\}/ { in_def = 0; next }
+    {
+      buf[NR % 6] = $0
+      if (!in_def && $0 ~ /_check_file_against_patterns/ \
+          && $0 !~ /^[[:space:]]*#/ \
+          && $0 !~ /_check_file_against_patterns[[:space:]]*\(\)/) {
+        seen = 0
+        for (i = 1; i <= 5; i++) {
+          k = (NR - i) % 6
+          if (k < 0) k += 6
+          if (buf[k] ~ /canonicalize_path/) { seen = 1; break }
+        }
+        if (!seen) print NR ":" $0
+      }
+    }
+  ' "$guard")"
+
+  if [ -n "$report" ]; then
+    violations=1
+    echo "  INV-005 violations:" >&2
+    echo "$report" >&2
+  fi
+
+  if [ "$violations" -eq 0 ]; then
+    pass "INV-005" "every _check_file_against_patterns call site is preceded by canonicalize_path"
+  else
+    fail "INV-005" "matcher receives non-canonicalized input"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# INV-005 [integration]: traversal-encoded sensitive paths are blocked
+# ---------------------------------------------------------------------------
+test_inv005_traversal_encoded_blocks() {
+  echo ""
+  echo "=== INV-005 [integration]: traversal-encoded blocks ==="
+
+  local test_dir="/tmp/correctless-sfg-inv005-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result
+  # Edit on traversal-encoded .env path
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"subdir/../.env","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-005: Edit subdir/../.env blocked" "2" "$(extract_exit "$result")"
+
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"./foo/../.env","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-005: Edit ./foo/../.env blocked" "2" "$(extract_exit "$result")"
+
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"subdir//.env","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-005: Edit subdir//.env blocked" "2" "$(extract_exit "$result")"
+
+  # Bash redirect with traversal-encoded target
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo secret > subdir/../.env"}}')"
+  assert_eq "INV-005: Bash > subdir/../.env blocked" "2" "$(extract_exit "$result")"
+
+  rm -rf "$test_dir"
+}
+
+# ---------------------------------------------------------------------------
+# INV-005a: sensitive-file-guard verifies canonicalize_path is defined +
+# version-probe matches before use. Probe input
+# `__canonicalize_path_v1_probe__/foo` must echo back unchanged (idempotent
+# on a non-traversal input).
+# ---------------------------------------------------------------------------
+test_inv005a_canonicalize_version_probe() {
+  echo ""
+  echo "=== INV-005a: canonicalize_path version probe before use ==="
+
+  local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
+
+  # Structural: the guard body must contain a probe call against the v1 sentinel
+  if ! grep -qF '__canonicalize_path_v1_probe__' "$guard"; then
+    fail "INV-005a" "guard does not contain the v1 sentinel probe"
+    return
+  fi
+
+  # Structural: the failure path must reference the explicit remediation
+  if ! grep -qE "canonicalize_path missing or version mismatch" "$guard"; then
+    fail "INV-005a" "guard missing the explicit 'canonicalize_path missing or version mismatch' remediation message"
+    return
+  fi
+
+  if ! grep -qE "bash setup" "$guard"; then
+    fail "INV-005a" "guard missing the 'bash setup' remediation hint"
+    return
+  fi
+
+  # Integration: simulate old-lib-without-canonicalize_path scenario
+  local test_dir="/tmp/correctless-sfg-inv005a-$$"
+  rm -rf "$test_dir"
+  mkdir -p "$test_dir/scripts" "$test_dir/hooks"
+  # Copy guard, but write a stub lib.sh that lacks canonicalize_path
+  cp "$guard" "$test_dir/hooks/sensitive-file-guard.sh"
+  cat > "$test_dir/scripts/lib.sh" <<'STUBLIB'
+#!/usr/bin/env bash
+# Stub lib.sh WITHOUT canonicalize_path — simulates pre-R2 install.
+_has_write_pattern() { return 1; }
+_source_lib_sh() { :; }
+get_target_file() { :; }
+config_file() { :; }
+STUBLIB
+
+  local stderr_out exit_code
+  stderr_out="$(echo '{"tool_name":"Edit","tool_input":{"file_path":".env","old_string":"a","new_string":"b"}}' \
+    | bash "$test_dir/hooks/sensitive-file-guard.sh" 2>&1 >/dev/null)" && exit_code=0 || exit_code=$?
+
+  assert_eq "INV-005a: missing canonicalize_path → exit 2" "2" "$exit_code"
+  if echo "$stderr_out" | grep -qE 'canonicalize_path missing or version mismatch'; then
+    pass "INV-005a" "guard emits explicit remediation message on missing canonicalize_path"
+  else
+    fail "INV-005a" "guard exited but did not emit the required remediation message (got: $stderr_out)"
+  fi
+
+  rm -rf "$test_dir"
+}
+
+# ---------------------------------------------------------------------------
+# INV-006 [integration]: over-extract blocks bypass commands
+# ---------------------------------------------------------------------------
+test_inv006_over_extract_blocks_bypasses() {
+  echo ""
+  echo "=== INV-006 [integration]: over-extract blocks R2 bypass enumeration ==="
+
+  local test_dir="/tmp/correctless-sfg-inv006-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result tag cmd
+  # Each row is one R2 bypass mechanism — every one must block
+  # Each fixture surfaces .env as a bash-visible token. Quoted-string-buried
+  # paths are out-of-scope per PRH-005 / BND-002.
+  local -a bypasses=(
+    'perl-i:perl -i -pe "s/foo/bar/" .env'
+    'perl-pi:perl -pi -e "s/x/y/" .env'
+    'perl-redir:perl -e "system(q{cat hostname > .env})"'
+    'php-redir:php -r "system(\"cat hostname > .env\");"'
+    'lua-redir:lua -e "os.execute(\"cat hostname > .env\")"'
+    'tclsh-redir:tclsh -c "exec sh -c \"cat hostname > .env\""'
+    'Rscript-redir:Rscript -e "system(\"cat hostname > .env\")"'
+    'nim-redir:nim e --eval:"discard execShellCmd(\"cat hostname > .env\")"'
+    'bash-c-perl:bash -c "perl -i -pe s/x/y/ .env"'
+    'ed-positional:printf "%s\n" w .env q | ed -s .env'
+    'vim-ex:vim -e -c "w" .env'
+  )
+  for row in "${bypasses[@]}"; do
+    tag="${row%%:*}"
+    cmd="${row#*:}"
+    # Build JSON payload (escape quotes/backslashes)
+    local json
+    json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
+    result="$(run_hook_capture "$json")"
+    assert_eq "INV-006/${tag}: bypass blocked" "2" "$(extract_exit "$result")"
+  done
+
+  rm -rf "$test_dir"
+}
+
+# ---------------------------------------------------------------------------
+# INV-006a [structural]: disallowed per-command branches in
+# _extract_bash_targets. Enumerated literal list — each must be absent.
+# ---------------------------------------------------------------------------
+test_inv006a_disallowed_branches_enumerated() {
+  echo ""
+  echo "=== INV-006a [structural]: disallowed per-command branches ==="
+
+  local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
+  # Extract the body of _extract_bash_targets
+  local body
+  body="$(awk '
+    /^_extract_bash_targets[[:space:]]*\(\)[[:space:]]*\{?$/,/^\}$/
+  ' "$guard")"
+  if [ -z "$body" ]; then
+    fail "INV-006a" "cannot locate _extract_bash_targets body"
+    return
+  fi
+
+  local -a disallowed=(
+    cp mv rm rmdir unlink tee curl wget sed perl touch chmod chown chgrp
+    tar unzip 7z cpio ar scp sftp mkdir git python python3 node ruby ln
+  )
+  local violations=0 tok
+  for tok in "${disallowed[@]}"; do
+    # Match a `case` branch like `tok)` or `tok|other)` — escape | for grep -E
+    if printf '%s' "$body" | grep -E "(^|[[:space:]\|])${tok}(\||\))" | grep -v '^[[:space:]]*#' >/dev/null; then
+      violations=$((violations + 1))
+      echo "  INV-006a: disallowed branch found for '$tok'" >&2
+    fi
+  done
+
+  if [ "$violations" -eq 0 ]; then
+    pass "INV-006a" "no disallowed per-command case branches in _extract_bash_targets"
+  else
+    fail "INV-006a" "$violations disallowed per-command branches remain"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# INV-007 [integration]: redirect detection covers all 5 operators in both
+# whitespace-separated and inline-attached forms.
+# ---------------------------------------------------------------------------
+test_inv007_redirect_blocks_integration() {
+  echo ""
+  echo "=== INV-007 [integration]: redirect forms blocked ==="
+
+  local test_dir="/tmp/correctless-sfg-inv007-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result
+  for cmd in \
+    'cat /etc/hostname > .env' \
+    'cat /etc/hostname>.env' \
+    'cat /etc/hostname>>.env' \
+    'cat /etc/hostname 2> .env' \
+    'cat /etc/hostname 2>.env' \
+    'cat /etc/hostname &> .env' \
+    'cat /etc/hostname &>.env' \
+    'cat /etc/hostname 1> .env' \
+    'cat /etc/hostname 1>.env'
+  do
+    local json
+    json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
+    result="$(run_hook_capture "$json")"
+    assert_eq "INV-007: '$cmd' blocked" "2" "$(extract_exit "$result")"
+  done
+
+  rm -rf "$test_dir"
+}
+
+# ---------------------------------------------------------------------------
+# INV-007a [integration]: process substitution sub-tokenization
+# ---------------------------------------------------------------------------
+test_inv007a_process_substitution_blocks() {
+  echo ""
+  echo "=== INV-007a [integration]: process substitution writes blocked ==="
+
+  local test_dir="/tmp/correctless-sfg-inv007a-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result json
+  for cmd in \
+    'cat /etc/hostname > >(cat > .env)' \
+    'tee >(grep foo > .env) >/dev/null'
+  do
+    json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
+    result="$(run_hook_capture "$json")"
+    assert_eq "INV-007a: '$cmd' blocked" "2" "$(extract_exit "$result")"
+  done
+
+  rm -rf "$test_dir"
+}
+
+# ---------------------------------------------------------------------------
+# INV-008 [integration]: pattern matching uses canonical forms on both sides
+# ---------------------------------------------------------------------------
+test_inv008_canonical_pattern_matching() {
+  echo ""
+  echo "=== INV-008 [integration]: canonical-on-both-sides matching ==="
+
+  local test_dir="/tmp/correctless-sfg-inv008-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result
+  # *.pem must match traversal-encoded forms
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"./certs/key.pem","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-008: ./certs/key.pem matches *.pem" "2" "$(extract_exit "$result")"
+
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"certs//key.pem","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-008: certs//key.pem matches *.pem" "2" "$(extract_exit "$result")"
+
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"subdir/../certs/key.pem","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-008: subdir/../certs/key.pem matches *.pem" "2" "$(extract_exit "$result")"
+
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"./.correctless/meta/harness-fingerprint.json","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-008: ./.correctless/meta/harness-fingerprint.json matches" "2" "$(extract_exit "$result")"
+
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"subdir/../.correctless/meta/harness-fingerprint.json","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-008: traversal-encoded harness-fingerprint.json matches" "2" "$(extract_exit "$result")"
+
+  rm -rf "$test_dir"
+}
+
+# ---------------------------------------------------------------------------
+# INV-013 [integration]: interpreter-chain detection in _has_write_pattern
+# ---------------------------------------------------------------------------
+test_inv013_interpreter_chains_blocked() {
+  echo ""
+  echo "=== INV-013 [integration]: interpreter chains flagged + blocked ==="
+
+  local test_dir="/tmp/correctless-sfg-inv013-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  # Each fixture surfaces .env as a bash-visible token. Quote-obfuscated
+  # forms are out-of-scope per PRH-005 / OQ-004.
+  local -a samples=(
+    'bash-c:bash -c "echo x > .env"'
+    'sh-c:sh -c "echo x > .env"'
+    'zsh-c:zsh -c "echo x > .env"'
+    'dash-c:dash -c "echo x > .env"'
+    'perl-e-redir:perl -e "system(q{cat /etc/hostname > .env})"'
+    'perl-pi:perl -pi -e "s/foo/bar/" .env'
+    'perl-i:perl -i -e 1 .env'
+    'python-c-redir:python -c "import os; os.system(\"cat hostname > .env\")"'
+    'python3-c-redir:python3 -c "import os; os.system(\"cat hostname > .env\")"'
+    'ruby-e-redir:ruby -e "system(\"cat hostname > .env\")"'
+    'php-r-redir:php -r "system(\"cat hostname > .env\");"'
+    'lua-e-redir:lua -e "os.execute(\"cat hostname > .env\")"'
+    'tclsh-c:tclsh -c "exec sh -c \"cat hostname > .env\""'
+    'Rscript-redir:Rscript -e "system(\"cat hostname > .env\")"'
+    'nim-redir:nim e --eval:"discard execShellCmd(\"cat hostname > .env\")"'
+    'node-e-redir:node -e "require(\"child_process\").execSync(\"cat hostname > .env\")"'
+    'env-perl-pi:/usr/bin/env perl -pi -e "s/x/y/" .env'
+    'env-python3-redir:/usr/bin/env python3 -c "import os; os.system(\"cat h > .env\")"'
+    'optlocal-ruby-redir:/opt/local/bin/ruby -e "system(\"cat h > .env\")"'
+  )
+  local result row tag cmd json
+  for row in "${samples[@]}"; do
+    tag="${row%%:*}"
+    cmd="${row#*:}"
+    json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
+    result="$(run_hook_capture "$json")"
+    assert_eq "INV-013/${tag}: blocked" "2" "$(extract_exit "$result")"
+  done
+
+  rm -rf "$test_dir"
+}
+
+# ---------------------------------------------------------------------------
+# PRH-005 [structural]: no recursion / no eval / no IFS shift inside
+# _extract_bash_targets body.
+# ---------------------------------------------------------------------------
+test_prh005_no_extractor_recursion() {
+  echo ""
+  echo "=== PRH-005 [structural]: extractor body has no recursion / eval / IFS shift ==="
+
+  local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
+  local body
+  body="$(awk '
+    /^_extract_bash_targets[[:space:]]*\(\)[[:space:]]*\{?$/,/^\}$/
+  ' "$guard")"
+  if [ -z "$body" ]; then
+    fail "PRH-005" "cannot locate _extract_bash_targets body"
+    return
+  fi
+
+  local violations=0
+  # Recursion: function name appearing inside its own body
+  if printf '%s' "$body" | tail -n +2 | head -n -1 | grep -E '^[[:space:]]*[^#]*_extract_bash_targets' >/dev/null; then
+    violations=$((violations + 1))
+    echo "  PRH-005: recursive call to _extract_bash_targets" >&2
+  fi
+  # eval
+  if printf '%s' "$body" | grep -v '^[[:space:]]*#' | grep -E '\beval\b' >/dev/null; then
+    violations=$((violations + 1))
+    echo "  PRH-005: eval found in body" >&2
+  fi
+  # Nested IFS shifts: more than one `local IFS=` or any `IFS=` after the first
+  local ifs_count
+  ifs_count="$(printf '%s' "$body" | grep -v '^[[:space:]]*#' | grep -cE '(\blocal[[:space:]]+IFS=|^[[:space:]]*IFS=)' || true)"
+  if [ "$ifs_count" -gt 1 ]; then
+    violations=$((violations + 1))
+    echo "  PRH-005: $ifs_count IFS reassignments in body (>1)" >&2
+  fi
+
+  if [ "$violations" -eq 0 ]; then
+    pass "PRH-005" "no recursion / no eval / single IFS shift in _extract_bash_targets"
+  else
+    fail "PRH-005" "$violations PRH-005 violations"
+  fi
+}
+
+# Run R2 hardening tests
+test_inv005_canonical_only_at_matcher
+test_inv005_traversal_encoded_blocks
+test_inv005a_canonicalize_version_probe
+test_inv006_over_extract_blocks_bypasses
+test_inv006a_disallowed_branches_enumerated
+test_inv007_redirect_blocks_integration
+test_inv007a_process_substitution_blocks
+test_inv008_canonical_pattern_matching
+test_inv013_interpreter_chains_blocked
+test_prh005_no_extractor_recursion
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
