@@ -365,6 +365,17 @@ See `.claude/rules/hooks-pretooluse.md`.
 - **Violated when**: A new scanner pattern ID is added with a corresponding skill audit check, but no content-pairing drift test links them; or one side of a pair is updated without the other
 - **Test**: SE-R-009 in test-test-evasion-antipatterns.sh (checks 5/6/7 ↔ AP-016/017/018), SE-R-009 in test-antipattern-scan.sh (check 8 ↔ dead-security-fn)
 
+### PAT-016: Glob over directory contents — never enumerate (guards AP-024)
+- **Pattern**: When installing or processing all files of a single type from a directory, use a glob pattern (`for f in dir/*.sh`) — never a hardcoded enumerated list
+- **Rule**: Code that iterates "all files of type X in directory Y" must use a shell glob over Y, not a hardcoded list of filenames. A structural test must verify the count of installed/processed files matches the count of source files. Adding a new file in the source directory must fail the test if the file is not picked up downstream. The structural count-match test is mandatory — a glob alone without the test only catches some failure modes.
+- **Why**: PMB-003 — `setup` installed hooks via glob (correct) but installed scripts via a hardcoded 2-file list. The list was correct when written (PR #30, only 2 scripts existed) and silently went stale across 5 PRs that added scripts. 16 of 18 scripts were never installed on user projects. The failure was silent — hooks worked (they source lib.sh from the manifest), but features needing other scripts (cost tracking, dashboard, entrypoints, auto-mode) silently degraded with no error. The test for script installation inherited the same 2-file assumption and passed every time.
+- **Guards against**: AP-024
+- **Violated when**: a new file in a source directory is silently dropped because the consumer enumerated instead of globbing; an enumerated list grows over time without a count-match test catching the drift; an interpreter list, command allowlist, or similar enumerated security-relevant array goes stale
+- **Test**: structural test that compares glob count to consumer's effective list count; CI integration check via `tests/test-scripts-namespace-migration.sh` (and equivalent per-feature where the pattern repeats)
+
+### PAT-017: canonicalize_path security invariants
+See `.claude/rules/canonicalize-path.md`.
+
 ## Environment Assumptions
 
 ### ENV-001: Bash 4+ required

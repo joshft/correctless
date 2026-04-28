@@ -115,6 +115,7 @@ jobs:
           bash tests/test-skill-path-discovery.sh
           bash tests/test-statusline-live-cost.sh
           bash tests/test-harness-fingerprint.sh
+          bash tests/test-canonicalize-path.sh
 
       - name: Verify sync
         run: |
