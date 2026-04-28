@@ -260,9 +260,13 @@ test_inv003_has_write_pattern() {
   _has_write_pattern "sed 's/foo/bar/' file.txt" && rc=0 || rc=$?
   assert_eq "INV-003: sed without -i not detected as write" "1" "$rc"
 
-  # perl without -i (read-only)
+  # INV-013 (interpreter+eval-flag chain): perl -ne is a write candidate.
+  # `-ne` is perl's loop+eval mode and CAN write — `perl -ne 'print > "out"'`.
   _has_write_pattern "perl -ne 'print' file.txt" && rc=0 || rc=$?
-  assert_eq "INV-003: perl without -i not detected as write" "1" "$rc"
+  assert_eq "INV-003: perl -ne (eval flag) detected as write under INV-013" "0" "$rc"
+
+  _has_write_pattern "perl file.txt" && rc=0 || rc=$?
+  assert_eq "INV-003: perl without eval flag not detected as write" "1" "$rc"
 }
 
 # ============================================================================
@@ -679,14 +683,14 @@ EOF
 }
 
 # ============================================================================
-# QA-002 [integration]: sensitive-file-guard.sh Edit works without lib.sh
-# Non-Bash write tools (Edit/Write/MultiEdit) must not be blocked when lib.sh
-# is missing. Only Bash tools require _has_write_pattern() from lib.sh.
+# QA-002 [integration]: sensitive-file-guard.sh fails-closed without lib.sh.
+# Updated under INV-005a — every tool type now requires canonicalize_path,
+# closing the partial-upgrade bypass class.
 # ============================================================================
 
 test_qa002_sensitive_guard_edit_without_lib() {
   echo ""
-  echo "=== QA-002: sensitive-file-guard.sh Edit works without lib.sh ==="
+  echo "=== QA-002: sensitive-file-guard.sh fails-closed without lib.sh (INV-005a) ==="
 
   rm -rf "$TEST_DIR"
   mkdir -p "$TEST_DIR"
@@ -702,7 +706,6 @@ test_qa002_sensitive_guard_edit_without_lib() {
   mkdir -p hooks .correctless/config .correctless/artifacts
   cp "$REPO_DIR/hooks/sensitive-file-guard.sh" hooks/sensitive-file-guard.sh
 
-  # Config with no sensitive patterns matching our test file
   cat > .correctless/config/workflow-config.json <<'EOF'
 {
   "patterns": { "test_file": "*.test.ts", "source_file": "*.ts" },
@@ -710,26 +713,30 @@ test_qa002_sensitive_guard_edit_without_lib() {
 }
 EOF
 
-  # Edit operation targeting a non-sensitive file — should be allowed (exit 0)
-  local json_input='{"tool_name":"Edit","tool_input":{"file_path":"src/app.ts","old_string":"old","new_string":"new"}}'
-  local exit_code
-  echo "$json_input" | bash hooks/sensitive-file-guard.sh >/dev/null 2>&1 && exit_code=0 || exit_code=$?
-  assert_exit_code "QA-002: Edit exits 0 without lib.sh (non-sensitive file)" "0" "$exit_code"
+  # All tool types now fail-closed when lib.sh (and thus canonicalize_path) is missing
+  local json_input exit_code stderr_out
+  for case in \
+    'Edit-nonsensitive:{"tool_name":"Edit","tool_input":{"file_path":"src/app.ts","old_string":"old","new_string":"new"}}' \
+    'Write-nonsensitive:{"tool_name":"Write","tool_input":{"file_path":"src/utils.ts","content":"export {}"}}' \
+    'Edit-sensitive:{"tool_name":"Edit","tool_input":{"file_path":".env","old_string":"old","new_string":"new"}}' \
+    'Bash-write:{"tool_name":"Bash","tool_input":{"command":"cp a.ts b.ts"}}'
+  do
+    local tag="${case%%:*}"
+    json_input="${case#*:}"
+    stderr_out="$(echo "$json_input" | bash hooks/sensitive-file-guard.sh 2>&1 >/dev/null)" && exit_code=0 || exit_code=$?
+    assert_exit_code "QA-002/${tag}: exits 2 without lib.sh (INV-005a fail-closed)" "2" "$exit_code"
+  done
 
-  # Write operation targeting a non-sensitive file — should also be allowed
-  json_input='{"tool_name":"Write","tool_input":{"file_path":"src/utils.ts","content":"export {}"}}'
-  echo "$json_input" | bash hooks/sensitive-file-guard.sh >/dev/null 2>&1 && exit_code=0 || exit_code=$?
-  assert_exit_code "QA-002: Write exits 0 without lib.sh (non-sensitive file)" "0" "$exit_code"
-
-  # Edit operation targeting a sensitive file — should still be blocked
-  json_input='{"tool_name":"Edit","tool_input":{"file_path":".env","old_string":"old","new_string":"new"}}'
-  echo "$json_input" | bash hooks/sensitive-file-guard.sh >/dev/null 2>&1 && exit_code=0 || exit_code=$?
-  assert_exit_code "QA-002: Edit exits 2 without lib.sh (sensitive .env)" "2" "$exit_code"
-
-  # Bash write command without lib.sh — should be blocked (fail-closed)
-  json_input='{"tool_name":"Bash","tool_input":{"command":"cp a.ts b.ts"}}'
-  echo "$json_input" | bash hooks/sensitive-file-guard.sh >/dev/null 2>&1 && exit_code=0 || exit_code=$?
-  assert_exit_code "QA-002: Bash exits 2 without lib.sh (fail-closed)" "2" "$exit_code"
+  # Verify the remediation message is clear (INV-005a message contract)
+  json_input='{"tool_name":"Edit","tool_input":{"file_path":"src/app.ts","old_string":"a","new_string":"b"}}'
+  stderr_out="$(echo "$json_input" | bash hooks/sensitive-file-guard.sh 2>&1 >/dev/null)" || true
+  if echo "$stderr_out" | grep -qE 'canonicalize_path missing|lib.sh not found|bash setup'; then
+    PASS=$((PASS + 1))
+    echo "  PASS: QA-002: explicit remediation message present"
+  else
+    FAIL=$((FAIL + 1))
+    echo "  FAIL: QA-002: remediation message missing (got: $stderr_out)"
+  fi
 
   cd "$REPO_DIR" || exit 1
 }

@@ -116,14 +116,23 @@ fi
 sync_file "skills/_shared/constraints.md" "correctless/skills/_shared/constraints.md"
 [ "$CHECK_ONLY" = false ] && info "Shared constraints → correctless/"
 
-# --- All 28 skills ---
-for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto carchitect; do
+# --- All 29 skills ---
+for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto carchitect cmodelupgrade; do
   if [ "$CHECK_ONLY" = false ]; then
     mkdir -p "correctless/skills/$skill"
   fi
   sync_file "skills/$skill/SKILL.md" "correctless/skills/$skill/SKILL.md"
 done
-[ "$CHECK_ONLY" = false ] && info "All skills (28) → correctless/"
+[ "$CHECK_ONLY" = false ] && info "All skills (29) → correctless/"
+
+# --- test-features templates (harness-fingerprint baseline) ---
+if [ "$CHECK_ONLY" = false ]; then
+  mkdir -p "correctless/templates/test-features"
+fi
+if [ -f "templates/test-features/baseline.md" ]; then
+  sync_file "templates/test-features/baseline.md" "correctless/templates/test-features/baseline.md"
+fi
+[ "$CHECK_ONLY" = false ] && info "test-features templates → correctless/"
 
 if [ "$CHECK_ONLY" = true ]; then
   # Skills: check for stale directories and count mismatch

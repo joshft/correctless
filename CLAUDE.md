@@ -3,7 +3,7 @@
 
 This project uses Correctless for structured development.
 Read .correctless/AGENT_CONTEXT.md before starting any work.
-Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect
+Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect, /cmodelupgrade
 
 ## GitHub Operations
 
@@ -113,3 +113,8 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 ### 2026-04-22 — Postmortem: Skill says "Read the spec artifact" without path discovery
 - `/creview-spec` step 2 says "Read the spec artifact" with no path and no `workflow-advance.sh status` call. Works on correctless (conversation context has the path from /cspec). Fails on other projects in fresh sessions — agent hallucinates wrong paths. `/creview` and `/ctdd` both say "path from workflow state" — /creview-spec missed this pattern. Class: skills must discover artifact paths via workflow state, not assume conversation context. See AP-025.
 - Source: PMB-004
+
+### 2026-04-26 — Convention confirmed: Structurally-enforced sole-writer for meta files
+- Observed in 8 features (auto-mode-phase-2, carchitect-phase0, override-freq-metrics, semi-auto-mode, session-cost-analysis, stale-hook-detection, harness-fingerprint, plus carchitect-phase0-2) — treat as established project convention. Directly mitigates AP-022 (dead-code-in-security-paths).
+- Every new spec that introduces a `.correctless/meta/` JSON file or a sensitive `scripts/*.sh` writer must: (1) name the sole writer in an ABS-xxx entry's Invariant, (2) add the file path to `hooks/sensitive-file-guard.sh` protected paths, (3) verify the hook blocks BOTH Edit/Write AND Bash redirects (`>`, `>>`, `tee`) via `_has_write_pattern` from `lib.sh`, (4) include a structural test in `tests/test-sensitive-file-guard.sh` covering both block paths. Advisory "sole writer" claims are not enough — the v1 spec for harness-fingerprint claimed sole-writer but the v2 spec hardened it after /creview-spec round 2 caught the AP-022 pattern.
+- Source: /cdocs after harness-fingerprint

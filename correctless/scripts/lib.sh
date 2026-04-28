@@ -1,6 +1,97 @@
 #!/usr/bin/env bash
 # Correctless — Shared library functions
 # Sourced by hooks and scripts that need common utilities.
+#
+# Security invariants for canonicalize_path are documented in
+# .claude/rules/canonicalize-path.md (PAT-017, harness-fingerprint-r2-hardening
+# INV-001..INV-004, INV-002a, INV-012, EA-004). Edit the rule file to update
+# the contract; this comment is the in-file pointer required by ABS-009 INV-021.
+
+# ---------------------------------------------------------------------------
+# get_current_session_id — stable identifier for the current shell process
+# ---------------------------------------------------------------------------
+# Used by harness-fingerprint.sh and any future per-session dedup logic.
+# Cross-platform: prefers `ps -o lstart=` (Linux/macOS/BSD), falls back to
+# /proc/{pid}/stat (Linux), then to PID-only with a one-line warning.
+#
+# The output is a string that is stable WITHIN a single shell process and
+# distinct between processes. It is NOT cryptographic — it's derived from
+# pid + start time and used as a flag-file path component.
+#
+# BND-003 (harness-fingerprint spec):
+#   - canonical: ps -o lstart= -p $$
+#   - fallback 1: /proc/{pid}/stat field 22 (boot-relative starttime)
+#   - fallback 2: PID-only + stderr warning
+# Output is sanitized for filesystem safety (alnum + dash + underscore only).
+
+get_current_session_id() {
+  local pid="$$"
+  local raw="" sid=""
+
+  if command -v ps >/dev/null 2>&1; then
+    raw="$(ps -o lstart= -p "$pid" 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//')" || raw=""
+  fi
+
+  if [ -z "$raw" ] && [ -r "/proc/$pid/stat" ]; then
+    # Field 22 of /proc/PID/stat is starttime (clock ticks since boot)
+    raw="$(awk '{print $22}' "/proc/$pid/stat" 2>/dev/null)" || raw=""
+  fi
+
+  if [ -z "$raw" ]; then
+    echo "warning: get_current_session_id falling back to PID-only (no ps, no /proc)" >&2
+    sid="pid${pid}"
+  else
+    # Sanitize: alnum + dash + underscore only
+    sid="pid${pid}_$(echo "$raw" | tr -c 'A-Za-z0-9_-' '_' | sed 's/_*$//')"
+  fi
+
+  echo "$sid"
+}
+
+# ---------------------------------------------------------------------------
+# locked_update_file — generic locked read-modify-write for arbitrary file paths
+# ---------------------------------------------------------------------------
+# Mirrors locked_update_state but works for any file (not only state files).
+# Used by harness-fingerprint.sh for the fingerprint store write
+# (BND-002, ME-4 round-2 disposition).
+# Usage: locked_update_file FILE_PATH JQ_FILTER [--arg key val ...]
+# Behavior:
+#   * Acquires lock at FILE_PATH.lock
+#   * If FILE_PATH does not exist, treats input as the empty object {}
+#   * Runs jq with filter, writes via temp file + atomic mv
+#   * Releases lock via EXIT trap (matches locked_update_state)
+
+locked_update_file() {
+  local target_file="$1"
+  local jq_filter="$2"
+  shift 2
+  local rc=0
+
+  _acquire_state_lock "$target_file" || return 1
+  # shellcheck disable=SC2064
+  trap "$(printf '_release_state_lock %q; rm -f %q' "$target_file" "${target_file}.$$.tmp")" EXIT
+
+  local tmp_file="${target_file}.$$.tmp"
+  local jq_ok=0
+  if [ -f "$target_file" ]; then
+    jq "$@" "$jq_filter" "$target_file" > "$tmp_file" 2>/dev/null && jq_ok=1
+  else
+    # Missing file → seed jq with the empty object via -n so the filter has a
+    # `.` to mutate. jq -n binds --arg/--argjson the same as the file form.
+    jq -n "$@" "$jq_filter" > "$tmp_file" 2>/dev/null && jq_ok=1
+  fi
+
+  if [ "$jq_ok" = "1" ]; then
+    mv "$tmp_file" "$target_file" || { rm -f "$tmp_file"; rc=1; }
+  else
+    rm -f "$tmp_file"
+    rc=1
+  fi
+
+  _release_state_lock "$target_file"
+  trap - EXIT
+  return "$rc"
+}
 
 # ---------------------------------------------------------------------------
 # branch_slug — filesystem-safe slug from current branch name
@@ -224,31 +315,150 @@ locked_update_state() {
 }
 
 # ---------------------------------------------------------------------------
+# canonicalize_path — pure-bash path normalizer (segment-stack walker)
+# ---------------------------------------------------------------------------
+# Total over arbitrary byte sequences. No external commands; no fork/exec.
+# Operates on bytes (LC_ALL=C). Glob characters and shell sigils pass through
+# as literal bytes — never expanded. See .claude/rules/canonicalize-path.md.
+#
+# Contract:
+#   * Empty / whitespace-only input → "."
+#   * Non-empty input → non-empty single-line output (INV-001a)
+#   * No `//`, no `.` segments, no `..` on absolute output, no trailing `/`
+#     (except when the entire output is exactly `/`)
+#   * Idempotent: canonicalize_path(canonicalize_path(x)) == canonicalize_path(x)
+#   * Only ASCII 0x2E (`.`) is treated as a path-segment dot — Unicode
+#     lookalikes pass through as ordinary bytes (INV-002a, EA-004)
+#   * Newlines in input are normalized to `_` in output to satisfy the
+#     single-line contract — paths with literal `\n` cannot legitimately
+#     reach the matcher and any false positive is fail-safe.
+
+canonicalize_path() {
+  local LC_ALL=C
+  local input="$1"
+
+  if [ -z "$input" ]; then
+    printf '%s\n' "."
+    return 0
+  fi
+
+  # Whitespace-only input → "." (preserves non-empty-output contract)
+  case "$input" in
+    *[!$' \t\n']*) ;;
+    *) printf '%s\n' "."; return 0 ;;
+  esac
+
+  # Absolute path?
+  local absolute=0
+  if [ "${input:0:1}" = "/" ]; then
+    absolute=1
+  fi
+
+  # Save and disable globbing for the field-split. Glob expansion against the
+  # cwd would let a hostile path like `*` smuggle filenames into the matcher.
+  local f_was_set=1
+  case $- in *f*) ;; *) f_was_set=0 ;; esac
+  set -f
+
+  local IFS_save="${IFS-}"
+  local IFS='/'
+  # shellcheck disable=SC2206
+  local -a segs=( $input )
+  IFS="$IFS_save"
+
+  [ "$f_was_set" = 1 ] || set +f
+
+  # Process segments through stack. Track top index instead of repacking the
+  # array on every pop — avoids the O(n²) cost on paths with many `..`.
+  local -a stack=()
+  local top_idx=-1 seg
+  for seg in "${segs[@]}"; do
+    case "$seg" in
+      ""|".")
+        continue
+        ;;
+      "..")
+        if [ "$top_idx" -ge 0 ]; then
+          if [ "${stack[$top_idx]}" = ".." ]; then
+            top_idx=$((top_idx + 1))
+            stack[$top_idx]=".."
+          else
+            top_idx=$((top_idx - 1))
+          fi
+        elif [ "$absolute" = 0 ]; then
+          top_idx=0
+          stack[0]=".."
+        fi
+        ;;
+      *)
+        top_idx=$((top_idx + 1))
+        stack[$top_idx]="$seg"
+        ;;
+    esac
+  done
+
+  if [ "$top_idx" -lt 0 ]; then
+    [ "$absolute" = 1 ] && printf '%s\n' "/" || printf '%s\n' "."
+    return 0
+  fi
+
+  # Pure-bash join via IFS expansion of "${arr[*]}".
+  local out IFS_save2="${IFS-}"
+  IFS='/'
+  out="${stack[*]:0:top_idx+1}"
+  IFS="$IFS_save2"
+  [ "$absolute" = 1 ] && out="/$out"
+
+  # Single-line contract (INV-001): newlines in input bytes become `_`.
+  out="${out//$'\n'/_}"
+
+  printf '%s\n' "$out"
+}
+
+# ---------------------------------------------------------------------------
 # _has_write_pattern — detect write/destructive shell command patterns
 # ---------------------------------------------------------------------------
 # Returns 0 if the command contains a write pattern, 1 otherwise.
-# Union of all write-command tokens from workflow-gate.sh and
-# sensitive-file-guard.sh: redirect regex, token list, sed -i, perl -i.
+# Union of: redirect operators, write-command tokens (cp/mv/rm/tee/...),
+# sed -i / perl -i, and interpreter+eval-flag chains (INV-013).
 
 _has_write_pattern() {
   local cmd="$1"
-  # Check redirect operators (single combined grep).
-  # Known limitation: matches '>' inside quoted strings (e.g., echo "x > y").
-  # False positives are fail-safe — read-only commands get phase-gated, not bypassed.
-  echo "$cmd" | grep -qE '>>|[0-9]*>[^&]' && return 0
-  # Tokenize on shell metacharacters and check each token
+  [[ "$cmd" =~ \>\>|[0-9]*\>[^\&] ]] && return 0
+
+  # Single token scan — glob-disabled to keep `*.foo` literal — looking for
+  # writers, sed -i / perl -i shapes, or interpreter+eval-flag chains.
+  local f_was_set=1
+  case $- in *f*) ;; *) f_was_set=0 ;; esac
+  set -f
   # shellcheck disable=SC2141
   local IFS=$' \t\n;|&()`'
+  local tok base has_interp=0 has_evalflag=0 rc=1
   for tok in $cmd; do
     case "$tok" in
-      cp|mv|tee|install|rm|rmdir|unlink|dd|curl|wget|rsync|patch|truncate|shred|ln|python|python3|node|ruby) return 0 ;;
-      tar|unzip|7z|cpio|ar|touch|chmod|chown|chgrp|scp|sftp|mkdir) return 0 ;;
-      git) [[ "$cmd" =~ git[[:space:]]+(checkout|restore|reset|stash|clean|apply|am|merge|rebase|cherry-pick) ]] && return 0 ;;
-      sed) [[ "$cmd" =~ sed[[:space:]]+-i ]] && return 0 ;;
-      perl) [[ "$cmd" =~ perl[[:space:]]+-i ]] && return 0 ;;
+      cp|mv|tee|install|rm|rmdir|unlink|dd|curl|wget|rsync|patch|truncate|shred|ln) rc=0; break ;;
+      tar|unzip|7z|cpio|ar|touch|chmod|chown|chgrp|scp|sftp|mkdir) rc=0; break ;;
+      ed|vim|vi|nvim|ex|view|nano|emacs) rc=0; break ;;
+      python|python3|node|ruby) rc=0; break ;;
+      git) [[ "$cmd" =~ git[[:space:]]+(checkout|restore|reset|stash|clean|apply|am|merge|rebase|cherry-pick) ]] && { rc=0; break; } ;;
+      sed) [[ "$cmd" =~ sed[[:space:]]+-i ]] && { rc=0; break; } ;;
+      perl) [[ "$cmd" =~ perl[[:space:]]+-i ]] && { rc=0; break; } ;;
     esac
+    # Interpreter+evalflag detection (INV-013) — basename match strips
+    # `/usr/bin/env perl` style paths down to their executable name.
+    base="${tok##*/}"
+    case "$base" in
+      bash|sh|zsh|dash|perl|python|python3|ruby|php|lua|tclsh|Rscript|nim|node) has_interp=1 ;;
+    esac
+    case "$tok" in
+      -c|-e|-r|-E|-pe|-ne|-pi|-ni|-lpi|--execute) has_evalflag=1 ;;
+    esac
+    if [ "$has_interp" = 1 ] && [ "$has_evalflag" = 1 ]; then
+      rc=0; break
+    fi
   done
-  return 1
+  [ "$f_was_set" = 1 ] || set +f
+  return "$rc"
 }
 
 # ---------------------------------------------------------------------------

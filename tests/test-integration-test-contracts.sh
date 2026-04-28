@@ -19,6 +19,9 @@ set -f
 
 CSPEC_SKILL="skills/cspec/SKILL.md"
 CTDD_SKILL="skills/ctdd/SKILL.md"
+# Post-M-1 (2026-04-26): RED-phase test-writer prompt content lives in agents/ctdd-red.md
+# (single source of truth per ABS-010). R-008 tests check both files.
+CTDD_RED_AGENT="agents/ctdd-red.md"
 SPEC_LITE="templates/spec-lite.md"
 SPEC_FULL="templates/spec-full.md"
 ARCH_FILE=".correctless/ARCHITECTURE.md"
@@ -363,28 +366,28 @@ fi
 section "R-008: Test agent prompt with contract-as-task framing"
 
 # R-008a: Contract-as-task framing for test agent
-if grep -qi 'self-contained task\|discrete.*bounded.*task\|contract.*task' "$CTDD_SKILL"; then
+if grep -qi 'self-contained task\|discrete.*bounded.*task\|contract.*task' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-008a" "Contract-as-task framing present in ctdd SKILL.md"
 else
   fail "R-008a" "Contract-as-task framing not found in ctdd SKILL.md"
 fi
 
 # R-008b: "Entry tells you where to start" instruction
-if grep -qi 'Entry tells you where to start\|Entry.*where.*start' "$CTDD_SKILL"; then
+if grep -qi 'Entry tells you where to start\|Entry.*where.*start' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-008b" "'Entry tells you where to start' instruction present"
 else
   fail "R-008b" "'Entry tells you where to start' instruction not found"
 fi
 
 # R-008c: "Through tells you what path to exercise" instruction
-if grep -qi 'Through tells you what\|Through.*path.*exercise\|Through.*what.*cannot mock' "$CTDD_SKILL"; then
+if grep -qi 'Through tells you what\|Through.*path.*exercise\|Through.*what.*cannot mock' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-008c" "'Through tells you what path...' instruction present"
 else
   fail "R-008c" "'Through tells you what path...' instruction not found"
 fi
 
 # R-008d: "Exit tells you what must be true" instruction
-if grep -qi 'Exit tells you what must be true\|Exit.*must be true\|Exit.*what.*true.*end' "$CTDD_SKILL"; then
+if grep -qi 'Exit tells you what must be true\|Exit.*must be true\|Exit.*what.*true.*end' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-008d" "'Exit tells you what must be true' instruction present"
 else
   fail "R-008d" "'Exit tells you what must be true' instruction not found"
@@ -392,28 +395,28 @@ fi
 
 # R-008e: Constraint flagging instruction — flag a contract defect rather than silently comply
 # Must be about contract constraint defects specifically, not general mock/test flagging
-if grep -qi 'flag.*contract.*defect\|contract.*defect.*finding\|wrong.*constraint.*spec.*issue\|constraint.*seems.*wrong.*flag' "$CTDD_SKILL"; then
+if grep -qi 'flag.*contract.*defect\|contract.*defect.*finding\|wrong.*constraint.*spec.*issue\|constraint.*seems.*wrong.*flag' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-008e" "Contract constraint flagging instruction present"
 else
   fail "R-008e" "Contract constraint flagging instruction not found in ctdd SKILL.md"
 fi
 
 # R-008f: TB-004 reference (escalation to human boundary)
-if grep -q 'TB-004' "$CTDD_SKILL"; then
+if grep -q 'TB-004' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-008f" "TB-004 reference present in ctdd SKILL.md"
 else
   fail "R-008f" "TB-004 reference not found in ctdd SKILL.md"
 fi
 
 # R-008g: TB-005 reference (test agent not overriding auditor)
-if grep -q 'TB-005' "$CTDD_SKILL"; then
+if grep -q 'TB-005' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-008g" "TB-005 reference present in ctdd SKILL.md"
 else
   fail "R-008g" "TB-005 reference not found in ctdd SKILL.md"
 fi
 
 # R-008h: "do not silently downgrade by mocking a prohibited component" instruction
-if grep -qi 'silently.*downgrade\|mocking.*prohibited\|testing through a different entry' "$CTDD_SKILL"; then
+if grep -qi 'silently.*downgrade\|mocking.*prohibited\|testing through a different entry' "$CTDD_SKILL" "$CTDD_RED_AGENT"; then
   pass "R-008h" "Silent downgrade prohibition present"
 else
   fail "R-008h" "Silent downgrade prohibition not found in ctdd SKILL.md"

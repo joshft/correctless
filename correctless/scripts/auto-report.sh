@@ -136,6 +136,15 @@ report_generate() {
     fi
   fi
 
+  # Harness warning section (INV-016 of harness-fingerprint spec) — surface any
+  # `harness-notified-*.flag` files emitted during the /cauto run so the human
+  # reviewer sees the warning in the Auto Run Report's "What to Review First".
+  local harness_warning_section=""
+  local artifacts_root=".correctless/artifacts"
+  if compgen -G "${artifacts_root}/harness-notified-*.flag" >/dev/null 2>&1; then
+    harness_warning_section="4. **Harness change detected during run**: harness-fingerprint reported version_bumped at least once. Run \`/cmodelupgrade\` to compare metrics against baseline before merging."
+  fi
+
   # Output the report
   cat << REPORT_EOF
 # Auto Run Report
@@ -187,6 +196,7 @@ ${verify_summary}
 1. Check all ASSUMPTION-tagged decisions
 2. Review supervisor-flagged concerns
 3. Verify test coverage for new code
+${harness_warning_section}
 REPORT_EOF
 
   return 0

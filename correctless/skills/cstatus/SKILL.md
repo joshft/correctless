@@ -110,6 +110,20 @@ Mark the current phase with `▶` and show it in the diagram. For TDD sub-phases
 | `documented` | "All steps complete. Options: create PR (`gh pr create`), merge locally, keep branch, or discard. After merging: `/cpostmortem` if bugs escape, `/cmetrics` for health, `/caudit` for sweep (at high+ intensity)." |
 | `audit` | "Audit in progress. Run `/caudit` to continue the convergence loop." |
 
+### 3a. Harness fingerprint advisory line
+
+After the phase-specific guidance in section 3 and before showing available commands in section 4, emit a single advisory line about the harness fingerprint state. This sits between the workflow state section and the intensity calibration section (per harness-fingerprint spec INV-015).
+
+Read `.correctless/meta/harness-fingerprint.json` if it exists. Compute the short form:
+
+- If the file is missing: `Harness: model=unknown version=? fingerprint=00000000 status=new`
+- If present and valid JSON: `Harness: model={X} version={Y} fingerprint={hash[:8]} status=ok`
+- If `status=version_bumped` was reported by the most recent `harness-fingerprint.sh check` (read from `.correctless/artifacts/harness-notified-*.flag` presence in current session): `Harness: model={X} version={Y} fingerprint={hash[:8]} status=version-bumped`
+
+The format is fixed: `Harness: model=\S+ version=\d+ fingerprint=[0-9a-f]{8} status=(ok|new|version-bumped)`. The `fingerprint` short form is the first 8 hex characters of `sha256(fingerprint)` for compact display only — the literal fingerprint stored in the meta file is `{model_name}|{HARNESS_VERSION}` without hashing (INV-001).
+
+This line is advisory — never block, never error. If the file is malformed or unreadable, emit `Harness: model=unknown version=? fingerprint=00000000 status=ok` and continue silently.
+
 ### 4. Show Available Commands
 
 Based on the current state:
@@ -136,6 +150,7 @@ Available commands:
   /crelease       Versioning and changelog management
   /cexplain       Guided codebase exploration
   /cauto          Semi-auto pipeline — orchestrates ctdd through PR
+  /cmodelupgrade  Harness regression report (after model upgrade or version_bumped advisory)
 
 State management:
   .correctless/hooks/workflow-advance.sh status      Current phase

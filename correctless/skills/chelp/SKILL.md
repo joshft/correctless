@@ -62,7 +62,7 @@ Correctless (critical intensity):
 
 ### 3. Show Commands
 
-All 28 skills are always visible. Skills gated behind an intensity level are annotated with their minimum.
+All 29 skills are always visible. Skills gated behind an intensity level are annotated with their minimum.
 
 ```
 Feature workflow:
@@ -96,6 +96,7 @@ Other:
   /cexplain      Guided codebase exploration with diagrams
   /cauto         Semi-auto pipeline — orchestrates ctdd through PR   [standard+]
   /carchitect    Architecture definition — reverse-engineer or greenfield
+  /cmodelupgrade Compare current model+HARNESS_VERSION pipeline metrics vs baseline
 ```
 
 ### 4. Show Current Status

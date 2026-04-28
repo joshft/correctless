@@ -91,6 +91,16 @@ else
   _source_lib_sh || true
 fi
 
+# STEP 4a: canonicalize_path v1 sentinel probe (INV-005a) — catches partial
+# upgrades where the new guard is paired with an old lib.sh missing the
+# function or shipping a divergent implementation.
+
+if ! declare -f canonicalize_path >/dev/null 2>&1 \
+   || [ "$(canonicalize_path '__canonicalize_path_v1_probe__/foo' 2>/dev/null || true)" != "__canonicalize_path_v1_probe__/foo" ]; then
+  echo "BLOCKED [sensitive-file]: canonicalize_path missing or version mismatch — re-run 'bash setup' to refresh installed scripts" >&2
+  exit 2
+fi
+
 # ============================================
 # STEP 5: Collect file targets to check
 # ============================================
@@ -117,254 +127,72 @@ collect_targets() {
   esac
 }
 
-# Strip leading/trailing shell quotes from extracted tokens (QA-006)
+# Strip shell-quote and interpreter-wrapper bytes iteratively from both ends.
+# Required because IFS-splitting on `perl -e "system(q{cat > .env})"` yields
+# tokens like `.env}` and `"system` — the matcher only sees the canonical
+# path once wrappers are peeled. False-positive risk on legitimate paths
+# containing these bytes is accepted per OQ-004.
 _strip_quotes() {
-  local s="$1"
-  s="${s#\"}"; s="${s%\"}"
-  s="${s#\'}"; s="${s%\'}"
+  local s="$1" prev
+  while :; do
+    prev="$s"
+    s="${s#[\"\'\{\(\[\\]}"
+    s="${s%[\"\'\}\)\];,\\]}"
+    [ "$s" = "$prev" ] && break
+  done
   echo "$s"
 }
 
-# Extract file targets from Bash commands (INV-002)
-# Must handle extensionless files like .env, id_rsa
+# Extract file targets from a Bash command (INV-006, INV-007, INV-007a).
+# Over-extracts every non-flag token plus every redirect target — no
+# per-command dispatch (PRH-002).
 _extract_bash_targets() {
   local cmd="$COMMAND"
-
-  # Tokenize command on whitespace and shell metacharacters
   # shellcheck disable=SC2141
   local IFS=$' \t\n;|&()`'
+  # Intentional word-split; set -f at top of hook prevents pathname
+  # expansion of glob bytes inside the command.
   # shellcheck disable=SC2206
   local -a tokens=($cmd)
-  local i=0 tok
+  local i=0 tok inner sub_tok
 
   while [ $i -lt ${#tokens[@]} ]; do
     tok="${tokens[$i]}"
     case "$tok" in
-      # Redirect: extract the NEXT token as target
-      ">"|">>")
-        local next_i=$((i + 1))
-        if [ $next_i -lt ${#tokens[@]} ]; then
-          _strip_quotes "${tokens[$next_i]}"
+      ">"|">>"|"1>"|"2>"|"&>")
+        # Whitespace-separated redirect (INV-007); next token is the target.
+        if [ $((i + 1)) -lt ${#tokens[@]} ]; then
+          _strip_quotes "${tokens[$((i + 1))]}"
           i=$((i + 2)); continue
         fi
         ;;
-      # cp/mv: emit all non-flag arguments
-      cp|mv)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -*) ;;  # skip flags
-            *) _strip_quotes "${tokens[$i]}" ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
+      -*)
         ;;
-      # rm/rmdir/unlink: emit all non-flag arguments
-      rm|rmdir|unlink)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -*) ;;  # skip flags
-            *) _strip_quotes "${tokens[$i]}" ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
-        ;;
-      # tee: emit all non-flag arguments
-      tee)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -*) ;;
-            *) _strip_quotes "${tokens[$i]}" ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
-        ;;
-      # curl -o / --output: emit output file
-      curl)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -o)
-              local next_i=$((i + 1))
-              if [ $next_i -lt ${#tokens[@]} ]; then
-                _strip_quotes "${tokens[$next_i]}"
-                i=$((i + 2)); continue
-              fi
-              ;;
-            -o*)
-              # Combined short option: -oFILENAME (M4 fix)
-              _strip_quotes "${tokens[$i]#-o}"
-              ;;
-            --output)
-              local next_i=$((i + 1))
-              if [ $next_i -lt ${#tokens[@]} ]; then
-                _strip_quotes "${tokens[$next_i]}"
-                i=$((i + 2)); continue
-              fi
-              ;;
-            --output=*)
-              _strip_quotes "${tokens[$i]#--output=}"
-              ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
-        ;;
-      # wget -O / --output-document: emit output file
-      wget)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -O)
-              local next_i=$((i + 1))
-              if [ $next_i -lt ${#tokens[@]} ]; then
-                _strip_quotes "${tokens[$next_i]}"
-                i=$((i + 2)); continue
-              fi
-              ;;
-            --output-document)
-              # Long option with space-separated value (M4 fix)
-              local next_i=$((i + 1))
-              if [ $next_i -lt ${#tokens[@]} ]; then
-                _strip_quotes "${tokens[$next_i]}"
-                i=$((i + 2)); continue
-              fi
-              ;;
-            --output-document=*)
-              _strip_quotes "${tokens[$i]#--output-document=}"
-              ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
-        ;;
-      # ln: emit last argument (LINK_NAME)
-      ln)
-        i=$((i + 1))
-        local ln_last=""
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -*) ;;  # skip flags
-            *) ln_last="${tokens[$i]}" ;;
-          esac
-          i=$((i + 1))
-        done
-        if [ -n "$ln_last" ]; then
-          _strip_quotes "$ln_last"
-        fi
-        continue
-        ;;
-      # sed -i: skip expression, emit file arguments
-      sed)
-        if [[ "$cmd" =~ sed[[:space:]]+-i ]]; then
-          i=$((i + 1))
-          # Skip -i flag
-          [[ "${tokens[$i]:-}" == -i* ]] && i=$((i + 1))
-          # Skip substitution expression (s/.../ or y/.../)
-          case "${tokens[$i]:-}" in
-            s/*|s\\*|y/*) i=$((i + 1)) ;;
-          esac
-          # Remaining tokens are file arguments
-          while [ $i -lt ${#tokens[@]} ]; do
-            case "${tokens[$i]}" in
+      *)
+        # Process substitution (INV-007a) — single-level sub-tokenize.
+        # `(` is special in case patterns, so prefix-check via substring.
+        if [ "${tok:0:2}" = ">(" ] || [ "${tok:0:2}" = "<(" ]; then
+          inner="${tok#?\(}"
+          inner="${inner%\)}"
+          for sub_tok in $inner; do
+            case "$sub_tok" in
               -*) ;;
-              *) _strip_quotes "${tokens[$i]}" ;;
+              *) _strip_quotes "$sub_tok" ;;
             esac
-            i=$((i + 1))
           done
-          continue
+        else
+          _strip_quotes "$tok"
         fi
-        ;;
-      # touch/chmod/chown/chgrp/mkdir: emit all non-flag arguments (R6 fix)
-      touch|chmod|chown|chgrp|mkdir)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -*) ;;
-            *) _strip_quotes "${tokens[$i]}" ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
-        ;;
-      # tar: emit all non-flag arguments (archive and extracted files)
-      tar)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -*) ;;
-            *) _strip_quotes "${tokens[$i]}" ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
-        ;;
-      # unzip/7z/cpio/ar: emit all non-flag arguments (R6 fix)
-      unzip|7z|cpio|ar)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -*) ;;
-            *) _strip_quotes "${tokens[$i]}" ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
-        ;;
-      # scp/sftp: emit all non-flag arguments (R6 fix)
-      scp|sftp)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -*) ;;
-            *) _strip_quotes "${tokens[$i]}" ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
-        ;;
-      # git write subcommands: emit all non-flag arguments after the subcommand
-      git)
-        if [[ "$cmd" =~ git[[:space:]]+(checkout|restore|reset|stash|clean|apply|am|merge|rebase|cherry-pick) ]]; then
-          i=$((i + 2))  # skip 'git' and the subcommand
-          while [ $i -lt ${#tokens[@]} ]; do
-            case "${tokens[$i]}" in
-              -*) ;;
-              *) _strip_quotes "${tokens[$i]}" ;;
-            esac
-            i=$((i + 1))
-          done
-          continue
-        fi
-        ;;
-      # python/node/ruby: generic interpreters that could write to any file
-      # Over-extract all non-flag tokens as potential targets (downstream matching filters)
-      python|python3|node|ruby)
-        i=$((i + 1))
-        while [ $i -lt ${#tokens[@]} ]; do
-          case "${tokens[$i]}" in
-            -*) ;;
-            *) _strip_quotes "${tokens[$i]}" ;;
-          esac
-          i=$((i + 1))
-        done
-        continue
         ;;
     esac
     i=$((i + 1))
   done
 
-  # Also catch inline redirects like "cat x>.env" (no space before >)
-  # Use a while loop to capture ALL matches, not just the first (QA-001)
-  local remainder="$cmd"
-  while [[ "$remainder" =~ \>{1,2}([^[:space:]\;\|]+) ]]; do
-    _strip_quotes "${BASH_REMATCH[1]}"
-    remainder="${remainder#*${BASH_REMATCH[0]}}"
+  # Inline-attached redirects (INV-007) — `cmd>file`, `cmd2>file`, `cmd&>file`.
+  local re='(>{1,2}|[12]>|&>)([^[:space:]\;\|]+)' rest="$cmd"
+  while [[ "$rest" =~ $re ]]; do
+    _strip_quotes "${BASH_REMATCH[2]}"
+    rest="${rest#*${BASH_REMATCH[0]}}"
   done
 }
 
@@ -404,7 +232,11 @@ id_ed25519.*
 .correctless/config/auto-policy.json
 .correctless/artifacts/intent-*.md
 .correctless/artifacts/workflow-state-*.json
-.correctless/artifacts/decision-record-*.md"
+.correctless/artifacts/decision-record-*.md
+.correctless/meta/harness-fingerprint.json
+.correctless/meta/model-baselines.json
+scripts/harness-fingerprint.sh
+.correctless/scripts/harness-fingerprint.sh"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)
@@ -429,11 +261,23 @@ fi
 # Pre-lowercase all patterns once (avoids per-file lowercasing in the match loop)
 ALL_PATTERNS="${ALL_PATTERNS,,}"
 
+# Canonicalize every pattern once (INV-005, INV-008, PRH-004 — canonical forms
+# on both sides). Glob bytes (`*.pem`, `secrets.*`) survive per INV-004.
+_canonical_arr=()
+while IFS= read -r pat; do
+  [ -n "$pat" ] && _canonical_arr+=( "$(canonicalize_path "$pat")" )
+done <<< "$ALL_PATTERNS"
+_IFS_save="${IFS-}"; IFS=$'\n'
+CANONICAL_PATTERNS="${_canonical_arr[*]}"
+IFS="$_IFS_save"
+
 # ============================================
-# STEP 8: Match each file target against patterns (INV-007)
+# STEP 8: Match each file target against patterns (INV-007, INV-008)
 # ============================================
 
 _check_file_against_patterns() {
+  # Pre-condition: argument is already a canonical-form path (output of
+  # canonicalize_path). Matched against CANONICAL_PATTERNS only. PRH-004.
   local filepath="$1"
 
   # Case-insensitive: lowercase the filepath (EA-002)
@@ -462,20 +306,23 @@ _check_file_against_patterns() {
         esac
         ;;
     esac
-  done <<< "$ALL_PATTERNS"
+  done <<< "$CANONICAL_PATTERNS"
 
   return 1
 }
 
 # ============================================
-# STEP 9: Check each file target (INV-001, INV-002, BND-004)
+# STEP 9: Check each file target (INV-001, INV-002, BND-004, INV-005)
 # ============================================
 
 while IFS= read -r target; do
   [ -z "$target" ] && continue
 
+  # Canonicalize the target before matching (INV-005, PRH-004).
+  canonical_target="$(canonicalize_path "$target")"
+
   matched_pattern=""
-  matched_pattern="$(_check_file_against_patterns "$target")" || true
+  matched_pattern="$(_check_file_against_patterns "$canonical_target")" || true
 
   if [ -n "$matched_pattern" ]; then
     echo "BLOCKED [sensitive-file]: $target matches protected pattern '$matched_pattern'.

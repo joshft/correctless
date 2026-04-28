@@ -1,7 +1,7 @@
 ---
 name: cspec
 description: Create a structured specification with testable invariants for a new feature. Researches current best practices before writing invariants. Adapts format to workflow intensity.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git log*), Bash(git diff*), Bash(git branch*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/research/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(.claude/rules/*.md), WebSearch, WebFetch
+allowed-tools: Read, Grep, Glob, Edit, Bash(git log*), Bash(git diff*), Bash(git branch*), Bash(*workflow-advance.sh*), Bash(*harness-fingerprint*), Write(.correctless/specs/*), Write(.correctless/artifacts/research/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(.claude/rules/*.md), WebSearch, WebFetch
 ---
 
 # /cspec — Write a Feature Specification
@@ -68,6 +68,17 @@ If no workflow is active, initialize one. Before calling `workflow-advance.sh in
 This creates the state file and sets the phase to `spec`. If you're on `main` or `master`, tell the user to create a feature branch first.
 
 ## How to Write the Spec
+
+<!-- correctless:harness-fingerprint:invocation -->
+### Step -1: Harness fingerprint check (advisory, runs before Step 0)
+
+Before any Socratic brainstorm runs, invoke the harness fingerprint check. This compares the current `{model_name}+HARNESS_VERSION}` against the stored value in `.correctless/meta/harness-fingerprint.json` and emits a one-line advisory if a version bump is detected.
+
+```bash
+bash .correctless/scripts/harness-fingerprint.sh check 2>/dev/null || true
+```
+
+The script is **strictly advisory** (PRH-001 of the harness-fingerprint spec) — it always exits 0 and never blocks /cspec. If the output reports `status=version_bumped` AND `notified=true`, surface the line `Harness has changed (model={X} version={Y}). Run /cmodelupgrade to compare metrics against baseline.` to the user one time per session. Then continue immediately to Step 0 below regardless of the script's output.
 
 ### Step 0: Socratic Brainstorm
 

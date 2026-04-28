@@ -293,8 +293,19 @@ install_hooks() {
   # PMB-003 / AP-024: glob all .sh files — never use a hardcoded list (matches hook pattern above)
   for script in "$SCRIPT_DIR"/scripts/*.sh; do
     [ -f "$script" ] || continue
-    cp "$script" "$script_dest/$(basename "$script")"
-    chmod +x "$script_dest/$(basename "$script")" 2>/dev/null || true
+    local _script_name _existing_install
+    _script_name="$(basename "$script")"
+    _existing_install="$script_dest/$_script_name"
+    # INV-014: detect pre-R2 harness-fingerprint.sh (carries VERSION_OVERRIDE)
+    # and force-reinstall so the upgraded test suite doesn't pair with a
+    # stale script.
+    if [ "$_script_name" = "harness-fingerprint.sh" ] \
+       && [ -f "$_existing_install" ] \
+       && grep -q 'VERSION_OVERRIDE' "$_existing_install"; then
+      echo "  ! Detected pre-R2 harness-fingerprint.sh — re-installing with current version" >&2
+    fi
+    cp "$script" "$_existing_install"
+    chmod +x "$_existing_install" 2>/dev/null || true
   done
 
   # ============================================
@@ -1208,7 +1219,7 @@ else
 This project uses Correctless for structured development.
 Read .correctless/AGENT_CONTEXT.md before starting any work.
 Do NOT Read AGENT_CONTEXT.md from the project root — it may be stale or absent.
-Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect
+Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect, /cmodelupgrade
 CMDEOF
   ok "Updated CLAUDE.md"
 fi

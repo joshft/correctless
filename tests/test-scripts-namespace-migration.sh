@@ -605,6 +605,11 @@ test_pmb003_all_scripts_installed() {
       "$TEST_DIR/.correctless/scripts/$name"
   done
 
+  # HF-PMB003: explicitly verify harness-fingerprint.sh is installed
+  # (harness-fingerprint spec PRE-006 — install-completeness coverage)
+  assert_file_exists "HF-PMB003: harness-fingerprint.sh installed" \
+    "$TEST_DIR/.correctless/scripts/harness-fingerprint.sh"
+
   cleanup
 }
 

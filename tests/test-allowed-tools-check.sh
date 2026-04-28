@@ -59,6 +59,33 @@ fi
 echo ""
 echo "=== Structural: skill allowed-tools coverage ==="
 
+# HF-007: cmodelupgrade-specific allowed-tools constraints (harness-fingerprint INV-007 / PRH-003)
+cmodelupgrade="$REPO_DIR/skills/cmodelupgrade/SKILL.md"
+if [ -f "$cmodelupgrade" ]; then
+  allowed_cmu="$(sed -n 's/^allowed-tools: //p' "$cmodelupgrade" 2>/dev/null)"
+  if echo "$allowed_cmu" | grep -qF 'model-baselines.json'; then
+    pass "HF-007-cmu-1" "cmodelupgrade allowed-tools includes Write(model-baselines.json)"
+  else
+    fail "HF-007-cmu-1" "cmodelupgrade allowed-tools missing Write(model-baselines.json)"
+  fi
+  if echo "$allowed_cmu" | grep -qF 'harness-fingerprint.json'; then
+    fail "HF-007-cmu-2" "cmodelupgrade allowed-tools must NOT include Write(harness-fingerprint.json) per INV-007"
+  else
+    pass "HF-007-cmu-2" "cmodelupgrade allowed-tools correctly excludes harness-fingerprint write"
+  fi
+  if echo "$allowed_cmu" | grep -qE '\bTask\b'; then
+    fail "HF-007-cmu-3" "cmodelupgrade allowed-tools must NOT include Task per PRH-003"
+  else
+    pass "HF-007-cmu-3" "cmodelupgrade allowed-tools correctly excludes Task (no subagent spawning)"
+  fi
+else
+  fail "HF-007-cmu-0" "cmodelupgrade SKILL.md does not exist"
+fi
+
+echo ""
+echo "=== Structural: per-skill body checks (existing) ===
+"
+
 # For each skill, extract allowed-tools and check that key Write() paths
 # mentioned in the skill body are covered by the frontmatter
 skills_dir="$REPO_DIR/skills"
