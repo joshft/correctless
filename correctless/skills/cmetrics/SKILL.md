@@ -81,6 +81,30 @@ Read everything in the accumulation layer. Skip files that don't exist.
 - Total findings across all runs
 - Recurring patterns flagged
 
+**Olympics staleness** — for "days since last Olympics" per preset, take the
+maximum of two independent signals (ABS-029 / PRH-005 — single-signal
+staleness was the original PMB-005 bug):
+- (a) mtime of `.correctless/artifacts/findings/audit-{preset}-history.md` if the file exists
+- (b) mtime of the most recent file matching `.correctless/artifacts/findings/audit-{preset}-*-round-*.json` if any match
+
+Use the `max` of (a) and (b) — the later of the two timestamps wins. If
+neither signal exists, report the staleness as `no data` literally (never
+silently zero or "infinite"). The comparison is strictly mtime-based — do
+NOT cross-check the round-JSON's `started_at` content; that's the gate's
+job (cmd_audit_done in workflow-advance.sh), not the consumer's. Layer
+separation is intentional.
+
+Acknowledged residual risk: ENV-003 says filesystem mtime is unreliable
+after `git checkout`/`git clone`. The consumer side accepts this — /cmetrics
+is advisory and fail-open; a stale mtime produces a slightly-wrong staleness
+number but does not corrupt workflow state. The gate (cmd_audit_done) is
+content-based and immune to the same drift.
+
+**Audit-done overrides** — count `audit-done` overrides separately from
+total overrides in the Override Health section. A routine `audit-done`
+override is the AP-023 recurrence pattern for the ABS-029 gate specifically.
+Surface as a dedicated counter line: `audit-done overrides: {N} across {M} runs`.
+
 **Feature velocity** — from git log:
 - Average branch duration (first commit to merge)
 - Features per month

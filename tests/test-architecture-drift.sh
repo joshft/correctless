@@ -2069,6 +2069,55 @@ check_canonicalize_rule_see_link_resolves
 check_canonicalize_pointer_in_lib_sh
 
 # ============================================================================
+# Class fix for QA-R4-001: every ABS-NNN identifier referenced anywhere in
+# the repo must resolve to an `### ABS-NNN:` heading in ARCHITECTURE.md.
+# Catches the "advisory references with no anchor" failure mode (AP-026).
+# ============================================================================
+
+check_abs_references_resolve() {
+  echo ""
+  echo "=== ABS-resolve: every ABS-NNN reference has a heading in ARCHITECTURE.md ==="
+  local arch="$REPO_DIR/.correctless/ARCHITECTURE.md"
+  if [ ! -f "$arch" ]; then
+    fail "ABS-resolve" "ARCHITECTURE.md missing"
+    return
+  fi
+
+  # Collect every ABS-NNN heading defined in ARCHITECTURE.md.
+  local defined_ids
+  defined_ids="$(grep -oE '^### ABS-[0-9]{3}:' "$arch" | sed -E 's/^### (ABS-[0-9]{3}):/\1/' | sort -u || true)"
+
+  # Collect every ABS-NNN reference across the repo, scoped to source dirs
+  # we own (avoid noise from tests/, .correctless/artifacts/, .correctless/specs/).
+  # Spec files reference future ABS entries by design — their references are
+  # promises, not violations. Same for test fixtures.
+  local referenced_ids
+  referenced_ids="$(grep -roEh 'ABS-[0-9]{3}' \
+    "$REPO_DIR/scripts/" \
+    "$REPO_DIR/hooks/" \
+    "$REPO_DIR/skills/" \
+    "$REPO_DIR/.correctless/AGENT_CONTEXT.md" \
+    "$REPO_DIR/.correctless/antipatterns.md" \
+    2>/dev/null | sort -u || true)"
+
+  local missing=""
+  while IFS= read -r ref; do
+    [ -z "$ref" ] && continue
+    if ! echo "$defined_ids" | grep -qFx "$ref"; then
+      missing="$missing $ref"
+    fi
+  done <<< "$referenced_ids"
+
+  if [ -z "$missing" ]; then
+    pass "ABS-resolve" "all ABS-NNN references resolve to a heading in ARCHITECTURE.md"
+  else
+    fail "ABS-resolve" "unresolved ABS-NNN references (no heading in ARCHITECTURE.md):$missing"
+  fi
+}
+
+check_abs_references_resolve
+
+# ============================================================================
 # Summary
 # ============================================================================
 

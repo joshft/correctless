@@ -394,6 +394,39 @@
         "tests/test-workflow-gate.sh"
       ],
       "timestamp": "2026-04-28T03:12:46Z"
+    },
+    {
+      "feature_slug": "audit-findings-persistence-contract",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 5,
+      "actual_findings_count": 1,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".claude/hooks/sensitive-file-guard.sh",
+        ".claude/hooks/workflow-gate.sh",
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/antipatterns.md",
+        ".correctless/config/workflow-config.json",
+        ".github/workflows/ci.yml",
+        "CLAUDE.md",
+        "CONTRIBUTING.md",
+        "correctless/hooks/sensitive-file-guard.sh",
+        "correctless/hooks/workflow-advance.sh",
+        "correctless/skills/caudit/SKILL.md",
+        "correctless/skills/cmetrics/SKILL.md",
+        "correctless/scripts/audit-record.sh",
+        "hooks/sensitive-file-guard.sh",
+        "hooks/workflow-advance.sh",
+        "skills/caudit/SKILL.md",
+        "skills/cmetrics/SKILL.md",
+        "scripts/audit-record.sh",
+        "tests/test-architecture-drift.sh",
+        "tests/test-audit-findings-persistence.sh"
+      ],
+      "timestamp": "2026-04-30T04:26:08Z"
     }
   ]
 }
