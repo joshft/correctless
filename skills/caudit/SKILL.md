@@ -645,7 +645,17 @@ You will be fired if a known pattern recurs and you don't find it.
 
 ## Findings Artifacts
 
-Write per-round findings to `.correctless/artifacts/findings/audit-{preset}-{date}-round-{N}.json` (date format: ISO 8601 `YYYY-MM-DD`).
+Persist per-round findings via the canonical writer:
+
+```
+bash scripts/audit-record.sh write-round <PRESET> <ROUND> <SOURCE>
+```
+
+`SOURCE` is a JSON path or `-` for stdin. The script is the sole writer per ABS-029. Direct `Write`/`Edit` calls or shell redirects to the findings path are forbidden (PRH-001 / INV-006).
+
+The destination resolves to `.correctless/artifacts/findings/audit-<PRESET>-<DATE>-round-<ROUND>.json` (date derived from workflow state's `started_at`, not "today"). The script enforces the schema and validates inputs.
+
+For a clean audit run (zero findings after Round 1 specialists), still invoke the canonical writer with stdin `{"findings": [], "rejected": []}`. The empty-findings document is the audit's evidence of having run; absence is NOT evidence of "no findings."
 
 **Note:** This schema differs from `/ctdd` QA findings (`.correctless/artifacts/qa-findings-*.json`). Olympics findings have `tier`, `agent`, `bounty` fields. TDD QA findings have `severity` (BLOCKING/NON-BLOCKING) and `rule_ref`. Consuming agents must handle both schemas.
 
@@ -683,7 +693,15 @@ Write per-round findings to `.correctless/artifacts/findings/audit-{preset}-{dat
 }
 ```
 
-Also maintain persistent history at `.correctless/artifacts/findings/audit-{preset}-history.md`. **Read the existing file first, then use Edit to append the new run** — do NOT use Write, which would overwrite all previous history:
+Also maintain persistent history at `.correctless/artifacts/findings/audit-{preset}-history.md`.
+
+Append the new run via the canonical writer:
+
+```
+bash scripts/audit-record.sh append-history <PRESET> <SUMMARY-SOURCE>
+```
+
+`SUMMARY-SOURCE` is a path or `-` for stdin. The script uses `flock`-serialized append-only redirection per PRH-004. Direct `Write` / `Edit` / shell redirect against the history path is forbidden (sole-writer per ABS-029 / INV-006). Format the summary content to match the schema below before piping it in:
 
 ```markdown
 # {Preset} Olympics Findings — {Project}
@@ -712,10 +730,10 @@ When a finding category recurs across runs, it's a systemic issue that belongs i
 
 1. Write regression tests (preset-specific, mandatory).
 2. Update `.correctless/antipatterns.md` with new entries for each finding class.
-3. Update the persistent findings history.
+3. Append the run summary to the persistent findings history via `bash scripts/audit-record.sh append-history {preset} <summary-file>|-` (advisory; never invoke a direct write or `>>` redirect to the history file — the script is the sole writer per ABS-029 / INV-006).
 4. Check for recurring patterns across runs — flag for .correctless/ARCHITECTURE.md.
 5. Present summary: total rounds, findings, fixed, recurring patterns, cost.
-6. Mark audit complete: `.correctless/hooks/workflow-advance.sh audit-done`
+6. Mark audit complete: `.correctless/hooks/workflow-advance.sh audit-done`. The gate refuses the transition unless the round-JSONs from Step 3 (or Round 1's clean marker for zero-finding runs) are persisted with `started_at` matching the workflow state — see ABS-029.
 7. Merge audit branch to main.
 
 ### Audit Learning

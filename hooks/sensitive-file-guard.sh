@@ -237,7 +237,11 @@ id_ed25519.*
 .correctless/meta/harness-fingerprint.json
 .correctless/meta/model-baselines.json
 scripts/harness-fingerprint.sh
-.correctless/scripts/harness-fingerprint.sh"
+.correctless/scripts/harness-fingerprint.sh
+harness-fingerprint.sh
+scripts/audit-record.sh
+.correctless/scripts/audit-record.sh
+audit-record.sh"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)

@@ -116,6 +116,7 @@ jobs:
           bash tests/test-statusline-live-cost.sh
           bash tests/test-harness-fingerprint.sh
           bash tests/test-canonicalize-path.sh
+          bash tests/test-audit-findings-persistence.sh
 
       - name: Verify sync
         run: |

@@ -720,6 +720,19 @@ cmd_audit_start() {
   fi
 
   local audit_type="${1:-qa}"
+  # QA-R3-004: validate audit_type against the same regex audit-record.sh uses
+  # (preset format: 1-32 chars, [a-z][a-z0-9-]*). Prevents log-injection via
+  # the unvalidated CLI input that flows into cmd_audit_done's stderr message.
+  case "$audit_type" in
+    [a-z]*) ;;
+    *) die "Invalid audit_type '$audit_type': must start with lowercase letter" ;;
+  esac
+  case "$audit_type" in
+    *[!a-z0-9-]*) die "Invalid audit_type '$audit_type': only [a-z0-9-] allowed" ;;
+  esac
+  if [ "${#audit_type}" -gt 32 ]; then
+    die "Invalid audit_type '$audit_type': must be 32 chars or fewer"
+  fi
   local branch
   branch="$(current_branch)"
   local default_branch
@@ -775,6 +788,102 @@ cmd_audit_start() {
 cmd_audit_done() {
   check_branch_match
   require_phase "audit"
+
+  # ABS-029: refuse the transition unless a current-run round-JSON exists.
+  # Match is content-based — string equality on the round-JSON's started_at
+  # field with the workflow state's started_at — robust to ENV-003 mtime
+  # unreliability after git checkout/clone (INV-001, INV-003).
+  local sf preset state_started
+  sf="$(state_file)"
+  preset=$(jq -r '.audit.type // empty' "$sf" 2>/dev/null)
+  state_started=$(jq -r '.started_at // empty' "$sf" 2>/dev/null)
+  if [ -z "$preset" ] || [ "$preset" = "null" ]; then
+    die "Audit findings missing: state .audit.type is missing or null. Re-run audit-start."
+  fi
+  # MA-003: validate .audit.type content before using it in glob expansion.
+  # State file is sole-writer-trusted (EA-001 / PAT-004) but defense-in-depth
+  # prevents a corrupted state with `.audit.type=*` (cross-preset matching)
+  # or `.audit.type=../etc` (path-traversal escape from the findings dir).
+  case "$preset" in
+    [a-z]*) ;;
+    *) die "Audit findings missing: state .audit.type '$preset' must start with lowercase letter" ;;
+  esac
+  case "$preset" in
+    *[!a-z0-9-]*) die "Audit findings missing: state .audit.type '$preset' contains invalid characters" ;;
+  esac
+  if [ "${#preset}" -gt 32 ]; then
+    die "Audit findings missing: state .audit.type '$preset' exceeds 32 characters"
+  fi
+  if [ -z "$state_started" ]; then
+    die "Audit findings missing: state .started_at is missing. Re-run audit-start."
+  fi
+
+  # Override sentinel respected (INV-008) — the existing override mechanism
+  # writes .override.active + .override.remaining_calls to the state file.
+  local override_active oa_remaining
+  override_active=$(jq -r '.override.active // false' "$sf" 2>/dev/null)
+  oa_remaining=$(jq -r '.override.remaining_calls // 0' "$sf" 2>/dev/null)
+  local override_in_effect=0
+  if [ "$override_active" = "true" ] && [ "${oa_remaining:-0}" -gt 0 ]; then
+    override_in_effect=1
+    # QA-R3-005: audit-specific log entry so /cmetrics' audit-done-override
+    # counter can distinguish ABS-029 gate bypasses from generic audit-phase
+    # overrides. The cmd_override base entry is at the audit-phase
+    # granularity; this appends a phase-specific bypass record.
+    # MA-010: initialize OVERRIDE_LOG with [] if missing so the audit-done
+    # bypass entry isn't silently dropped — exactly the silent-telemetry
+    # failure mode this spec exists to prevent. PMB-005-class regression
+    # caught by the mini-audit.
+    if [ ! -f "$OVERRIDE_LOG" ]; then
+      mkdir -p "$(dirname "$OVERRIDE_LOG")" 2>/dev/null || true
+      printf '[]\n' > "$OVERRIDE_LOG" 2>/dev/null || true
+    fi
+    if [ -f "$OVERRIDE_LOG" ]; then
+      local _ts
+      _ts="$(now_iso)"
+      # NB: --arg name "gate" intentionally avoids "phase" — the
+      # test-token-tracking-skill-field R-008 extractor treats
+      # `--arg phase "..."` as a real phase declaration. This entry
+      # is metadata, not a phase transition.
+      jq --arg ts "$_ts" --arg gate "audit-done" --arg reason "Audit findings missing — overridden (ABS-029 gate)" \
+        '. + [{timestamp: $ts, gate: $gate, reason: $reason, bypass_target: "cmd_audit_done"}]' \
+        "$OVERRIDE_LOG" > "$OVERRIDE_LOG.tmp" 2>/dev/null && mv "$OVERRIDE_LOG.tmp" "$OVERRIDE_LOG" 2>/dev/null || rm -f "$OVERRIDE_LOG.tmp"
+    fi
+  fi
+
+  if [ "$override_in_effect" = 0 ]; then
+    local findings_dir=".correctless/artifacts/findings"
+    local matched=""
+    if [ -d "$findings_dir" ]; then
+      local f
+      for f in "$findings_dir"/audit-"$preset"-*-round-*.json; do
+        [ -f "$f" ] || continue
+        local file_started
+        file_started=$(jq -r '.started_at // empty' "$f" 2>/dev/null)
+        if [ "$file_started" = "$state_started" ]; then
+          matched="$f"
+          break
+        fi
+      done
+    fi
+    if [ -z "$matched" ]; then
+      echo "BLOCKED: Audit findings missing — no round-JSON for this run found." >&2
+      echo "  Expected file pattern: audit-${preset}-*-round-*.json" >&2
+      echo "  Required match: started_at = ${state_started}" >&2
+      # MA-007: detect which install path actually has the script — emit the
+      # one that exists. If neither exists, the user is on an upgrade
+      # boundary and needs to run /csetup first.
+      if [ -x ".correctless/scripts/audit-record.sh" ]; then
+        echo "  Remediation: bash .correctless/scripts/audit-record.sh write-round ${preset} <round> <findings>" >&2
+      elif [ -x "scripts/audit-record.sh" ]; then
+        echo "  Remediation: bash scripts/audit-record.sh write-round ${preset} <round> <findings>" >&2
+      else
+        echo "  Remediation: audit-record.sh is not installed — run 'bash setup' to refresh, then write-round." >&2
+      fi
+      die "cmd_audit_done refused: ABS-029 gate"
+    fi
+  fi
+
   update_phase "done"
   info "Audit complete. Merge audit branch to main."
   info "Post-merge: update antipatterns, write regression tests."

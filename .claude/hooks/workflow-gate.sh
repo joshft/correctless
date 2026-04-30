@@ -2,6 +2,7 @@
 # shellcheck disable=SC2254
 # HOOK_TYPE: PreToolUse
 # HOOK_MATCHER: Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash
+# Rule: .claude/rules/hooks-pretooluse.md (PAT-001 — fail-closed posture)
 # Correctless — PreToolUse gate hook (supports both Lite and Full modes)
 # Blocks file operations that violate the current workflow phase.
 #
@@ -32,8 +33,8 @@ _source_lib() {
   if [ -n "$lib_dir" ] && [ -f "$lib_dir/lib.sh" ]; then
     # shellcheck source=../scripts/lib.sh
     source "$lib_dir/lib.sh"
-  elif [ -f "$REPO_ROOT/scripts/lib.sh" ]; then
-    source "$REPO_ROOT/scripts/lib.sh"
+  elif [ -f "$REPO_ROOT/.correctless/scripts/lib.sh" ]; then
+    source "$REPO_ROOT/.correctless/scripts/lib.sh"
   else
     return 1
   fi
@@ -130,9 +131,10 @@ if [ ! -f "$STATE_FILE" ]; then
           IFS="$_FC_OLDIFS"
           case "$BASENAME_CHECK" in
             $p)
-              echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+              echo "BLOCKED [fail-closed]: Cannot edit source file — no active workflow.
   Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
   (You must be on a feature branch, not main.)
+  Diagnose: .correctless/hooks/workflow-advance.sh diagnose \"filepath\"
   Or run /cstatus to see what's going on." >&2
               exit 2
               ;;
@@ -152,9 +154,10 @@ if [ ! -f "$STATE_FILE" ]; then
             IFS="$_FC_OLDIFS2"
             case "$_fc_bn" in
               $p)
-                echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+                echo "BLOCKED [fail-closed]: Cannot edit source file — no active workflow.
   Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
   (You must be on a feature branch, not main.)
+  Diagnose: .correctless/hooks/workflow-advance.sh diagnose \"filepath\"
   Or run /cstatus to see what's going on." >&2
                 exit 2
                 ;;
@@ -177,9 +180,10 @@ if [ ! -f "$STATE_FILE" ]; then
             IFS="$_FC_OLDIFS"
             case "$BASENAME_CHECK" in
               $p)
-                echo "BLOCKED [fail-closed]: This project requires an active workflow before editing source files.
+                echo "BLOCKED [fail-closed]: Cannot edit source file — no active workflow.
   Start a workflow: .correctless/hooks/workflow-advance.sh init \"task description\"
   (You must be on a feature branch, not main.)
+  Diagnose: .correctless/hooks/workflow-advance.sh diagnose \"filepath\"
   Or run /cstatus to see what's going on." >&2
                 exit 2
                 ;;
@@ -202,18 +206,24 @@ eval "$(jq -r '
   @sh "OVERRIDE_ACTIVE=\(.override.active // false)",
   @sh "OVERRIDE_REMAINING=\(.override.remaining_calls // 0)"
 ' "$STATE_FILE" 2>/dev/null)" || {
-  echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
+  echo "BLOCKED: State file is corrupt or unreadable.
+  Try: .correctless/hooks/workflow-advance.sh status
+  If that also fails: .correctless/hooks/workflow-advance.sh reset
+  (Reset removes state for this branch — restart with init.)" >&2
   exit 2
 }
 # Post-eval validation: if PHASE is still empty, jq produced no output (corrupt file)
 if [ -z "$PHASE" ]; then
-  echo "BLOCKED: State file is corrupt or unreadable. Run workflow-advance.sh status to check." >&2
+  echo "BLOCKED: State file is corrupt or unreadable.
+  Try: .correctless/hooks/workflow-advance.sh status
+  If that also fails: .correctless/hooks/workflow-advance.sh reset
+  (Reset removes state for this branch — restart with init.)" >&2
   exit 2
 fi
 
 # Validate phase is a known value
 case "$PHASE" in
-  spec|review|review-spec|model|tdd-tests|tdd-impl|tdd-qa|tdd-verify|done|verified|documented|audit) ;;
+  spec|review|review-spec|model|tdd-tests|tdd-impl|tdd-qa|tdd-verify|tdd-audit|done|verified|documented|audit) ;;
   *)
     echo "BLOCKED: Invalid or corrupted workflow phase: $PHASE. Run workflow-advance.sh status to check." >&2
     exit 2
@@ -531,11 +541,13 @@ case "$PHASE" in
     # Everything allowed
     ;;
 
-  tdd-qa|tdd-verify)
-    # QA and verify phases: no source or test edits
+  tdd-qa|tdd-verify|tdd-audit)
+    # QA, verify, and mini-audit phases: no source or test edits
     if [ "$FILE_CLASS" = "source" ] || [ "$FILE_CLASS" = "test" ]; then
-      if [ "$PHASE" = "tdd-qa" ]; then
-        block "QA phase — code is frozen while the QA agent reviews.
+      if [ "$PHASE" = "tdd-qa" ] || [ "$PHASE" = "tdd-audit" ]; then
+        _label="QA phase"
+        [ "$PHASE" = "tdd-audit" ] && _label="Mini-audit phase"
+        block "$_label — code is frozen while agents review.
   Source and test files are locked. Report findings as text, don't edit code.
   If issues found: .correctless/hooks/workflow-advance.sh fix  (returns to implementation)
   If clean: .correctless/hooks/workflow-advance.sh done  (completes the workflow)"
