@@ -785,6 +785,48 @@ cmd_audit_start() {
 }
 
 
+_log_audit_done_override() {
+  # Append an audit-done-specific bypass entry to OVERRIDE_LOG so /cmetrics'
+  # audit-done-override counter (AP-023 monitor for the ABS-029 gate) can
+  # distinguish gate bypasses from other audit-phase overrides.
+  #
+  # H-3: explicit error reporting on jq/mv failure — silently swallowing
+  # parse errors is exactly the silent-telemetry-failure shape this PR
+  # exists to close.
+  # MA-010: initialize OVERRIDE_LOG with [] if missing (PMB-005-class fix).
+  local state_started="$1"
+  if [ ! -f "$OVERRIDE_LOG" ]; then
+    mkdir -p "$(dirname "$OVERRIDE_LOG")" 2>/dev/null || true
+    printf '[]\n' > "$OVERRIDE_LOG" 2>/dev/null || {
+      echo "WARN: cannot initialize $OVERRIDE_LOG — audit-done bypass not logged" >&2
+      return 0
+    }
+  fi
+
+  local _ts tmp
+  _ts="$(now_iso)"
+  tmp="$OVERRIDE_LOG.tmp"
+
+  # NB: --arg name "gate" intentionally avoids "phase" — the
+  # test-token-tracking-skill-field R-008 extractor treats `--arg phase
+  # "..."` as a real phase declaration. This entry is metadata.
+  if ! jq --arg ts "$_ts" --arg gate "audit-done" \
+        --arg reason "Audit findings missing — overridden (ABS-029 gate)" \
+        --arg started_at "$state_started" \
+        '. + [{timestamp: $ts, gate: $gate, reason: $reason, bypass_target: "cmd_audit_done", state_started_at: $started_at}]' \
+        "$OVERRIDE_LOG" > "$tmp" 2>/dev/null; then
+    echo "WARN: jq failed appending audit-done bypass to $OVERRIDE_LOG (corrupt JSON?) — entry dropped" >&2
+    rm -f "$tmp"
+    return 0
+  fi
+  if ! mv "$tmp" "$OVERRIDE_LOG"; then
+    echo "WARN: cannot atomically commit audit-done bypass to $OVERRIDE_LOG — entry dropped" >&2
+    rm -f "$tmp"
+    return 0
+  fi
+  return 0
+}
+
 cmd_audit_done() {
   check_branch_match
   require_phase "audit"
@@ -818,55 +860,40 @@ cmd_audit_done() {
     die "Audit findings missing: state .started_at is missing. Re-run audit-start."
   fi
 
-  # Override sentinel respected (INV-008) — the existing override mechanism
-  # writes .override.active + .override.remaining_calls to the state file.
+  # Read override state (INV-008) — the existing override mechanism writes
+  # .override.active + .override.remaining_calls to the state file.
   local override_active oa_remaining
   override_active=$(jq -r '.override.active // false' "$sf" 2>/dev/null)
   oa_remaining=$(jq -r '.override.remaining_calls // 0' "$sf" 2>/dev/null)
   local override_in_effect=0
   if [ "$override_active" = "true" ] && [ "${oa_remaining:-0}" -gt 0 ]; then
     override_in_effect=1
-    # QA-R3-005: audit-specific log entry so /cmetrics' audit-done-override
-    # counter can distinguish ABS-029 gate bypasses from generic audit-phase
-    # overrides. The cmd_override base entry is at the audit-phase
-    # granularity; this appends a phase-specific bypass record.
-    # MA-010: initialize OVERRIDE_LOG with [] if missing so the audit-done
-    # bypass entry isn't silently dropped — exactly the silent-telemetry
-    # failure mode this spec exists to prevent. PMB-005-class regression
-    # caught by the mini-audit.
-    if [ ! -f "$OVERRIDE_LOG" ]; then
-      mkdir -p "$(dirname "$OVERRIDE_LOG")" 2>/dev/null || true
-      printf '[]\n' > "$OVERRIDE_LOG" 2>/dev/null || true
-    fi
-    if [ -f "$OVERRIDE_LOG" ]; then
-      local _ts
-      _ts="$(now_iso)"
-      # NB: --arg name "gate" intentionally avoids "phase" — the
-      # test-token-tracking-skill-field R-008 extractor treats
-      # `--arg phase "..."` as a real phase declaration. This entry
-      # is metadata, not a phase transition.
-      jq --arg ts "$_ts" --arg gate "audit-done" --arg reason "Audit findings missing — overridden (ABS-029 gate)" \
-        '. + [{timestamp: $ts, gate: $gate, reason: $reason, bypass_target: "cmd_audit_done"}]' \
-        "$OVERRIDE_LOG" > "$OVERRIDE_LOG.tmp" 2>/dev/null && mv "$OVERRIDE_LOG.tmp" "$OVERRIDE_LOG" 2>/dev/null || rm -f "$OVERRIDE_LOG.tmp"
-    fi
   fi
 
-  if [ "$override_in_effect" = 0 ]; then
-    local findings_dir=".correctless/artifacts/findings"
-    local matched=""
-    if [ -d "$findings_dir" ]; then
-      local f
-      for f in "$findings_dir"/audit-"$preset"-*-round-*.json; do
-        [ -f "$f" ] || continue
-        local file_started
-        file_started=$(jq -r '.started_at // empty' "$f" 2>/dev/null)
-        if [ "$file_started" = "$state_started" ]; then
-          matched="$f"
-          break
-        fi
-      done
-    fi
-    if [ -z "$matched" ]; then
+  # Run the artifact check first (read-only). H-2: log the audit-done bypass
+  # entry ONLY if the gate would have blocked AND the override is what
+  # carried it through — otherwise an unrelated still-active override would
+  # cause /cmetrics to count phantom audit-done bypasses, polluting the
+  # AP-023 monitor signal.
+  local findings_dir=".correctless/artifacts/findings"
+  local artifact_matched=0
+  if [ -d "$findings_dir" ]; then
+    local f
+    for f in "$findings_dir"/audit-"$preset"-*-round-*.json; do
+      [ -f "$f" ] || continue
+      local file_started
+      file_started=$(jq -r '.started_at // empty' "$f" 2>/dev/null)
+      if [ "$file_started" = "$state_started" ]; then
+        artifact_matched=1
+        break
+      fi
+    done
+  fi
+
+  if [ "$artifact_matched" = 0 ]; then
+    if [ "$override_in_effect" = 1 ]; then
+      _log_audit_done_override "$state_started"
+    else
       echo "BLOCKED: Audit findings missing — no round-JSON for this run found." >&2
       echo "  Expected file pattern: audit-${preset}-*-round-*.json" >&2
       echo "  Required match: started_at = ${state_started}" >&2

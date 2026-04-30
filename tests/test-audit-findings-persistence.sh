@@ -619,12 +619,20 @@ test_inv006_sole_writer_via_script() {
     # observed in QA-R3-001.
     local hits_literal hits_natural
     hits_literal=$(grep -nE '(Write|>>?)[[:space:]]*[\("][^)"]*findings/audit-' "$skill" | grep -v 'audit-record\.sh' || true)
-    # Natural-language: imperative "use Edit/Write" or "Edit ... append" near
-    # findings/audit-* or history.md. False-positive risk on documentation
-    # comments — accept that (noisy-but-correct).
-    hits_natural=$(grep -niE '(use|invoke|run)[[:space:]]+(Edit|Write)[^.]*(findings/audit-|history\.md)' "$skill" \
+    # Natural-language: imperative verb directing the orchestrator at
+    # findings/audit-* or history.md. The verb list intentionally covers
+    # rephrasings the prior regex missed (M-1 from /cpr-review #88) —
+    # "Update history.md directly", "Write the round JSON to ...",
+    # "Append a summary entry to ..." — verb-first patterns that don't
+    # require an Edit/Write keyword. False-positive risk on documentation
+    # comments — accept that (noisy-but-correct, OQ-004).
+    # Anchor to audit-{preset}-history.md or findings/audit-* specifically —
+    # plain `history.md` matches workflow-history.md, dev-journal etc. which
+    # are unrelated.
+    hits_natural=$(grep -niE '(use|invoke|run|update|write|append|edit|persist|modify)[[:space:]]+[^.]{1,80}(findings/audit-|audit-[a-z-]+-history\.md)' "$skill" \
                    | grep -v 'audit-record\.sh' \
-                   | grep -vE '^[[:space:]]*[0-9]+:[[:space:]]*(<!--|//)' || true)
+                   | grep -vE '^[[:space:]]*[0-9]+:[[:space:]]*(<!--|//)' \
+                   | grep -vE 'append-history|write-round|sole writer|via the canonical writer' || true)
     if [ -n "$hits_literal" ]; then
       violations=$((violations + 1))
       echo "  INV-006 (literal): $skill: $hits_literal" >&2
@@ -705,13 +713,56 @@ test_inv007_stdout_is_single_line_path() {
 # INV-008: gate respects --override sentinel (structural; integration deferred)
 # ============================================================================
 
-test_inv008_override_grep_in_cmd_audit_done() {
-  local body
-  body=$(awk '/^cmd_audit_done\(\)/,/^}/' "$WORKFLOW_ADVANCE")
-  if echo "$body" | grep -qE 'override|OVERRIDE'; then
-    pass "INV-008-override-ref" "cmd_audit_done references override mechanism"
+test_inv008_override_bypasses_with_log_entry() {
+  # M-3: replace the prior keyword-presence tautology with the integration
+  # test the spec specifies — set up override sentinel, run cmd_audit_done
+  # WITHOUT artifacts, assert phase advances AND the audit-done-specific
+  # bypass log entry is appended.
+  local d
+  d=$(mkworkdir inv008_override)
+  local sf
+  sf=$(make_state_fixture "$d" "qa" "2026-04-29T22:00:00Z")
+
+  # Write override flag to state — mirrors what cmd_override does.
+  jq '.override = {active: true, remaining_calls: 5, reason: "test override for INV-008", expires_at: "2099-01-01T00:00:00Z"}' \
+    "$sf" > "${sf}.tmp" && mv "${sf}.tmp" "$sf"
+
+  # Run cmd_audit_done without any round-JSON
+  local result code
+  result=$(run_audit_done "$d")
+  code=$(extract_exit "$result")
+
+  # Phase must advance to "done"
+  local phase
+  phase=$(jq -r '.phase' "$sf")
+
+  local pass_count=0 fail_count=0
+  if [ "$code" = "0" ]; then
+    pass_count=$((pass_count + 1))
   else
-    fail "INV-008-override-ref" "cmd_audit_done has no override-related branch — bypass missing"
+    fail_count=$((fail_count + 1))
+    echo "  INV-008: cmd_audit_done exited non-zero ($code) under active override — bypass not honored" >&2
+  fi
+  if [ "$phase" = "done" ]; then
+    pass_count=$((pass_count + 1))
+  else
+    fail_count=$((fail_count + 1))
+    echo "  INV-008: phase did not transition to done (got '$phase')" >&2
+  fi
+
+  # Override log must contain an entry with gate=audit-done
+  local log="$d/.correctless/artifacts/override-log.json"
+  if [ -f "$log" ] && jq -e '.[] | select(.gate == "audit-done" and .bypass_target == "cmd_audit_done")' "$log" >/dev/null 2>&1; then
+    pass_count=$((pass_count + 1))
+  else
+    fail_count=$((fail_count + 1))
+    echo "  INV-008: override log missing audit-done bypass entry (file: $log)" >&2
+  fi
+
+  if [ "$fail_count" -eq 0 ]; then
+    pass "INV-008-override-bypass" "override transitions to done AND logs audit-done bypass entry ($pass_count/3 checks pass)"
+  else
+    fail "INV-008-override-bypass" "$fail_count of 3 integration checks failed"
   fi
 }
 
@@ -815,21 +866,81 @@ test_prh001_only_caudit_writes() {
 # ============================================================================
 
 test_prh002_no_escape_hatch() {
+  # Spec PRH-002 detection (load-bearing): every conditional branch in
+  # cmd_audit_done's body controls on ONLY one of the allowed input
+  # sources — workflow-state field reads via jq, the override sentinel
+  # check, or the constructed glob/path matching.
+  #
+  # The blocklist below is the secondary signal — drift to a new flag name
+  # (e.g., AUDIT_DONE_PERMIT) would defeat enumeration alone. The positive-
+  # shape grep that follows is the load-bearing assertion. The blocklist
+  # remains as a quick sanity check for the obvious forms.
   local body
   body=$(awk '/^cmd_audit_done\(\)/,/^}/' "$WORKFLOW_ADVANCE")
   local body_nc
   body_nc=$(echo "$body" | grep -v '^[[:space:]]*#')
   local fail_count=0
+
+  # Secondary signal: blocklist of known-bad forms.
   for pat in 'CORRECTLESS_SKIP' '\-\-no-verify' '\-\-skip\b' '\-\-force\b' 'AUDIT_DONE_BYPASS' 'SKIP_GATE' '\-\-allow-empty'; do
     if echo "$body_nc" | grep -qE -- "$pat"; then
       fail_count=$((fail_count + 1))
-      echo "  PRH-002: forbidden pattern '$pat' in body" >&2
+      echo "  PRH-002 (blocklist): forbidden pattern '$pat' in body" >&2
     fi
   done
+
+  # Load-bearing positive-shape assertion: extract every line that opens a
+  # conditional (`if`, `elif`, top-level `case`, `[[`/`[ ]`) AND look at
+  # what its controlling expression references. The allowed input sources:
+  #   * Variables read from the state file via jq (preset, state_started,
+  #     override_active, oa_remaining, override_in_effect)
+  #   * Locally-derived check results (artifact_matched)
+  #   * The constructed file/glob path (matched, file_started, $f, "$dst",
+  #     $findings_dir, OVERRIDE_LOG/related)
+  #   * Path-existence tests on script-install paths (-x scripts/...,
+  #     -x .correctless/scripts/...) — for remediation message branching
+  #     only, not for gate decisions
+  # Anything controlling on stdin, environment variables, positional args
+  # to cmd_audit_done, or arbitrary command output fails the assertion.
+  local conditionals
+  conditionals=$(echo "$body_nc" \
+    | grep -nE '^[[:space:]]*(if|elif)[[:space:]]+\[' \
+    || true)
+  local bad_conditional=""
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    # Allowed token set in the conditional expression. Covers `$var`,
+    # `"$var"`, `${var}`, and `${#var}` — all are reads of the named
+    # variable, just different forms. The trailing `\b` enforces a word
+    # boundary so e.g. `$presets` would not pass as `$preset`.
+    if echo "$line" | grep -qE '\$\{?#?(preset|state_started|override_active|oa_remaining|override_in_effect|artifact_matched|matched|file_started|f|dst|findings_dir|OVERRIDE_LOG|tmp|_ts|sf)\b'; then
+      continue
+    fi
+    # Path-existence checks for remediation-message branching are allowed
+    if echo "$line" | grep -qE '\-x[[:space:]]+("?\.?correctless/scripts/audit-record\.sh"?|"?scripts/audit-record\.sh"?)'; then
+      continue
+    fi
+    # Plain directory existence check on the findings dir
+    if echo "$line" | grep -qE '\-d[[:space:]]+"?\.correctless/artifacts/findings"?'; then
+      continue
+    fi
+    # File existence on OVERRIDE_LOG path (for log init)
+    if echo "$line" | grep -qE '\-f[[:space:]]+"?\$(OVERRIDE_LOG|f|sf)"?|\-f[[:space:]]+"?\$\{OVERRIDE_LOG'; then
+      continue
+    fi
+    bad_conditional="$bad_conditional
+  $line"
+  done <<< "$conditionals"
+
+  if [ -n "$bad_conditional" ]; then
+    fail_count=$((fail_count + 1))
+    echo "  PRH-002 (positive-shape): cmd_audit_done branches on disallowed input:$bad_conditional" >&2
+  fi
+
   if [ "$fail_count" -eq 0 ]; then
-    pass "PRH-002-no-escape" "no forbidden flag/env-var bypasses in cmd_audit_done"
+    pass "PRH-002-no-escape" "no forbidden bypasses; all conditionals branch on allowed inputs"
   else
-    fail "PRH-002-no-escape" "$fail_count forbidden patterns present"
+    fail "PRH-002-no-escape" "$fail_count violation(s)"
   fi
 }
 
@@ -968,7 +1079,7 @@ test_inv006_sole_writer_via_script
 test_inv007_failure_exits_nonzero
 test_inv007_success_exits_zero
 test_inv007_stdout_is_single_line_path
-test_inv008_override_grep_in_cmd_audit_done
+test_inv008_override_bypasses_with_log_entry
 test_inv009_writer_script_in_defaults
 test_inv009_writer_script_protected_edit
 test_inv009_install_mirror_protected

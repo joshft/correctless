@@ -10,7 +10,7 @@
 #   write-round <preset> <round> <findings-file>|-
 #   append-history <preset> <summary-file>|-
 
-set -uo pipefail
+set -euo pipefail
 
 # Source lib.sh for branch_slug() — needed to find the workflow state file
 # whose started_at populates the round-JSON. lib.sh is the canonical source
