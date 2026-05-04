@@ -2,7 +2,6 @@
 name: creview
 description: Skeptically review a spec for unstated assumptions, untestable rules, missing edge cases, and security gaps. Run after /cspec.
 allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*)
-context: fork
 ---
 
 # /creview — Skeptical Spec Review

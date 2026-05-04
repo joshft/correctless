@@ -2,7 +2,6 @@
 name: cdebug
 description: Structured bug investigation workflow. Root cause analysis, hypothesis testing, TDD fix with agent separation, escalation after 3 failed attempts. Use when stuck on a bug.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/antipatterns.md), Write(.correctless/artifacts/debug-*), Write(.correctless/artifacts/token-log-*), Edit
-context: fork
 ---
 
 # /cdebug — Structured Bug Investigation

@@ -2,7 +2,6 @@
 name: cdocs
 description: Update project documentation after a feature lands. Updates README, .correctless/AGENT_CONTEXT.md, .correctless/ARCHITECTURE.md, and feature docs. Run before merging.
 allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(*compute-session-cost.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md), Write(.claude/rules/*.md)
-context: fork
 ---
 
 # /cdocs — Update Project Documentation

@@ -114,14 +114,12 @@ run_sfg_hook() {
 
 # ============================================
 # R-001 [integration]: /cauto skill invokes skills in exact order
-#   with context: fork in each sub-skill's SKILL.md frontmatter
+#   and spawns each as a sub-agent for fresh context
 # ============================================
 
-test_r001_cauto_skill_order_and_context_fork() {
+test_r001_cauto_skill_order_and_sub_agents() {
   echo ""
-  echo "=== R-001: /cauto skill order and context: fork ==="
-
-  # R-001 integration verification requires running the actual pipeline — structural test covers SKILL.md content only
+  echo "=== R-001: /cauto skill order and sub-agent dispatch ==="
 
   local skill_file="$REPO_DIR/skills/cauto/SKILL.md"
 
@@ -132,18 +130,9 @@ test_r001_cauto_skill_order_and_context_fork() {
   file_contains_i "$skill_file" "ctdd.*simplify.*cverify.*cupdate-arch.*cdocs\|ctdd.*cverify.*cupdate-arch.*cdocs" \
     "R-001: cauto lists skills in pipeline order (ctdd -> simplify -> cverify -> cupdate-arch -> cdocs)"
 
-  # R-001: cauto must have context: fork in its frontmatter
-  local frontmatter
-  frontmatter="$(sed -n '/^---$/,/^---$/p' "$skill_file" 2>/dev/null)"
-  assert_contains "R-001: cauto SKILL.md has context: fork in frontmatter" "context: fork" "$frontmatter"
-
-  # R-001: each pipeline sub-skill must have context: fork
-  for sub_skill in ctdd cverify cupdate-arch cdocs; do
-    local sub_file="$REPO_DIR/skills/$sub_skill/SKILL.md"
-    local sub_fm
-    sub_fm="$(sed -n '/^---$/,/^---$/p' "$sub_file" 2>/dev/null)"
-    assert_contains "R-001: $sub_skill has context: fork in frontmatter" "context: fork" "$sub_fm"
-  done
+  # R-001: cauto must document sub-agent dispatch for pipeline skills
+  file_contains_i "$skill_file" "sub-agent\|sub_agent\|spawns.*agent" \
+    "R-001: cauto documents sub-agent dispatch for pipeline skills"
 
   # R-001: cauto must instruct creating a commit before simplify ("TDD complete")
   file_contains_i "$skill_file" "commit.*TDD.*complete\|TDD complete.*commit\|commit.*before.*simplify" \
@@ -865,25 +854,33 @@ test_pre001_is_full_mode_feature_intensity() {
 }
 
 # ============================================
-# PRE-002: cdocs and cupdate-arch have context: fork
+# PRE-002: multi-turn skills must NOT have context: fork (PMB-006)
 # ============================================
 
-test_pre002_context_fork_in_skills() {
+test_pre002_no_fork_on_multi_turn_skills() {
   echo ""
-  echo "=== PRE-002: cdocs and cupdate-arch have context: fork ==="
+  echo "=== PRE-002: multi-turn skills must not have context: fork ==="
 
-  local cdocs="$REPO_DIR/skills/cdocs/SKILL.md"
-  local cupdate="$REPO_DIR/skills/cupdate-arch/SKILL.md"
+  # Multi-turn skills need user interaction mid-execution. context: fork runs
+  # them as sub-agents that complete after first output, breaking the interaction.
+  # See PMB-006 and AP-027.
+  local multi_turn_skills="carchitect caudit cauto cdebug cdocs cmaintain cmodel crefactor creview creview-spec ctdd cupdate-arch"
 
-  # PRE-002: cdocs must have context: fork in frontmatter
-  local cdocs_fm
-  cdocs_fm="$(sed -n '/^---$/,/^---$/p' "$cdocs" 2>/dev/null)"
-  assert_contains "PRE-002: cdocs has context: fork in frontmatter" "context: fork" "$cdocs_fm"
-
-  # PRE-002: cupdate-arch must have context: fork in frontmatter
-  local cupdate_fm
-  cupdate_fm="$(sed -n '/^---$/,/^---$/p' "$cupdate" 2>/dev/null)"
-  assert_contains "PRE-002: cupdate-arch has context: fork in frontmatter" "context: fork" "$cupdate_fm"
+  for skill in $multi_turn_skills; do
+    local skill_file="$REPO_DIR/skills/$skill/SKILL.md"
+    if [ ! -f "$skill_file" ]; then
+      fail "PRE-002: $skill SKILL.md exists" "File not found: $skill_file"
+      continue
+    fi
+    local fm
+    fm="$(sed -n '/^---$/,/^---$/p' "$skill_file" 2>/dev/null)"
+    if echo "$fm" | grep -q 'context: fork'; then
+      fail "PRE-002: $skill must not have context: fork" \
+        "Multi-turn skill $skill has context: fork — this breaks direct user invocation (PMB-006)"
+    else
+      pass "PRE-002: $skill does not have context: fork"
+    fi
+  done
 }
 
 # ============================================
@@ -1440,7 +1437,7 @@ echo "Semi-Auto Mode Test Suite"
 echo "============================================="
 
 # Rules
-test_r001_cauto_skill_order_and_context_fork
+test_r001_cauto_skill_order_and_sub_agents
 test_r002_cauto_phase_gate
 test_r003_cauto_reads_preferences
 test_r004_preferences_template_categories
@@ -1462,7 +1459,7 @@ test_r019_preferences_in_sensitive_guard
 
 # Prerequisites
 test_pre001_is_full_mode_feature_intensity
-test_pre002_context_fork_in_skills
+test_pre002_no_fork_on_multi_turn_skills
 test_pre003_architecture_entries
 test_pre004_new_patterns
 test_pre005_shared_constraints_preferences
