@@ -2,7 +2,6 @@
 name: ctdd
 description: Enforced TDD workflow. Write failing tests from spec rules, then implement. Use after /creview approves a spec.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Edit
-context: fork
 ---
 
 # /ctdd — Enforced Test-Driven Development

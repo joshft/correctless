@@ -141,11 +141,11 @@ if [ -f "$SKILL_FILE" ]; then
     fail "R-001-d" "Frontmatter missing allowed-tools field"
   fi
 
-  # context: fork
+  # multi-turn skill must NOT have context: fork (PMB-006)
   if head -20 "$SKILL_FILE" | grep -q '^context: fork$'; then
-    pass "R-001-e" "Frontmatter has context: fork"
+    fail "R-001-e" "Multi-turn skill must not have context: fork (PMB-006)"
   else
-    fail "R-001-e" "Frontmatter missing context: fork"
+    pass "R-001-e" "Frontmatter does not have context: fork (correct for multi-turn)"
   fi
 
   # allowed-tools includes required tools

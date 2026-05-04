@@ -2,7 +2,6 @@
 name: caudit
 description: Cross-codebase quality audit. Use after a major feature lands or periodically for systemic bug detection. Presets: QA, Hacker, Performance.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/antipatterns.md), Write(*test*), Write(*spec*), Edit, Task(correctless:fix-diff-reviewer)
-context: fork
 ---
 
 # /caudit — Olympics Audit System
