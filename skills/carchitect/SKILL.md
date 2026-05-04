@@ -2,7 +2,6 @@
 name: carchitect
 description: Structured architecture definition. Two modes — reverse-engineer from existing code or greenfield directed discovery. Produces .correctless/ARCHITECTURE.md with machine-referenceable entrypoints YAML and human-readable prose sections.
 allowed-tools: Read, Grep, Glob, Bash(git*), Write(.correctless/ARCHITECTURE.md), Edit(.correctless/ARCHITECTURE.md), Task(correctless:architecture-reviewer)
-context: fork
 ---
 
 # /carchitect — Architecture Definition Skill

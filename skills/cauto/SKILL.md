@@ -2,7 +2,6 @@
 name: cauto
 description: Semi-auto mode. Orchestrates the full implementation pipeline after human-approved spec review. Runs ctdd, simplify, cverify, cupdate-arch, cdocs, then creates a PR.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/meta/overrides/*), Edit, Task
-context: fork
 ---
 
 # /cauto — Semi-Auto Implementation Pipeline
@@ -111,7 +110,7 @@ On invocation, check for an existing escalation file at `.correctless/artifacts/
 
 The pipeline invokes skills in this exact order: `/ctdd` -> `/simplify` -> `/cverify` -> `/cupdate-arch` -> `/cdocs`.
 
-Each skill runs in a fresh context (`context: fork`) — the orchestrator spawns a sub-agent for each skill. Each skill must complete successfully before the next begins.
+The orchestrator spawns a sub-agent for each skill, giving each a fresh context. Each skill must complete successfully before the next begins.
 
 ### Intensity-Aware Pipeline (R-009)
 

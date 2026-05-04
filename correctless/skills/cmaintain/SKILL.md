@@ -2,7 +2,6 @@
 name: cmaintain
 description: Maintainer review for incoming PRs. Use when you need to decide whether to merge a contribution. Checks scope, conventions, and maintenance burden.
 allowed-tools: Read, Grep, Glob, Bash(*)
-context: fork
 ---
 
 # /cmaintain — Maintainer Contribution Review

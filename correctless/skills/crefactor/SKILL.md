@@ -2,7 +2,6 @@
 name: crefactor
 description: Structured refactoring with behavioral equivalence enforcement. Tests must pass before AND after. Any test change requires explicit approval. Writes characterization tests for low-coverage code.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Edit(.correctless/ARCHITECTURE.md), Edit(.correctless/AGENT_CONTEXT.md)
-context: fork
 ---
 
 # /crefactor — Structured Refactoring
