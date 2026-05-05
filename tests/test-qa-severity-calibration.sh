@@ -51,31 +51,6 @@ mini_audit_section() {
 }
 
 # ============================================================================
-# Helper: extract orchestrator section between "persist findings" and
-# "decide next step" — the severity floor check location
-# ============================================================================
-
-post_qa_orchestrator_section() {
-  awk '
-    /persist.*findings|After the QA agent reports findings/ { in_sec=1 }
-    in_sec && /decide next step|If BLOCKING findings exist|If no BLOCKING/ { exit }
-    in_sec { print }
-  ' "$CTDD_SKILL"
-}
-
-# ============================================================================
-# Helper: extract post-mini-audit orchestrator section
-# ============================================================================
-
-post_mini_audit_orchestrator_section() {
-  awk '
-    /Disposition Options/             { in_sec=1; next }
-    in_sec && /^### No Convergence/   { exit }
-    in_sec                            { print }
-  ' "$CTDD_SKILL"
-}
-
-# ============================================================================
 # INV-001 [unit]: QA prompt contains severity calibration examples
 # ============================================================================
 
@@ -134,7 +109,7 @@ else
 fi
 
 # INV-001h: NON-BLOCKING calibration example — style inconsistency
-if echo "$QA_SECTION" | grep -qi 'style.*inconsistent\|inconsistent.*style\|naming.*inconsistent\|formatting.*inconsistent'; then
+if echo "$QA_SECTION" | grep -qi 'style.*inconsistenc\|inconsistenc.*style\|naming.*inconsistenc\|formatting.*inconsistenc'; then
   pass "INV-001h" "QA prompt has NON-BLOCKING calibration: style inconsistency"
 else
   fail "INV-001h" "QA prompt missing NON-BLOCKING calibration: style inconsistency"
