@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: Test Suite (jq ${{ matrix.jq_version }})
+    name: Tests (jq ${{ matrix.jq_version }})
     runs-on: ubuntu-latest
     # AP-011: Matrix across jq versions to catch operator precedence and
     # other version-portability bugs before they hit main. See PMB-001.
@@ -123,6 +123,19 @@ jobs:
         run: |
           bash sync.sh
           git diff --exit-code || (echo "sync.sh produced changes — run sync.sh and commit" && exit 1)
+
+  test-suite:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+    steps:
+      - name: Check matrix results
+        run: |
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "Test matrix failed: ${{ needs.test.result }}"
+            exit 1
+          fi
 
   shellcheck:
     name: ShellCheck
