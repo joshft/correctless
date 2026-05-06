@@ -331,9 +331,9 @@ See `.claude/rules/hooks-pretooluse.md`.
 
 ### PAT-009: Orchestrator skill conventions
 - **Pattern**: Skills that invoke other skills in sequence (meta-skills)
-- **Rule**: Orchestrator skills must: (1) have `context: fork` in frontmatter, (2) invoke each sub-skill with `context: fork` (fresh context per skill), (3) implement escalation and resumption (R-005, R-016 pattern), (4) emit progress via audit trail entries (R-011 schema), (5) preserve the shared constraint "Never auto-invoke the next skill" — the orchestrator invokes skills; skills do not auto-continue. The orchestrator is the caller, not a constraint modifier.
+- **Rule**: Orchestrator skills must: (1) use `context: fork` only if single-turn (runs to completion without user input); multi-turn orchestrators with escalation/approval points must NOT use fork (AP-027 / PMB-006), (2) invoke each sub-skill in a fresh context (via Task or equivalent), (3) implement escalation and resumption (R-005, R-016 pattern), (4) emit progress via audit trail entries (R-011 schema), (5) preserve the shared constraint "Never auto-invoke the next skill" — the orchestrator invokes skills; skills do not auto-continue. The orchestrator is the caller, not a constraint modifier.
 - **Guards against**: Uncontrolled skill chaining, context exhaustion, missing escalation paths
-- **Violated when**: An orchestrator modifies shared constraints, invokes skills without fork isolation, or lacks an escalation mechanism
+- **Violated when**: A multi-turn orchestrator uses `context: fork` (user follow-ups route to the main conversation, not back to the fork), an orchestrator modifies shared constraints, or lacks an escalation mechanism
 - **Test**: R-007 in semi-auto-mode tests (constraint preservation), R-001 (fork isolation), R-005 (escalation)
 
 ### PAT-010: jq `as $var` bindings must be explicitly parenthesized

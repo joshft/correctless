@@ -154,3 +154,8 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 - Root cause: conversation output is ephemeral — long outputs scroll away, context compaction clears them, terminal rendering can displace them. Skills that only present findings inline have no recovery path when the display fails. No spec ever required persist-before-present as a structural contract for review skills.
 - Class fix: (1) `/creview-spec` must write to `.correctless/artifacts/review-spec-findings-{slug}.md` before presenting, (2) `/creview` must write to `.correctless/artifacts/review-findings-{slug}.md` before presenting, (3) AP-029 antipattern entry, (4) structural test verifying all finding-producing skills reference an artifact write path.
 - Source: PMB-008, GitHub issue #94
+
+### 2026-05-06 — Convention confirmed: Structural enforcement over prompt-level instruction
+- Observed in 6+ features (auto-mode-phase-2, auto-mode-phase-3, carchitect-phase1, test-evasion-antipatterns, audit-findings-persistence-contract, structural-enforcement-pat) — treat as established project convention
+- Every spec invariant at high+ intensity must include an `Enforcement:` field (PAT-018 mechanisms: allowed-tools, sensitive-file-guard, gate preconditions, hash verification, CI test assertions, agent tool-pinning); the Design Contract Checker in `/creview-spec` flags missing or prompt-level-only enforcement
+- Source: /cdocs after structural-enforcement-pat

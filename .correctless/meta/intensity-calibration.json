@@ -427,6 +427,30 @@
         "tests/test-audit-findings-persistence.sh"
       ],
       "timestamp": "2026-04-30T04:26:08Z"
+    },
+    {
+      "feature_slug": "structural-enforcement-pat",
+      "recommended_intensity": "standard",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/config/workflow-config.json",
+        ".correctless/specs/structural-enforcement-pat.md",
+        ".github/workflows/ci.yml",
+        "CONTRIBUTING.md",
+        "correctless/skills/creview-spec/SKILL.md",
+        "correctless/skills/cspec/SKILL.md",
+        "correctless/templates/spec-full.md",
+        "skills/creview-spec/SKILL.md",
+        "skills/cspec/SKILL.md",
+        "templates/spec-full.md",
+        "tests/test-structural-enforcement-pat.sh"
+      ],
+      "timestamp": "2026-05-06T06:15:00Z"
     }
   ]
 }
