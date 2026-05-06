@@ -384,6 +384,13 @@ See `.claude/rules/hooks-pretooluse.md`.
 ### PAT-017: canonicalize_path security invariants
 See `.claude/rules/canonicalize-path.md`.
 
+### PAT-018: Structural enforcement over prompt-level instruction
+- **Pattern**: Invariants enforced by structural mechanisms rather than prompt-level instructions
+- **Rule**: When a spec invariant claims a property (sole writer, phase gating, file protection, immutability), prefer structural enforcement over prompt-level instruction. Acceptable structural mechanisms: allowed-tools restrictions, file permissions via sensitive-file-guard, phase-transition gate preconditions, cryptographic hash verification, static test assertions in CI, tool-pinning in plugin agent frontmatter. Use "prompt-level" as the explicit fallback only when no structural mechanism applies — this makes the choice conscious rather than a default.
+- **Violated when**: An invariant states a property but relies solely on prompt-level instruction when a structural enforcement mechanism is available; or the spec author does not explicitly choose between structural and prompt-level enforcement
+- **Guards against**: The class of review findings where an invariant claims a property but enforcement is prompt-level only — the invariant holds only as long as the agent follows instructions, with no mechanical backstop
+- **Test**: R-001 through R-008 in `tests/test-structural-enforcement-pat.sh`; Design Contract Checker in `/creview-spec` flags invariants with missing or prompt-level-only `Enforcement:` fields
+
 ## Environment Assumptions
 
 ### ENV-001: Bash 4+ required
