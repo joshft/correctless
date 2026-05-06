@@ -158,9 +158,31 @@ If `require_external_review` is true, OR if any invariant is flagged `needs_exte
 
 **Error handling**: timeout, non-zero exit, unparsable output → log and continue. Don't block on external failures. Don't retry.
 
+## Step 3.5: Persist Findings (Mandatory)
+
+**Before presenting findings to the user, write them to `.correctless/artifacts/review-spec-findings-{slug}.md`** (derive slug from the spec file basename). This is not optional — conversation output is ephemeral and findings will be lost if the display fails (AP-029). The artifact is the source of truth; the presentation in Step 4 renders from it.
+
+Write the artifact with this structure:
+```markdown
+# Review-Spec Findings: {slug}
+Date: {ISO timestamp}
+Spec: {spec path}
+Agents: {list of agents that completed}
+
+## Finding RS-{NNN}: {title}
+**Source**: {agent name(s)}
+**Category**: {category}
+**Description**: {description}
+**Status**: pending
+
+---
+```
+
+If the artifact already exists (checkpoint resume), append new findings rather than overwriting.
+
 ## Step 4: Present to Human
 
-Organize findings by category:
+Organize findings by category (reading from the artifact written in Step 3.5):
 1. Self-assessment highlights
 2. Red team attack paths
 3. Unstated assumptions
