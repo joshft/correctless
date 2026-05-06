@@ -190,6 +190,16 @@ If mean overrides per run > 0.5, emit a warning: "Override rate is elevated ({me
 
 If `.correctless/meta/overrides/` doesn't exist or is empty, the section says: "No override data yet. Override tracking starts automatically on the next `/cauto` run."
 
+## Fix-Round Loop Activation
+
+Read `fix_rounds_triggered` from each entry in `.correctless/meta/intensity-calibration.json` (ABS-005 consumer — read-only). Filter to entries where `actual_intensity` is `high` or `critical`.
+
+If `fix_rounds_triggered` is 0 across 3 or more consecutive high+ intensity features, emit a warning: "Fix-round loop has not fired in {N} consecutive high+ features — severity calibration may be insufficient (AP-028). Consider reviewing QA findings from recent features to check if NON-BLOCKING ratings were appropriate."
+
+If fewer than 3 high+ features exist, omit the warning: "Insufficient data — fewer than 3 high+ features completed."
+
+If `fix_rounds_triggered` > 0 in recent features, report the activation count: "Fix-round loop activated in {N}/{M} recent high+ features ({total} fix rounds total)."
+
 ## ROI Estimate
 - **Issues caught:** {N}
 - **Estimated fix time if found in production:** {N} × 2 hours avg = {N} hours

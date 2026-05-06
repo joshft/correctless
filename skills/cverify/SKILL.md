@@ -252,6 +252,7 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
       "actual_cost_usd": "number or absent — read from cost artifact if it exists (see below)",
       "actual_spec_updates": "number — read from the workflow state file (spec_updates field)",
       "harness_version": "integer or absent — current HARNESS_VERSION constant from scripts/harness-fingerprint.sh (BND-005 of harness-fingerprint spec)",
+      "fix_rounds_triggered": "integer — derived: max(0, qa_rounds - 1) + mini_audit_fix_rounds (see below)",
       "file_paths_touched": ["array of file paths from git diff against the default branch"],
       "timestamp": "ISO 8601 string"
     }
@@ -269,6 +270,7 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
 - `actual_findings_count`: Count only BLOCKING findings from `qa-findings-{slug}.json`. MEDIUM and LOW findings indicate thorough QA, not insufficient intensity.
 - `actual_tokens`: Sum of `total_tokens` from the token log JSONL file for this branch. See "Token Summation for actual_tokens" below.
 - `actual_cost_usd`: Read `total_cost_usd` from the cost artifact at `.correctless/artifacts/cost-{branch-slug}.json` if it exists. If the cost artifact does not exist (e.g., /cdocs hasn't run yet), omit `actual_cost_usd` from the calibration entry entirely — do not set it to 0, just leave it absent. The cost artifact is the canonical source of USD cost data (ABS-026).
+- `fix_rounds_triggered`: Derived value: `max(0, qa_rounds - 1) + mini_audit_fix_rounds`. `qa_rounds` is read from the workflow state — QA round 1 is the initial QA, rounds 2+ are fix rounds (so `qa_rounds - 1` = fix rounds from QA). `mini_audit_fix_rounds` is the count of fix-loop re-entries during the mini-audit phase, derived from qa-findings JSON round entries with `MA-` prefix that triggered fix loops. Default to 0 when not determinable.
 - `file_paths_touched`: Collect from `git diff {default_branch}...HEAD --name-only`.
 - `timestamp`: Current ISO 8601 timestamp.
 

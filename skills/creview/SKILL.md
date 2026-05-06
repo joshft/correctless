@@ -287,9 +287,13 @@ For each relevant historical pattern class, present:
   3. Modify — accept concern but change the proposed rule
   4. Defer — log as accepted risk
 
+## Persist Findings (Mandatory)
+
+**Before presenting findings to the user, write them to `.correctless/artifacts/reviews/review-findings-{slug}.md`** (derive slug from the spec file basename). This is not optional — conversation output is ephemeral and findings will be lost if the display fails (AP-029). The artifact is the source of truth; the presentation below renders from it.
+
 ## Output
 
-Present findings to the human organized by category:
+Present findings to the human organized by category (reading from the artifact written above):
 1. Unstated assumptions found
 2. Rules that need rewriting (with proposed rewrites)
 3. Edge cases to add rules for

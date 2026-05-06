@@ -117,6 +117,7 @@ jobs:
           bash tests/test-harness-fingerprint.sh
           bash tests/test-canonicalize-path.sh
           bash tests/test-audit-findings-persistence.sh
+          bash tests/test-qa-severity-calibration.sh
 
       - name: Verify sync
         run: |
