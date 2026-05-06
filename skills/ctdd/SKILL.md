@@ -398,6 +398,24 @@ Spawn a **QA agent** as a third forked subagent:
 > - NON-BLOCKING: issues to be aware of
 > - UNCERTAIN: issues where you cannot confidently determine whether the problem is real. Use this when you can see a potential issue but cannot trace the full code path, don't understand the system well enough to confirm, or the evidence is ambiguous. UNCERTAIN findings are non-blocking and advisory — they are presented to the user with your reasoning about why you're unsure. Do not inflate uncertain issues to BLOCKING — honest uncertainty is a valid output. Do not silently suppress uncertain issues either — flag them so the human can investigate.
 >
+> ### Severity Calibration Examples
+>
+> **BLOCKING — use for bugs that cause silent wrong behavior or compromise safety:**
+> - Silent data corruption (data written/read incorrectly with no error)
+> - Security bypass (auth check skipped, trust boundary violated, input not sanitized)
+> - Resource leak (file handles, connections, goroutines not closed on error paths)
+> - Mock gap hiding a wiring failure (BLOCKING because the test passes but production would fail — the mock papers over a missing integration)
+> - Test-routing around the spec-named resource (AP-016 — test covers an auxiliary path while avoiding the required endpoint/function)
+> - Uninitialized or zero-value field used in a decision (silent wrong branch taken)
+>
+> **NON-BLOCKING — use for issues that don't cause wrong behavior:**
+> - Missing documentation or incomplete comments
+> - Suboptimal error messages (correct behavior, unclear wording)
+> - Style inconsistency (naming conventions, formatting, import ordering)
+> - Minor performance inefficiency (correct but slower than necessary)
+>
+> **When in doubt, rate BLOCKING.** A disputed BLOCKING costs one conversation turn to downgrade. A shipped bug costs a postmortem.
+>
 > **For every BLOCKING finding, classify the corrective action:**
 > - **Instance fix**: fixes this specific bug (e.g., "add the missing SetFooConfig call")
 > - **Class fix**: prevents this category of bug from recurring (e.g., "add a structural test that fails when any new config sub-struct lacks wiring")
@@ -436,13 +454,53 @@ The QA agent has `allowed-tools` restricted to: `Read, Grep, Glob, Bash(test com
       "rule_ref": "R-xxx or null",
       "instance_fix": "fix for this specific bug",
       "class_fix": "structural fix preventing this class of bug",
-      "status": "open|fixed"
+      "status": "open|fixed|accepted"
     }
   ]
 }
 ```
 
+The `status` field supports `"open|fixed|accepted"`. The `accepted` value is additive — consumers should treat unknown status values as `open` for backward compatibility with existing artifacts.
+
 This artifact is consumed by `/cverify` (to check class fixes were implemented), `/cspec` (to inform future specs about what QA historically finds), and `/cpostmortem` (to trace whether a bug was caught during QA but insufficiently fixed).
+
+### Severity Floor Check (Post-QA)
+
+After persisting findings, run a severity floor check as a secondary safety net. The **canonical severity floor keyword list** is: `corrupt, silent, bypass, leak, security, data loss, zero value, uninitialized`. Matching is **case-insensitive**.
+
+If ALL findings are NON-BLOCKING but any finding's description contains a keyword from this list, warn the user: "Severity floor check triggered — finding QA-NNN describes '{matched keyword}' but is rated NON-BLOCKING. This may be under-rated." Present re-rating options:
+
+```
+  1. Upgrade to BLOCKING (recommended) — re-enter fix loop
+  2. Confirm NON-BLOCKING — accept current rating
+  3. Dispute — explain why the keyword match is a false positive
+
+  Or type your own: ___
+```
+
+**This is a secondary safety net, not the primary fix.** The calibration examples above do 90% of the work by shaping the agent's initial rating. This tripwire catches agents that describe the bug correctly but rate it wrong.
+
+**Limitation (documented as brittle):** This check has two failure modes: (1) **False negatives** — agents that avoid the trigger words will evade it, and agents that describe bugs softly ("the default value is used" instead of "silent data corruption") will not trigger it. (2) **False positives** — keywords like "leak" and "security" can appear in positive contexts ("leak mitigation is working", "security configuration is properly validated") and trigger the check incorrectly. The calibration examples (severity calibration section above) are the primary fix; this check is a cheap safety net only.
+
+### Non-Blocking Finding Disposition Flow (Post-QA)
+
+After all BLOCKING findings are resolved (or if none exist), the orchestrator must present each NON-BLOCKING finding to the user with disposition options. No finding may remain with `status: open` when advancing past QA — every finding receives an explicit human disposition.
+
+For each NON-BLOCKING finding, present:
+
+```
+  NON-BLOCKING finding QA-NNN: {description}
+
+  1. Fix now — address before proceeding
+  2. Accept — known issue, will not fix now
+  3. Upgrade to BLOCKING — re-enter fix loop
+
+  Or type your own: ___
+```
+
+Update the finding's status in the qa-findings JSON based on the disposition: `fixed` (if Fix now), `accepted` (if Accept), or upgrade to BLOCKING and re-enter the fix loop.
+
+**In `/cauto` pipeline context**: NON-BLOCKING findings are auto-accepted with disposition `auto-accepted-pipeline` and status `accepted` in the findings JSON. This is not a severity override — it is an acceptance disposition by the autonomous orchestrator. The auto-acceptance is logged so `/cmetrics` and `/cpostmortem` can distinguish human-accepted from pipeline-accepted findings.
 
 **Then decide next step:**
 - **If a BLOCKING finding involves a bug that's hard to understand** (unclear root cause, multiple possible explanations): suggest the human run `/cdebug` for structured investigation before attempting the fix round.
@@ -514,6 +572,24 @@ Each mini-audit round spawns four specialist agents as forked subagents, running
 
 4. **Upgrade compatibility agent**: "An existing user has this project's tooling installed from a prior version. They update to the version with these changes. Your job is to mechanically check the implementation (git diff against base branch) against the 5-item checklist below — do not hallucinate what the project looked like before; work from what the diff adds, changes, or removes. (1) Does the install/setup mechanism install all new files? Verify glob patterns, not hardcoded lists (AP-024/PMB-003). (2) Do new config keys have fallback defaults in the code that reads them? (3) Do new artifact schemas include version markers or graceful parsing for old formats? (4) Do removed or renamed files have migration paths? (5) Do new features that depend on artifacts from other new features degrade gracefully when those artifacts don't exist yet? For each issue, report it as a finding with the MA- prefix and LENS: upgrade-compatibility."
 
+### Severity Calibration for Mini-Audit Agents
+
+Each mini-audit agent must apply these calibration examples when rating findings:
+
+**CRITICAL/HIGH — use for bugs that cause silent wrong behavior, compromise safety, or lose data:**
+- Silent data corruption (data written/read incorrectly with no error surfaced)
+- Security bypass (auth check skipped, trust boundary violation, unsanitized input crosses a boundary)
+- Resource leak (file handles, connections, goroutines not closed on error/shutdown paths)
+- Trust boundary violation (data crosses a boundary without the required validation)
+- Data loss (user data deleted, overwritten, or made inaccessible without recovery path)
+
+**MEDIUM/LOW — use for issues that don't cause wrong behavior:**
+- Missing documentation or incomplete comments
+- Suboptimal naming (unclear variable/function names that don't cause bugs)
+- Minor performance inefficiency (correct but slower than necessary)
+
+**When in doubt, rate HIGH.** A disputed HIGH costs one conversation turn to downgrade. A shipped bug costs a postmortem.
+
 ### Agent Context and Tools
 
 Each agent receives as context: the spec, `.correctless/ARCHITECTURE.md` (including entrypoints YAML), `.correctless/AGENT_CONTEXT.md`, `.correctless/antipatterns.md`, the source code changed by this feature (from `git diff` against the base branch), and the test files. Agents have read-only tools: `Read, Grep, Glob, Bash(git diff*, git log*, git show*)`. Agents must not use Edit or file-writing tools.
@@ -551,6 +627,38 @@ CRITICAL and HIGH findings from the mini-audit are blocking — they must be fix
 ```
 
 MEDIUM and LOW findings are advisory — presented to the user but do not block `done`.
+
+### Severity Floor Check (Post-Mini-Audit)
+
+After collecting all mini-audit findings, run a severity floor check using the same canonical severity floor keyword list defined in the QA section (do not duplicate the list here — reference it). If ALL findings are MEDIUM/LOW but any finding's description contains a keyword from the canonical list (case-insensitive), warn the user and present re-rating options:
+
+```
+  1. Upgrade to CRITICAL/HIGH (recommended) — enter fix loop
+  2. Confirm current rating — accept current severity
+  3. Dispute — explain why the keyword match is a false positive
+
+  Or type your own: ___
+```
+
+### Non-Blocking Mini-Audit Finding Disposition Flow
+
+After all CRITICAL/HIGH findings are resolved (or if none exist), the orchestrator must present each MEDIUM/LOW finding to the user with disposition options. No finding may remain with `status: open` when advancing past mini-audit — every finding receives an explicit human disposition.
+
+For each MEDIUM/LOW finding, present:
+
+```
+  MEDIUM/LOW finding MA-NNN: {description}
+
+  1. Fix now — address before proceeding
+  2. Accept — known issue, will not fix now
+  3. Upgrade to HIGH — enter fix loop
+
+  Or type your own: ___
+```
+
+Update the finding's status in the qa-findings JSON based on the disposition: `fixed`, `accepted`, or upgraded and re-entered into the fix loop.
+
+**In `/cauto` pipeline context**: MEDIUM/LOW findings are auto-accepted with disposition `auto-accepted-pipeline` and status `accepted`.
 
 ### Fix Loop
 
