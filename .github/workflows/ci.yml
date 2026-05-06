@@ -118,6 +118,7 @@ jobs:
           bash tests/test-canonicalize-path.sh
           bash tests/test-audit-findings-persistence.sh
           bash tests/test-qa-severity-calibration.sh
+          bash tests/test-structural-enforcement-pat.sh
 
       - name: Verify sync
         run: |

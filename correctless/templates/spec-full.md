@@ -26,6 +26,7 @@
 - **Category**: functional
 - **Statement**: {testable statement}
 - **Violated when**: {condition}
+- **Enforcement**: {structural mechanism from PAT-018: allowed-tools | sensitive-file-guard | gate precondition | hash verification | CI test assertion | agent tool-pinning | prompt-level}
 - **Test approach**: unit
 
 ### INV-002: {short name} [integration]

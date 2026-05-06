@@ -263,6 +263,7 @@ What this covers and — critically — what it does NOT.
 - **Statement**: {precise testable statement}
 - **Boundary**: {ref TB-xxx or ABS-xxx}
 - **Violated when**: {specific condition}
+- **Enforcement**: {structural mechanism from PAT-018: allowed-tools restrictions | sensitive-file-guard | gate precondition | hash verification | CI test assertion | agent tool-pinning | prompt-level (fallback when no structural mechanism applies)}
 - **Guards against**: {AP-xxx or null}
 - **Test approach**: unit | property-based | integration
 - **Risk**: low | medium | high | critical
