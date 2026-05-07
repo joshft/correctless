@@ -473,6 +473,26 @@
         "tests/test-carchitect-phase2.sh"
       ],
       "timestamp": "2026-05-07T01:25:00Z"
+    },
+    {
+      "feature_slug": "carchitect-phase-3-audit",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/config/workflow-config.json",
+        ".correctless/specs/carchitect-phase-3-audit.md",
+        ".github/workflows/ci.yml",
+        "CONTRIBUTING.md",
+        "correctless/skills/caudit/SKILL.md",
+        "docs/skills/caudit.md",
+        "skills/caudit/SKILL.md",
+        "tests/test-carchitect-phase3.sh"
+      ],
+      "timestamp": "2026-05-07T07:00:00Z"
     }
   ]
 }
