@@ -119,6 +119,7 @@ jobs:
           bash tests/test-audit-findings-persistence.sh
           bash tests/test-qa-severity-calibration.sh
           bash tests/test-structural-enforcement-pat.sh
+          bash tests/test-carchitect-phase2.sh
 
       - name: Verify sync
         run: |

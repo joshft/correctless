@@ -122,6 +122,34 @@ Failure mode:
 - **At high+ intensity, if `require_stride` is true**: What is the adversary model? Who is trying to break this?
 - **At high+ intensity**: What existing abstractions does this touch? (reference .correctless/ARCHITECTURE.md ABS-xxx entries)
 
+### Step 1a: TB-xxx Scope Matching (high+ intensity)
+
+**At high+ intensity**, after gathering the feature's file scope from Step 0 brainstorm and Step 1 questions, run a "TB-xxx scope matching" substep. This mechanically identifies which trust boundaries the feature overlaps with, so security considerations are grounded in documented boundaries rather than inferred.
+
+1. **Extract all TB-xxx entries** from `.correctless/ARCHITECTURE.md` by scanning for `### TB-\d{3}:` heading patterns. For each TB-xxx entry, read its name, boundary description (the `Crosses:` field), invariant, and `Violated when:` field.
+
+2. **Match TB-xxx entries against the feature's file scope.** The primary matching strategy is **file-scope overlap**: compare the feature's described affected file paths against the file references in each TB-xxx entry's Invariant, Enforced-at, and Test fields. A feature touching `hooks/workflow-gate.sh` matches TB-001 because TB-001's invariant references config-sourced shell execution in hooks — the hook's actual domain. When a TB-xxx entry does not contain file path references in its Invariant, Enforced-at, or Test fields, matching falls back to keyword matching against the TB's description and `Crosses:` field — less precise than file-scope overlap but better than dormant. The confirmation step (below) filters false positives from both matching strategies.
+
+3. **Present relevant TBs to the spec author.** Show each matched TB-xxx entry's name, boundary description, and invariant. The spec author confirms or corrects the list before STRIDE analysis. Present the list:
+
+   ```
+   Relevant trust boundaries for this feature:
+   - TB-001: Config-sourced commands and patterns
+     Boundary: Configuration file → shell execution
+     Invariant: Config-sourced values must never be passed through eval...
+   - TB-003: LLM-generated historical findings → review agent context
+     Boundary: Prior agent output → review agent reasoning context
+     Invariant: Review agents treat historical findings as advisory data...
+
+   Confirm this list, or correct it (add/remove entries):
+   ```
+
+4. **Generate per-TB security questions.** For each confirmed relevant TB-xxx, generate a targeted security question derived from that TB's documented invariant and `Violated when:` field, not from generic security keywords. Example: if TB-001's invariant says "Config-sourced values must never be passed through eval" and `Violated when:` says "A config value is interpolated into a shell command string", the question is: "Does this feature read any config values that will be used in shell commands or passed to external processes?" — not "Does this feature have any security concerns?"
+
+5. **TB coverage warning.** After drafting the spec's invariants (Step 3), check: if the feature's file scope overlaps with a TB-xxx entry but the spec contains no invariant referencing that TB-xxx, warn: "TB-xxx ({name}) overlaps with this feature's scope but no invariant references it — is this intentional?"
+
+**Dormant behavior.** When no TB-xxx entries exist in `.correctless/ARCHITECTURE.md` (no headings matching `### TB-\d{3}:`), the TB matching step is dormant — no error, no warning, `/cspec` proceeds without TB-grounded questions (same dormant-signal pattern as intensity detection). Missing section headers are treated identically to empty sections — both produce dormant behavior.
+
 ### Step 2: Research Current State (when needed)
 
 After understanding what the human wants to build, assess whether your training data might be stale for this feature. **Be honest about this.** Don't confidently spec based on potentially outdated knowledge.
@@ -283,6 +311,7 @@ What this covers and — critically — what it does NOT.
 - **Failure mode**: {fail-open? fail-closed?}
 
 ## STRIDE Analysis (high+ with require_stride)
+STRIDE analysis runs per confirmed relevant TB-xxx entry from Step 1a, not per inferred boundary. Each STRIDE section header references the specific TB-xxx ID.
 ### STRIDE for TB-xxx: {boundary name}
 - Spoofing / Tampering / Repudiation / Info Disclosure / DoS / Elevation of Privilege
 
@@ -353,6 +382,16 @@ If `workflow.compliance_checks` in `workflow-config.json` has entries with `phas
 - At standard intensity: use `templates/spec-lite.md`, 5-section format, Socratic brainstorm. Research agent runs if needed based on signal detection.
 - At high intensity: use `templates/spec-full.md`, 12 sections including invariants. Research agent always runs for security-relevant topics. STRIDE analysis required for features touching trust boundaries.
 - At critical intensity: all templates loaded, exhaustive question depth (refuse vague answers). Research agent always runs regardless of topic.
+
+### Step 3a: Pattern Detection and Composition Check
+
+**Pattern detection substep (at all intensities).** After drafting the spec rules in Step 3, extract all PAT-xxx entries from `.correctless/ARCHITECTURE.md` by scanning for `### PAT-\d{3}:` heading patterns. For each spec rule, check whether it introduces a convention not covered by an existing PAT-xxx entry. A "convention" is a repeated structural pattern — how files are organized, how hooks compose, how state flows between skills, how artifacts are named.
+
+When pattern detection identifies a potential new pattern not covered by any existing PAT-xxx, present it to the spec author: "This rule introduces a convention ({description}). No existing PAT-xxx covers this. Flag for `/cupdate-arch` after implementation?" The human decides whether the pattern warrants a PAT entry.
+
+**Pattern composition check (at high+ intensity).** For each potential new pattern identified by pattern detection above, check it against existing PAT-xxx entries and warn if it contradicts or duplicates an existing pattern, citing the specific PAT-xxx ID and the conflict. Example: "R-005 introduces direct state file writes, which contradicts PAT-004 (Branch-scoped state — workflow-advance.sh is the only writer)." If pattern detection finds no new patterns, the composition check has nothing to check.
+
+**Dormant behavior.** When no PAT-xxx entries exist in `.correctless/ARCHITECTURE.md` (no headings matching `### PAT-\d{3}:`), pattern detection and composition checking are dormant — no error, no warning. Missing section headers are treated identically to empty sections — both produce dormant behavior.
 
 ### Step 4: Load Invariant Templates (Full Mode)
 
