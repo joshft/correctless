@@ -391,6 +391,14 @@ See `.claude/rules/canonicalize-path.md`.
 - **Guards against**: The class of review findings where an invariant claims a property but enforcement is prompt-level only — the invariant holds only as long as the agent follows instructions, with no mechanical backstop
 - **Test**: R-001 through R-008 in `tests/test-structural-enforcement-pat.sh`; Design Contract Checker in `/creview-spec` flags invariants with missing or prompt-level-only `Enforcement:` fields
 
+### PAT-019: Dormant-signal graceful degradation
+- **Pattern**: Optional data sources degrade to no-op when absent — no error, no warning, no behavioral change
+- **Rule**: When a skill reads an optional data source (ARCHITECTURE.md entries, antipatterns.md, qa-findings-*.json, calibration files, drift-debt.json), absence of the file or absence of relevant entries within the file must produce dormant behavior: the signal contributes nothing to the output, no error is raised, no warning is shown, and the skill proceeds normally. The dormant check must happen before any processing of the data source — not as error handling after a failed read. Skill prompts must state the dormant condition explicitly (e.g., "When no TB-xxx entries exist, this step is dormant — no error, no warning").
+- **Why**: Correctless skills run on projects at all stages of adoption. A project that hasn't run `/carchitect` yet has no ARCHITECTURE.md entries. A project that hasn't run `/caudit` yet has no qa-findings files. Skills that error or warn on missing optional data punish new users and create noise for projects that don't use every feature. The pattern appears in 15+ locations across `/cspec` (intensity detection, TB matching, pattern detection, calibration), `/caudit` (architecture adherence checker), `/cstatus` (measurement gate), and `/cdocs` (dormant-gate baseline).
+- **Violated when**: A skill errors, warns, or changes behavior when an optional data source is absent; or a skill reads an optional file without first checking whether it exists or has relevant entries; or a new optional data source is added without explicit dormant-condition documentation in the skill prompt
+- **Guards against**: Adoption friction from features that assume a fully-configured project; false warnings that train users to ignore skill output; cascading failures when one optional feature's data is missing
+- **Test**: Dormant behavior is tested per-feature (e.g., R-002 dormant checks in `tests/test-intensity-detection.sh`, R-004 in `tests/test-carchitect-phase3.sh`). No single cross-cutting test — each feature's test suite verifies its own dormant conditions.
+
 ## Environment Assumptions
 
 ### ENV-001: Bash 4+ required
