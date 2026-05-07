@@ -19,7 +19,7 @@ Runs independently of the main spec-to-merge pipeline. The TDD cycle catches "do
 ## What It Does
 
 - Creates an audit branch (`audit/{preset}-{date}`) for all fixes
-- Spawns 4-6 specialist agents in parallel, each with a hostile lens specific to the preset
+- Spawns 5-7 specialist agents in parallel, each with a hostile lens specific to the preset
 - Agents classify findings into confidence tiers (confirmed, probable, suspicious) with bounty incentives for accuracy
 - A triage agent deduplicates, validates, and rejects false positives
 - Fixes are applied on the audit branch (TDD for non-trivial fixes, direct for one-liners)
@@ -54,12 +54,25 @@ Invoke with: `/caudit [preset] [scope]`
 
 | Preset | Purpose | Agents | Max Rounds |
 |--------|---------|--------|------------|
-| `qa` | Incorrect behavior, silent failures, data corruption | Concurrency, Error Handling, Input Boundary, Resource Lifecycle, API Contract, Regression Hunter | 5 |
-| `hacker` | Security vulnerabilities — bypass, escalation, exfiltration, DoS | Encoding/Normalization, Protocol Abuse, Auth/AuthZ, Config Manipulation, Injection, Regression Hunter | 7 |
-| `perf` | Performance bottlenecks, memory waste, algorithmic inefficiency | Allocation Hunter, Algorithmic Complexity, I/O Bottleneck, Concurrency Efficiency, Regression Hunter | 5 |
+| `qa` | Incorrect behavior, silent failures, data corruption | Concurrency, Error Handling, Input Boundary, Resource Lifecycle, API Contract, Architecture Adherence Checker, Regression Hunter | 5 |
+| `hacker` | Security vulnerabilities — bypass, escalation, exfiltration, DoS | Encoding/Normalization, Protocol Abuse, Auth/AuthZ, Config Manipulation, Injection, Architecture Adherence Checker, Regression Hunter | 7 |
+| `perf` | Performance bottlenecks, memory waste, algorithmic inefficiency | Allocation Hunter, Algorithmic Complexity, I/O Bottleneck, Concurrency Efficiency, Architecture Adherence Checker, Regression Hunter | 5 |
 | `custom` | Project-specific lenses (rate limiting, data integrity, compliance) | User-defined | Configurable |
 
 Scope options: `all`, `changed` (default — git diff against main), or a specific path.
+
+## Architecture Adherence Checker
+
+Every preset includes an Architecture Adherence Checker agent that reads `.correctless/ARCHITECTURE.md` and mechanically checks the codebase against documented architecture entries. It performs four types of checks:
+
+- **Pattern compliance** (PAT-xxx): verifies the code follows documented patterns
+- **Abstraction invariant** (ABS-xxx): verifies the code maintains documented abstraction invariants
+- **Trust boundary enforcement** (TB-xxx): verifies the code enforces documented trust boundary invariants
+- **Undocumented pattern detection**: identifies project-specific conventions appearing in 3+ files that have no PAT-xxx entry
+
+If `.correctless/ARCHITECTURE.md` does not exist or contains only placeholder markers, the Architecture Adherence Checker skips its checks and reports zero findings — architecture adherence checks are skipped. Architecture inference is not attempted; that is `/carchitect`'s job.
+
+If ARCHITECTURE.md is stale (last updated more than 30 days before the most recent source commit), a staleness warning is prepended advising you to run `/cupdate-arch` to refresh the architecture document before trusting adherence findings.
 
 ## Common Issues
 
