@@ -168,8 +168,9 @@ for skill_dir in "$skills_dir"/*/; do
     continue
   fi
 
-  # If skill mentions writing to ARCHITECTURE.md
-  if grep -qi "write.*ARCHITECTURE\.md\|ARCHITECTURE\.md.*write\|add.*ARCHITECTURE\.md\|append.*ARCHITECTURE" "$skill_file" 2>/dev/null; then
+  # If skill mentions writing to ARCHITECTURE.md (exclude blockquoted agent
+  # prompt lines starting with > — those describe subagent reads, not skill writes)
+  if grep -v '^>' "$skill_file" 2>/dev/null | grep -qi "write.*ARCHITECTURE\.md\|ARCHITECTURE\.md.*write\|add.*ARCHITECTURE\.md\|append.*ARCHITECTURE"; then
     if echo "$allowed" | grep -qF "Write(.correctless/ARCHITECTURE.md)"; then
       pass "AP-008-arch" "$skill_name has Write(.correctless/ARCHITECTURE.md)"
     else

@@ -21,7 +21,7 @@ Sits between spec/model and TDD. This is the last gate before code gets written.
   - **Red Team Agent** — finds attack paths, bypass vectors, and failure modes the spec ignores
   - **Assumptions Auditor** — surfaces every unstated assumption (OS, network, clock, DNS)
   - **Testability Auditor** — flags vague invariants that cannot be turned into pass/fail tests
-  - **Design Contract Checker** — verifies the spec composes correctly with ARCHITECTURE.md abstractions and patterns
+  - **Design Contract Checker** — verifies the spec composes correctly with ARCHITECTURE.md abstractions and patterns; cross-references the spec's invariant boundaries against TB-xxx entries and flags relevant trust boundaries the spec does not reference
   - **Upgrade Compatibility Auditor** — checks what happens to existing users upgrading from a prior version (installation gaps, missing config defaults, schema backward compatibility, migration paths, graceful degradation)
 - Synthesizes findings: unanimous agreement is auto-incorporated; disagreements go to the human
 - Optionally routes flagged invariants to external models for cross-validation

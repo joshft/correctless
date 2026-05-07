@@ -81,6 +81,18 @@ For `[integration]` rules, `/cspec` defines Entry/Through/Exit contract constrai
 
 If no entrypoints are defined in ARCHITECTURE.md, the skill prompts you to run `/carchitect` first or skip contracts for this spec. Rules tagged `[unit]` are not affected — contracts apply only to `[integration]` rules.
 
+## Architecture Awareness
+
+At high+ intensity, `/cspec` mechanically identifies which trust boundaries (TB-xxx) and design patterns (PAT-xxx) from `.correctless/ARCHITECTURE.md` are relevant to the feature being specified.
+
+**Trust boundary matching** (high+ intensity): After gathering the feature's file scope, the skill extracts all TB-xxx entries and matches them against the feature's affected files. Matching uses file-scope overlap (comparing file paths against TB entry references) with keyword fallback for TB entries that lack file path references. You confirm the matched list before STRIDE analysis runs. Per-TB security questions are derived from each boundary's documented invariant, not from generic security keywords.
+
+**Pattern detection** (all intensities): After drafting spec rules, the skill checks whether any rule introduces a convention not covered by an existing PAT-xxx entry. If so, it asks whether the pattern should be flagged for `/cupdate-arch` after implementation.
+
+**Pattern composition check** (high+ intensity): For each potential new pattern, the skill checks it against existing PAT-xxx entries and warns if it contradicts or duplicates an existing pattern.
+
+When ARCHITECTURE.md has no TB-xxx or PAT-xxx entries, these features are dormant — no error, no warning.
+
 ## Intensity Levels
 
 **Standard intensity** produces 5 sections: What, Rules (R-xxx with test levels), Won't Do, Risks, Open Questions. Simple and fast.
