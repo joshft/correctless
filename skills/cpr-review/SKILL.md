@@ -1,7 +1,7 @@
 ---
 name: cpr-review
 description: Review an incoming PR. Use when someone opens a PR against your project. Checks architecture, security, tests, and antipatterns.
-allowed-tools: Read, Grep, Glob, Bash(gh*), Bash(glab*), Bash(git*), Bash(*test*), Bash(*lint*), Bash(*audit*), Bash(govulncheck*)
+allowed-tools: Read, Grep, Glob, Bash(gh*), Bash(glab*), Bash(git*), Bash(*test*), Bash(*lint*), Bash(*audit*), Bash(govulncheck*), Task(correctless:architecture-compliance-reviewer)
 ---
 
 # /cpr-review — Multi-Lens PR Review
@@ -20,7 +20,7 @@ PR reviews take 5-15 minutes depending on PR size and mode. The user must see pr
 1. Fetch PR info and diff
 2. Detect dependency bump (may switch to dep-specific lens)
 3. Read project context
-4. Architecture compliance check
+4. Spawn Architecture Compliance Agent
 5. Security checklist
 6. Test coverage analysis
 7. Antipattern check
@@ -144,15 +144,11 @@ Read these files to understand the project's standards:
 
 ## Step 3: Architecture Compliance
 
-Check every changed file against .correctless/ARCHITECTURE.md:
+**Staleness check (before spawning agent):** Compute ARCHITECTURE.md staleness via `git log -1 --format='%ai' .correctless/ARCHITECTURE.md` and `git log -1 --format='%ai'`. If the last-modified date is more than 30 days before the most recent source commit, prepend a LOW-severity staleness finding directly: "ARCHITECTURE.md may be stale — last updated {date}, most recent source commit {date}. Architecture findings below may be false positives due to doc drift. Consider running /cupdate-arch." This is a single warning, not per-entry.
 
-- **Pattern violations**: Do changes follow documented design patterns (PAT-xxx)? If a new database query bypasses the repository layer, flag it.
-- **Convention violations**: Naming, file organization, import patterns — does the PR follow what's documented?
-- **Prohibition violations**: Does the PR do anything listed in the Prohibitions section? (e.g., "Never import database packages from HTTP handlers")
-- **New patterns**: Does the PR introduce a pattern not documented in .correctless/ARCHITECTURE.md? If so, it's either a good addition that should be documented or drift that should be questioned.
-- **Component boundaries**: Do changes respect the component boundaries in the Key Components table? Cross-boundary imports that aren't documented are a smell.
+**Spawn the Architecture Compliance Agent** via `Task(subagent_type="correctless:architecture-compliance-reviewer")`. The agent mechanically extracts PAT-xxx, ABS-xxx, and TB-xxx entries from `.correctless/ARCHITECTURE.md` and checks the PR diff against each entry's documented invariant/rule. The agent runs in parallel with Steps 4-8 (security checklist, test coverage, antipattern check, convention compliance, spec alignment). Architecture compliance is not gated by intensity — the agent is spawned at all intensity levels.
 
-For each finding: cite the specific .correctless/ARCHITECTURE.md entry (PAT-xxx, prohibition, convention) being violated.
+Collect the Architecture Compliance Agent's findings before presenting the final severity-grouped output in "Present Findings." Merge the agent's severity-classified findings into the main output alongside findings from Steps 4-8.
 
 ## Step 4: Security Checklist
 
@@ -250,6 +246,9 @@ Compute the effective intensity using the same method as other pipeline skills: 
 - Channel usage: can channels deadlock? Is there proper cleanup?
 
 ### Trust Boundary Analysis
+
+> The Architecture Compliance Agent handles mechanical TB-xxx/PAT-xxx checking. This section adds semantic analysis beyond what mechanical extraction can catch.
+
 - Does the PR modify trust boundaries documented in .correctless/ARCHITECTURE.md?
 - Do changes cross trust boundaries without proper validation?
 - Is data from less-trusted sources sanitized before reaching more-trusted components?
@@ -259,6 +258,9 @@ Compute the effective intensity using the same method as other pipeline skills: 
 - Example: a PR that changes the auth middleware might break invariants from the payments spec that assumes authenticated users.
 
 ### Drift Detection
+
+> The Architecture Compliance Agent handles mechanical TB-xxx/PAT-xxx checking. This section adds semantic analysis beyond what mechanical extraction can catch.
+
 - Do changes match the documented architecture, or are they introducing architectural drift?
 - If drift is detected: is it intentional evolution (document it) or accidental erosion (fix it)?
 - Check `.correctless/meta/drift-debt.json` for existing drift in the same area.

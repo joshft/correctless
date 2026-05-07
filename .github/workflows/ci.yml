@@ -121,6 +121,7 @@ jobs:
           bash tests/test-structural-enforcement-pat.sh
           bash tests/test-carchitect-phase2.sh
           bash tests/test-carchitect-phase3.sh
+          bash tests/test-carchitect-phase4.sh
 
       - name: Verify sync
         run: |
