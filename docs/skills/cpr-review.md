@@ -58,6 +58,19 @@ User: /cpr-review 42
 | `.correctless/config/workflow-config.json` | |
 | `.correctless/specs/*.md` (if referenced) | |
 
+## Architecture Compliance Agent
+
+During Step 3 (Architecture Compliance), `/cpr-review` spawns a dedicated Architecture Compliance Agent (`architecture-compliance-reviewer`) that mechanically checks the PR diff against `.correctless/ARCHITECTURE.md` entries. The agent performs four check types:
+
+1. **Pattern compliance** (PAT-xxx): Verifies the PR diff follows documented design patterns.
+2. **Abstraction invariant** (ABS-xxx): Checks that the PR maintains documented abstraction invariants (sole-writer contracts, consumer handling).
+3. **Trust boundary enforcement** (TB-xxx): Verifies the PR enforces documented trust boundary invariants.
+4. **New pattern detection**: Flags structural or dependency patterns not documented in any PAT-xxx entry as informational LOW-severity candidates for documentation.
+
+**Dormant-signal fallback**: Projects without ARCHITECTURE.md or without any PAT-xxx/ABS-xxx/TB-xxx entries get zero findings from the agent — architecture compliance checks are skipped rather than inferred.
+
+**Staleness warning**: If ARCHITECTURE.md is more than 30 days stale (last updated 30+ days before the most recent source commit), a LOW-severity warning is prepended suggesting `/cupdate-arch` to refresh the architecture document.
+
 ## Intensity Levels
 
 - **Standard intensity**: Runs architecture, security, test coverage, antipattern, convention, and spec alignment checks.
