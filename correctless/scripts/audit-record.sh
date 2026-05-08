@@ -127,6 +127,22 @@ write_round() {
   # we synthesize an empty array if absent to keep the schema uniform.
   payload=$(echo "$payload" | jq 'if has("rejected") then . else . + {rejected: []} end')
 
+  # Validate escape_type vocabulary on each findings entry (INV-002).
+  # Valid values: "implementation", "spec", "non-escape", null (absent is fine).
+  # Reject entire payload if ANY entry has an invalid value.
+  local bad_escape
+  bad_escape=$(echo "$payload" | jq -r '
+    [.findings[] |
+      select(.escape_type != null) |
+      select(.escape_type != "implementation" and .escape_type != "spec" and .escape_type != "non-escape") |
+      .escape_type
+    ] | first // empty
+  ')
+  if [ -n "$bad_escape" ]; then
+    echo "audit-record.sh write-round: invalid escape_type '$bad_escape' in findings (valid: implementation, spec, non-escape, null)" >&2
+    return 1
+  fi
+
   # Read started_at + date from workflow state
   local sf started_at date
   sf="$(_state_file)" || { echo "audit-record.sh write-round: cannot find workflow state file" >&2; return 2; }

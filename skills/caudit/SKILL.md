@@ -493,6 +493,7 @@ Spawn a triage agent with this framing:
 > - Check against antipatterns and previous findings (if already tracked, it's a regression → Regression Hunter credit)
 > - Reject false positives with explanation
 > - For Hacker preset: require PoC for all Confirmed-tier findings
+> - Validate each finding's `escape_type` classification: must be `implementation`, `spec`, or `non-escape`. Reject invalid values and default to `implementation` when the specialist's classification is ambiguous or missing
 
 ## Presets
 
@@ -609,6 +610,12 @@ Context you receive (skip any files that don't exist — this is normal on first
 For each finding, submit:
 - Tier: confirmed | probable | suspicious
 - Severity: critical | high | medium | low
+- Escape type: implementation | spec | non-escape
+  (implementation = code violates spec, spec = spec was too permissive,
+   non-escape = not a defect that passed per-feature gates — e.g.,
+   performance issue, documentation gap, style violation)
+  Classify per finding at submission time, not batched after convergence.
+  When ambiguous, default to "implementation."
 - Title: short description
 - Description: what's wrong and why it matters
 - Evidence: (tier-appropriate)
@@ -735,7 +742,9 @@ The destination resolves to `.correctless/artifacts/findings/audit-<PRESET>-<DAT
 
 For a clean audit run (zero findings after Round 1 specialists), still invoke the canonical writer with stdin `{"findings": [], "rejected": []}`. The empty-findings document is the audit's evidence of having run; absence is NOT evidence of "no findings."
 
-**Note:** This schema differs from `/ctdd` QA findings (`.correctless/artifacts/qa-findings-*.json`). Olympics findings have `tier`, `agent`, `bounty` fields. TDD QA findings have `severity` (BLOCKING/NON-BLOCKING) and `rule_ref`. Consuming agents must handle both schemas.
+Each specialist agent includes `escape_type` (`implementation`, `spec`, or `non-escape`) in its finding submission alongside severity. The triage agent validates the classification during finding triage — rejecting invalid values and defaulting to `implementation` when ambiguous. The orchestrator passes the validated classification to `audit-record.sh write-round` during persistence. Classification is distributed across the audit (one decision per finding at submission time), not batched after convergence.
+
+**Note:** This schema differs from `/ctdd` QA findings (`.correctless/artifacts/qa-findings-*.json`). Olympics findings have `tier`, `agent`, `bounty`, `escape_type` fields. TDD QA findings have `severity` (BLOCKING/NON-BLOCKING) and `rule_ref`. Consuming agents must handle both schemas.
 
 
 ```json
@@ -756,6 +765,7 @@ For a clean audit run (zero findings after Round 1 specialists), still invoke th
       "location": {"file": "pool.go", "lines": [45, 67]},
       "invariant_ref": "INV-003 or null",
       "architecture_ref": "PAT-xxx, ABS-xxx, or TB-xxx, or null for undocumented-pattern findings",
+      "escape_type": "implementation",
       "instance_fix": "add mutex around resize",
       "class_fix": "structural test for all pool operations under concurrent access",
       "status": "open",

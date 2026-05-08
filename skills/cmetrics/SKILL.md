@@ -58,9 +58,28 @@ Read everything in the accumulation layer. Skip files that don't exist.
 - Verify: findings in verification reports
 - Audit: findings in Olympics history
 
-**Bug escape rate** — from `workflow-effectiveness.json`:
-- `post_merge_bugs` count / (total issues caught + post_merge_bugs)
-- List the escaped bugs with which phase should have caught them
+**Escape rate (three-gate breakdown)** — replaces the single "Bug escape rate" line with a three-gate model:
+- **Per-feature escapes**: issues caught by a later per-feature gate. Derived from `qa-findings-*.json` — count of BLOCKING findings across all files. NON-BLOCKING and UNCERTAIN findings are excluded (advisory observations, not escaped defects). Note: QA findings use BLOCKING/NON-BLOCKING/UNCERTAIN severity vocabulary, distinct from audit findings' critical/high/medium/low/info vocabulary.
+- **Audit escapes**: issues caught by `/caudit` post-feature audits. From round-JSON files in `.correctless/artifacts/findings/`. Count of findings with a non-null `severity` field not equal to `"info"` (info findings are not counted as escapes, case-insensitive). Findings without a `severity` field are excluded from escape counts.
+- **Production escapes**: from `workflow-effectiveness.json` `post_merge_bugs` (unchanged source)
+
+**Severity-weighted escape score** — per audit cycle (a set of round-JSON files sharing the same `preset` and `date`). Weights: critical=5, high=3, medium=2, low=1, info=0. Severity matching is case-insensitive — normalize to lowercase before applying the weight mapping. Score = sum of `weight(severity)` across all findings with a valid severity field that is not `"info"`.
+
+**Escape breakdown by root cause** — uses the `escape_type` field from round-JSON findings:
+- **Implementation escapes**: code violates spec (`escape_type: "implementation"`)
+- **Spec escapes**: spec was too permissive (`escape_type: "spec"`)
+- **Unclassified**: no `escape_type` field or null value
+Missing or null `escape_type` is counted as "unclassified."
+
+**Escape trends** — for each preset, compare the current cycle's weighted escape score to the previous cycle's score:
+- **Improving**: score decreased
+- **Stable**: score change <= 20%
+- **Regressing**: score change > 20%
+When fewer than 2 cycles exist for a preset, report "insufficient data for trend."
+
+**Severity distribution** — per audit cycle, report count of CRITICAL, HIGH, MEDIUM, LOW findings as a table. Note the distribution shift from previous cycle when available.
+
+**Dormant escape metrics** — when no round-JSON files exist in `.correctless/artifacts/findings/`, the entire escape metrics section is dormant — no error, no warning, just omitted from output. Follows PAT-019.
 
 **Phase effectiveness** — from `workflow-effectiveness.json`:
 - For each phase: bugs that should have been caught vs bugs actually caught
@@ -133,8 +152,49 @@ Print to conversation AND write to `.correctless/artifacts/metrics-{date}.md`:
 | Verify | {N} | {%} | |
 | Audit (Olympics) | {N} | {%} | |
 
-## Bug Escapes
-{From workflow-effectiveness.json}
+## Escape Rate (Three-Gate Breakdown)
+
+| Gate | Count | Source |
+|------|-------|--------|
+| Per-feature escapes | {N} BLOCKING findings | qa-findings-*.json |
+| Audit escapes | {N} findings (excl. info) | round-JSON in artifacts/findings/ |
+| Production escapes | {N} post-merge bugs | workflow-effectiveness.json |
+
+### Severity-Weighted Escape Score
+
+Per audit cycle (grouped by `preset` + `date` from round-JSON files):
+
+| Cycle | Preset | Date | Weighted Score | Trend |
+|-------|--------|------|----------------|-------|
+| {N} | {preset} | {date} | {score} | {improving/stable/regressing} |
+
+Weights: critical=5, high=3, medium=2, low=1, info=0. Case-insensitive.
+Trend: improving (score decreased), stable (change <= 20%), regressing (change > 20%).
+When fewer than 2 cycles exist for a preset: "insufficient data for trend."
+
+### Root Cause Breakdown
+
+| Category | Count | % |
+|----------|-------|---|
+| Implementation escapes | {N} | {%} |
+| Spec escapes | {N} | {%} |
+| Unclassified | {N} | {%} |
+
+Uses `escape_type` field from round-JSON findings. Missing/null = unclassified.
+
+### Severity Distribution
+
+Per audit cycle:
+
+| Severity | Count | Shift from Previous |
+|----------|-------|--------------------|
+| CRITICAL | {N} | {+/-N or "—"} |
+| HIGH | {N} | {+/-N or "—"} |
+| MEDIUM | {N} | {+/-N or "—"} |
+| LOW | {N} | {+/-N or "—"} |
+
+### Production Bug Escapes
+{From workflow-effectiveness.json — unchanged}
 | ID | Severity | What | Phase That Missed | Why |
 |----|----------|------|-------------------|-----|
 | PMB-001 | {sev} | {desc} | {phase} | {reason} |
