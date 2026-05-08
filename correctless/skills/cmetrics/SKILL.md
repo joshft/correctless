@@ -2,6 +2,7 @@
 name: cmetrics
 description: Project health and ROI dashboard. Use monthly or when evaluating workflow effectiveness. Shows bugs caught, token cost, and trends.
 allowed-tools: Read, Grep, Glob, Bash(git*), Bash(wc*), Bash(find*), Bash(cat*), Bash(jq*), Write(.correctless/artifacts/metrics-*)
+interaction_mode: autonomous
 ---
 
 # /cmetrics — Workflow Metrics Dashboard
@@ -435,6 +436,10 @@ Use TaskCreate/TaskUpdate:
 - Analyzing health indicators
 - Reading token logs and computing ROI
 - Generating dashboard
+
+## Autonomous Defaults
+
+- **AD-001**: Report scope — generate full metrics dashboard (default). No human input required; this skill runs to completion autonomously.
 
 ## If Something Goes Wrong
 

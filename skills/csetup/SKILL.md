@@ -2,6 +2,7 @@
 name: csetup
 description: Initialize Correctless and run a project health check. Detects stack, configures workflow, bootstraps docs, checks security/quality/CI/testing hygiene, and offers to fix gaps. Adapts to project maturity — greenfield, early-stage, or mature.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
+interaction_mode: interactive
 ---
 
 # /csetup — Initialize Correctless

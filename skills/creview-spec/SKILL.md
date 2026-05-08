@@ -2,6 +2,7 @@
 name: creview-spec
 description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, and design contract checker. Use after /cspec or /cmodel.
 allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Write(.correctless/meta/external-review-history.json)
+interaction_mode: hybrid
 ---
 
 # /creview-spec — Multi-Agent Adversarial Spec Review
@@ -315,6 +316,15 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Finding triage — auto-incorporate HIGH and above (default). Rationale: high-severity findings represent concrete spec gaps that weaken the feature if left unaddressed.
+- **AD-002**: Spec rewrite scope — minimal targeted edits (default). Rationale: minimal edits preserve the spec author's intent while addressing identified gaps.
+- **AD-003**: Spec direction change — `escalate: always`. Default if deferred: preserve original direction. Rationale: changing spec direction is a strategic decision that resets the pipeline.
 
 ## If Something Goes Wrong
 

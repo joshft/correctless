@@ -2,6 +2,7 @@
 name: cspec
 description: Create a structured specification with testable invariants for a new feature. Researches current best practices before writing invariants. Adapts format to workflow intensity.
 allowed-tools: Read, Grep, Glob, Edit, Bash(git log*), Bash(git diff*), Bash(git branch*), Bash(*workflow-advance.sh*), Bash(*harness-fingerprint*), Write(.correctless/specs/*), Write(.correctless/artifacts/research/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(.claude/rules/*.md), WebSearch, WebFetch
+interaction_mode: interactive
 ---
 
 # /cspec — Write a Feature Specification

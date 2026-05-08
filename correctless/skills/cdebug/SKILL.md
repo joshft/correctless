@@ -2,6 +2,7 @@
 name: cdebug
 description: Structured bug investigation workflow. Root cause analysis, hypothesis testing, TDD fix with agent separation, escalation after 3 failed attempts. Use when stuck on a bug.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/antipatterns.md), Write(.correctless/artifacts/debug-*), Write(.correctless/artifacts/token-log-*), Edit
+interaction_mode: hybrid
 ---
 
 # /cdebug — Structured Bug Investigation
@@ -214,6 +215,15 @@ If `mcp.context7` is `true` in `workflow-config.json`, use Context7 when researc
 
 - Use `resolve-library-id` to find the canonical ID for a library before fetching docs
 - Use `get-library-docs` to retrieve current documentation, API references, and known issues
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Investigation approach — automated hypothesis testing (default). Rationale: systematic hypothesis testing is the designed workflow and does not require human judgment until escalation.
+- **AD-002**: Fix application — apply most targeted fix (default). Rationale: the smallest fix that addresses the confirmed root cause minimizes blast radius.
+- **AD-003**: Root cause ambiguity — `escalate: always`. Default if deferred: stop — report findings without applying fix. Rationale: ambiguous root causes risk masking the real bug with a surface-level patch.
 
 ## If Something Goes Wrong
 

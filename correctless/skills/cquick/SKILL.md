@@ -2,6 +2,7 @@
 name: cquick
 description: Quick fix with TDD — no spec/review for small changes. Branch, test, implement, commit.
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash(*)
+interaction_mode: hybrid
 ---
 
 # /cquick — Quick Fix with TDD
@@ -96,6 +97,14 @@ When presenting choices to the user:
 3. Include 2-4 options maximum
 4. Always end with: "Or type your own: ___"
 5. Accept the number, the option name, or a typed response
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Scope assessment — auto-assess against 50 LOC / 3 file limit (default). Rationale: the scope guard is a mechanical check with objective thresholds.
+- **AD-002**: Scope exceeded — `escalate: always`. Default if deferred: stop and flag scope exceeded. Rationale: scope decisions affect workflow choice; proceeding past the limit or spawning an interactive skill are both wrong defaults.
 
 ## If Something Goes Wrong
 

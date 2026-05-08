@@ -2,6 +2,7 @@
 name: chelp
 description: Quick help — shows the workflow pipeline, available commands, and current status.
 allowed-tools: Read, Bash(*)
+interaction_mode: autonomous
 ---
 
 # /chelp — Correctless Quick Help
@@ -120,6 +121,10 @@ Quick reference:
   Project health     → /cmetrics
   Audit the workflow → /cwtf
 ```
+
+## Autonomous Defaults
+
+- **AD-001**: Display scope — show full command reference (default). No human input required; this skill runs to completion autonomously.
 
 ## Constraints
 

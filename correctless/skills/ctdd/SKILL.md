@@ -2,6 +2,7 @@
 name: ctdd
 description: Enforced TDD workflow. Write failing tests from spec rules, then implement. Use after /creview approves a spec.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Edit
+interaction_mode: hybrid
 ---
 
 # /ctdd — Enforced Test-Driven Development
@@ -768,6 +769,15 @@ If `mcp.context7` is `true` in `workflow-config.json`, the test agent (RED phase
 
 - Use `resolve-library-id` + `get-library-docs` to fetch testing docs for the libraries under test
 - Useful when the test agent needs to know how a library's test helpers work (e.g., testing hooks in React, test fixtures in pytest)
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Test strategy — follow spec rule test levels (default). Rationale: spec rules define `[unit]` or `[integration]` levels explicitly; the test agent follows them mechanically.
+- **AD-002**: QA finding triage — auto-fix CRITICAL and HIGH (default). Rationale: BLOCKING findings have concrete instance and class fixes; deferring them increases escape risk.
+- **AD-003**: Spec update needed — `escalate: always`. Default if deferred: flag as open question. Rationale: spec changes reset the pipeline and affect all downstream phases.
 
 ## If Something Goes Wrong
 

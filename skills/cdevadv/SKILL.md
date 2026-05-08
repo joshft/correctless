@@ -3,6 +3,7 @@ name: cdevadv
 description: "10th Man / Devil's Advocate. Challenges the assumptions, architecture, and strategies that every other agent accepts as true. Periodic deep analysis — not every feature."
 allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*test*), Bash(*coverage*), Write(.correctless/artifacts/devadv/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/meta/drift-debt.json)
 context: fork
+interaction_mode: hybrid
 ---
 
 # /cdevadv — Devil's Advocate (10th Man Rule)
@@ -257,6 +258,17 @@ Log token usage following the shared constraints (`_shared/constraints.md`). Tok
 
 ### /context
 Check context usage before starting. Layers mode is context-efficient (cheap passes first). Signals mode loads more data. If context is above 50% before starting, suggest compacting first.
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+**Deferred escalation (R-011)**: This skill has `context: fork` and cannot receive human follow-up input. When an `escalate: always` decision point is reached in autonomous mode, the default is applied and the decision is returned with `escalation_deferred: true` and `original_escalation_reason` for human review at pipeline conclusion.
+
+- **AD-001**: Analysis depth — full adversarial analysis across all categories (default). Rationale: depth is the skill's purpose; shallow analysis defeats the point of running it.
+- **AD-002**: Finding severity — rate conservatively, flag edge cases (default). Rationale: conservative severity avoids under-rating findings that compound with other issues.
+- **AD-003**: Architectural challenge acceptance — `escalate: always`. Default if deferred: log finding as open question. Rationale: accepting an architectural challenge could trigger significant rework.
 
 ## If Something Goes Wrong
 

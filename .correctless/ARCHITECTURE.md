@@ -280,6 +280,16 @@
 - **Test**: `tests/test-audit-findings-persistence.sh` (INV-001..009, PRH-001..005, BND-001..002)
 - **Guards against**: AP-026, AP-022
 
+### ABS-030: Autonomous decisions JSONL contract
+- **Artifact**: `.correctless/artifacts/autonomous-decisions-{branch_slug}.jsonl`
+- **Sole writer**: `/cauto` orchestrator via `scripts/autonomous-decision-writer.sh` (skills return decisions as structured output; `/cauto` persists them via the writer script, same SFG-bypass pattern as ABS-029/audit-record.sh)
+- **Consumers**: R-007 pipeline summary, `/cwtf` accountability analysis
+- **Invariant**: `/cauto` verifies JSONL growth after each skill invocation. Deferred escalations gate PR creation (R-013). Skills must NOT write to this file directly.
+- **Enforced at**: `skills/cauto/SKILL.md` (sole writer, JSONL growth check, R-013 confirmation gate), `hooks/sensitive-file-guard.sh` (blocks Edit/Write/Bash redirects to `autonomous-decisions-*.jsonl`)
+- **Violated when**: A skill other than `/cauto` writes directly to the JSONL; `/cauto` skips JSONL growth check after skill invocation; deferred escalation confirmation gate is bypassed before PR creation
+- **Test**: `tests/test-autonomous-skill-contract.sh` (R-006, R-007, R-013 tests), `tests/test-sensitive-file-guard.sh` (behavioral block tests)
+- **Guards against**: AP-026, AP-022
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.

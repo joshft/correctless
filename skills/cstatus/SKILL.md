@@ -2,6 +2,7 @@
 name: cstatus
 description: Show current Correctless workflow state, available commands, and suggested next steps. Run anytime to see where you are.
 allowed-tools: Bash, Read, Grep, Glob
+interaction_mode: autonomous
 ---
 
 # /cstatus — Workflow Status and Next Steps
@@ -215,6 +216,10 @@ If the human asks "is everything set up correctly?" or similar, validate:
 - .correctless/AGENT_CONTEXT.md has content (not template)
 
 Report any issues with fix instructions.
+
+## Autonomous Defaults
+
+- **AD-001**: Display scope — show full pipeline status with next steps (default). No human input required; this skill runs to completion autonomously.
 
 ## If Something Goes Wrong
 

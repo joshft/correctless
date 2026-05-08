@@ -2,6 +2,7 @@
 name: cauto
 description: Semi-auto mode. Orchestrates the full implementation pipeline after human-approved spec review. Runs ctdd, simplify, cverify, cupdate-arch, cdocs, then creates a PR.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/meta/overrides/*), Edit, Task
+interaction_mode: hybrid
 ---
 
 # /cauto — Semi-Auto Implementation Pipeline
@@ -123,6 +124,34 @@ The effective intensity computation from shared constraints determines which ski
 
 When `/cupdate-arch` is skipped due to standard intensity, log a `preference_applied` audit event with the reason "cupdate-arch skipped: standard intensity".
 
+### Autonomous Mode Dispatch (R-005, ABS-030)
+
+When dispatching each skill via Task, the orchestrator must include `mode: autonomous` in the first 10 lines of the task prompt. Example:
+
+```
+mode: autonomous
+You are running as part of the /cauto pipeline. Use your Autonomous Defaults section for all decision points instead of pausing for human input. Return your autonomous decisions as structured output at the end of your response in this format:
+
+AUTONOMOUS_DECISIONS_START
+{"decision_id": "AD-001", "default_applied": "...", "rationale": "...", "escalation_deferred": false, "original_escalation_reason": null}
+{"decision_id": "AD-002", "default_applied": "...", "rationale": "...", "escalation_deferred": true, "original_escalation_reason": "..."}
+AUTONOMOUS_DECISIONS_END
+```
+
+Skills detect `mode: autonomous` by checking their prompt context. When absent, skills run interactively (fail-open — the failure mode "pipeline stalls" is safer than "skill silently applies defaults when user expected to be asked").
+
+**Sole-Writer Contract (ABS-030)**: `/cauto` is the sole writer of `.correctless/artifacts/autonomous-decisions-{branch_slug}.jsonl`. Skills do NOT write to this file directly. After each skill completes, `/cauto` parses the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` block from the skill's output and writes each decision via the writer script:
+
+```bash
+bash scripts/autonomous-decision-writer.sh append "<skill-name>" '<json-line>'
+```
+
+The writer script handles branch_slug derivation, directory creation, and JSONL append internally — the SFG permits this because the Bash command contains no direct redirect to the protected path (same pattern as ABS-029/audit-record.sh). Each entry has fields: `skill` (string), `decision_id` (AD-xxx or AD-UNLISTED-N), `default_applied` (string), `rationale` (string), `timestamp` (ISO 8601), `escalation_deferred` (boolean, default false), `original_escalation_reason` (string, null unless escalation_deferred is true).
+
+**JSONL Growth Verification**: After each skill invocation, verify the JSONL grew. For skills with `interaction_mode: autonomous` or `hybrid` that have known decision points in their `## Autonomous Defaults` section, if the skill's response contains no parseable decisions, log a warning in the pipeline summary (advisory, not blocking — first iteration).
+
+**AD-UNLISTED Fallback (R-014)**: When a skill in autonomous mode encounters a decision point not listed in its `## Autonomous Defaults` section, it applies the first option (the recommended default) and returns it with `decision_id: AD-UNLISTED-{N}` and `escalation_deferred: true`. Unlisted decisions are highlighted separately in the end-of-pipeline summary under the Deferred Escalations heading.
+
 ### Workflow State Machine Transitions (R-010)
 
 The orchestrator advances the workflow state machine through all required transitions using `workflow-advance.sh`. It must not skip transitions or write to the state file directly — always use `workflow-advance.sh` commands.
@@ -220,6 +249,18 @@ git reset HEAD .correctless/artifacts/
 R-003 must not push to branches matching `main`, `master`, `develop`, or `release/*` — abort with an error if the current branch matches any of these.
 
 If `git push` fails (auth failure, rejected push), `/cauto` aborts with a clear error message including the git error output. The local commit is preserved but the PR step is skipped. Re-running `/cauto` after fixing the push issue resumes at the PR step (the phase is `documented`, so the phase-to-step mapping routes to PR-only).
+
+### Autonomous Decisions Summary (R-007, R-013)
+
+After `/cdocs` completes and before PR creation, read `.correctless/artifacts/autonomous-decisions-{branch_slug}.jsonl` and present a summary to the human.
+
+**Summary format**:
+- Group decisions by skill
+- Show each default that was applied with its rationale
+- Normal autonomous decisions (escalation_deferred: false) are informational — not a gate
+- Deferred escalations (escalation_deferred: true) are presented under a separate **"Deferred Escalations"** heading
+
+**Deferred Escalation Confirmation Gate (R-013)**: If any deferred escalations exist, present them as a confirmation prompt before PR creation. List each deferred escalation with its default and original escalation reason, then: "{N} deferred escalations were made autonomously. Review above and confirm to proceed with PR creation, or request re-run of specific skills interactively." The human must confirm before the PR is created. Normal autonomous decisions (non-deferred) do not gate PR creation.
 
 ### Step 9: Create PR (R-008)
 
@@ -373,6 +414,17 @@ Log orchestration decisions to the audit trail at `.correctless/artifacts/audit-
 ## Progress Updates (R-014) [advisory]
 
 Emit progress updates between each skill invocation. Progress is observable via the audit trail entries which include `elapsed_ms` and skill transition data. Conversational progress updates to the user (e.g., "Starting /cverify...") are best-effort and not mechanically enforced. The audit trail provides the reliable progress record.
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input. When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Pipeline order — follow R-001 standard order: /ctdd → /simplify → /cverify → /cupdate-arch → /cdocs (default). No human input required.
+- **AD-002**: Preference loading — use built-in defaults when preferences.md is absent (default). Rationale: fail-open preserves pipeline flow.
+- **AD-003**: Escalation sensitivity — escalate on any architectural decision per R-006 heuristics (default). Rationale: conservative default is safer.
+- **AD-004**: Spec approval gate (INV-023) — `escalate: always`. Default if deferred: halt pipeline. Rationale: human spec approval is non-negotiable (PRH-001).
+- **AD-005**: CLAUDE.md change detection (R-006(e)) — `escalate: always`. Default if deferred: halt pipeline. Rationale: CLAUDE.md changes alter system instructions.
+- **AD-006**: Deferred escalation confirmation (R-013) — `escalate: always`. Default if deferred: halt pipeline. Rationale: deferred escalations may contain architectural decisions that need human review before PR creation.
 
 ---
 

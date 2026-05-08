@@ -2,6 +2,7 @@
 name: cmodel
 description: Generate an Alloy formal model of security-relevant behavior and run the Alloy Analyzer. Use after /cspec for features with state machines, protocol handling, or trust boundaries.
 allowed-tools: Read, Grep, Glob, Bash(java*), Bash(alloy*), Bash(git*), Bash(*workflow-advance.sh*), Write(docs/models/*), Write(.correctless/artifacts/token-log-*)
+interaction_mode: hybrid
 ---
 
 # /cmodel — Formal Alloy Modeling
@@ -146,6 +147,14 @@ Log token usage following the shared constraints (`_shared/constraints.md`). Ski
 
 ### Background Tasks
 Run the Alloy Analyzer (`java -jar`) as a background task while preparing the counterexample interpretation context. The JAR can take 30+ seconds for complex state spaces.
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Model generation approach — generate from spec invariants (default). Rationale: Alloy model structure follows mechanically from spec INV-xxx entries; no subjective choices needed.
+- **AD-002**: Model accuracy review — `escalate: always`. Default if deferred: accept model as generated. Rationale: a correct analysis of a wrong model creates false confidence; human verification of the model's faithfulness to the real system is load-bearing.
 
 ## If Something Goes Wrong
 
