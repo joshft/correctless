@@ -18,6 +18,7 @@ Runs after features are merged and documented. Keeps the living architecture doc
 ## What It Does
 
 - Reads current ARCHITECTURE.md, recent specs, and verification reports
+- **Validates existing entries** before scanning for new ones: checks `Enforced at` paths exist on disk, `Test` paths exist and reference entry IDs, and `Enforced at` includes all actual producers/consumers. Also incorporates open drift-debt items from `.correctless/meta/drift-debt.json` as candidates for entry updates (dormant when absent or empty)
 - Scans the codebase for undocumented trust boundaries (TB-xxx), abstractions (ABS-xxx), patterns (PAT-xxx), and environment assumptions (ENV-xxx)
 - Drafts structured entries for each candidate with invariant, violated-when, and detection method
 - Presents each entry individually for human approval (no batch auto-writes)

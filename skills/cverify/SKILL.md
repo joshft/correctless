@@ -40,7 +40,7 @@ Verification takes 10-15 minutes with mutation testing running in the background
 4. Dependency check
 5. Basic smell check
 6. Drift detection
-7. Architecture compliance and prohibitions
+7. Architecture adherence
 8. Write verification report
 
 **Between each check**, print a 1-line status: "Rule coverage complete — {N}/{M} rules covered, {K} weak. Starting mutation testing in background..." When mutation testing completes in the background, announce immediately: "Mutation testing done — {N} mutations, {M} killed, {K} survivors."
@@ -87,14 +87,35 @@ For each new dependency: what is it, which file introduced it, was it in the spe
 ### Monorepo: Multi-Package Verification
 If `workflow-config.json` has `is_monorepo: true` and the spec lists "Packages Affected", run tests in ALL listed packages — not just the one where most code changed. Use the per-package test commands from `workflow-config.json`. Report per-package: "Package `api`: all tests pass. Package `web`: 2 tests fail."
 
-### 3. Architecture Compliance and Prohibitions
+### 3. Architecture Adherence
 
-Does the implementation follow the patterns in `.correctless/ARCHITECTURE.md`?
-- Error handling, validation, state management, naming conventions?
-- New patterns introduced? Flag for .correctless/ARCHITECTURE.md update.
-- **Prohibition check**: For each prohibition in .correctless/ARCHITECTURE.md, grep the changed files for prohibited imports, patterns, or constructs. Flag any violations.
+**Complementarity note:** The Architecture Compliance Agent (Phase 4) checks whether PR diffs violate entries — a violation lens. This section checks the inverse: whether entries need updating after implementation — a maintenance lens ("do entries need updating?"). /cdocs acts on these findings. /cupdate-arch does comprehensive validation of ALL entries.
 
-### Compliance Checks (if configured)
+For each affected `.correctless/ARCHITECTURE.md` entry, verify that the entry's structural claims still hold after this feature's changes. This is NOT the same as the Phase 4 Architecture Compliance Agent's check types — those remain that agent's domain and are not duplicated here.
+
+**Step-by-step:**
+
+1. **Extract all ABS-xxx, PAT-xxx, TB-xxx, ENV-xxx entries** from `.correctless/ARCHITECTURE.md`. If no entries exist, the architecture adherence check is dormant — no error, no warning. Skip to drift-debt surfacing.
+
+2. **Get changed files**: Run `git diff {default_branch}...HEAD --name-only` to get the list of files changed by the feature.
+
+3. **Identify affected entries** — entries whose `Enforced at`, `Test`, or consumer/path references overlap with changed files. Only these entries are checked — do not validate every entry.
+
+4. **For each affected entry**, check:
+   - (a) **Enforced at paths exist on disk**: verify each file path in the `Enforced at` field exists. Strip parenthetical annotations (e.g., `scripts/lib.sh (source)` → `scripts/lib.sh`) and backtick formatting before checking. Skip entries that reference non-file entities (e.g., `setup`, function names without file paths). When an entry uses wildcards (e.g., `hooks/*.sh`), verify at least one matching file exists via glob.
+   - (b) **Test paths exist and reference the entry ID**: verify each file path in the `Test` field exists, and grep it for the entry ID (e.g., `ABS-001`).
+   - (c) **Invariant text conflicts**: check whether the `Invariant` text conflicts with what the feature changed — does the implementation contradict or invalidate the stated invariant?
+
+5. **Report findings** with advisory severity levels (these are for /cdocs prioritization — they do not gate /cverify advancement, non-blocking advisory):
+   - path-missing = HIGH
+   - test-ID-missing = MEDIUM
+   - invariant-conflict = MEDIUM
+   - consumers-incomplete = LOW
+
+**Drift-debt surfacing:** Read `.correctless/meta/drift-debt.json` and surface open items whose `rule_id`, `description`, or `spec_id` references an architecture entry ID (ABS/PAT/TB/ENV) OR whose `description` references files changed by the feature. Include each relevant drift-debt item in the verification report. Dormant when `drift-debt.json` is absent, empty, or has no open items (PAT-019).
+
+### 3a. Compliance Checks (if configured)
+
 Read `workflow.compliance_checks` from `workflow-config.json`. For each check where `phase` is `"verify"`:
 1. Run the command
 2. Report results: pass/fail with output
@@ -188,9 +209,18 @@ If the spec was updated during TDD, note what changed and why.
 ## Dependencies
 - + zod@3.22.0 — input validation (src/routes/register.ts)
 
-## Architecture Compliance
-- ✓ Error handling follows middleware pattern
-- ! New pattern: rate limiting — needs .correctless/ARCHITECTURE.md entry
+## Architecture Adherence
+
+Per-entry lines: `- {entry-ID}: {status} — {one-line description}` where status is `valid`, `stale`, or `path-missing`.
+
+- ABS-001: valid — shared script library paths verified
+- PAT-003: stale — Enforced at path `hooks/old-gate.sh` missing on disk
+- TB-002: valid — trust boundary invariant consistent with implementation
+
+### Drift Debt
+- DRIFT-001: R-003 drift — config parsing moved from `src/config.ts` to `src/config/index.ts`
+
+{N} entries checked, {M} stale, {K} drift-debt items
 
 ## QA Class Fixes Verified
 - QA-001: structural config wiring test added ✓

@@ -18,7 +18,7 @@
 2. **Updates README.md** — checks feature list, setup instructions, usage examples, and project description against the current state of the project
 3. **Updates AGENT_CONTEXT.md** — the briefing document every fresh agent reads. Adds new components, design patterns, common pitfalls, and verifies the quick reference commands are accurate. Keeps it under 1500 words.
 4. **Creates feature documentation** — for significant features, creates or updates docs in `docs/features/` with usage, configuration, examples, and known limitations
-5. **Suggests ARCHITECTURE.md additions** — if the feature introduced new patterns or conventions, proposes entries one at a time for your approval
+5. **Maintains ARCHITECTURE.md entries** — before suggesting new entries, checks whether existing entries need updating. Performs existing-entry staleness detection using the verification report's Architecture Adherence section (or its own analysis if no report exists). Stale entries are presented one at a time with options to update, skip, or log as drift debt. Also surfaces open drift-debt items from `.correctless/meta/drift-debt.json` for resolution (resolve now, keep as debt, or close). Then suggests new entries for patterns or conventions introduced by the feature
 6. **Fact-checks against code** — verifies that documented API parameters, config defaults, and described flows actually match the implementation
 7. **Flags stale docs** — checks existing documentation for references to code, config, or features that no longer exist
 
