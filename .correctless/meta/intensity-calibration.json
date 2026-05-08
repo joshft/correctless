@@ -493,6 +493,32 @@
         "tests/test-carchitect-phase3.sh"
       ],
       "timestamp": "2026-05-07T07:00:00Z"
+    },
+    {
+      "feature_slug": "carchitect-phase-5-maintenance",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "file_paths_touched": [
+        ".correctless/config/workflow-config.json",
+        ".correctless/specs/carchitect-phase-5-maintenance.md",
+        ".github/workflows/ci.yml",
+        "CONTRIBUTING.md",
+        "correctless/skills/cdocs/SKILL.md",
+        "correctless/skills/cupdate-arch/SKILL.md",
+        "correctless/skills/cverify/SKILL.md",
+        "docs/skills/cdocs.md",
+        "docs/skills/cupdate-arch.md",
+        "docs/skills/cverify.md",
+        "skills/cdocs/SKILL.md",
+        "skills/cupdate-arch/SKILL.md",
+        "skills/cverify/SKILL.md",
+        "tests/test-carchitect-phase5.sh"
+      ],
+      "timestamp": "2026-05-08T03:00:00Z"
     }
   ]
 }

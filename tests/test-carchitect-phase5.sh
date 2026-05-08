@@ -479,29 +479,31 @@ else
   fail "R-010a" "cverify missing maintenance-lens distinction"
 fi
 
+# Extract the Architecture Adherence section once for R-010, PRH-002, and PRH-003
+ARCH_ADHERENCE_SECTION=$(skill_body "$CVERIFY_SKILL" | sed -n '/^### .*Architecture Adherence/,/^### [0-9]\|^## /p')
+
 # R-010b: /cverify does NOT duplicate Phase 4 check types — pattern compliance
-R010_SECTION=$(skill_body "$CVERIFY_SKILL" | sed -n '/^### .*Architecture Adherence/,/^### [0-9]\|^## /p')
-if [ -z "$R010_SECTION" ]; then
+if [ -z "$ARCH_ADHERENCE_SECTION" ]; then
   fail "R-010b" "Architecture Adherence section not found — cannot check Phase 4 exclusion"
-elif echo "$R010_SECTION" | grep -qi 'pattern compliance'; then
+elif echo "$ARCH_ADHERENCE_SECTION" | grep -qi 'pattern compliance'; then
   fail "R-010b" "cverify Architecture Adherence section duplicates Phase 4 'pattern compliance'"
 else
   pass "R-010b" "cverify does not duplicate Phase 4 pattern compliance check"
 fi
 
 # R-010c: /cverify does NOT duplicate Phase 4 check types — trust boundary enforcement
-if [ -z "$R010_SECTION" ]; then
+if [ -z "$ARCH_ADHERENCE_SECTION" ]; then
   fail "R-010c" "Architecture Adherence section not found — cannot check Phase 4 exclusion"
-elif echo "$R010_SECTION" | grep -qi 'trust boundary enforcement'; then
+elif echo "$ARCH_ADHERENCE_SECTION" | grep -qi 'trust boundary enforcement'; then
   fail "R-010c" "cverify Architecture Adherence section duplicates Phase 4 'trust boundary enforcement'"
 else
   pass "R-010c" "cverify does not duplicate Phase 4 trust boundary enforcement"
 fi
 
 # R-010d: /cverify does NOT duplicate Phase 4 check types — new pattern introduction
-if [ -z "$R010_SECTION" ]; then
+if [ -z "$ARCH_ADHERENCE_SECTION" ]; then
   fail "R-010d" "Architecture Adherence section not found — cannot check Phase 4 exclusion"
-elif echo "$R010_SECTION" | grep -qi 'new pattern introduction'; then
+elif echo "$ARCH_ADHERENCE_SECTION" | grep -qi 'new pattern introduction'; then
   fail "R-010d" "cverify Architecture Adherence section duplicates Phase 4 'new pattern introduction'"
 else
   pass "R-010d" "cverify does not duplicate Phase 4 new pattern introduction"
@@ -591,9 +593,8 @@ section "PRH-002: /cverify architecture findings not blocking"
 # PRH-002a: The Architecture Adherence section (not the old Section 3) does NOT classify
 # findings as BLOCKING. Extract only the "Architecture Adherence" section by heading.
 # Exclude lines containing "non-blocking" since that's the OPPOSITE of blocking.
-ARCH_SECTION=$(skill_body "$CVERIFY_SKILL" | sed -n '/^### .*Architecture Adherence/,/^### [0-9]\|^## /p')
-ARCH_BLOCKING=$(echo "$ARCH_SECTION" | grep -iv 'non-blocking' | grep -qi 'BLOCKING.*finding\|finding.*BLOCKING\|classified.*BLOCKING' && echo "yes" || echo "no")
-if [ -z "$ARCH_SECTION" ]; then
+ARCH_BLOCKING=$(echo "$ARCH_ADHERENCE_SECTION" | grep -iv 'non-blocking' | grep -qi 'BLOCKING.*finding\|finding.*BLOCKING\|classified.*BLOCKING' && echo "yes" || echo "no")
+if [ -z "$ARCH_ADHERENCE_SECTION" ]; then
   fail "PRH-002a" "Architecture Adherence section not found — cannot verify non-BLOCKING"
 elif [ "$ARCH_BLOCKING" = "yes" ]; then
   fail "PRH-002a" "Architecture Adherence section classifies findings as BLOCKING"
@@ -608,29 +609,27 @@ fi
 section "PRH-003: No duplication of Phase 4 check types in architecture section"
 
 # PRH-003a: "pattern compliance" does not appear in the Architecture Adherence section
-# Extract the section fresh for these checks
-PRH3_SECTION=$(skill_body "$CVERIFY_SKILL" | sed -n '/^### .*Architecture Adherence/,/^### [0-9]\|^## /p')
-if [ -z "$PRH3_SECTION" ]; then
+if [ -z "$ARCH_ADHERENCE_SECTION" ]; then
   fail "PRH-003a" "Architecture Adherence section not found — cannot verify exclusion"
-elif echo "$PRH3_SECTION" | grep -qi 'pattern compliance'; then
+elif echo "$ARCH_ADHERENCE_SECTION" | grep -qi 'pattern compliance'; then
   fail "PRH-003a" "Phase 4 'pattern compliance' duplicated in Architecture Adherence section"
 else
   pass "PRH-003a" "'pattern compliance' absent from Architecture Adherence section"
 fi
 
 # PRH-003b: "trust boundary enforcement" does not appear
-if [ -z "$PRH3_SECTION" ]; then
+if [ -z "$ARCH_ADHERENCE_SECTION" ]; then
   fail "PRH-003b" "Architecture Adherence section not found — cannot verify exclusion"
-elif echo "$PRH3_SECTION" | grep -qi 'trust boundary enforcement'; then
+elif echo "$ARCH_ADHERENCE_SECTION" | grep -qi 'trust boundary enforcement'; then
   fail "PRH-003b" "Phase 4 'trust boundary enforcement' duplicated in Architecture Adherence section"
 else
   pass "PRH-003b" "'trust boundary enforcement' absent from Architecture Adherence section"
 fi
 
 # PRH-003c: "new pattern introduction" does not appear
-if [ -z "$PRH3_SECTION" ]; then
+if [ -z "$ARCH_ADHERENCE_SECTION" ]; then
   fail "PRH-003c" "Architecture Adherence section not found — cannot verify exclusion"
-elif echo "$PRH3_SECTION" | grep -qi 'new pattern introduction'; then
+elif echo "$ARCH_ADHERENCE_SECTION" | grep -qi 'new pattern introduction'; then
   fail "PRH-003c" "Phase 4 'new pattern introduction' duplicated in Architecture Adherence section"
 else
   pass "PRH-003c" "'new pattern introduction' absent from Architecture Adherence section"

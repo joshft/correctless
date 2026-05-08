@@ -105,7 +105,7 @@ Reference the spec artifact for detailed rules — don't duplicate.
 **Step 5a: Existing-entry staleness detection** — check whether existing `.correctless/ARCHITECTURE.md` entries need updating BEFORE suggesting new entries:
 
 1. Read the verification report's "Architecture Adherence" section (path: `.correctless/verification/{task-slug}-verification.md`). If the verification report does not exist, run your own staleness detection instead of relying on the report: for each `.correctless/ARCHITECTURE.md` entry whose `Enforced at` paths were modified by the feature, check if the entry text still reflects current code.
-2. For each entry whose `Enforced at` paths were modified by the feature, check if the entry text still reflects current code.
+2. For each entry flagged as `stale` or `path-missing` by the report (or identified by your own detection), verify whether the entry text still reflects current code.
 3. Present stale entries to the human one at a time with numbered options:
 
 ```
