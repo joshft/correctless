@@ -83,7 +83,7 @@ update_phase() {
   local ts
   ts="$(date -u +%FT%TZ)"
   locked_update_state "$sf" \
-    ".phase = \"$new_phase\" | .phase_entered_at = \"$ts\"" \
+    ".phase = \"$new_phase\" | .phase_entered_at = \"$ts\" | .override.active = false | .override.remaining_calls = 0" \
     || die "Failed to update phase"
   info "Phase: $new_phase"
 }
@@ -530,7 +530,7 @@ cmd_tests() {
     sf="$(state_file)"
     ts="$(now_iso)"
     locked_update_state "$sf" \
-      '.phase = "tdd-tests" | .phase_entered_at = $ts | .spec_hash = $hash | .spec_line_count = ($lines | tonumber)' \
+      '.phase = "tdd-tests" | .phase_entered_at = $ts | .spec_hash = $hash | .spec_line_count = ($lines | tonumber) | .override.active = false | .override.remaining_calls = 0' \
       --arg ts "$ts" --arg hash "$_spec_hash" --arg lines "$_spec_lines" \
       || die "Failed to update state for tdd-tests phase"
     info "Phase: tdd-tests"
@@ -570,7 +570,7 @@ cmd_qa() {
   sf="$(state_file)"
   ts="$(date -u +%FT%TZ)"
   locked_update_state "$sf" \
-    ".qa_rounds += 1 | .phase = \"tdd-qa\" | .phase_entered_at = \"$ts\"" \
+    ".qa_rounds += 1 | .phase = \"tdd-qa\" | .phase_entered_at = \"$ts\" | .override.active = false | .override.remaining_calls = 0" \
     || die "Failed to update state for QA phase"
   info "Phase: tdd-qa"
   info "Next: QA review (edits blocked)"
@@ -1000,7 +1000,9 @@ cmd_spec_update() {
   jq_filter='.spec_update_history = (.spec_update_history // []) + [{from_phase: .phase, reason: $reason, timestamp: $ts}]
      | .spec_updates = ((.spec_updates // 0) + 1)
      | .phase = "spec"
-     | .phase_entered_at = $ts'
+     | .phase_entered_at = $ts
+     | .override.active = false
+     | .override.remaining_calls = 0'
   if [ "$has_hash" = true ]; then
     jq_filter="$jq_filter"'
      | .spec_hash = $hash
