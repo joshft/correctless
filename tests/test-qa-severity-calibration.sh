@@ -315,25 +315,22 @@ fi
 
 section "INV-007: Severity floor check is documented as brittle"
 
-# Read the full skill file once for this section
-FULL_SKILL="$(cat "$CTDD_SKILL")"
-
 # INV-007a: False negatives caveat documented
-if echo "$FULL_SKILL" | grep -qi 'false.*negative\|evasion\|avoid.*trigger.*word\|agent.*describe.*soft'; then
+if grep -qi 'false.*negative\|evasion\|avoid.*trigger.*word\|agent.*describe.*soft' "$CTDD_SKILL"; then
   pass "INV-007a" "False negatives caveat documented for floor check"
 else
   fail "INV-007a" "False negatives caveat missing — floor check not documented as brittle"
 fi
 
 # INV-007b: False positives caveat documented
-if echo "$FULL_SKILL" | grep -qi 'false.*positive\|positive.*context\|leak.*mitigation\|security.*configuration.*proper'; then
+if grep -qi 'false.*positive\|positive.*context\|leak.*mitigation\|security.*configuration.*proper' "$CTDD_SKILL"; then
   pass "INV-007b" "False positives caveat documented for floor check"
 else
   fail "INV-007b" "False positives caveat missing — floor check presented as reliable"
 fi
 
 # INV-007c: Primary fix is calibration examples (not the floor check)
-if echo "$FULL_SKILL" | grep -qi 'calibration.*primary\|primary.*fix.*calibration\|cheap.*safety.*net\|secondary.*safety'; then
+if grep -qi 'calibration.*primary\|primary.*fix.*calibration\|cheap.*safety.*net\|secondary.*safety' "$CTDD_SKILL"; then
   pass "INV-007c" "Floor check documented as secondary — calibration is primary fix"
 else
   fail "INV-007c" "Floor check framing doesn't identify calibration examples as primary fix"
@@ -362,7 +359,7 @@ else
 fi
 
 # INV-008c: Status field extended to include 'accepted'
-if echo "$FULL_SKILL" | grep -qi '"status".*open.*fixed.*accepted\|status.*open|fixed|accepted\|open.*fixed.*accepted'; then
+if grep -qi '"status".*open.*fixed.*accepted\|status.*open|fixed|accepted\|open.*fixed.*accepted' "$CTDD_SKILL"; then
   pass "INV-008c" "Status field extended to include 'accepted'"
 else
   fail "INV-008c" "Status field not extended to include 'accepted'"
@@ -376,7 +373,7 @@ else
 fi
 
 # INV-008e: Backward compatibility note for 'accepted' status
-if echo "$FULL_SKILL" | grep -qi 'backward.*compat\|unknown.*status.*open\|treat.*unknown.*open'; then
+if grep -qi 'backward.*compat\|unknown.*status.*open\|treat.*unknown.*open' "$CTDD_SKILL"; then
   pass "INV-008e" "Backward compatibility note for 'accepted' status present"
 else
   fail "INV-008e" "Backward compatibility note for 'accepted' status missing"
@@ -566,7 +563,7 @@ section "PRH-002: No automated severity override"
 
 # PRH-002a: No auto-upgrade instruction in orchestrator
 # The floor check must WARN and PRESENT options, not auto-upgrade
-if echo "$FULL_SKILL" | grep -qi 'automatically.*upgrade.*severity\|auto.*upgrade.*finding\|auto.*re-rate'; then
+if grep -qi 'automatically.*upgrade.*severity\|auto.*upgrade.*finding\|auto.*re-rate' "$CTDD_SKILL"; then
   fail "PRH-002a" "Orchestrator contains automatic severity upgrade instruction"
 else
   pass "PRH-002a" "No automatic severity override found in orchestrator instructions"
@@ -579,7 +576,7 @@ fi
 section "BND-004: /cauto semi-auto mode disposition"
 
 # BND-004a: ctdd skill mentions auto-acceptance for pipeline context
-if echo "$FULL_SKILL" | grep -qi 'auto-accept.*pipeline\|pipeline.*auto-accept\|cauto.*auto-accept\|auto-accepted-pipeline'; then
+if grep -qi 'auto-accept.*pipeline\|pipeline.*auto-accept\|cauto.*auto-accept\|auto-accepted-pipeline' "$CTDD_SKILL"; then
   pass "BND-004a" "Auto-acceptance for /cauto pipeline context documented"
 else
   fail "BND-004a" "Auto-acceptance for /cauto pipeline context not documented"
