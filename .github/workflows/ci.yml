@@ -122,6 +122,7 @@ jobs:
           bash tests/test-carchitect-phase2.sh
           bash tests/test-carchitect-phase3.sh
           bash tests/test-carchitect-phase4.sh
+          bash tests/test-carchitect-phase5.sh
 
       - name: Verify sync
         run: |

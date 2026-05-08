@@ -100,7 +100,35 @@ Reference the spec artifact for detailed rules — don't duplicate.
 
 ### 5. .correctless/ARCHITECTURE.md
 
-If the feature introduced new patterns or conventions:
+**Complementarity note:** /cverify detects stale entries and includes them in the verification report. This section acts on those findings and surfaces drift-debt. /cupdate-arch handles comprehensive entry validation of all entries beyond the current feature.
+
+**Step 5a: Existing-entry staleness detection** — check whether existing `.correctless/ARCHITECTURE.md` entries need updating BEFORE suggesting new entries:
+
+1. Read the verification report's "Architecture Adherence" section (path: `.correctless/verification/{task-slug}-verification.md`). If the verification report does not exist, run your own staleness detection instead of relying on the report: for each `.correctless/ARCHITECTURE.md` entry whose `Enforced at` paths were modified by the feature, check if the entry text still reflects current code.
+2. For each entry whose `Enforced at` paths were modified by the feature, check if the entry text still reflects current code.
+3. Present stale entries to the human one at a time with numbered options:
+
+```
+  1. Update (recommended) — modify this entry to reflect current code
+  2. Skip — entry is still accurate despite the path change
+  3. Log as drift debt — create DRIFT-NNN entry for future resolution
+
+  Or type your own: ___
+```
+
+**Step 5b: Drift-debt resolution prompting** — read `.correctless/meta/drift-debt.json` and surface open items. Dormant when `drift-debt.json` is absent or has no open items (PAT-019). For each open drift-debt item, present the human with resolution options:
+
+```
+  1. Resolve now (recommended) — update the affected entry
+  2. Keep as debt — defer to a future feature
+  3. Close — mark as resolved (the drift was intentional)
+
+  Or type your own: ___
+```
+
+Resolved or closed items are updated in `drift-debt.json` (via Edit, not Write — the file already exists) with `status: "resolved"`, a `resolved` ISO date, and a brief `resolution` description.
+
+**Step 5c: Suggest new entries** — if the feature introduced new patterns or conventions:
 - Suggest additions to .correctless/ARCHITECTURE.md
 - Present each to the human for approval — one at a time, with options:
 

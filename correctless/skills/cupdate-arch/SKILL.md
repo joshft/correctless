@@ -30,11 +30,12 @@ Architecture updates take 5-10 minutes. The user must see progress throughout.
 
 **Before starting**, create a task list:
 1. Read current architecture docs and recent specs
-2. Scan codebase for undocumented abstractions
-3. Draft new component entries
-4. Draft new pattern entries
-5. Check size thresholds (fragmentation)
-6. Present entries for approval
+2. Validate existing entries (paths, tests, producers/consumers)
+3. Scan codebase for undocumented abstractions
+4. Draft new component entries
+5. Draft new pattern entries
+6. Check size thresholds (fragmentation)
+7. Present entries for approval
 
 **Between each step**, print a 1-line status: "Scanned codebase — found {N} undocumented abstractions. Drafting entries..." Mark each task complete as it finishes.
 
@@ -46,6 +47,28 @@ Architecture updates take 5-10 minutes. The user must see progress throughout.
 4. Scan implementation source code for undocumented patterns.
 
 ## Behavior
+
+**Complementarity note:** /cverify detects feature-scoped staleness. /cdocs updates entries for the current feature. This skill validates ALL entries, not just those affected by a single feature.
+
+### 0. Validate Existing Entries
+
+Before scanning for undocumented entries, validate that existing `.correctless/ARCHITECTURE.md` entries are still accurate. For each ABS-xxx, PAT-xxx, TB-xxx, ENV-xxx entry:
+
+1. **Enforced at paths exist on disk**: verify each file path in the `Enforced at` field exists. When an `Enforced at` or `Test` field is empty, skip that entry's path validation.
+2. **Test paths exist and reference the entry ID**: verify each file path in the `Test` field exists, and grep it for the entry ID.
+3. **Enforced at includes all producers/consumers**: check whether the `Enforced at` paths include all files that actually reference the abstraction as producers or consumers.
+
+Read `.correctless/meta/drift-debt.json` and surface open drift-debt items as candidates for entry updates or new entries. Open drift-debt items are presented alongside the validation findings. Dormant when `drift-debt.json` is absent or empty (PAT-019).
+
+Entries with broken paths or missing test references are presented to the human one at a time with options:
+
+```
+  1. Fix (recommended) — update the entry to reflect current paths
+  2. Delete — remove the entry (it's no longer relevant)
+  3. Skip — investigate later
+
+  Or type your own: ___
+```
 
 ### 1. Scan for Undocumented Entries
 
