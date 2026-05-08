@@ -233,6 +233,7 @@ id_ed25519.*
 .correctless/artifacts/intent-*.md
 .correctless/artifacts/workflow-state-*.json
 .correctless/artifacts/decision-record-*.md
+.correctless/artifacts/autonomous-decisions-*.jsonl
 .correctless/meta/harness-fingerprint.json
 .correctless/meta/model-baselines.json
 scripts/harness-fingerprint.sh
@@ -240,7 +241,10 @@ scripts/harness-fingerprint.sh
 harness-fingerprint.sh
 scripts/audit-record.sh
 .correctless/scripts/audit-record.sh
-audit-record.sh"
+audit-record.sh
+scripts/autonomous-decision-writer.sh
+.correctless/scripts/autonomous-decision-writer.sh
+autonomous-decision-writer.sh"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)

@@ -123,6 +123,7 @@ jobs:
           bash tests/test-carchitect-phase3.sh
           bash tests/test-carchitect-phase4.sh
           bash tests/test-carchitect-phase5.sh
+          bash tests/test-autonomous-skill-contract.sh
 
       - name: Verify sync
         run: |

@@ -2,6 +2,7 @@
 name: ccontribute
 description: Open source contribution workflow. Learns the target project's conventions, patterns, and CI requirements before writing code. Generates a PR that matches what maintainers expect.
 allowed-tools: Read, Grep, Glob, Bash(*), Edit, Write(*), WebSearch, WebFetch
+interaction_mode: hybrid
 ---
 
 # /ccontribute — Open Source Contribution
@@ -205,6 +206,15 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Pre-flight checks — run all checks (default). Rationale: CI will reject the PR if checks fail; running them all locally is strictly safer than skipping any.
+- **AD-002**: Contribution scope — apply all suggested improvements (default). Rationale: staying within the planned scope is the safe path; all improvements were pre-approved in the plan.
+- **AD-003**: Breaking changes — `escalate: always`. Default if deferred: flag in PR description. Rationale: breaking changes affect downstream users and require explicit maintainer awareness.
 
 ## If Something Goes Wrong
 

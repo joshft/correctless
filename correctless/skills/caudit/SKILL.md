@@ -2,6 +2,7 @@
 name: caudit
 description: Cross-codebase quality audit. Use after a major feature lands or periodically for systemic bug detection. Presets: QA, Hacker, Performance.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/antipatterns.md), Write(*test*), Write(*spec*), Edit, Task(correctless:fix-diff-reviewer)
+interaction_mode: hybrid
 ---
 
 # /caudit — Olympics Audit System
@@ -875,6 +876,15 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Audit preset — hacker preset for security-relevant features, qa for others (default). Rationale: preset selection follows from feature classification and is deterministic.
+- **AD-002**: Finding severity triage — auto-fix CRITICAL and HIGH (default). Rationale: high-severity findings have concrete instance fixes and class fixes; deferring them increases risk.
+- **AD-003**: Architectural findings — `escalate: always`. Default if deferred: flag for human review — do not dismiss. Rationale: architectural changes affect system-wide invariants and need human review.
 
 ## If Something Goes Wrong
 

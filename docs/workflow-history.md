@@ -1,5 +1,8 @@
 # Workflow History
 
+### 2026-05-08 — Autonomous Skill Contract
+Branch: feature/autonomous-skill-contract. Rules: 14. QA rounds: 3. Findings fixed: 0. Overrides: 1. Added `interaction_mode` frontmatter field to all 29 skills (autonomous/interactive/hybrid), `## Autonomous Defaults` sections with AD-xxx entries, autonomous dispatch protocol for /cauto (mode: autonomous in Task prompt), deferred escalation for fork+hybrid skills, and ABS-030 sole-writer JSONL contract for autonomous decisions logging.
+
 ### 2026-04-02 — Consolidate artifacts into .correctless directory
 Branch: feature/correctless-directory. Rules: 20. QA rounds: 3. Findings fixed: 5. Moved all Correctless-generated files from scattered locations (.claude/artifacts/, docs/specs/, root ARCHITECTURE.md) into a unified .correctless/ directory with auto-migration for existing installs.
 

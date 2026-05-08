@@ -2,6 +2,7 @@
 name: cdocs
 description: Update project documentation after a feature lands. Updates README, .correctless/AGENT_CONTEXT.md, .correctless/ARCHITECTURE.md, and feature docs. Run before merging.
 allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(*compute-session-cost.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md), Write(.claude/rules/*.md)
+interaction_mode: hybrid
 ---
 
 # /cdocs — Update Project Documentation
@@ -309,6 +310,15 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Documentation scope — update all standard docs (default). Rationale: README, AGENT_CONTEXT, and feature docs are factual records of what changed; updating them is mechanical.
+- **AD-002**: .correctless/ARCHITECTURE.md entries — add all discovered entries (default). Rationale: discovered entries are derived from code analysis and are verifiable against the codebase.
+- **AD-003**: CLAUDE.md changes — `escalate: always`. Default if deferred: skip CLAUDE.md update. Rationale: CLAUDE.md changes alter agent system instructions; writing before human review is irreversible in the pipeline context.
 
 ## If Something Goes Wrong
 

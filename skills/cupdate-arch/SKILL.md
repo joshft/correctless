@@ -2,6 +2,7 @@
 name: cupdate-arch
 description: Update .correctless/ARCHITECTURE.md after features land. Use after /cdocs or when the codebase structure has changed.
 allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.correctless/ARCHITECTURE.md), Write(docs/architecture/*), Write(.claude/rules/*.md)
+interaction_mode: hybrid
 ---
 
 # /cupdate-arch — Maintain Architecture Documentation
@@ -120,6 +121,15 @@ Present each entry to the human one at a time. Don't batch — each entry deserv
 If .correctless/ARCHITECTURE.md exceeds ~5000 words after updates, suggest fragmentation:
 - Move sections to `docs/architecture/{section}.md`
 - Root .correctless/ARCHITECTURE.md links to fragments
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Entry discovery — auto-discover undocumented patterns (default). Rationale: discovery is a codebase scan with objective criteria (5+ occurrences, not already documented).
+- **AD-002**: Entry content — generate from code analysis (default). Rationale: entry fields (invariant, violated-when, test) are derived from code structure, not subjective design choices.
+- **AD-003**: New entry approval — `escalate: always`. Default if deferred: skip — flag for human review. Rationale: architecture doc changes affect all future features and shape agent behavior across the project.
 
 ## If Something Goes Wrong
 

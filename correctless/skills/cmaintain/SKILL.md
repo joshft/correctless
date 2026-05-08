@@ -2,6 +2,7 @@
 name: cmaintain
 description: Maintainer review for incoming PRs. Use when you need to decide whether to merge a contribution. Checks scope, conventions, and maintenance burden.
 allowed-tools: Read, Grep, Glob, Bash(*)
+interaction_mode: hybrid
 ---
 
 # /cmaintain — Maintainer Contribution Review
@@ -249,6 +250,15 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Review thoroughness — full review (default). Rationale: skipping review steps risks missing maintenance burden signals that only surface with complete analysis.
+- **AD-002**: PR recommendation — based on test results (default). Rationale: test pass/fail is an objective signal; the recommendation follows deterministically from it.
+- **AD-003**: Post review to PR — `escalate: always`. Default if deferred: do not post. Rationale: posting PR comments is a visible external action that represents the maintainer's voice.
 
 ## If Something Goes Wrong
 

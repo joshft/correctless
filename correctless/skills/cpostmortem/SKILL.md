@@ -3,6 +3,7 @@ name: cpostmortem
 description: Post-merge bug analysis. Use when a bug escapes to production. Traces which phase missed it and strengthens the workflow.
 allowed-tools: Read, Grep, Glob, Bash(git*), Edit, Write(.correctless/meta/*), Write(.correctless/antipatterns.md), Write(.claude/templates/invariants/*), Write(.correctless/artifacts/token-log-*), Write(CLAUDE.md), Write(.correctless/ARCHITECTURE.md)
 context: fork
+interaction_mode: hybrid
 ---
 
 # /cpostmortem — Post-Merge Bug Analysis
@@ -176,6 +177,17 @@ Log token usage following the shared constraints (`_shared/constraints.md`). Ski
 
 ### /export
 After postmortem completes: "Export this postmortem conversation: `/export .correctless/decisions/{task-slug}-postmortem.md` — captures the full analysis of why the workflow missed this bug."
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+**Deferred escalation (R-011)**: This skill has `context: fork` and cannot receive human follow-up input. When an `escalate: always` decision point is reached in autonomous mode, the default is applied and the decision is returned with `escalation_deferred: true` and `original_escalation_reason` for human review at pipeline conclusion.
+
+- **AD-001**: Investigation scope — full root cause analysis (default). Rationale: partial investigation risks missing the class of bug behind the instance.
+- **AD-002**: Corrective action classification — apply standard AP/PMB taxonomy (default). Rationale: consistent taxonomy enables cross-postmortem pattern detection.
+- **AD-003**: Corrective action approval — `escalate: always`. Default if deferred: propose but do not apply. Rationale: corrective actions create new antipattern entries and architectural constraints.
 
 ## If Something Goes Wrong
 

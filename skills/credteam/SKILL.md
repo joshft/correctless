@@ -3,6 +3,7 @@ name: credteam
 description: "Live adversarial red team assessment against a running system. Goal-directed penetration testing with source code access. Requires isolated environment."
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/redteam/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/antipatterns.md), Write(*test*), Write(*spec*), Write(docker-compose*.yml)
 context: fork
+interaction_mode: hybrid
 ---
 
 # /credteam — Red Team Assessment
@@ -343,6 +344,17 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+**Deferred escalation (R-011)**: This skill has `context: fork` and cannot receive human follow-up input. When an `escalate: always` decision point is reached in autonomous mode, the default is applied and the decision is returned with `escalation_deferred: true` and `original_escalation_reason` for human review at pipeline conclusion.
+
+- **AD-001**: Attack surface scope — test all declared trust boundaries (default). Rationale: partial coverage leaves unknown gaps in the security posture.
+- **AD-002**: Exploit depth — standard depth per target's risk level (default). Rationale: depth calibrated to risk avoids wasting cycles on low-value targets.
+- **AD-003**: Vulnerability disclosure action — `escalate: always`. Default if deferred: document finding, do not auto-remediate. Rationale: security remediation decisions need human judgment on priority and approach.
 
 ## If Something Goes Wrong
 

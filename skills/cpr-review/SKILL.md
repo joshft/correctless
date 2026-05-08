@@ -2,6 +2,7 @@
 name: cpr-review
 description: Review an incoming PR. Use when someone opens a PR against your project. Checks architecture, security, tests, and antipatterns.
 allowed-tools: Read, Grep, Glob, Bash(gh*), Bash(glab*), Bash(git*), Bash(*test*), Bash(*lint*), Bash(*audit*), Bash(govulncheck*), Task(correctless:architecture-compliance-reviewer)
+interaction_mode: hybrid
 ---
 
 # /cpr-review — Multi-Lens PR Review
@@ -354,6 +355,15 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Review depth — all lenses (default). Rationale: partial reviews miss cross-cutting issues; the full lens set is the designed minimum.
+- **AD-002**: Test execution — run full test suite (default). Rationale: partial test runs can miss regressions introduced by the PR in unrelated areas.
+- **AD-003**: Post findings to PR — `escalate: always`. Default if deferred: do not post. Rationale: posting PR comments is a visible external action that represents the project's review voice.
 
 ## If Something Goes Wrong
 

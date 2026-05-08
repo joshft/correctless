@@ -2,6 +2,7 @@
 name: cmodelupgrade
 description: Compare current model+HARNESS_VERSION pipeline metrics against stored baselines and produce a per-feature regression report. Use after Anthropic ships a model upgrade or when /cspec/cstatus surfaces a harness version_bumped advisory. Read-only on the fingerprint store; writes only the baseline file.
 allowed-tools: Read, Grep, Glob, Bash(jq*), Bash(*workflow-advance.sh*), Bash(*harness-fingerprint*), Bash(git*), Write(.correctless/meta/model-baselines.json), Write(.correctless/artifacts/cmodelupgrade-*)
+interaction_mode: hybrid
 ---
 
 # /cmodelupgrade — Harness Regression Report
@@ -150,6 +151,14 @@ The exit-code contract for `/cmodelupgrade` is:
 - **exit 2** — unrecoverable (baseline file corrupt and migration unavailable)
 
 The exit codes 0/1/2 are the gate for `/cauto` integration. Always document any new failure mode against this contract.
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Upgrade scope — apply all compatible upgrades (default). Rationale: compatible upgrades have passed the regression report checks and are safe to apply.
+- **AD-002**: Breaking model changes — `escalate: always`. Default if deferred: skip breaking changes. Rationale: breaking model changes can invalidate baselines and need human assessment of downstream impact.
 
 ## Constraints
 

@@ -2,6 +2,7 @@
 name: crefactor
 description: Structured refactoring with behavioral equivalence enforcement. Tests must pass before AND after. Any test change requires explicit approval. Writes characterization tests for low-coverage code.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Edit(.correctless/ARCHITECTURE.md), Edit(.correctless/AGENT_CONTEXT.md)
+interaction_mode: hybrid
 ---
 
 # /crefactor — Structured Refactoring
@@ -329,6 +330,14 @@ If `mcp.context7` is `true` in `workflow-config.json`, use Context7 when checkin
 
 - Use `resolve-library-id` + `get-library-docs` to check if the target library version has a migration guide
 - Useful when refactoring involves upgrading a dependency (e.g., "does library-x v3 have a codemod for v2 → v3?")
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Refactoring plan — generate and apply plan (default). Rationale: the plan is derived from dependency analysis and presented for verification before execution.
+- **AD-002**: Test change approval — `escalate: always`. Default if deferred: skip test changes. Rationale: test changes during refactoring risk hiding behavioral changes disguised as structural cleanup.
 
 ## If Something Goes Wrong
 

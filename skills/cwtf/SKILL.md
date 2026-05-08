@@ -2,6 +2,7 @@
 name: cwtf
 description: Audit the workflow itself. Use when you suspect agents shortcut or after a bug escapes despite the workflow running. Checks phase execution, rule coverage, and agent thoroughness.
 allowed-tools: Read, Grep, Glob, Bash(git*), Bash(jq*), Bash(find*), Bash(grep*)
+interaction_mode: autonomous
 ---
 
 # /cwtf — Workflow Accountability
@@ -196,6 +197,10 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
+
+## Autonomous Defaults
+
+- **AD-001**: Analysis scope — analyze all available data sources for accountability report (default). No human input required; this skill runs to completion autonomously.
 
 ## If Something Goes Wrong
 

@@ -3,6 +3,7 @@ name: cverify
 description: Verify implementation matches spec. Check rule coverage, undocumented dependencies, architecture compliance. Writes verification report and drift debt. Run after /ctdd completes.
 allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(jq*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/meta/intensity-calibration.json), Write(.correctless/artifacts/*)
 context: fork
+interaction_mode: hybrid
 ---
 
 # /cverify — Post-Implementation Verification
@@ -392,6 +393,17 @@ If `mcp.serena` is `true` in `workflow-config.json`, use Serena MCP for symbol-l
 | `get_symbols_overview` | Read directory + read index files |
 | `replace_symbol_body` | Edit tool |
 | `search_for_pattern` | Grep tool |
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+**Deferred escalation (R-011)**: This skill has `context: fork` and cannot receive human follow-up input. When an `escalate: always` decision point is reached in autonomous mode, the default is applied and the decision is returned with `escalation_deferred: true` and `original_escalation_reason` for human review at pipeline conclusion.
+
+- **AD-001**: Verification scope — verify all spec rules (default). Rationale: partial verification leaves gaps that downstream skills assume are covered.
+- **AD-002**: Coverage assessment — strict assessment against spec (default). Rationale: lenient assessment masks weak tests that pass despite rule violations.
+- **AD-003**: Rule bypass approval — `escalate: always`. Default if deferred: flag as uncovered, do not bypass. Rationale: bypassing verification rules weakens the safety net.
 
 ## If Something Goes Wrong
 

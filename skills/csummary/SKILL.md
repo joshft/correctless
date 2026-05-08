@@ -2,6 +2,7 @@
 name: csummary
 description: Feature summary. Use after /cdocs to see what the workflow caught, or mid-feature to check progress.
 allowed-tools: Read, Grep, Glob, Bash(git*), Write(.correctless/artifacts/summary-*)
+interaction_mode: autonomous
 ---
 
 # /csummary — Feature Workflow Summary
@@ -139,6 +140,10 @@ Use TaskCreate/TaskUpdate to show progress:
 
 ### /export
 After generating: "Export this summary to include in your PR description: `/export .correctless/artifacts/summary-{task-slug}.md`"
+
+## Autonomous Defaults
+
+- **AD-001**: Report scope — generate complete workflow summary (default). No human input required; this skill runs to completion autonomously.
 
 ## If Something Goes Wrong
 

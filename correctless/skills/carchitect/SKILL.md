@@ -2,6 +2,7 @@
 name: carchitect
 description: Structured architecture definition. Two modes — reverse-engineer from existing code or greenfield directed discovery. Produces .correctless/ARCHITECTURE.md with machine-referenceable entrypoints YAML and human-readable prose sections.
 allowed-tools: Read, Grep, Glob, Bash(git*), Write(.correctless/ARCHITECTURE.md), Edit(.correctless/ARCHITECTURE.md), Task(correctless:architecture-reviewer)
+interaction_mode: hybrid
 ---
 
 # /carchitect — Architecture Definition Skill
@@ -228,6 +229,15 @@ Check `.correctless/config/workflow-config.json` for MCP availability:
 Serena and Context7 are optimizers, not dependencies. If unavailable, fall back silently — no abort, no retry, no mid-operation warnings. Notify once at the end of the session if MCP was unavailable.
 
 ---
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: New component discovery — auto-add all discovered components (default). Rationale: components are derived from codebase structure and are factual, not subjective.
+- **AD-002**: Pattern classification — apply closest matching existing pattern (default). Rationale: pattern matching against existing PAT-xxx entries is mechanical and low-risk.
+- **AD-003**: Architecture entry approval — `escalate: always`. Default if deferred: skip — flag for human review. Rationale: new ABS/PAT/TB entries are architectural decisions that shape all future features.
 
 ## Phase 0 Scope Constraints (R-012)
 

@@ -1114,6 +1114,44 @@ test_hf006_script_protection() {
 test_hf002_harness_meta_protection
 test_hf006_script_protection
 
+# ---------------------------------------------------------------------------
+# ABS-030: autonomous-decisions JSONL protection
+# ---------------------------------------------------------------------------
+test_abs030_autonomous_decisions_protection() {
+  echo ""
+  echo "=== ABS-030: autonomous-decisions JSONL structurally protected ==="
+
+  local test_dir="/tmp/correctless-sfg-abs030-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result
+
+  # Edit on autonomous-decisions-*.jsonl blocked
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":".correctless/artifacts/autonomous-decisions-test.jsonl","old_string":"a","new_string":"b"}}')"
+  assert_eq "ABS-030: Edit autonomous-decisions-test.jsonl blocked" "2" "$(extract_exit "$result")"
+
+  # Write on autonomous-decisions-*.jsonl blocked
+  result="$(run_hook_capture '{"tool_name":"Write","tool_input":{"file_path":".correctless/artifacts/autonomous-decisions-test.jsonl","content":"{}"}}')"
+  assert_eq "ABS-030: Write autonomous-decisions-test.jsonl blocked" "2" "$(extract_exit "$result")"
+
+  # Bash redirect to autonomous-decisions-*.jsonl blocked
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x > .correctless/artifacts/autonomous-decisions-test.jsonl"}}')"
+  assert_eq "ABS-030: redirect > autonomous-decisions-test.jsonl blocked" "2" "$(extract_exit "$result")"
+
+  # Bash tee on autonomous-decisions-*.jsonl blocked
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x | tee .correctless/artifacts/autonomous-decisions-test.jsonl"}}')"
+  assert_eq "ABS-030: tee autonomous-decisions-test.jsonl blocked" "2" "$(extract_exit "$result")"
+
+  # Append redirect blocked
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x >> .correctless/artifacts/autonomous-decisions-test.jsonl"}}')"
+  assert_eq "ABS-030: append >> autonomous-decisions-test.jsonl blocked" "2" "$(extract_exit "$result")"
+
+  rm -rf "$test_dir"
+}
+
+test_abs030_autonomous_decisions_protection
+
 # ===========================================================================
 # R2 Hardening tests — harness-fingerprint-r2-hardening spec
 # INV-005, INV-005a, INV-006, INV-006a, INV-007, INV-007a, INV-008, INV-013, PRH-005

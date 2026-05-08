@@ -2,6 +2,7 @@
 name: crelease
 description: Automate version bumping, changelog generation, and release tagging from specs.
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash(*)
+interaction_mode: hybrid
 ---
 
 # /crelease — Version Bump, Changelog, and Release Tag
@@ -210,6 +211,14 @@ When presenting choices to the user:
 - **No pre-release versions.** No alpha, beta, or rc suffixes — single version for the whole project.
 - **No monorepo per-package versioning.** One version for the entire project.
 - **Dry-run is the safe default.** Always offer dry-run before making changes.
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Version bump type — based on conventional analysis (default). Rationale: bump classification follows deterministically from spec analysis (patch/minor/major).
+- **AD-002**: Release confirmation — `escalate: always`. Default if deferred: dry-run only. Rationale: releases are irreversible external actions that create git tags and potentially push to registries.
 
 ## If Something Goes Wrong
 

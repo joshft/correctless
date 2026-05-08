@@ -2,6 +2,7 @@
 name: creview
 description: Skeptically review a spec for unstated assumptions, untestable rules, missing edge cases, and security gaps. Run after /cspec.
 allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*)
+interaction_mode: hybrid
 ---
 
 # /creview — Skeptical Spec Review
@@ -378,6 +379,15 @@ If `mcp.context7` is `true` in `workflow-config.json`, use Context7 to verify li
 
 - Use `resolve-library-id` to find the library, then `get-library-docs` to fetch current docs
 - Compare the spec's claims against actual current documentation
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Finding disposition — accept all non-architectural findings (default). Rationale: non-architectural findings are concrete spec gaps with proposed rules; accepting them strengthens the spec.
+- **AD-002**: Spec update recommendation — apply recommended updates (default). Rationale: recommended updates are the reviewer's best-judgment fixes for identified gaps.
+- **AD-003**: Architectural findings — `escalate: always`. Default if deferred: flag for human review — do not dismiss. Rationale: architectural decisions affect system-wide invariants and need human input.
 
 ## If Something Goes Wrong
 

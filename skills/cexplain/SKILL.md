@@ -2,6 +2,7 @@
 name: cexplain
 description: Guided codebase exploration with mermaid diagrams and prose walkthroughs.
 allowed-tools: Read, Grep, Glob, Bash(*)
+interaction_mode: hybrid
 ---
 
 # /cexplain — Guided Codebase Exploration
@@ -261,6 +262,15 @@ Log token usage following the shared constraints (`_shared/constraints.md`). Ski
 - `skill`: "cexplain"
 - `phase`: "exploration"
 - `agent_role`: "explain-agent"
+
+## Autonomous Defaults
+
+When running in autonomous mode (`mode: autonomous` in prompt context), use these defaults instead of pausing for human input.
+When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECISIONS_START`/`AUTONOMOUS_DECISIONS_END` format provided in the task prompt.
+
+- **AD-001**: Exploration mode — overview mode (default). Rationale: overview provides the broadest useful starting point without committing to a specific deep-dive path.
+- **AD-002**: Depth level — standard depth (default). Rationale: standard depth balances thoroughness with token cost for the initial pass.
+- **AD-003**: Scope expansion — `escalate: always`. Default if deferred: stay within original scope. Rationale: scope expansion can be costly in tokens and may not align with the user's intent.
 
 ## Constraints
 
