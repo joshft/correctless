@@ -432,6 +432,18 @@ test_additional_coverage() {
   echo '{"tool_name": "Edit", "tool_input": {"file_path": "'"$TEST_DIR"'/index.ts"}}' | .correctless/hooks/workflow-gate.sh >/dev/null 2>&1 && override_exit=0 || override_exit=$?
   assert_eq "override expires after 10 calls" "2" "$override_exit"
 
+  # B11: Test override cleared on phase transition
+  ADV fix >/dev/null 2>&1
+  ADV override "phase transition test" >/dev/null 2>&1
+  local pre_transition_override
+  pre_transition_override="$(ADV status 2>&1 | grep 'Override:')"
+  assert_contains "override active before transition" "ACTIVE" "$pre_transition_override"
+  echo '{"name": "test-app", "scripts": {"test": "echo PASS && exit 0"}}' > package.json
+  ADV qa >/dev/null 2>&1
+  local post_transition_override
+  post_transition_override="$(jq -r '.override.active // false' "$(find .correctless/artifacts -name 'workflow-state-*.json' | head -1)")"
+  assert_eq "override cleared on phase transition" "false" "$post_transition_override"
+
   # N12: Test verify-phase rejected in Lite mode
   setup_test_project
   .claude/skills/workflow/setup >/dev/null 2>&1
