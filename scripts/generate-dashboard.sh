@@ -284,7 +284,6 @@ if compgen -G ".correctless/artifacts/findings/audit-*-round-*.json" >/dev/null 
   HAS_ESCAPE_DATA=true
   # Compute escape counts and severity distribution from round-JSON findings
   ESCAPE_METRICS_JSON=$(jq -n '[inputs]' .correctless/artifacts/findings/audit-*-round-*.json 2>/dev/null | jq '
-    . as $rounds |
     # Flatten all findings
     [.[] | (.findings // [])[] | select(.severity != null)] as $all_findings |
     # Escape count: findings with severity != info (case-insensitive)

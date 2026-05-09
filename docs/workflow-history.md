@@ -1,5 +1,8 @@
 # Workflow History
 
+### 2026-05-08 — Audit Findings as Escape Metrics
+Branch: feature/audit-escape-metrics. Rules: 10. Invariants: 4. Prohibitions: 2. QA rounds: 1. Overrides: 1. Reframed `/caudit` findings as pipeline escapes with a three-gate taxonomy (per-feature / audit / production), root-cause classification (implementation/spec/non-escape per finding), severity-weighted scoring (critical=5, high=3, medium=2, low=1, info=0), and per-cycle trend tracking. Extended ABS-029 round-JSON schema with optional `escape_type` field validated by `audit-record.sh`. Updated `/cmetrics` to replace single "Bug escape rate" line with full escape breakdown. Dashboard escape metrics section reads from metrics artifacts. Classification happens at specialist submission time during audit, not batched after convergence.
+
 ### 2026-05-08 — Autonomous Skill Contract
 Branch: feature/autonomous-skill-contract. Rules: 14. QA rounds: 3. Findings fixed: 0. Overrides: 1. Added `interaction_mode` frontmatter field to all 29 skills (autonomous/interactive/hybrid), `## Autonomous Defaults` sections with AD-xxx entries, autonomous dispatch protocol for /cauto (mode: autonomous in Task prompt), deferred escalation for fork+hybrid skills, and ABS-030 sole-writer JSONL contract for autonomous decisions logging.
 
