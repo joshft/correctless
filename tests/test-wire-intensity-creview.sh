@@ -288,8 +288,8 @@ test_r004_high_intensity_routing() {
     "R-004: mentions effective intensity is high"
 
   # R-004: high intensity routing text tells user to run /creview-spec
-  file_contains_i "$skill_file" "Run.*creview-spec.*5-agent adversarial" \
-    "R-004: routes to /creview-spec with 5-agent adversarial review at high intensity"
+  file_contains_i "$skill_file" "Run.*creview-spec.*6-agent adversarial" \
+    "R-004: routes to /creview-spec with 6-agent adversarial review at high intensity"
 
   # R-004: numbered option 1 — switch (recommended)
   file_contains_i "$skill_file" "Switch.*creview-spec\|1.*Switch\|1.*creview-spec" \

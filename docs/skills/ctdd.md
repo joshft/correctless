@@ -53,8 +53,8 @@ Agent: Spawning test-writing agent — reading spec (5 rules),
        Fix round complete — all 9 tests passing. Re-running QA...
        QA clean. No blocking findings.
 
-       Starting mini-audit round 1/2 — spawning 4 specialist agents
-       (cross-component, hostile input, resource bounds)...
+       Starting mini-audit round 1/2 — spawning 5 specialist agents
+       (cross-component, hostile input, resource bounds, upgrade compatibility, UX review)...
        Cross-component complete — found 0 findings.
        Hostile input complete — found 0 findings.
        Resource bounds complete — found 0 findings.

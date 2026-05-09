@@ -1,6 +1,6 @@
 ---
 name: creview-spec
-description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, and design contract checker. Use after /cspec or /cmodel.
+description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, design contract checker, and UX auditor. Use after /cspec or /cmodel.
 allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Write(.correctless/meta/external-review-history.json)
 interaction_mode: hybrid
 ---
@@ -23,7 +23,7 @@ This skill requires effective intensity `high` or above. Compute effective inten
   - Then **do not proceed** with the skill body. Stop here.
 - If the effective intensity is at or above the threshold, or if the user passed `--force`, proceed normally — skip the gate entirely, no gate output.
 
-**When to use:** This is the standard review at high+ intensity. Spawns 5 adversarial agents (10-20 min). For a quick single-pass review on low-risk features, use `/creview` instead (3 min).
+**When to use:** This is the standard review at high+ intensity. Spawns 6 adversarial agents (10-20 min). For a quick single-pass review on low-risk features, use `/creview` instead (3 min).
 
 You are the review-spec lead agent. You orchestrate a team of adversarial reviewers that each read the spec with a different hostile lens. You did NOT write this spec.
 
@@ -38,14 +38,15 @@ This review spawns multiple parallel agents and can take 10-20 minutes. The user
 4. Testability Auditor
 5. Design Contract Checker
 6. Upgrade Compatibility Auditor
-7. Synthesis and deduplication
-8. Present findings
+7. UX Auditor
+8. Synthesis and deduplication
+9. Present findings
 
-**When spawning agents**, tell the user: "Spawning 5 adversarial agents in parallel: Red Team, Assumptions Auditor, Testability Auditor, Design Contract Checker, Upgrade Compatibility Auditor. Each reads the spec with a different hostile lens."
+**When spawning agents**, tell the user: "Spawning 6 adversarial agents in parallel: Red Team, Assumptions Auditor, Testability Auditor, Design Contract Checker, Upgrade Compatibility Auditor, UX Auditor. Each reads the spec with a different hostile lens."
 
 **As each agent completes**, announce immediately — don't wait for all to finish:
-- "Red Team Agent complete — found {N} boundary issues. Still waiting on 4 agents..."
-- "Assumptions Auditor complete — found {N} unstated assumptions. 3 agents still running..."
+- "Red Team Agent complete — found {N} boundary issues. Still waiting on 5 agents..."
+- "Assumptions Auditor complete — found {N} unstated assumptions. 4 agents still running..."
 - "All agents complete. Synthesizing findings..."
 
 Mark each task complete as agents return results.
@@ -58,7 +59,7 @@ Mark each task complete as agents return results.
 
 After reading the spec artifact (step 2 below), check for `.correctless/artifacts/checkpoint-creview-spec-{slug}.json` (derive slug from the spec file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
-- **If found and <24 hours old**: Read `completed_phases`. Phases: `self-assessment`, `red-team`, `assumptions`, `testability`, `design-contract`, `upgrade-compatibility`. For parallel agents, checkpoint only after ALL 5 complete, not individually — partial agent results are not useful without synthesis. Verification is weak here (agent output lives in conversation context, not artifacts), so if the checkpoint says agents completed but you cannot access their findings: "Checkpoint found but agent outputs are not recoverable. Restarting agent team." Re-spawning is safer than skipping.
+- **If found and <24 hours old**: Read `completed_phases`. Phases: `self-assessment`, `red-team`, `assumptions`, `testability`, `design-contract`, `upgrade-compatibility`, `ux`. For parallel agents, checkpoint only after ALL 6 complete, not individually — partial agent results are not useful without synthesis. Verification is weak here (agent output lives in conversation context, not artifacts), so if the checkpoint says agents completed but you cannot access their findings: "Checkpoint found but agent outputs are not recoverable. Restarting agent team." Re-spawning is safer than skipping.
   If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}."
 - **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
 - **If not found**: Start from the beginning as normal.
@@ -69,7 +70,7 @@ After each major phase completes, write/update the checkpoint:
   "skill": "creview-spec",
   "slug": "{task-slug}",
   "branch": "{current-branch}",
-  "completed_phases": ["self-assessment", "red-team", "assumptions", "testability", "design-contract", "upgrade-compatibility"],
+  "completed_phases": ["self-assessment", "red-team", "assumptions", "testability", "design-contract", "upgrade-compatibility", "ux"],
   "current_phase": "synthesis",
   "timestamp": "ISO"
 }
@@ -132,9 +133,30 @@ Spawn these agents in parallel each as a forked subagent:
 ### 5. Upgrade Compatibility Auditor
 > An existing user has this project's tooling installed from a prior version. A new version ships with the changes described in this spec. Your job is to mechanically check the spec against the 5-item checklist below — do not hallucinate what the project looked like before; work from what the spec adds, changes, or removes. (1) New scripts or hooks that setup/install must propagate — does the spec account for installation? Is the installation mechanism complete (glob vs hardcoded list, see AP-024/PMB-003)? (2) New config keys — does the spec require defaults so old configs still work? (3) Schema changes in state files, artifacts, or config — does the spec address backward compatibility for old consumers? (4) Removed or renamed files — does the spec include a migration path? (5) New features that depend on artifacts old versions don't produce — does the spec require graceful degradation? For each finding, state what the upgrade user experiences (error, silent degradation, or crash) and what the spec should add to prevent it.
 
+### 6. UX Auditor
+> You are a UX auditor. You evaluate the spec through four sub-lenses — each representing a different user journey stage. Your goal is to find silent failures, missing feedback, lost output, broken interaction patterns, recovery paths, and progress visibility gaps — the class of bugs that QA, security, and performance lenses don't catch.
+>
+> **Sub-lens checklist** (evaluate the spec through each sub-lens):
+>
+> **"new-user" sub-lens**: Does the spec account for path discovery without prior context? What happens at zero-state (no config, no artifacts, no history)? Are there error messages on first run that guide the user? Are documentation pointers provided when features are unavailable?
+>
+> **"upgrade" sub-lens**: Does the spec address behavioral changes between versions? Could updates cause silent breakage? Is migration path clarity ensured? Are artifacts and config backward compatible?
+>
+> **"offboarding" sub-lens**: Does the spec handle cleanup of generated artifacts? Is there residual state after feature removal? Does the system degrade gracefully when components are removed?
+>
+> **"recovery" sub-lens**: Are error messages actionable on failure? Are there resumption paths after interruption? Is state consistency maintained after failure? Is output persistence ensured (no lost findings/results)?
+>
+> **Calibration examples — these are the class of UX bugs this lens should catch:**
+> - PMB-004: skill says "Read the spec artifact" with no path and no `workflow-advance.sh status` call — works when conversation context has the path, fails in fresh sessions where agent hallucinates wrong paths
+> - PMB-006: `context: fork` in SKILL.md makes multi-turn skills run as sub-agents that complete after producing output — user's follow-up response routes to main conversation, not back to the fork, so the approval/write phase never executes
+> - PMB-008: findings presented inline without artifact persistence — findings disappear from terminal before user can read them, no recovery path
+> - PMB-009: pipeline stopped after 2 of 7 steps with no error, no warning, no truncation artifact — silent truncation breaks the "run to completion" assumption
+>
+> For each finding, report with ID prefix UX-xxx, category, and description. If the UX agent fails to spawn, returns an error, times out, or returns malformed or incomplete output, the skill proceeds without UX findings and notes the absence — the UX lens is advisory and never gates progression.
+
 At `low` intensity: spawn only assumptions + testability auditors.
 At `standard`: add red team.
-At `high`/`critical`: spawn all five.
+At `high`/`critical`: spawn all six.
 
 ## Step 2: Collect and Synthesize
 
@@ -289,7 +311,7 @@ See "Progress Visibility" section above — task creation and agent announcement
 Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
 - `skill`: "creview-spec"
 - `phase`: "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|external-{model}}"
-- `agent_role`: "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|upgrade-compatibility|external-{model}}"
+- `agent_role`: "{self-assessment|red-team|assumptions-auditor|testability-auditor|design-contract-checker|upgrade-compatibility|ux-auditor|external-{model}}"
 
 ### Context Enforcement
 **Context enforcement (mandatory):** Before spawning the agent team, check context usage. If above 70%: the agents run forked (clean context) but the orchestrator needs to synthesize findings. Warn: "Context at {N}%. Run `/compact` before I spawn the review team — synthesis quality degrades with full context." If above 85%: stop and require /compact.

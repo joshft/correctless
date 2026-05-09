@@ -133,12 +133,12 @@ else
   fail "R-002g" "Mini-audit upgrade agent mechanical check description not found"
 fi
 
-# R-002h: The upgrade compatibility agent is described as a 4th specialist
-# (alongside cross-component, hostile-input, resource-bounds)
-if grep -qi '4th.*specialist\|fourth.*specialist\|4.*specialist agent\|four specialist' "$CTDD_SKILL"; then
-  pass "R-002h" "Upgrade compatibility described as 4th specialist in ctdd"
+# R-002h: The upgrade compatibility agent is described as a numbered specialist
+# (alongside cross-component, hostile-input, resource-bounds, ux-review)
+if grep -qi 'Upgrade compatibility agent\|upgrade.*compatibility.*agent' "$CTDD_SKILL"; then
+  pass "R-002h" "Upgrade compatibility described as specialist in ctdd"
 else
-  fail "R-002h" "Upgrade compatibility not described as 4th specialist in ctdd"
+  fail "R-002h" "Upgrade compatibility not described as specialist in ctdd"
 fi
 
 # ============================================================================
@@ -196,23 +196,23 @@ else
 fi
 
 # ============================================================================
-# R-005 [unit]: ctdd says "4 specialist agents" in mini-audit announcements
+# R-005 [unit]: ctdd says "5 specialist agents" in mini-audit announcements
 # ============================================================================
 
-section "R-005: ctdd mini-audit agent count updated to 4"
+section "R-005: ctdd mini-audit agent count updated to 5"
 
-# R-005a: Progress announcement says 4 specialist agents
-if grep -qE 'spawning 4 specialist agents|4 specialist agents' "$CTDD_SKILL"; then
-  pass "R-005a" "Progress announcement references 4 specialist agents"
+# R-005a: Progress announcement says 5 specialist agents
+if grep -qE 'spawning 5 specialist agents|5 specialist agents' "$CTDD_SKILL"; then
+  pass "R-005a" "Progress announcement references 5 specialist agents"
 else
-  fail "R-005a" "Progress announcement does not reference 4 specialist agents"
+  fail "R-005a" "Progress announcement does not reference 5 specialist agents"
 fi
 
-# R-005b: "Each mini-audit round spawns four specialist agents" (or "4 specialist agents")
-if grep -qE 'spawns four specialist agents|spawns 4 specialist agents' "$CTDD_SKILL"; then
-  pass "R-005b" "Agent prompt section references four/4 specialist agents"
+# R-005b: "Each mini-audit round spawns five specialist agents" (or "5 specialist agents")
+if grep -qE 'spawns five specialist agents|spawns 5 specialist agents' "$CTDD_SKILL"; then
+  pass "R-005b" "Agent prompt section references five/5 specialist agents"
 else
-  fail "R-005b" "Agent prompt section still references three/3 specialist agents"
+  fail "R-005b" "Agent prompt section still references four/4 specialist agents"
 fi
 
 # R-005c: The agent_role enum includes upgrade-compatibility
@@ -230,30 +230,30 @@ else
 fi
 
 # ============================================================================
-# R-006 [unit]: creview-spec count references updated from 4 to 5
+# R-006 [unit]: creview-spec count references updated from 4 to 6
 # ============================================================================
 
-section "R-006: creview-spec agent count updated to 5"
+section "R-006: creview-spec agent count updated to 6"
 
-# R-006a: "Spawns 5 adversarial agents" (was 4)
-if grep -qE 'Spawns 5 adversarial agents' "$CREVIEW_SPEC_SKILL"; then
-  pass "R-006a" "'Spawns 5 adversarial agents' present in creview-spec"
+# R-006a: "Spawns 6 adversarial agents" (was 5)
+if grep -qE 'Spawns 6 adversarial agents' "$CREVIEW_SPEC_SKILL"; then
+  pass "R-006a" "'Spawns 6 adversarial agents' present in creview-spec"
 else
-  fail "R-006a" "'Spawns 5 adversarial agents' not found (still says 4?)"
+  fail "R-006a" "'Spawns 6 adversarial agents' not found (still says 5?)"
 fi
 
-# R-006b: "Spawning 5 adversarial agents in parallel" (was 4)
-if grep -qE 'Spawning 5 adversarial agents in parallel' "$CREVIEW_SPEC_SKILL"; then
-  pass "R-006b" "'Spawning 5 adversarial agents in parallel' present"
+# R-006b: "Spawning 6 adversarial agents in parallel" (was 5)
+if grep -qE 'Spawning 6 adversarial agents in parallel' "$CREVIEW_SPEC_SKILL"; then
+  pass "R-006b" "'Spawning 6 adversarial agents in parallel' present"
 else
-  fail "R-006b" "'Spawning 5 adversarial agents in parallel' not found (still says 4?)"
+  fail "R-006b" "'Spawning 6 adversarial agents in parallel' not found (still says 5?)"
 fi
 
-# R-006c: "spawn all five" at high/critical (was "spawn all four")
-if grep -qi 'spawn all five' "$CREVIEW_SPEC_SKILL"; then
-  pass "R-006c" "'spawn all five' at high+ intensity present"
+# R-006c: "spawn all six" at high/critical (was "spawn all five")
+if grep -qi 'spawn all six' "$CREVIEW_SPEC_SKILL"; then
+  pass "R-006c" "'spawn all six' at high+ intensity present"
 else
-  fail "R-006c" "'spawn all five' not found (still says 'spawn all four'?)"
+  fail "R-006c" "'spawn all six' not found (still says 'spawn all five'?)"
 fi
 
 # R-006d: Upgrade Compatibility Auditor appears as a numbered task list item

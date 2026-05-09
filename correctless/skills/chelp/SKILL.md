@@ -69,13 +69,13 @@ All 29 skills are always visible. Skills gated behind an intensity level are ann
 Feature workflow:
   /cspec         Write a feature spec with testable rules
   /creview       Skeptical review + security checklist (~3 min)
-  /creview-spec  Adversarial 4-agent review (~15 min)              [high+]
+  /creview-spec  Adversarial 6-agent review (~15 min)              [high+]
   /cmodel        Formal Alloy modeling                             [critical+]
   /ctdd          Enforced TDD: tests → implement → QA
   /cverify       Verify implementation matches spec
   /cupdate-arch  Update .correctless/ARCHITECTURE.md               [high+]
   /cdocs         Update documentation
-  /caudit        Olympics audit (QA/Hacker/Performance)            [high+]
+  /caudit        Olympics audit (QA/Hacker/Performance/UX)          [high+]
   /cpostmortem   Post-merge bug analysis (when bugs escape)
   /cdevadv       Devil's advocate — challenge assumptions
   /credteam      Live red team assessment                          [critical+]

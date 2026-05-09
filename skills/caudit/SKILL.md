@@ -1,6 +1,6 @@
 ---
 name: caudit
-description: Cross-codebase quality audit. Use after a major feature lands or periodically for systemic bug detection. Presets: QA, Hacker, Performance.
+description: Cross-codebase quality audit. Use after a major feature lands or periodically for systemic bug detection. Presets: QA, Hacker, Performance, UX.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/antipatterns.md), Write(*test*), Write(*spec*), Edit, Task(correctless:fix-diff-reviewer)
 interaction_mode: hybrid
 ---
@@ -48,7 +48,7 @@ Olympics audits run multiple convergence rounds, each spawning parallel agents. 
 ## Parameters
 
 Invoke with: `/caudit [preset] [scope]`
-- `preset`: `qa` | `hacker` | `perf` | `custom` (default: `qa`)
+- `preset`: `qa` | `hacker` | `perf` | `ux` | `custom` (default: `qa`)
 - `scope`: `all` | `changed` | `path/to/package` (default: `changed`)
 
 ## When to Run
@@ -549,6 +549,30 @@ Spawn a triage agent with this framing:
 | Regression Hunter | "Every optimization was reverted" | Performance antipatterns, previously-fixed bottlenecks |
 
 **Post-convergence**: for each finding, provide estimated impact (order of magnitude). Benchmark-backed findings get 1.5x bounty.
+
+### UX Olympics
+
+**Purpose**: find UX failures — silent breakage, missing feedback, lost output, broken interaction patterns, missing recovery paths, and progress visibility gaps. The class of bugs that QA, Hacker, and Performance lenses don't catch.
+
+**Agent roles** (spawn all 5):
+
+| Role | Lens | What it looks for |
+|------|------|-------------------|
+| First Contact Auditor | "Every new user quits before value" | Zero-state behavior, missing setup guidance, error messages without recovery, undiscoverable features, path discovery without prior context, documentation pointers when features are unavailable |
+| Upgrade Path Auditor | "Every update breaks something silently" | Silent behavioral changes, missing migration guidance, config schema breaks, artifact format drift, backward compatibility of artifacts and config, migration path clarity |
+| Cleanup/Offboarding Auditor | "Every removal leaves ghosts" | Residual state, orphaned artifacts, graceful degradation when components removed, cleanup of generated artifacts |
+| Error Recovery Auditor | "Every interruption loses work" | Missing resumption paths, lost findings, state inconsistency after failure, missing progress persistence, output persistence (no lost findings/results), error messages on failure |
+| Cross-Session Continuity Auditor | "Every fresh session forgets everything" | Conversation context dependency, session-boundary state corruption, artifact path hallucination, stale workflow state, workflow state persistence across sessions, fresh-session artifact path resolution, session-boundary state transitions |
+
+**Calibration examples — these are the class of UX bugs this preset should catch:**
+- PMB-004: skill says "Read the spec artifact" with no path and no `workflow-advance.sh status` call — works when conversation context has the path, fails in fresh sessions where agent hallucinates wrong paths
+- PMB-006: `context: fork` in SKILL.md makes multi-turn skills run as sub-agents that complete after producing output — user's follow-up response routes to main conversation, not back to the fork, so the approval/write phase never executes
+- PMB-008: findings presented inline without artifact persistence — findings disappear from terminal before user can read them, no recovery path
+- PMB-009: pipeline stopped after 2 of 7 steps with no error, no warning, no truncation artifact — silent truncation breaks the "run to completion" assumption
+
+If the UX preset agent fails to spawn, returns an error, times out, or returns malformed or incomplete output, the round proceeds without that agent's findings and notes the absence — the UX lens is advisory and never gates progression. The UX preset follows the existing preset table format and uses the same agent prompt template, triage agent, and convergence loop as QA/Hacker/Performance presets.
+
+**Post-convergence**: regression tests for silent failure, lost output, and missing recovery path findings.
 
 ### Custom Presets
 
