@@ -5,16 +5,10 @@ nav_order: 1
 permalink: /
 ---
 
-<div markdown="1" style="text-align:center;padding:1rem 0 0.5rem">
-
-# Correctless
-
-Correctness-oriented development workflow for [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-{: style="font-size:1.15rem;opacity:0.85;margin-bottom:0.25rem"}
-
-29 skills · 8 hooks · 3 intensity levels · enforced TDD with agent separation
-{: style="font-size:0.9rem;opacity:0.6"}
-
+<div style="text-align:center;padding:1rem 0 0.5rem">
+  <h1 style="font-size:2.5rem;margin-bottom:0.25rem">Correctless</h1>
+  <p style="font-size:1.15rem;opacity:0.85;margin-bottom:0.25rem">Correctness-oriented development workflow for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a></p>
+  <p style="font-size:0.9rem;opacity:0.6">29 skills · 8 hooks · 3 intensity levels · enforced TDD with agent separation</p>
 </div>
 
 ---
