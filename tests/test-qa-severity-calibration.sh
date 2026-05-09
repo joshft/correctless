@@ -501,7 +501,7 @@ section "INV-013: Fix-round loop activation tracking"
 CVERIFY_CONTENT="$(cat "$CVERIFY_SKILL")"
 
 # INV-013a: fix_rounds_triggered field documented in cverify calibration schema
-if echo "$CVERIFY_CONTENT" | grep -qi 'fix_rounds_triggered'; then
+if grep -qi 'fix_rounds_triggered' <<< "$CVERIFY_CONTENT"; then
   pass "INV-013a" "fix_rounds_triggered field in cverify calibration schema"
 else
   fail "INV-013a" "fix_rounds_triggered field missing from cverify calibration schema"
@@ -509,14 +509,14 @@ fi
 
 # INV-013b: cmetrics warns when fix_rounds_triggered is 0 across 3+ high+ features
 CMETRICS_CONTENT="$(cat "$CMETRICS_SKILL")"
-if echo "$CMETRICS_CONTENT" | grep -qi 'fix_rounds_triggered'; then
+if grep -qi 'fix_rounds_triggered' <<< "$CMETRICS_CONTENT"; then
   pass "INV-013b" "cmetrics references fix_rounds_triggered"
 else
   fail "INV-013b" "cmetrics does not reference fix_rounds_triggered"
 fi
 
 # INV-013c: cmetrics warning mentions 3+ consecutive high+ features
-if echo "$CMETRICS_CONTENT" | grep -qi 'fix.*round.*loop.*not.*fired\|fix_rounds_triggered.*0.*3\|3.*consecutive.*high\|never.*fire'; then
+if grep -qi 'fix.*round.*loop.*not.*fired\|fix_rounds_triggered.*0.*3\|3.*consecutive.*high\|never.*fire' <<< "$CMETRICS_CONTENT"; then
   pass "INV-013c" "cmetrics warning for 0 fix rounds across 3+ high+ features"
 else
   fail "INV-013c" "cmetrics missing warning for 0 fix rounds across 3+ features"
@@ -531,7 +531,7 @@ else
 fi
 
 # INV-013e: fix_rounds_triggered derivation formula documented in cverify
-if echo "$CVERIFY_CONTENT" | grep -qi 'qa_rounds.*-.*1\|qa_rounds.*minus\|max.*0.*qa_rounds\|mini_audit_fix_rounds'; then
+if grep -qi 'qa_rounds.*-.*1\|qa_rounds.*minus\|max.*0.*qa_rounds\|mini_audit_fix_rounds' <<< "$CVERIFY_CONTENT"; then
   pass "INV-013e" "fix_rounds_triggered derivation formula documented in cverify"
 else
   fail "INV-013e" "fix_rounds_triggered derivation formula missing from cverify"

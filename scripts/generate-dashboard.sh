@@ -273,6 +273,50 @@ if compgen -G ".correctless/artifacts/cost-*.json" >/dev/null 2>&1; then
 fi
 
 # ============================================================================
+# STEP 9c: Parse escape metrics from round-JSON and metrics artifacts (R-009)
+# ============================================================================
+
+ESCAPE_METRICS_JSON='{"dormant":true}'
+HAS_ESCAPE_DATA=false
+
+# Check for round-JSON files (primary source for escape data)
+if compgen -G ".correctless/artifacts/findings/audit-*-round-*.json" >/dev/null 2>&1; then
+  HAS_ESCAPE_DATA=true
+  # Compute escape counts and severity distribution from round-JSON findings
+  ESCAPE_METRICS_JSON=$(jq -n '[inputs]' .correctless/artifacts/findings/audit-*-round-*.json 2>/dev/null | jq '
+    # Flatten all findings
+    [.[] | (.findings // [])[] | select(.severity != null)] as $all_findings |
+    # Escape count: findings with severity != info (case-insensitive)
+    [$all_findings[] | select((.severity | ascii_downcase) != "info")] as $escapes |
+    # Severity distribution
+    {
+      dormant: false,
+      total_findings: ($all_findings | length),
+      escape_count: ($escapes | length),
+      weighted_score: ([$escapes[] |
+        ((.severity | ascii_downcase) as $s |
+          if $s == "critical" then 5
+          elif $s == "high" then 3
+          elif $s == "medium" then 2
+          elif $s == "low" then 1
+          else 0 end)
+      ] | add // 0),
+      severity_distribution: {
+        critical: [$all_findings[] | select((.severity | ascii_downcase) == "critical")] | length,
+        high: [$all_findings[] | select((.severity | ascii_downcase) == "high")] | length,
+        medium: [$all_findings[] | select((.severity | ascii_downcase) == "medium")] | length,
+        low: [$all_findings[] | select((.severity | ascii_downcase) == "low")] | length
+      },
+      root_cause: {
+        implementation: [$all_findings[] | select(.escape_type == "implementation")] | length,
+        spec: [$all_findings[] | select(.escape_type == "spec")] | length,
+        unclassified: [$all_findings[] | select(.escape_type == null or .escape_type == "" or (.escape_type | not))] | length
+      }
+    }
+  ' 2>/dev/null || echo '{"dormant":true}')
+fi
+
+# ============================================================================
 # STEP 10: Parse overrides
 # ============================================================================
 
@@ -361,6 +405,8 @@ DASHBOARD_DATA=$(jq -n \
   --argjson has_cost_artifacts "$HAS_COST_ARTIFACTS" \
   --argjson cost_unknown_models "$COST_UNKNOWN_MODELS" \
   --argjson cost_warnings "$COST_WARNINGS" \
+  --argjson escape_metrics "$ESCAPE_METRICS_JSON" \
+  --argjson has_escape_data "$HAS_ESCAPE_DATA" \
   '{
     project_name: $project_name,
     intensity_floor: $intensity_floor,
@@ -384,7 +430,9 @@ DASHBOARD_DATA=$(jq -n \
     cost_artifacts: $cost_artifacts,
     has_cost_artifacts: $has_cost_artifacts,
     cost_unknown_models: $cost_unknown_models,
-    cost_warnings: $cost_warnings
+    cost_warnings: $cost_warnings,
+    escape_metrics: $escape_metrics,
+    has_escape_data: $has_escape_data
   }')
 
 # ============================================================================
@@ -670,6 +718,73 @@ cat >> dashboard.html <<'HTMLEOF2'
         fixTrack.appendChild(h('div', { className: 'bar-fill bar-qa', style: { width: fixPct + '%' } }));
       }
       app.appendChild(fixTrack);
+    }
+  }
+
+  // ---- Section 3c: Escape Metrics (R-009) ----
+  // Dormant when no escape data — PAT-019: no error, no warning, just omitted
+  if (data.has_escape_data && data.escape_metrics && !data.escape_metrics.dormant) {
+    app.appendChild(h('h2', null, 'Escape Metrics'));
+    const em = data.escape_metrics;
+
+    const escapeStats = h('div', { className: 'stat-row' });
+    [{l:'Total Findings', v:em.total_findings || 0},
+     {l:'Escape Count', v:em.escape_count || 0},
+     {l:'Weighted Score', v:em.weighted_score || 0}
+    ].forEach(s => {
+      const st = h('div', { className: 'stat' });
+      st.appendChild(h('div', { className: 'stat-label' }, s.l));
+      st.appendChild(h('div', { className: 'stat-value' }, String(s.v)));
+      escapeStats.appendChild(st);
+    });
+    app.appendChild(escapeStats);
+
+    // Severity distribution table
+    if (em.severity_distribution) {
+      const sd = em.severity_distribution;
+      const sdTable = h('table');
+      const sdHead = h('thead');
+      const sdHr = h('tr');
+      ['Severity', 'Count'].forEach(col => sdHr.appendChild(h('th', null, col)));
+      sdHead.appendChild(sdHr);
+      sdTable.appendChild(sdHead);
+      const sdBody = h('tbody');
+      [['Critical', sd.critical || 0], ['High', sd.high || 0],
+       ['Medium', sd.medium || 0], ['Low', sd.low || 0]].forEach(([sev, cnt]) => {
+        const row = h('tr');
+        row.appendChild(h('td', null, sev));
+        row.appendChild(h('td', null, String(cnt)));
+        sdBody.appendChild(row);
+      });
+      sdTable.appendChild(sdBody);
+      app.appendChild(sdTable);
+    }
+
+    // Root cause breakdown
+    if (em.root_cause) {
+      const rc = em.root_cause;
+      const rcTotal = (rc.implementation || 0) + (rc.spec || 0) + (rc.unclassified || 0);
+      if (rcTotal > 0) {
+        app.appendChild(h('div', { className: 'bar-label', style: { marginTop: '1rem' } },
+          h('span', null, 'Root Cause Breakdown')));
+        const rcBar = h('div', { className: 'stacked-bar' });
+        if (rc.implementation > 0) {
+          const pct = Math.round((rc.implementation / rcTotal) * 100);
+          rcBar.appendChild(h('div', { className: 'stacked-segment bar-blocking', style: { width: pct + '%' } },
+            'Impl ' + rc.implementation));
+        }
+        if (rc.spec > 0) {
+          const pct = Math.round((rc.spec / rcTotal) * 100);
+          rcBar.appendChild(h('div', { className: 'stacked-segment bar-review', style: { width: pct + '%' } },
+            'Spec ' + rc.spec));
+        }
+        if (rc.unclassified > 0) {
+          const pct = Math.round((rc.unclassified / rcTotal) * 100);
+          rcBar.appendChild(h('div', { className: 'stacked-segment', style: { width: pct + '%', background: 'var(--muted)' } },
+            'Unclassified ' + rc.unclassified));
+        }
+        app.appendChild(rcBar);
+      }
     }
   }
 
