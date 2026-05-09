@@ -155,6 +155,12 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 - Class fix: (1) `/creview-spec` must write to `.correctless/artifacts/review-spec-findings-{slug}.md` before presenting, (2) `/creview` must write to `.correctless/artifacts/review-findings-{slug}.md` before presenting, (3) AP-029 antipattern entry, (4) structural test verifying all finding-producing skills reference an artifact write path.
 - Source: PMB-008, GitHub issue #94
 
+### 2026-05-08 — Postmortem: Pipeline orchestrator without completeness verification silently truncates
+- `/cauto` pipeline stopped after simplify (2 of 7 steps) when run via the Skill tool's forked execution. The Skill tool reported "completed" — no error, no warning, no truncation artifact. The fork context exhausted its capacity during the long pipeline (ctdd spawns 4+ sub-agents, then simplify). Workflow state showed `done` instead of `documented`. Pipeline is resumable on re-invocation, so no data loss, but silent truncation breaks the "run to completion" assumption.
+- Root cause: no spec ever required pipeline completeness verification. The autonomous-skill-contract spec (R-009) models `context: fork` as a SKILL.md frontmatter attribute but never modeled the Skill tool's independent forked execution mechanism. PMB-006 fixed multi-turn fork stalls but didn't address context exhaustion during long single-turn pipelines. `/cauto` writes `skill_started`/`skill_completed` audit entries per step, but only IF the step runs — no upfront manifest, no end-of-pipeline assertion.
+- Class fix: two-layer. (1) Pipeline manifest artifact at start with expected_steps + expected_end_phase, updated per step, checked on re-invocation or by `/cstatus`. (2) Post-return phase assertion — after `/cauto` returns, verify workflow state matches expected end state. See AP-030.
+- Source: PMB-009, GitHub issue #108
+
 ### 2026-05-06 — Convention confirmed: Structural enforcement over prompt-level instruction
 - Observed in 6+ features (auto-mode-phase-2, auto-mode-phase-3, carchitect-phase1, test-evasion-antipatterns, audit-findings-persistence-contract, structural-enforcement-pat) — treat as established project convention
 - Every spec invariant at high+ intensity must include an `Enforcement:` field (PAT-018 mechanisms: allowed-tools, sensitive-file-guard, gate preconditions, hash verification, CI test assertions, agent tool-pinning); the Design Contract Checker in `/creview-spec` flags missing or prompt-level-only enforcement

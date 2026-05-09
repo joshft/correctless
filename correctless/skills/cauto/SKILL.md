@@ -1,6 +1,6 @@
 ---
 name: cauto
-description: Semi-auto mode. Orchestrates the full implementation pipeline after human-approved spec review. Runs ctdd, simplify, cverify, cupdate-arch, cdocs, then creates a PR.
+description: Semi-auto mode. Orchestrates the full implementation pipeline after human-approved spec review. Runs ctdd, simplify, cverify, cupdate-arch, cdocs, then creates a PR. After /cauto completes, verify the workflow reached the expected end state — if it didn't, re-invoke /cauto to resume.
 allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/meta/overrides/*), Edit, Task
 interaction_mode: hybrid
 ---
@@ -50,6 +50,51 @@ If validation fails 2 consecutive times, skip validation and proceed — the pha
 
 The validation failure is logged in the audit trail with type `artifact_validation_failed`.
 
+## Canonical Step Name Enum (R-010)
+
+The canonical step name enum is the single source of truth for `expected_steps` and `completed_steps` values in the pipeline manifest.
+
+At **high+ intensity**: `["ctdd", "simplify", "cverify", "cupdate-arch", "cdocs", "consolidation", "pr"]`
+
+At **standard intensity**: `["ctdd", "simplify", "cverify", "cdocs", "consolidation", "pr"]` (cupdate-arch excluded — skipped at standard intensity per R-009)
+
+These names correspond to pipeline Steps 1–9. Internal orchestration actions (pre-simplify commit, post-simplify validation, override-log preservation, pipeline summary) are excluded — they are not pipeline steps.
+
+## Pipeline Manifest (R-001, R-002, R-003, R-006, R-008)
+
+### Writing the Manifest (R-001)
+
+As the FIRST action after the phase gate — before any skill invocation — write a pipeline manifest to `.correctless/artifacts/pipeline-manifest-{branch_slug}.json`. The manifest must contain:
+
+```json
+{
+  "expected_steps": ["ctdd", "simplify", "cverify", "cupdate-arch", "cdocs", "consolidation", "pr"],
+  "expected_end_phase": "documented",
+  "completed_steps": [],
+  "started_at": "2026-05-08T00:00:00Z",
+  "branch": "feature/example-feature",
+  "status": "in_progress"
+}
+```
+
+- `expected_steps`: array of canonical step names from the step name enum (R-010), filtered by the current effective intensity. At standard intensity, `expected_steps` reflects the reduced pipeline without `cupdate-arch`.
+- `expected_end_phase`: the workflow phase that indicates pipeline completion — `documented` for full runs, or the appropriate phase for partial runs.
+- `completed_steps`: array, initially empty.
+- `started_at`: ISO 8601 timestamp.
+- `branch`: current branch name.
+
+### Tracking Step Completion (R-002)
+
+After each pipeline step completes successfully, append the current step name to `completed_steps` in the manifest. The append must happen AFTER the step completes but BEFORE the next step begins. Enforcement: prompt-level — SKILL.md instruction ordering.
+
+### Marking Pipeline Complete (R-003)
+
+As the FINAL action — after Step 10 (pipeline summary) — write `"status": "complete"` to the manifest. A manifest without `"status": "complete"` indicates truncation. This is how truncation is detected: if `/cauto` was interrupted or its context exhausted, the manifest will exist but `status` will not be `"complete"`.
+
+### Manifest is Ephemeral (R-006)
+
+The pipeline manifest is an ephemeral artifact — it is NOT committed during consolidation (Step 8). The manifest lives under `.correctless/artifacts/` which is already excluded from consolidation staging by Step 8.2's belt-and-suspenders guard.
+
 ## Effective Intensity
 
 Determine the effective intensity using the computation in the shared constraints (`_shared/constraints.md`). The effective intensity controls pipeline behavior including attempt thresholds and skill activation.
@@ -97,7 +142,7 @@ Built-in defaults when preferences.md is missing:
 
 Log a `preference_applied` audit event for each non-default preference loaded from `preferences.md`. If all preferences match the built-in defaults (or the file is absent), no `preference_applied` events are logged.
 
-## Resumption Check (R-016)
+## Resumption Check (R-016, R-004)
 
 On invocation, check for an existing escalation file at `.correctless/artifacts/escalation-{branch_slug}.md`. If present:
 
@@ -106,6 +151,14 @@ On invocation, check for an existing escalation file at `.correctless/artifacts/
 3. Verify completed skill artifacts still exist (tests pass, verification report present if applicable).
 4. If both checks pass, resume from the failed skill — skip completed skills in the pipeline.
 5. If either check fails (phase inconsistent or artifacts missing), delete the stale escalation file and start fresh with a clean pipeline run.
+
+### Pipeline Manifest Truncation Detection (R-004)
+
+Also read any existing pipeline manifest at `.correctless/artifacts/pipeline-manifest-{branch_slug}.json`. If the manifest exists but `status` is not `"complete"`, report which steps were missed:
+
+> "Pipeline was truncated at step {last_completed}. Missing steps: {list}. Resuming from {next_step}."
+
+The workflow state is authoritative (queried via `workflow-advance.sh`). The manifest is advisory — when the two conflict, workflow state wins. R-004 reports the divergence as a diagnostic signal, not as a superseding mechanism.
 
 ## Pipeline Order (R-001)
 
@@ -290,7 +343,7 @@ This copies override entries for the current branch from `.correctless/artifacts
 
 ### Step 10: Pipeline Summary
 
-After PR creation (or after the last pipeline step if `pr_creation: skip`), print a structured summary with three sections.
+After PR creation (or after the last pipeline step if `pr_creation: skip`), print a structured summary with three sections. Also include a **Pipeline Completeness** line showing `{completed_count}/{expected_count} steps completed`. If all expected steps completed AND `status` is `"complete"`, show "(all steps completed)". If steps are missing, show "(incomplete — {missing_steps})".
 
 #### (a) Findings & Decisions
 
