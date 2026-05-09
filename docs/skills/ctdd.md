@@ -19,7 +19,7 @@
 3. **GREEN phase** — spawns an implementation agent that sees the failing tests and spec but did not write the tests. Implements just enough to make tests pass. Any test edits are logged with reasons.
 4. **QA phase** — a third independent agent reviews the implementation against the spec. For each rule: is there a test? Does the implementation actually satisfy the rule, or just the test cases? Every blocking finding requires both an instance fix and a class fix (structural prevention).
 5. **Fix rounds** — if QA finds blocking issues, the workflow returns to GREEN for a fix round, then re-runs QA. Repeats until clean.
-6. **Mini-audit phase** — after QA is clean, spawns four adversarial specialist agents (cross-component interaction, hostile input, resource bounds, upgrade compatibility) to catch issues that the QA agent's rule-satisfaction lens misses. Fixed rounds per intensity level (standard=1, high=2, critical=3). CRITICAL/HIGH findings are blocking; MEDIUM/LOW are advisory. Uses `MA-` prefix for findings to distinguish from QA findings.
+6. **Mini-audit phase** — after QA is clean, spawns five adversarial specialist agents (cross-component interaction, hostile input, resource bounds, upgrade compatibility, UX review) to catch issues that the QA agent's rule-satisfaction lens misses. Fixed rounds per intensity level (standard=1, high=2, critical=3). CRITICAL/HIGH findings are blocking; MEDIUM/LOW are advisory. Uses `MA-` prefix for findings to distinguish from QA findings.
 
 For features with 5+ rules, the orchestrator builds a task graph to identify independent tracks that can run RED and GREEN in parallel.
 
@@ -59,8 +59,9 @@ Agent: Spawning test-writing agent — reading spec (5 rules),
        Hostile input complete — found 0 findings.
        Resource bounds complete — found 0 findings.
        Upgrade compatibility complete — found 0 findings.
-       Mini-audit round 1 clean — no findings across all four lenses.
-       Mini-audit round 2 clean — no findings across all four lenses.
+       UX review complete — found 0 findings.
+       Mini-audit round 1 clean — no findings across all five lenses.
+       Mini-audit round 2 clean — no findings across all five lenses.
        Mini-audit complete — no blocking findings.
 
        TDD complete. Run /cverify when ready.

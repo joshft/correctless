@@ -5,7 +5,7 @@
 ## When to Use
 
 - After `/cspec` produces an approved spec — this is the mandatory next step at standard intensity
-- At high/critical intensity, for a quick single-pass review on low-risk features (use `/creview-spec` for the full 5-agent adversarial review)
+- At high/critical intensity, for a quick single-pass review on low-risk features (use `/creview-spec` for the full 6-agent adversarial review)
 - **Not for:** reviewing code or pull requests (use `/cpr-review`), reviewing implementation after TDD (use `/cverify`)
 
 ## How It Fits in the Workflow
