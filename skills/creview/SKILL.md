@@ -1,6 +1,6 @@
 ---
 name: creview
-description: Skeptically review a spec for unstated assumptions, untestable rules, missing edge cases, and security gaps. Run after /cspec.
+description: Skeptically review a spec for unstated assumptions, untestable rules, missing edge cases, security gaps, and UX failures. Run after /cspec.
 allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*)
 interaction_mode: hybrid
 ---
@@ -19,7 +19,7 @@ You are a separate agent from the spec author. Do not assume the spec is correct
 
 | | Standard | High | Critical |
 |---|---|---|---|
-| Agents | 1 + security checklist | Routes to /creview-spec (5-agent adversarial) | Routes to /creview-spec + external model |
+| Agents | 1 + security checklist | Routes to /creview-spec (6-agent adversarial) | Routes to /creview-spec + external model |
 | Finding threshold | Disposition required | All addressed | Zero unresolved |
 
 ## Effective Intensity
@@ -30,7 +30,7 @@ Determine the effective intensity using the computation in the shared constraint
 
 **If effective intensity is high:**
 
-> This feature's effective intensity is high. Run `/creview-spec` instead for the 5-agent adversarial review. To proceed with single-pass review anyway, confirm below.
+> This feature's effective intensity is high. Run `/creview-spec` instead for the 6-agent adversarial review. To proceed with single-pass review anyway, confirm below.
 
 Present numbered options:
 1. Switch to /creview-spec (recommended)
@@ -40,7 +40,7 @@ If the user chooses option 2, proceed with the standard single-pass review (all 
 
 **If effective intensity is critical:**
 
-> This feature's effective intensity is critical. Run `/creview-spec` instead — it includes 5-agent adversarial review plus external model verification.
+> This feature's effective intensity is critical. Run `/creview-spec` instead — it includes 6-agent adversarial review plus external model verification.
 
 Present the same numbered options:
 1. Switch to /creview-spec (recommended)
@@ -54,15 +54,16 @@ This review takes 5-10 minutes. The user must see progress throughout.
 
 **Before starting**, create a task list:
 1. Read context (spec, .correctless/ARCHITECTURE.md, antipatterns, flywheel data)
-2. Assumptions check
-3. Testability check
-4. Edge cases check
-5. Antipattern check
-6. Integration test coverage check
-7. Security checklist
-8. Compliance checks (if configured)
-9. Self-assessment
-10. Present findings to human
+2. UX review subagent (parallel with single-pass review)
+3. Assumptions check
+4. Testability check
+5. Edge cases check
+6. Antipattern check
+7. Integration test coverage check
+8. Security checklist
+9. Compliance checks (if configured)
+10. Self-assessment
+11. Present findings to human
 
 **Between each check**, print a 1-line status: "Assumptions check complete — found {N} unstated assumptions. Running testability check..." Mark each task complete as it finishes.
 
@@ -82,6 +83,34 @@ This review takes 5-10 minutes. The user must see progress throughout.
 10. Grep/glob relevant source code to understand the codebase area this spec touches.
 
 For steps 7-9 (historical data files): skip any that don't exist. Read no more than 10 historical data files total across all three source types (qa-findings, audit-history, devadv reports). If more files exist, select the most recent by filename sort and skip the rest.
+
+## UX Review Subagent
+
+Spawn a **UX review subagent** as a forked subagent. This runs in parallel with the single-pass review — the UX lens checks different concerns (silent failures, missing feedback, recovery paths) that don't depend on code-level review findings.
+
+> You are a UX reviewer. You evaluate the spec through four sub-lenses — each representing a different user journey stage. Your goal is to find silent failures, missing feedback, lost output, broken interaction patterns, recovery paths, and progress visibility gaps.
+>
+> **Sub-lens checklist:**
+>
+> **new-user**: Does the spec account for path discovery without prior context? What happens at zero-state (no config, no artifacts, no history)? Are there error messages on first run that guide the user? Are documentation pointers provided when features are unavailable?
+>
+> **upgrade**: Does the spec address behavioral changes between versions? Could updates cause silent breakage? Is migration path clarity ensured? Are artifacts and config backward compatible?
+>
+> **offboarding**: Does the spec handle cleanup of generated artifacts? Is there residual state after feature removal? Does the system degrade gracefully when components are removed?
+>
+> **recovery**: Are error messages actionable on failure? Are there resumption paths after interruption? Is state consistency maintained after failure? Is output persistence ensured (no lost findings/results)?
+>
+> **Calibration examples — these are the class of UX bugs this lens should catch:**
+> - PMB-004: skill says "Read the spec artifact" with no path and no `workflow-advance.sh status` call — works when conversation context has the path, fails in fresh sessions where agent hallucinates wrong paths
+> - PMB-006: `context: fork` in SKILL.md makes multi-turn skills run as sub-agents that complete after producing output — user's follow-up response routes to main conversation, not back to the fork, so the approval/write phase never executes
+> - PMB-008: findings presented inline without artifact persistence — findings disappear from terminal before user can read them, no recovery path
+> - PMB-009: pipeline stopped after 2 of 7 steps with no error, no warning, no truncation artifact — silent truncation breaks the "run to completion" assumption
+>
+> For each finding, report with ID prefix UX-xxx, severity, and description — structured as a numbered finding list.
+
+If the UX agent fails to spawn, returns an error, times out, or returns malformed or incomplete output, the skill proceeds without UX findings and notes the absence — the UX lens is advisory and never gates progression.
+
+Collect UX subagent findings after the single-pass review completes and include them in the output alongside the other categories.
 
 ## What to Check
 

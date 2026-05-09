@@ -126,6 +126,7 @@ jobs:
           bash tests/test-autonomous-skill-contract.sh
           bash tests/test-audit-escape-metrics.sh
           bash tests/test-pipeline-completeness-verification.sh
+          bash tests/test-ux-review-lens.sh
 
       - name: Verify sync
         run: |

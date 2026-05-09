@@ -57,6 +57,7 @@ Invoke with: `/caudit [preset] [scope]`
 | `qa` | Incorrect behavior, silent failures, data corruption | Concurrency, Error Handling, Input Boundary, Resource Lifecycle, API Contract, Architecture Adherence Checker, Regression Hunter | 5 |
 | `hacker` | Security vulnerabilities — bypass, escalation, exfiltration, DoS | Encoding/Normalization, Protocol Abuse, Auth/AuthZ, Config Manipulation, Injection, Architecture Adherence Checker, Regression Hunter | 7 |
 | `perf` | Performance bottlenecks, memory waste, algorithmic inefficiency | Allocation Hunter, Algorithmic Complexity, I/O Bottleneck, Concurrency Efficiency, Architecture Adherence Checker, Regression Hunter | 5 |
+| `ux` | UX failures — silent errors, missing feedback, lost output, broken recovery | First Contact, Upgrade Path, Cleanup/Offboarding, Error Recovery, Cross-Session Continuity, Architecture Adherence Checker, Regression Hunter | 5 |
 | `custom` | Project-specific lenses (rate limiting, data integrity, compliance) | User-defined | Configurable |
 
 Scope options: `all`, `changed` (default — git diff against main), or a specific path.
