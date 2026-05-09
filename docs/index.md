@@ -5,27 +5,17 @@ nav_order: 1
 permalink: /
 ---
 
-{::nomarkdown}
-<style>
-.hero { text-align: center; padding: 1rem 0 0.5rem; }
-.hero h1 { font-size: 2.5rem; margin-bottom: 0.25rem; }
-.hero .tagline { font-size: 1.15rem; opacity: 0.85; margin-bottom: 0.25rem; }
-.hero .stats { font-size: 0.9rem; opacity: 0.6; }
-.feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.5rem 0; }
-.feature-grid .card { padding: 1.25rem; border: 1px solid #30363d; border-radius: 8px; }
-.feature-grid .card h4 { margin-top: 0; margin-bottom: 0.5rem; }
-.feature-grid .card p { margin: 0; font-size: 0.95rem; }
-@media (max-width: 600px) { .feature-grid { grid-template-columns: 1fr; } }
-</style>
-{:/nomarkdown}
+<div style="text-align:center;padding:1rem 0 0.5rem">
 
-{::nomarkdown}
-<div class="hero">
-  <h1>Correctless</h1>
-  <p class="tagline">Correctness-oriented development workflow for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a></p>
-  <p class="stats">29 skills &middot; 8 hooks &middot; 3 intensity levels &middot; enforced TDD with agent separation</p>
+# Correctless
+
+Correctness-oriented development workflow for [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+{: style="font-size:1.15rem;opacity:0.85;margin-bottom:0.25rem"}
+
+29 skills · 8 hooks · 3 intensity levels · enforced TDD with agent separation
+{: style="font-size:0.9rem;opacity:0.6"}
+
 </div>
-{:/nomarkdown}
 
 ---
 
@@ -57,26 +47,41 @@ At **high+ intensity**, the pipeline expands with 6-agent adversarial spec revie
 
 ---
 
-{::nomarkdown}
-<div class="feature-grid">
-  <div class="card">
-    <h4>Agent Separation</h4>
-    <p>Every phase uses a different agent. The test writer doesn't implement. The implementer doesn't review. The reviewer didn't write the spec.</p>
-  </div>
-  <div class="card">
-    <h4>Phase Gating</h4>
-    <p>Hooks block file operations that violate the current phase. During RED, you can only write tests. During QA, everything is blocked. No shortcuts.</p>
-  </div>
-  <div class="card">
-    <h4>Configurable Intensity</h4>
-    <p>Standard (~15 min/feature) covers core TDD. High adds adversarial review and convergence auditing. Critical adds formal modeling.</p>
-  </div>
-  <div class="card">
-    <h4>Self-Improving</h4>
-    <p>Post-merge bugs feed back as antipatterns. QA findings calibrate intensity. The workflow learns from its mistakes.</p>
-  </div>
+<div markdown="1" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin:1.5rem 0">
+
+<div markdown="1" style="padding:1.25rem;border:1px solid #30363d;border-radius:8px">
+
+#### Agent Separation
+
+Every phase uses a different agent. The test writer doesn't implement. The implementer doesn't review. The reviewer didn't write the spec.
+
 </div>
-{:/nomarkdown}
+
+<div markdown="1" style="padding:1.25rem;border:1px solid #30363d;border-radius:8px">
+
+#### Phase Gating
+
+Hooks block file operations that violate the current phase. During RED, you can only write tests. During QA, everything is blocked. No shortcuts.
+
+</div>
+
+<div markdown="1" style="padding:1.25rem;border:1px solid #30363d;border-radius:8px">
+
+#### Configurable Intensity
+
+Standard (~15 min/feature) covers core TDD. High adds adversarial review and convergence auditing. Critical adds formal modeling.
+
+</div>
+
+<div markdown="1" style="padding:1.25rem;border:1px solid #30363d;border-radius:8px">
+
+#### Self-Improving
+
+Post-merge bugs feed back as antipatterns. QA findings calibrate intensity. The workflow learns from its mistakes.
+
+</div>
+
+</div>
 
 ---
 
