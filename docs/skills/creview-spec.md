@@ -69,7 +69,7 @@ Intensity scales with risk:
 |-----------|---------------|----------|
 | `low` | Assumptions + Testability only | ~5 min |
 | `standard` | + Red Team | ~10 min |
-| `high` / `critical` | All 5 agents | 10-20 min |
+| `high` / `critical` | All 6 agents | 10-20 min |
 
 Intensity is set in `.correctless/config/workflow-config.json`.
 
