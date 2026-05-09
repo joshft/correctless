@@ -44,28 +44,35 @@ At **high+ intensity**, the pipeline expands with 6-agent adversarial spec revie
 
 ---
 
-<div class="feature-grid" markdown="1">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; margin: 2rem 0;">
+  <div style="padding: 1.25rem; border: 1px solid #30363d; border-radius: 8px;" markdown="1">
 
-<div class="feature-card" markdown="1">
 ### Agent Separation
+
 Every phase uses a different agent. The test writer doesn't implement. The implementer doesn't review. The reviewer didn't write the spec.
-</div>
 
-<div class="feature-card" markdown="1">
+  </div>
+  <div style="padding: 1.25rem; border: 1px solid #30363d; border-radius: 8px;" markdown="1">
+
 ### Phase Gating
+
 Hooks block file operations that violate the current phase. During RED, you can only write tests. During QA, everything is blocked. No shortcuts.
-</div>
 
-<div class="feature-card" markdown="1">
+  </div>
+  <div style="padding: 1.25rem; border: 1px solid #30363d; border-radius: 8px;" markdown="1">
+
 ### Configurable Intensity
+
 Standard (~15 min/feature) covers core TDD. High adds adversarial review and convergence auditing. Critical adds formal modeling.
-</div>
 
-<div class="feature-card" markdown="1">
+  </div>
+  <div style="padding: 1.25rem; border: 1px solid #30363d; border-radius: 8px;" markdown="1">
+
 ### Self-Improving
-Post-merge bugs feed back as antipatterns. QA findings calibrate intensity. The workflow learns from its mistakes.
-</div>
 
+Post-merge bugs feed back as antipatterns. QA findings calibrate intensity. The workflow learns from its mistakes.
+
+  </div>
 </div>
 
 ---
