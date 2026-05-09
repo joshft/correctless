@@ -206,6 +206,16 @@ This check is dormant by design: it fires only when the post-merge measurement w
 
 **No active workflow**: "No active workflow on this branch. You can edit freely — the gate only blocks during active workflows. To start a structured workflow: `git checkout -b feature/my-feature` then `/cspec`."
 
+### 6a. Incomplete Pipeline Detection (R-009)
+
+Check for a pipeline manifest at `.correctless/artifacts/pipeline-manifest-{branch_slug}.json` (derive `branch_slug` via `workflow-advance.sh status` output or `scripts/lib.sh`). If the manifest exists and `status` is not `"complete"`, report:
+
+> **Incomplete pipeline detected.** Last completed step: {last_completed}. Missing steps: {list}. Expected end phase: {expected_end_phase}, current phase: {current_phase}. Run `/cauto` to resume.
+
+If the manifest does not exist or `status` is `"complete"`, produce no output for this section (dormant — PAT-019).
+
+The workflow state is authoritative — the manifest report is a diagnostic signal, not an override of workflow state.
+
 ### 7. Health Check (if requested)
 
 If the human asks "is everything set up correctly?" or similar, validate:

@@ -10,3 +10,5 @@ BLOCKIN = "BLOCKIN"
 BLOCKINGs = "BLOCKINGs"
 # grep prefix pattern matching both "promote" and "promotion" in test assertions
 promot = "promot"
+# grep prefix pattern matching both "truncated" and "truncation" in test assertions
+truncat = "truncat"

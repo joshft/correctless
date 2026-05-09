@@ -290,6 +290,16 @@
 - **Test**: `tests/test-autonomous-skill-contract.sh` (R-006, R-007, R-013 tests), `tests/test-sensitive-file-guard.sh` (behavioral block tests)
 - **Guards against**: AP-026, AP-022
 
+### ABS-031: Pipeline manifest artifact contract
+- **Artifact**: `.correctless/artifacts/pipeline-manifest-{branch_slug}.json`
+- **Sole writer**: `/cauto` orchestrator (writes manifest as first action after phase gate, updates `completed_steps` after each pipeline step, writes `status: "complete"` as final action)
+- **Consumers**: `/cauto` R-004 resumption (reads manifest to detect truncation and report missed steps), `/cstatus` R-009 (reads manifest to report incomplete pipeline)
+- **Invariant**: Pipeline manifest is ephemeral — not committed during consolidation. Covered by Step 8.2 unstage guard (`.correctless/artifacts/` exclusion). Manifest without `"status": "complete"` indicates pipeline truncation.
+- **Enforced at**: `skills/cauto/SKILL.md` (sole writer, R-001/R-002/R-003 instructions), Step 8.2 belt-and-suspenders guard (prevents accidental commit)
+- **Violated when**: Manifest is committed to the branch; manifest `status` is set to `"complete"` before pipeline summary (Step 10) completes; a consumer other than `/cauto` or `/cstatus` writes to the manifest
+- **Test**: `tests/test-pipeline-completeness-verification.sh`
+- **Guards against**: PMB-009 (silent pipeline truncation)
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.
