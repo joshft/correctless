@@ -5,6 +5,14 @@ nav_order: 1
 permalink: /
 ---
 
+<style>
+.feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin: 1.5rem 0; }
+.feature-grid .card { padding: 1.25rem; border: 1px solid #30363d; border-radius: 8px; }
+.feature-grid .card h4 { margin-top: 0; margin-bottom: 0.5rem; }
+.feature-grid .card p { margin: 0; }
+@media (max-width: 600px) { .feature-grid { grid-template-columns: 1fr; } }
+</style>
+
 <div class="hero" markdown="1">
 
 # Correctless
@@ -44,12 +52,24 @@ At **high+ intensity**, the pipeline expands with 6-agent adversarial spec revie
 
 ---
 
-| | |
-|:--|:--|
-| **Agent Separation** | **Phase Gating** |
-| Every phase uses a different agent. The test writer doesn't implement. The implementer doesn't review. The reviewer didn't write the spec. | Hooks block file operations that violate the current phase. During RED, you can only write tests. During QA, everything is blocked. No shortcuts. |
-| **Configurable Intensity** | **Self-Improving** |
-| Standard (~15 min/feature) covers core TDD. High adds adversarial review and convergence auditing. Critical adds formal modeling. | Post-merge bugs feed back as antipatterns. QA findings calibrate intensity. The workflow learns from its mistakes. |
+<div class="feature-grid">
+  <div class="card">
+    <h4>Agent Separation</h4>
+    <p>Every phase uses a different agent. The test writer doesn't implement. The implementer doesn't review. The reviewer didn't write the spec.</p>
+  </div>
+  <div class="card">
+    <h4>Phase Gating</h4>
+    <p>Hooks block file operations that violate the current phase. During RED, you can only write tests. During QA, everything is blocked. No shortcuts.</p>
+  </div>
+  <div class="card">
+    <h4>Configurable Intensity</h4>
+    <p>Standard (~15 min/feature) covers core TDD. High adds adversarial review and convergence auditing. Critical adds formal modeling.</p>
+  </div>
+  <div class="card">
+    <h4>Self-Improving</h4>
+    <p>Post-merge bugs feed back as antipatterns. QA findings calibrate intensity. The workflow learns from its mistakes.</p>
+  </div>
+</div>
 
 ---
 
