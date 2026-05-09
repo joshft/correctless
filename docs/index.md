@@ -5,7 +5,7 @@ nav_order: 1
 permalink: /
 ---
 
-<div style="text-align:center;padding:1rem 0 0.5rem">
+<div markdown="1" style="text-align:center;padding:1rem 0 0.5rem">
 
 # Correctless
 
