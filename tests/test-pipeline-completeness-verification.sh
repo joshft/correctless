@@ -15,17 +15,6 @@ FAIL=0
 # Helpers (matching project test conventions)
 # ============================================
 
-assert_eq() {
-  local desc="$1" expected="$2" actual="$3"
-  if [ "$expected" = "$actual" ]; then
-    echo "  PASS: $desc"
-    PASS=$((PASS + 1))
-  else
-    echo "  FAIL: $desc (expected '$expected', got '$actual')"
-    FAIL=$((FAIL + 1))
-  fi
-}
-
 assert_contains() {
   local desc="$1" expected="$2" actual="$3"
   if echo "$actual" | grep -qF "$expected"; then
@@ -33,17 +22,6 @@ assert_contains() {
     PASS=$((PASS + 1))
   else
     echo "  FAIL: $desc (expected output to contain '$expected')"
-    FAIL=$((FAIL + 1))
-  fi
-}
-
-assert_not_contains() {
-  local desc="$1" unexpected="$2" actual="$3"
-  if ! echo "$actual" | grep -qF "$unexpected"; then
-    echo "  PASS: $desc"
-    PASS=$((PASS + 1))
-  else
-    echo "  FAIL: $desc (expected output NOT to contain '$unexpected')"
     FAIL=$((FAIL + 1))
   fi
 }
@@ -59,17 +37,6 @@ file_contains() {
   fi
 }
 
-file_not_contains() {
-  local file="$1" pattern="$2" desc="$3"
-  if grep -q "$pattern" "$file" 2>/dev/null; then
-    echo "  FAIL: $desc (pattern '$pattern' should NOT be in $file)"
-    FAIL=$((FAIL + 1))
-  else
-    echo "  PASS: $desc"
-    PASS=$((PASS + 1))
-  fi
-}
-
 file_contains_i() {
   local file="$1" pattern="$2" desc="$3"
   if grep -qi "$pattern" "$file" 2>/dev/null; then
@@ -77,17 +44,6 @@ file_contains_i() {
     PASS=$((PASS + 1))
   else
     echo "  FAIL: $desc (pattern '$pattern' not found case-insensitively in $file)"
-    FAIL=$((FAIL + 1))
-  fi
-}
-
-assert_file_exists() {
-  local desc="$1" path="$2"
-  if [ -f "$path" ]; then
-    echo "  PASS: $desc"
-    PASS=$((PASS + 1))
-  else
-    echo "  FAIL: $desc (file '$path' does not exist)"
     FAIL=$((FAIL + 1))
   fi
 }
