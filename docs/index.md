@@ -6,7 +6,7 @@ permalink: /
 ---
 
 <style>
-.feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin: 1.5rem 0; }
+.feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.5rem 0; }
 .feature-grid .card { padding: 1.25rem; border: 1px solid #30363d; border-radius: 8px; }
 .feature-grid .card h4 { margin-top: 0; margin-bottom: 0.5rem; }
 .feature-grid .card p { margin: 0; }
