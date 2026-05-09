@@ -1,3 +1,10 @@
+---
+title: "/crelease"
+parent: "Core Workflow"
+grand_parent: Skills
+nav_order: 9
+---
+
 # /crelease — Version Bump, Changelog, and Release Tag
 
 > Automate version bumping, changelog generation, and release tagging. Reads specs merged since the last tag to determine the bump level, generates a user-facing changelog, updates the version file, and creates an annotated git tag.

@@ -1,3 +1,10 @@
+---
+title: "/carchitect"
+parent: "Core Workflow"
+grand_parent: Skills
+nav_order: 7
+---
+
 # /carchitect — Architecture Definition
 
 > Produce a structured `.correctless/ARCHITECTURE.md` for any project. Two modes: reverse-engineer from existing code or greenfield directed discovery. Output includes machine-referenceable entrypoints YAML and human-readable prose sections.

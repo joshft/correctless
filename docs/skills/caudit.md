@@ -1,3 +1,10 @@
+---
+title: "/caudit"
+parent: "High+ Intensity"
+grand_parent: Skills
+nav_order: 3
+---
+
 # /caudit — Cross-Codebase Quality Audit (Olympics)
 
 > Run convergence-based audits using parallel specialist agents with hostile lenses. The loop runs until no critical or high findings remain.

@@ -1,3 +1,10 @@
+---
+title: "/cauto"
+parent: "Core Workflow"
+grand_parent: Skills
+nav_order: 8
+---
+
 # /cauto — Semi-Auto Implementation Pipeline
 
 > Orchestrate the full implementation pipeline after spec review. Runs /ctdd, /simplify, /cverify, /cupdate-arch, /cdocs, then creates a PR — with flexible phase resume and autonomous decision-making.

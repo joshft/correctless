@@ -1,3 +1,8 @@
+---
+title: Autonomous Skill Contract
+parent: Features
+---
+
 # Autonomous Skill Contract
 
 > Added: 2026-05-08 | Spec: `.correctless/specs/autonomous-skill-contract.md` | Intensity: high

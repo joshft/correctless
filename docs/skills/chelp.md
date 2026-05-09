@@ -1,3 +1,10 @@
+---
+title: "/chelp"
+parent: "Observability"
+grand_parent: Skills
+nav_order: 2
+---
+
 # /chelp — Quick Help
 
 > Show the workflow pipeline, all available commands, and a quick-reference cheat sheet.

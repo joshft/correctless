@@ -1,3 +1,10 @@
+---
+title: "/crefactor"
+parent: "Code Quality"
+grand_parent: Skills
+nav_order: 2
+---
+
 # /crefactor — Structured Refactoring
 
 > Restructure code with behavioral equivalence enforcement — tests must pass before and after, and any test change requires explicit approval.

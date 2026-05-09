@@ -1,3 +1,10 @@
+---
+title: "/ctdd"
+parent: "Core Workflow"
+grand_parent: Skills
+nav_order: 4
+---
+
 # /ctdd — Enforced Test-Driven Development
 
 > Orchestrate the full RED-GREEN-QA pipeline with agent separation — different agents write tests, implement code, and review quality.

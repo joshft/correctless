@@ -1,3 +1,10 @@
+---
+title: "/cverify"
+parent: "Core Workflow"
+grand_parent: Skills
+nav_order: 5
+---
+
 # /cverify — Post-Implementation Verification
 
 > Verify that the implementation actually matches the spec — not just that tests pass, but that the right things were tested.

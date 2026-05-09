@@ -1,3 +1,10 @@
+---
+title: "/cmetrics"
+parent: "Observability"
+grand_parent: Skills
+nav_order: 4
+---
+
 # /cmetrics — Workflow Metrics Dashboard
 
 > Aggregate all workflow data into a project health and ROI dashboard showing bugs caught, token cost, and trends.

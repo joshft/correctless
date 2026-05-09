@@ -1,3 +1,10 @@
+---
+title: "/cmaintain"
+parent: "Open Source"
+grand_parent: Skills
+nav_order: 2
+---
+
 # /cmaintain — Maintainer Contribution Review
 
 > Evaluate an incoming PR from a maintainer's perspective: scope, conventions, quality, and long-term maintenance burden.

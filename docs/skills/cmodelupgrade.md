@@ -1,3 +1,10 @@
+---
+title: "/cmodelupgrade"
+parent: "High+ Intensity"
+grand_parent: Skills
+nav_order: 8
+---
+
 # /cmodelupgrade — Harness Regression Report
 
 > Compare the current `{model}+HARNESS_VERSION` combination's pipeline metrics against a stored baseline and produce a per-feature regression report. Strictly advisory — never auto-applies anything.

@@ -1,3 +1,10 @@
+---
+title: "/cdebug"
+parent: "Code Quality"
+grand_parent: Skills
+nav_order: 3
+---
+
 # /cdebug — Structured Bug Investigation
 
 > Investigate a bug systematically — reproduce, trace root cause, form hypotheses, fix with TDD discipline, and escalate if the bug resists.

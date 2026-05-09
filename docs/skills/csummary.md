@@ -1,3 +1,10 @@
+---
+title: "/csummary"
+parent: "Observability"
+grand_parent: Skills
+nav_order: 3
+---
+
 # /csummary — Feature Workflow Summary
 
 > Generate a one-page report of everything the Correctless workflow caught during a feature.
