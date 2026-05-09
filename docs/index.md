@@ -5,22 +5,27 @@ nav_order: 1
 permalink: /
 ---
 
+{::nomarkdown}
 <style>
+.hero { text-align: center; padding: 1rem 0 0.5rem; }
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.25rem; }
+.hero .tagline { font-size: 1.15rem; opacity: 0.85; margin-bottom: 0.25rem; }
+.hero .stats { font-size: 0.9rem; opacity: 0.6; }
 .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.5rem 0; }
 .feature-grid .card { padding: 1.25rem; border: 1px solid #30363d; border-radius: 8px; }
 .feature-grid .card h4 { margin-top: 0; margin-bottom: 0.5rem; }
-.feature-grid .card p { margin: 0; }
+.feature-grid .card p { margin: 0; font-size: 0.95rem; }
 @media (max-width: 600px) { .feature-grid { grid-template-columns: 1fr; } }
 </style>
+{:/nomarkdown}
 
-<div class="hero" markdown="1">
-
-# Correctless
-
-<p class="tagline">Correctness-oriented development workflow for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a></p>
-<p class="stats">29 skills &middot; 8 hooks &middot; 3 intensity levels &middot; enforced TDD with agent separation</p>
-
+{::nomarkdown}
+<div class="hero">
+  <h1>Correctless</h1>
+  <p class="tagline">Correctness-oriented development workflow for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a></p>
+  <p class="stats">29 skills &middot; 8 hooks &middot; 3 intensity levels &middot; enforced TDD with agent separation</p>
 </div>
+{:/nomarkdown}
 
 ---
 
@@ -52,6 +57,7 @@ At **high+ intensity**, the pipeline expands with 6-agent adversarial spec revie
 
 ---
 
+{::nomarkdown}
 <div class="feature-grid">
   <div class="card">
     <h4>Agent Separation</h4>
@@ -70,6 +76,7 @@ At **high+ intensity**, the pipeline expands with 6-agent adversarial spec revie
     <p>Post-merge bugs feed back as antipatterns. QA findings calibrate intensity. The workflow learns from its mistakes.</p>
   </div>
 </div>
+{:/nomarkdown}
 
 ---
 
