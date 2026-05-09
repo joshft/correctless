@@ -1,3 +1,8 @@
+---
+title: Harness Fingerprint + Model Upgrade Detection
+parent: Features
+---
+
 # Harness Fingerprint + Model Upgrade Detection
 
 > Detect when Anthropic ships a new model or updates harness defaults silently — and produce a regression report against a captured baseline. Spec: `.correctless/specs/harness-fingerprint.md`. Architecture: ABS-027, ABS-028.

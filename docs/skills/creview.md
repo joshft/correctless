@@ -1,3 +1,10 @@
+---
+title: "/creview"
+parent: "Core Workflow"
+grand_parent: Skills
+nav_order: 3
+---
+
 # /creview — Skeptical Spec Review
 
 > Read a spec cold and find what the author missed — unstated assumptions, untestable rules, missing edge cases, and security gaps.

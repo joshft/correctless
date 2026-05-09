@@ -1,3 +1,8 @@
+---
+title: Auto UX Improvements
+parent: Features
+---
+
 # Auto UX Improvements
 
 Three usability improvements to `/cauto` based on the first real pipeline run (scanner-expansion, 2026-04-13): flexible phase entry, scoped commit consolidation, and a structured pipeline summary.

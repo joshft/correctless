@@ -1,3 +1,8 @@
+---
+title: Path-scoped rules (dogfood prototype)
+parent: Features
+---
+
 # Path-scoped rules (dogfood prototype)
 
 ## What it does

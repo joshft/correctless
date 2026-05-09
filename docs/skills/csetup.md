@@ -1,3 +1,10 @@
+---
+title: "/csetup"
+parent: "Core Workflow"
+grand_parent: Skills
+nav_order: 1
+---
+
 # /csetup — Initialize Correctless
 
 > Detect your project's stack, configure the workflow, bootstrap documentation, and run a health check — all in one adaptive, interactive conversation that scales to your project's maturity.

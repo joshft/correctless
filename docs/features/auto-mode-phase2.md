@@ -1,3 +1,8 @@
+---
+title: "Auto Mode Phase 2: Policy-Driven Decision Engine"
+parent: Features
+---
+
 # Auto Mode Phase 2: Policy-Driven Decision Engine
 
 ## What Phase 2 Adds

@@ -1,3 +1,10 @@
+---
+title: "/cspec"
+parent: "Core Workflow"
+grand_parent: Skills
+nav_order: 2
+---
+
 # /cspec — Write a Feature Specification
 
 > Turn a feature idea into a structured specification with testable rules before any code is written.

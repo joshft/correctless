@@ -1,3 +1,8 @@
+---
+title: Design Rationale
+nav_order: 8
+---
+
 # Correctless: Correctness-Oriented Development Workflow
 
 > **Note:** This is the original design specification. The implementation has evolved — 13 skills were added, the bounty/penalty economics were refined, and several feedback loops were closed. As of v3.0, Correctless ships as a single plugin with 28 skills and configurable intensity levels (standard, high, critical). The former "Lite" and "Full" distributions have been merged. See the [README](../../README.md) and the actual [skill files](../../skills/) for the current implementation.

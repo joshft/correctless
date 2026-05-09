@@ -1,3 +1,8 @@
+---
+title: Fix-diff reviewer plugin agent (dogfood of ABS-010)
+parent: Features
+---
+
 # Fix-diff reviewer plugin agent (dogfood of ABS-010)
 
 ## What it does
