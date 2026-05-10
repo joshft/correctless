@@ -83,7 +83,8 @@ update_phase() {
   local ts
   ts="$(date -u +%FT%TZ)"
   locked_update_state "$sf" \
-    ".phase = \"$new_phase\" | .phase_entered_at = \"$ts\" | .override.active = false | .override.remaining_calls = 0" \
+    '.phase = $p | .phase_entered_at = $t | .override.active = false | .override.remaining_calls = 0' \
+    --arg p "$new_phase" --arg t "$ts" \
     || die "Failed to update phase"
   info "Phase: $new_phase"
 }
@@ -570,7 +571,8 @@ cmd_qa() {
   sf="$(state_file)"
   ts="$(date -u +%FT%TZ)"
   locked_update_state "$sf" \
-    ".qa_rounds += 1 | .phase = \"tdd-qa\" | .phase_entered_at = \"$ts\" | .override.active = false | .override.remaining_calls = 0" \
+    '.qa_rounds += 1 | .phase = "tdd-qa" | .phase_entered_at = $t | .override.active = false | .override.remaining_calls = 0' \
+    --arg t "$ts" \
     || die "Failed to update state for QA phase"
   info "Phase: tdd-qa"
   info "Next: QA review (edits blocked)"
@@ -937,7 +939,8 @@ cmd_set_intensity() {
   sf="$(state_file)"
   [ -f "$sf" ] || die "No state file — run 'init' first"
   locked_update_state "$sf" \
-    ".feature_intensity = \"$level\"" \
+    '.feature_intensity = $lv' \
+    --arg lv "$level" \
     || die "Failed to set feature intensity"
   info "Feature intensity set to: $level"
 }

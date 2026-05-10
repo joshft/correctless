@@ -316,3 +316,22 @@ Zero findings. **Converged (R4-R7).**
 - R4 security: python3 -c interpreter bypass, symlink resolution, policy hash at override, CORRECTLESS_TRIAGE_FN env var — architectural decisions needed
 - R4 portability: timeout macOS wrapper, sha256sum test fallback
 - UX deferred: scripts/ relocation, tutorial, FAQ, team guide, file manifest, JS/TS detection, /cauto docs, test_new docs, before/after comparison
+
+## Run: 2026-05-09
+### Round 1
+| ID | Severity | Tier | Title | Status | Fixed in |
+|----|----------|------|-------|--------|----------|
+| QA-R1-001 | high | confirmed | auto-policy.json template missing from sync.sh distribution | fixed | audit branch |
+| QA-R1-002 | high | confirmed | Root AGENT_CONTEXT.md and ARCHITECTURE.md stale counts (28 skills/59 tests) | fixed | audit branch |
+| QA-R1-003 | medium | confirmed | update_phase() uses jq string interpolation instead of --arg (AP-010) | fixed | audit branch |
+| QA-R1-004 | low | confirmed | error_json() in compute-session-cost.sh uses raw string interpolation | fixed | audit branch |
+
+### Round 2
+Zero findings. **Converged (R1-R2).**
+
+Scope: full (20+ PRs since last QA audit 2026-04-12). 6 specialist lenses.
+
+### Recurring Patterns
+- **AP-024 (hardcoded file list)**: auto-policy.json added to templates/ but never added to the hardcoded template list in sync.sh. Same class as QA-006 (2026-04-03: spec templates missing from distribution). The template sync loop should use a glob instead of an enumerated list.
+- **AP-005 (stale counts)**: Root AGENT_CONTEXT.md and ARCHITECTURE.md counts stale again (28→29 skills, 59→78 tests). 5th recurrence across 4 audit runs. Canonical .correctless/ copies were correct; root copies were not updated. The "stale copy" banner helps but doesn't prevent the drift.
+- **AP-010 (jq string interpolation)**: update_phase() used $new_phase directly in jq filter string. Same class as QA-R3-001 (2026-04-09). All callers pass hardcoded values so no exploitation path, but inconsistent with the --arg pattern used elsewhere in the same file.
