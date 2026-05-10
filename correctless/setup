@@ -61,6 +61,7 @@ detect_config() {
     go)
       cat <<GOEOF
 {
+  "schema_version": 1,
   "project": {
     "name": "$name",
     "language": "go",
@@ -115,6 +116,7 @@ GOEOF
 
       cat <<TSEOF
 {
+  "schema_version": 1,
   "project": {
     "name": "$name",
     "language": "typescript",
@@ -153,6 +155,7 @@ TSEOF
 
       cat <<PYEOF
 {
+  "schema_version": 1,
   "project": {
     "name": "$name",
     "language": "python",
@@ -186,6 +189,7 @@ PYEOF
     rust)
       cat <<RSEOF
 {
+  "schema_version": 1,
   "project": {
     "name": "$name",
     "language": "rust",
@@ -219,6 +223,7 @@ RSEOF
     *)
       cat <<OTHEREOF
 {
+  "schema_version": 1,
   "project": {
     "name": "$name",
     "language": "other",
