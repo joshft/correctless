@@ -84,37 +84,24 @@ TOTAL_FEATURES=$(echo "$FEATURES_JSON" | jq 'length')
 
 QA_FINDINGS_JSON="[]"
 if compgen -G ".correctless/artifacts/qa-findings-*.json" >/dev/null 2>&1; then
-  # Extract findings with task slug from each file
-  _findings_parts=""
-  for _qf in .correctless/artifacts/qa-findings-*.json; do
-    _task_slug=$(basename "$_qf" .json | sed 's/^qa-findings-//')
-    _part=$(jq --arg task "$_task_slug" '
-      [.findings[]? | {
-        id: .id,
-        severity: .severity,
-        description: .description,
-        rule_ref: .rule_ref,
-        status: .status,
-        lens: (.lens // null),
-        task: $task
-      }]
-    ' "$_qf" 2>/dev/null || echo "[]")
-    if [ -z "$_findings_parts" ]; then
-      _findings_parts="$_part"
-    else
-      _findings_parts=$(echo "$_findings_parts" "$_part" | jq -s 'add')
-    fi
-  done
-  QA_FINDINGS_JSON="${_findings_parts:-[]}"
+  QA_FINDINGS_JSON=$(jq -n '[inputs | .findings[]? | {
+    id: .id,
+    severity: .severity,
+    description: .description,
+    rule_ref: .rule_ref,
+    status: .status,
+    lens: (.lens // null),
+    task: (input_filename | ltrimstr(".correctless/artifacts/qa-findings-") | rtrimstr(".json"))
+  }]' .correctless/artifacts/qa-findings-*.json 2>/dev/null || echo "[]")
 fi
 
-TOTAL_FINDINGS=$(echo "$QA_FINDINGS_JSON" | jq 'length')
-
-# Count by phase prefix
-QA_COUNT=$(echo "$QA_FINDINGS_JSON" | jq '[.[] | select(.id | startswith("QA-"))] | length')
-MA_COUNT=$(echo "$QA_FINDINGS_JSON" | jq '[.[] | select(.id | startswith("MA-"))] | length')
-BLOCKING_COUNT=$(echo "$QA_FINDINGS_JSON" | jq '[.[] | select(.severity == "BLOCKING")] | length')
-NONBLOCKING_COUNT=$(echo "$QA_FINDINGS_JSON" | jq '[.[] | select(.severity != "BLOCKING")] | length')
+eval "$(echo "$QA_FINDINGS_JSON" | jq -r '
+  "TOTAL_FINDINGS=\(length)",
+  "QA_COUNT=\([.[] | select(.id | startswith("QA-"))] | length)",
+  "MA_COUNT=\([.[] | select(.id | startswith("MA-"))] | length)",
+  "BLOCKING_COUNT=\([.[] | select(.severity == "BLOCKING")] | length)",
+  "NONBLOCKING_COUNT=\([.[] | select(.severity != "BLOCKING")] | length)"
+')"
 
 # ============================================================================
 # STEP 5: Parse review decisions (optional, Phase 3 only)
@@ -267,9 +254,10 @@ if compgen -G ".correctless/artifacts/cost-*.json" >/dev/null 2>&1; then
   HAS_COST_ARTIFACTS=true
   COST_JSON=$(jq -n '[inputs]' .correctless/artifacts/cost-*.json 2>/dev/null || echo "[]")
   # Check for unknown models across all cost artifacts
-  COST_UNKNOWN_MODELS=$(echo "$COST_JSON" | jq '[.[] | (.unknown_models // []) | length] | add // 0 | . > 0' 2>/dev/null || echo "false")
-  # Collect warnings
-  COST_WARNINGS=$(echo "$COST_JSON" | jq '[.[] | (.warnings // [])[]] | unique' 2>/dev/null || echo "[]")
+  eval "$(echo "$COST_JSON" | jq -r '
+    "COST_UNKNOWN_MODELS=\([.[] | (.unknown_models // []) | length] | add // 0 | . > 0)",
+    "COST_WARNINGS=\([.[] | (.warnings // [])[]] | unique | @json)"
+  ' 2>/dev/null || echo 'COST_UNKNOWN_MODELS=false; COST_WARNINGS="[]"')"
 fi
 
 # ============================================================================
