@@ -25,7 +25,7 @@ source "$SCRIPT_DIR/lib.sh"
 # Used for all graceful-degradation paths so callers always get valid JSON.
 error_json() {
   local msg="$1"
-  echo "{\"error\":\"$msg\",\"total_cost_usd\":0,\"total_input_tokens\":0,\"total_output_tokens\":0,\"total_cache_write_tokens\":0,\"total_cache_read_tokens\":0,\"by_phase\":[],\"by_subagent\":[],\"pricing_used\":{},\"model_breakdown\":[],\"unknown_models\":[],\"warnings\":[],\"sessions\":[]}"
+  jq -n --arg m "$msg" '{error:$m,total_cost_usd:0,total_input_tokens:0,total_output_tokens:0,total_cache_write_tokens:0,total_cache_read_tokens:0,by_phase:[],by_subagent:[],pricing_used:{},model_breakdown:[],unknown_models:[],warnings:[],sessions:[]}'
   exit 0
 }
 

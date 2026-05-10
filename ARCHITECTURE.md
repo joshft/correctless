@@ -6,15 +6,15 @@
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Skills | `skills/*/SKILL.md` | 28 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
+| Skills | `skills/*/SKILL.md` | 29 skill definitions (Markdown with frontmatter). Each defines one slash command's behavior, tools, and constraints. |
 | Hooks | `hooks/` | 7 bash scripts + 1 agent hook: workflow gate, sensitive-file-guard (PreToolUse), state machine, statusline, audit trail, auto-format, token-tracking (PostToolUse), import-guard (agent). |
 | Templates | `templates/` | Scaffolding templates for ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, invariant templates (high+ intensity), spec templates, workflow configs. |
 | Helpers | `helpers/` | Property-based testing guides per language (Go, Python, TypeScript, Rust). High+ intensity. |
-| Distribution | `correctless/` | Single 28-skill distribution. Intensity gates control which skills activate at each level. |
+| Distribution | `correctless/` | Single 29-skill distribution. Intensity gates control which skills activate at each level. |
 | Docs | `docs/` | Per-skill user-facing documentation and feature docs. |
 | Design Specs | `docs/design/correctless.md` | Design specification covering all intensity levels. |
 | Setup | `setup` | Bash script: detects stack, scaffolds config/hooks/templates, registers Claude Code hooks. Idempotent. |
-| Tests | `tests/test*.sh` | 59 test files (~4,500 assertions) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, and test-evasion antipattern validation. |
+| Tests | `tests/test*.sh` | 78 test files (~5,000 assertions) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, and test-evasion antipattern validation. |
 | Sync | `sync.sh` | Copies source files into the `correctless/` distribution target. |
 
 ## Design Patterns
@@ -22,7 +22,7 @@
 ### PAT-001: Source → Distribution Sync
 - All development happens in root-level `skills/`, `hooks/`, `templates/`, `helpers/`
 - `sync.sh` copies to `correctless/` — this directory is never edited directly
-- All 28 skills are included; intensity gates control which activate at each level
+- All 29 skills are included; intensity gates control which activate at each level
 
 ### PAT-002: Agent Separation (The Lens Principle)
 - Never let an agent grade its own work
