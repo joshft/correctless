@@ -638,11 +638,11 @@ cmd_done() {
   info "Checking that tests still pass..."
   tests_pass
 
-  # R-002/R-004: Check spec integrity before completing
+  # R-002/R-004: Check spec integrity before completing (single state read)
   local state spec_path stored_hash
   state="$(read_state)"
-  spec_path="$(echo "$state" | jq -r '.spec_file // ""')"
-  stored_hash="$(echo "$state" | jq -r '.spec_hash // ""')"
+  local original_lines
+  eval "$(echo "$state" | jq -r '@sh "spec_path=\(.spec_file // "") stored_hash=\(.spec_hash // "") original_lines=\(.spec_line_count // 0)"')"
 
   if [ -n "$stored_hash" ] && [ "$stored_hash" != "null" ] && [ -n "$spec_path" ] && [ "$spec_path" != "null" ]; then
     if [ ! -f "$REPO_ROOT/$spec_path" ]; then
@@ -653,8 +653,7 @@ cmd_done() {
       current_hash="$(sha256_hash_file "$REPO_ROOT/$spec_path" 2>/dev/null || echo "")"
       if [ -n "$current_hash" ] && [ "$current_hash" != "$stored_hash" ]; then
         # R-002: Spec was modified after review approval
-        local original_lines current_lines delta
-        original_lines="$(echo "$state" | jq -r '.spec_line_count // 0')"
+        local current_lines delta
         current_lines="$(wc -l < "$REPO_ROOT/$spec_path" 2>/dev/null || echo "0")"
         delta="$((current_lines - original_lines))"
         [ "$delta" -ge 0 ] && delta="+$delta"
@@ -835,10 +834,9 @@ cmd_audit_done() {
   # Match is content-based — string equality on the round-JSON's started_at
   # field with the workflow state's started_at — robust to ENV-003 mtime
   # unreliability after git checkout/clone (INV-001, INV-003).
-  local sf preset state_started
+  local sf preset state_started override_active oa_remaining
   sf="$(state_file)"
-  preset=$(jq -r '.audit.type // empty' "$sf" 2>/dev/null)
-  state_started=$(jq -r '.started_at // empty' "$sf" 2>/dev/null)
+  eval "$(jq -r '@sh "preset=\(.audit.type // "") state_started=\(.started_at // "") override_active=\(.override.active // false) oa_remaining=\(.override.remaining_calls // 0)"' "$sf" 2>/dev/null)"
   if [ -z "$preset" ] || [ "$preset" = "null" ]; then
     die "Audit findings missing: state .audit.type is missing or null. Re-run audit-start."
   fi
@@ -860,11 +858,6 @@ cmd_audit_done() {
     die "Audit findings missing: state .started_at is missing. Re-run audit-start."
   fi
 
-  # Read override state (INV-008) — the existing override mechanism writes
-  # .override.active + .override.remaining_calls to the state file.
-  local override_active oa_remaining
-  override_active=$(jq -r '.override.active // false' "$sf" 2>/dev/null)
-  oa_remaining=$(jq -r '.override.remaining_calls // 0' "$sf" 2>/dev/null)
   local override_in_effect=0
   if [ "$override_active" = "true" ] && [ "${oa_remaining:-0}" -gt 0 ]; then
     override_in_effect=1
@@ -1062,16 +1055,15 @@ cmd_override() {
 
   check_branch_match
 
-  local phase
-  phase="$(read_phase)"
   local ts
   ts="$(now_iso)"
 
-  # Check override count — max 3 per workflow
+  # Single state read — extract phase, override_count, and override status
   local state
   state="$(read_state)"
-  local override_count
-  override_count="$(echo "$state" | jq -r '.override_count // 0')"
+  local phase override_count override_active remaining
+  eval "$(echo "$state" | jq -r '@sh "phase=\(.phase) override_count=\(.override_count // 0) override_active=\(.override.active // false) remaining=\(.override.remaining_calls // 0)"')"
+
   if [ "$override_count" -ge 3 ]; then
     die "Override limit reached (3 per workflow). If the gate is consistently blocking legitimate edits, the workflow config or patterns may need adjustment. Use 'reset' as a last resort."
   fi
@@ -1086,12 +1078,6 @@ cmd_override() {
       die "Override rejected: your reason is too similar to a previous override request. Provide a genuinely different justification — explain why this specific edit is needed, not just a rephrasing of the previous reason."
     fi
   fi
-
-  # Block renewal while an override is still active
-  local override_active
-  override_active="$(echo "$state" | jq -r '.override.active // false')"
-  local remaining
-  remaining="$(echo "$state" | jq -r '.override.remaining_calls // 0')"
   if [ "$override_active" = "true" ] && [ "$remaining" -gt 0 ]; then
     die "An override is already active ($remaining calls remaining). It must expire before requesting another."
   fi

@@ -1,0 +1,47 @@
+{
+  "review_dispositions": {
+    "security": "fix",
+    "availability": "add_rule",
+    "testability": "fix",
+    "scope_expansion": "defer",
+    "performance": "tier2_decide",
+    "default": "tier2_decide"
+  },
+  "qa_dispositions": {
+    "critical": "fix",
+    "high": "fix",
+    "medium": { "fix_under_loc": 50, "defer_over_loc": true },
+    "low": "defer_to_report"
+  },
+  "spec_update": {
+    "max_autonomous_revisions": 2,
+    "on_third_revision": "escalate_supervisor",
+    "on_fundamental_restructure": "hard_stop"
+  },
+  "drift": {
+    "clear_violation": "fix",
+    "ambiguous": "log_as_debt",
+    "intentional_divergence": "tier2_decide"
+  },
+  "security": {
+    "never_relax_autonomously": true
+  },
+  "budget": {
+    "max_tokens": 2000000,
+    "warn_at_percent": 75,
+    "hard_stop_at_percent": 100
+  },
+  "time": {
+    "max_duration_hours": 8,
+    "warn_at_hours": 6
+  },
+  "ambiguity_policy": "conservative",
+  "hard_stops": [
+    "security_constraint_conflict",
+    "spec_requires_fundamental_restructure",
+    "budget_exceeded",
+    "time_exceeded",
+    "supervisor_uncertain",
+    "3_or_more_spec_revisions"
+  ]
+}

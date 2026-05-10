@@ -474,7 +474,8 @@ preserve_override_log() {
 
   # R-006: Enforce 50-file cap using shared timestamp sort helper
   local file_count
-  file_count="$(find "$overrides_dir" -maxdepth 1 -name '*.json' -type f 2>/dev/null | wc -l | tr -d ' ')"
+  file_count=0
+  for _fc in "$overrides_dir"/*.json; do [ -f "$_fc" ] && file_count=$((file_count + 1)); done
 
   if [ "$file_count" -gt 50 ]; then
     local excess=$((file_count - 50))
@@ -513,13 +514,14 @@ _list_overrides_by_timestamp() {
   local _sentinel="0000-00-00T00:00:00Z"
   local _result
   _result="$(
-    for f in "$_dir"/*.json; do
-      [ -f "$f" ] || continue
-      local ts
-      ts="$(jq -r '.completed_at // ""' "$f" 2>/dev/null)" || ts=""
-      [ -n "$ts" ] && [ "$ts" != "null" ] || ts="$_sentinel"
-      echo "$ts $f"
-    done | sort $_sort_flag
+    # Single jq invocation for all files instead of per-file loop
+    if compgen -G "$_dir"'/*.json' >/dev/null 2>&1; then
+      jq -r --arg sentinel "$_sentinel" '
+        (input_filename) as $f |
+        (.completed_at // "") as $ts |
+        (if $ts == "" or $ts == "null" then $sentinel else $ts end) + " " + $f
+      ' "$_dir"/*.json 2>/dev/null | sort $_sort_flag
+    fi
   )"
 
   if [ -n "$_limit" ] && [ -n "$_result" ]; then
