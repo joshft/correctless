@@ -205,6 +205,8 @@ If the artifact already exists (checkpoint resume), append new findings rather t
 
 ## Step 4: Present to Human
 
+**Before presenting, verify the artifact exists and is non-empty.** If `.correctless/artifacts/review-spec-findings-{slug}.md` is missing or empty, re-write findings from agent outputs before proceeding. Do not present findings from conversation context alone — the artifact is the recovery path if the display is interrupted (AP-029).
+
 Organize findings by category (reading from the artifact written in Step 3.5):
 1. Self-assessment highlights
 2. Red team attack paths
