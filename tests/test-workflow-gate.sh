@@ -520,13 +520,17 @@ test_protected_files() {
   assert_eq "protected: Edit workflow-state file blocked" "2" "$(extract_exit "$result")"
   assert_contains "protected: block message mentions state files" "workflow state files" "$(extract_stderr "$result")"
 
-  # Edit workflow-config.json -> BLOCKED during active workflow
+  # Edit workflow-config.json -> ALLOWED during tdd-impl (test registration)
   result="$(run_gate "Edit" ".correctless/config/workflow-config.json")"
-  assert_eq "protected: Edit workflow-config blocked" "2" "$(extract_exit "$result")"
+  assert_eq "protected: Edit workflow-config allowed in tdd-impl" "0" "$(extract_exit "$result")"
+
+  # Edit workflow-config.json -> BLOCKED during other phases (e.g., spec)
+  set_phase "spec"
+  result="$(run_gate "Edit" ".correctless/config/workflow-config.json")"
+  assert_eq "protected: Edit workflow-config blocked in spec" "2" "$(extract_exit "$result")"
   assert_contains "protected: block message mentions workflow-config" "workflow-config.json" "$(extract_stderr "$result")"
 
   # Protected files blocked even in spec phase
-  set_phase "spec"
   result="$(run_gate "Edit" ".correctless/artifacts/workflow-state-test.json")"
   assert_eq "protected: workflow-state blocked in spec phase" "2" "$(extract_exit "$result")"
 
