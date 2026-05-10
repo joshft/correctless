@@ -1,3 +1,10 @@
+---
+title: "/cquick"
+parent: "Code Quality"
+grand_parent: Skills
+nav_order: 1
+---
+
 # /cquick — Quick Fix with TDD
 
 > Small, focused fixes with TDD — no spec, no review, no verify, no docs. Just branch, test, implement, commit.

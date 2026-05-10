@@ -1,3 +1,8 @@
+---
+title: Scanner Expansion
+parent: Features
+---
+
 # Scanner Expansion
 
 Expands `scripts/antipattern-scan.sh` with grep portability checks and dead-code-in-security-paths detection. Mechanical prevention of two recurring bug classes that documentation-only enforcement failed to stop.

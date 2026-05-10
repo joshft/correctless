@@ -323,6 +323,8 @@ For each relevant historical pattern class, present:
 
 ## Output
 
+**Before presenting, verify the artifact exists and is non-empty.** If `.correctless/artifacts/reviews/review-findings-{slug}.md` is missing or empty, re-write findings before proceeding. Do not present findings from conversation context alone — the artifact is the recovery path if the display is interrupted (AP-029).
+
 Present findings to the human organized by category (reading from the artifact written above):
 1. Unstated assumptions found
 2. Rules that need rewriting (with proposed rewrites)

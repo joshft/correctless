@@ -1,3 +1,8 @@
+---
+title: Workflow History
+nav_order: 7
+---
+
 # Workflow History
 
 ### 2026-05-08 — Audit Findings as Escape Metrics

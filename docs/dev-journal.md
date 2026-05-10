@@ -1,4 +1,27 @@
+---
+title: Dev Journal
+nav_order: 6
+---
+
 # Dev Journal
+
+## 2026-05-09 — UX Review Lens
+
+4 of 9 post-merge bugs (PMB-004 path hallucination, PMB-006 fork stalling, PMB-008 lost findings, PMB-009 silent truncation) are fundamentally UX failures -- silent breakage, missing recovery paths, lost output -- that no existing review lens would have caught. QA checks correctness, Hacker checks security, Performance checks speed, but nothing asks "does this work from the user's perspective?" This feature adds UX review agents to all four quality review integration points.
+
+The implementation adds a UX agent to `/creview-spec` (6th adversarial agent, spawned at high+ intensity), `/creview` (first-ever parallel subagent in the single-pass review), `/ctdd` mini-audit (5th specialist agent alongside cross-component, hostile-input, resource-bounds, upgrade-compatibility), and `/caudit` (new UX preset with 5 specialized roles). The UX agent at each integration point evaluates through four sub-lenses: new-user (path discovery, zero-state behavior, first-run errors), upgrade (silent behavioral changes, migration path clarity, config backward compatibility), offboarding (residual state, orphaned artifacts, graceful degradation), and recovery (error messages on failure, resumption paths, state consistency, output persistence). The `/caudit` UX preset adds a fifth sub-lens -- cross-session continuity -- that checks for workflow state persistence across sessions, conversation context dependency, and fresh-session artifact path resolution. This fifth sub-lens is scoped to `/caudit` because cross-session continuity is only meaningfully testable through multi-session audit scenarios.
+
+Each UX agent prompt includes PMB calibration examples (at least 3 of PMB-004, PMB-006, PMB-008, PMB-009) as concrete instances of what BLOCKING UX failures look like per AP-028 (uncalibrated severity gate). The fail-open design (R-008) means UX agent failures never gate progression -- consistent with all other review lenses. Output format varies by integration point: UX-xxx IDs in `/creview-spec` and `/creview`, MA-xxx with `ux-review` LENS in `/ctdd`, confidence-tiered bounty format in `/caudit`.
+
+## 2026-05-08 — Pipeline Completeness Verification
+
+PMB-009 exposed a silent truncation bug in `/cauto`: the pipeline stopped after TDD+simplify (2 of 7 steps at high intensity) when the Skill tool's forked execution exhausted context capacity. The Skill tool reported "completed" with no error -- workflow state showed `done` instead of `documented`. The pipeline is resumable on re-invocation, but the silent truncation breaks the "run to completion" assumption.
+
+The fix adds a two-layer verification mechanism. First, `/cauto` writes a pipeline manifest (`.correctless/artifacts/pipeline-manifest-{branch_slug}.json`) as its very first action after the phase gate. The manifest records `expected_steps` (canonical step list based on intensity: standard gets 6 steps, high+ gets 7 including `cupdate-arch`), `completed_steps` (updated after each step), and `status` (`in_progress` vs `completed`). On resumption, `/cauto` reads the existing manifest and reports which steps were missed. Second, `/cstatus` checks for incomplete manifests and reports them as a dormant check (per PAT-019 -- skips silently when no manifest exists, fires only when one is found incomplete). The canonical step enum (`ctdd`, `simplify`, `cverify`, `cupdate-arch`, `cdocs`, `consolidation`, `pr`) is defined in ABS-031 and verified by structural tests.
+
+## 2026-05-08 — Escape Metrics in Audit Pipeline
+
+Added escape rate tracking to the `/caudit` convergence pipeline. After each audit round, the pipeline now computes and logs the escape rate -- findings from round N+1 that should have been caught in round N. This feeds into `/cmetrics` as a quality signal: a declining escape rate across rounds means agents are getting better at catching issues on the first pass. The metric is advisory and never gates progression.
 
 ## 2026-05-08 — Autonomous Skill Contract
 

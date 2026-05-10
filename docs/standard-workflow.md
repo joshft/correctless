@@ -1,10 +1,11 @@
+---
+title: Workflow Guide
+nav_order: 3
+---
+
 # Standard Workflow Guide
 
 The standard Correctless workflow enforces a linear pipeline: **spec, review, TDD, verify, docs, merge**. Each step is a separate skill invocation. The human decides when to advance — skills never auto-invoke the next skill.
-
-[Back to documentation index](index.md)
-
----
 
 ## 1. Pipeline Overview
 
@@ -19,7 +20,7 @@ graph LR
     end
 
     subgraph "High+ Intensity adds"
-        S2["/cspec"] --> RS["/creview-spec<br>5-agent adversarial"]
+        S2["/cspec"] --> RS["/creview-spec<br>6-agent adversarial"]
         RS --> T2["/ctdd"]
         T2 --> V2["/cverify"]
         V2 --> A["/cupdate-arch"]
@@ -37,7 +38,7 @@ graph LR
     style M2 fill:#2196f3,color:#fff
 ```
 
-At **high+ intensity**, the pipeline expands: `/creview` becomes `/creview-spec` (5-agent adversarial review), `/cupdate-arch` runs after verification, and `/caudit` (Olympics convergence audit) runs before merge.
+At **high+ intensity**, the pipeline expands: `/creview` becomes `/creview-spec` (6-agent adversarial review), `/cupdate-arch` runs after verification, and `/caudit` (Olympics convergence audit) runs before merge.
 
 The state machine in `hooks/workflow-advance.sh` enforces the ordering — you cannot skip phases or go backwards. Each transition has a gate that validates preconditions (e.g., tests must fail before advancing from RED to GREEN, verification report must exist before advancing to documented).
 

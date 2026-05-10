@@ -1,3 +1,10 @@
+---
+title: "/cpostmortem"
+parent: "High+ Intensity"
+grand_parent: Skills
+nav_order: 5
+---
+
 # /cpostmortem — Post-Merge Bug Analysis
 
 > Analyze why a bug escaped the workflow and strengthen the process so the entire class of bug cannot recur.

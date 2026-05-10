@@ -1,3 +1,10 @@
+---
+title: "/credteam"
+parent: "High+ Intensity"
+grand_parent: Skills
+nav_order: 7
+---
+
 # /credteam — Red Team Assessment
 
 > Live adversarial penetration testing against a running system with source code access and a specific objective to accomplish.

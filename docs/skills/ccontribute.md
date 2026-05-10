@@ -1,3 +1,10 @@
+---
+title: "/ccontribute"
+parent: "Open Source"
+grand_parent: Skills
+nav_order: 1
+---
+
 # /ccontribute — Open Source Contribution
 
 > Learn a target project's conventions first, then generate a PR that looks like a regular contributor wrote it.

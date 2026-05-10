@@ -1,3 +1,10 @@
+---
+title: "/creview-spec"
+parent: "High+ Intensity"
+grand_parent: Skills
+nav_order: 2
+---
+
 # /creview-spec — Multi-Agent Adversarial Spec Review
 
 > Spawn 6 adversarial agents in parallel to tear apart a spec before any code is written.
@@ -62,7 +69,7 @@ Intensity scales with risk:
 |-----------|---------------|----------|
 | `low` | Assumptions + Testability only | ~5 min |
 | `standard` | + Red Team | ~10 min |
-| `high` / `critical` | All 5 agents | 10-20 min |
+| `high` / `critical` | All 6 agents | 10-20 min |
 
 Intensity is set in `.correctless/config/workflow-config.json`.
 

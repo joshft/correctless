@@ -1,3 +1,10 @@
+---
+title: "/cwtf"
+parent: "Observability"
+grand_parent: Skills
+nav_order: 5
+---
+
 # /cwtf — Workflow Accountability
 
 > Audit the workflow itself: did agents actually follow their instructions, check every rule, and avoid shortcuts?

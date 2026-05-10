@@ -1,3 +1,10 @@
+---
+title: "/cdocs"
+parent: "Core Workflow"
+grand_parent: Skills
+nav_order: 6
+---
+
 # /cdocs — Update Project Documentation
 
 > Keep project documentation current after a feature lands — README, AGENT_CONTEXT.md, feature docs, and ARCHITECTURE.md suggestions.

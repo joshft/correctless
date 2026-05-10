@@ -1,3 +1,10 @@
+---
+title: "/cdevadv"
+parent: "High+ Intensity"
+grand_parent: Skills
+nav_order: 6
+---
+
 # /cdevadv — Devil's Advocate (10th Man Rule)
 
 > Challenge the assumptions, architecture, and strategies that every other agent accepts as true.

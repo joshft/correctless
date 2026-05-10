@@ -1,3 +1,10 @@
+---
+title: "/cupdate-arch"
+parent: "High+ Intensity"
+grand_parent: Skills
+nav_order: 4
+---
+
 # /cupdate-arch — Maintain Architecture Documentation
 
 > Scan the codebase for undocumented trust boundaries, abstractions, and patterns, then update ARCHITECTURE.md with human-approved entries.

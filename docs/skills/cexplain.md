@@ -1,3 +1,10 @@
+---
+title: "/cexplain"
+parent: "Code Quality"
+grand_parent: Skills
+nav_order: 5
+---
+
 # /cexplain — Guided Codebase Exploration
 
 > Interactive codebase exploration using mermaid diagrams and prose walkthroughs. Scans the project, presents an overview, and lets you drill into what you care about. Export explored sections to a self-contained HTML document at any point.

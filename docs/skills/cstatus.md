@@ -1,3 +1,10 @@
+---
+title: "/cstatus"
+parent: "Observability"
+grand_parent: Skills
+nav_order: 1
+---
+
 # /cstatus — Workflow Status and Next Steps
 
 > Show the current Correctless workflow state, available commands, and what to do next.

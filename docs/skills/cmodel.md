@@ -1,3 +1,10 @@
+---
+title: "/cmodel"
+parent: "High+ Intensity"
+grand_parent: Skills
+nav_order: 1
+---
+
 # /cmodel — Formal Alloy Modeling
 
 > Translate spec invariants into a formal Alloy model and run the Alloy Analyzer to find design-level bugs before code is written.

@@ -1,3 +1,8 @@
+---
+title: Audit Findings Persistence Contract
+parent: Features
+---
+
 # Audit Findings Persistence Contract
 
 > Gate-enforced persistence for `/caudit` round-JSON and history.md artifacts. Spec: `.correctless/specs/audit-findings-persistence-contract.md`. Architecture: ABS-029. Antipattern guarded: AP-026.

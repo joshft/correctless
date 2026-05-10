@@ -1,3 +1,10 @@
+---
+title: "/cpr-review"
+parent: "Code Quality"
+grand_parent: Skills
+nav_order: 4
+---
+
 # /cpr-review — Multi-Lens PR Review
 
 > Review an incoming pull request through multiple focused lenses: architecture, security, tests, antipatterns, and conventions.
