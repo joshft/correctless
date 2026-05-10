@@ -524,13 +524,32 @@ test_protected_files() {
   result="$(run_gate "Edit" ".correctless/config/workflow-config.json")"
   assert_eq "protected: Edit workflow-config allowed in tdd-impl" "0" "$(extract_exit "$result")"
 
-  # Edit workflow-config.json -> BLOCKED during other phases (e.g., spec)
+  # Bash redirect to workflow-config.json -> ALLOWED during tdd-impl
+  result="$(run_gate_bash "echo '{}' > .correctless/config/workflow-config.json")"
+  assert_eq "protected: Bash workflow-config allowed in tdd-impl" "0" "$(extract_exit "$result")"
+
+  # Edit workflow-config.json -> BLOCKED during spec
   set_phase "spec"
   result="$(run_gate "Edit" ".correctless/config/workflow-config.json")"
   assert_eq "protected: Edit workflow-config blocked in spec" "2" "$(extract_exit "$result")"
   assert_contains "protected: block message mentions workflow-config" "workflow-config.json" "$(extract_stderr "$result")"
 
+  # Bash redirect to workflow-config.json -> BLOCKED during spec
+  result="$(run_gate_bash "echo '{}' > .correctless/config/workflow-config.json")"
+  assert_eq "protected: Bash workflow-config blocked in spec" "2" "$(extract_exit "$result")"
+
+  # workflow-config.json blocked in tdd-tests phase
+  set_phase "tdd-tests"
+  result="$(run_gate "Edit" ".correctless/config/workflow-config.json")"
+  assert_eq "protected: Edit workflow-config blocked in tdd-tests" "2" "$(extract_exit "$result")"
+
+  # workflow-config.json blocked in tdd-qa phase
+  set_phase "tdd-qa"
+  result="$(run_gate "Edit" ".correctless/config/workflow-config.json")"
+  assert_eq "protected: Edit workflow-config blocked in tdd-qa" "2" "$(extract_exit "$result")"
+
   # Protected files blocked even in spec phase
+  set_phase "spec"
   result="$(run_gate "Edit" ".correctless/artifacts/workflow-state-test.json")"
   assert_eq "protected: workflow-state blocked in spec phase" "2" "$(extract_exit "$result")"
 
