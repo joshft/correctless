@@ -398,9 +398,9 @@ check_shell() {
         brace_depth=1
       elif [ -n "$in_func" ]; then
         # Count all opening and closing braces on the line
-        local opens closes
-        opens=$(echo "$fline" | grep -o '{' | wc -l)
-        closes=$(echo "$fline" | grep -o '}' | wc -l)
+        local opens closes _stripped
+        _stripped="${fline//[^\{]/}"; opens=${#_stripped}
+        _stripped="${fline//[^\}]/}"; closes=${#_stripped}
         brace_depth=$((brace_depth + opens - closes))
         if [ "$brace_depth" -le 0 ]; then
           exempt_ranges+=("$func_start-$line_idx")
