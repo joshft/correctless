@@ -206,10 +206,10 @@ else
 fi
 
 # ============================================================================
-# R-003 [unit]: Three specialist agents with specific prompts
+# R-003 [unit]: Six specialist agents with specific prompts
 # ============================================================================
 
-section "R-003: Five specialist agent prompts"
+section "R-003: Six specialist agent prompts"
 
 # R-003a: Cross-component interaction agent prompt
 if grep -qi 'cross.component' "$SKILL_FILE"; then
@@ -720,7 +720,7 @@ fi
 section "R-020: Zero findings + clean round"
 
 # R-020a: Clean round announcement
-if grep -qi 'clean.*no.*finding\|no.*finding.*all.*three.*lens\|round.*clean' "$SKILL_FILE"; then
+if grep -qi 'clean.*no.*finding\|no.*finding.*all.*six.*lens\|round.*clean' "$SKILL_FILE"; then
   pass "R-020a" "Clean round announcement documented"
 else
   fail "R-020a" "Clean round announcement not documented in SKILL.md"

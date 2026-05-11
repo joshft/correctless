@@ -196,23 +196,23 @@ else
 fi
 
 # ============================================================================
-# R-005 [unit]: ctdd says "5 specialist agents" in mini-audit announcements
+# R-005 [unit]: ctdd says "6 specialist agents" in mini-audit announcements
 # ============================================================================
 
-section "R-005: ctdd mini-audit agent count updated to 5"
+section "R-005: ctdd mini-audit agent count updated to 6"
 
-# R-005a: Progress announcement says 5 specialist agents
-if grep -qE 'spawning 5 specialist agents|5 specialist agents' "$CTDD_SKILL"; then
-  pass "R-005a" "Progress announcement references 5 specialist agents"
+# R-005a: Progress announcement says 6 specialist agents
+if grep -qE 'spawning 6 specialist agents|6 specialist agents' "$CTDD_SKILL"; then
+  pass "R-005a" "Progress announcement references 6 specialist agents"
 else
-  fail "R-005a" "Progress announcement does not reference 5 specialist agents"
+  fail "R-005a" "Progress announcement does not reference 6 specialist agents"
 fi
 
-# R-005b: "Each mini-audit round spawns five specialist agents" (or "5 specialist agents")
-if grep -qE 'spawns five specialist agents|spawns 5 specialist agents' "$CTDD_SKILL"; then
-  pass "R-005b" "Agent prompt section references five/5 specialist agents"
+# R-005b: "Each mini-audit round spawns six specialist agents" (or "6 specialist agents")
+if grep -qE 'spawns six specialist agents|six specialist agents' "$CTDD_SKILL"; then
+  pass "R-005b" "Agent prompt section references six/6 specialist agents"
 else
-  fail "R-005b" "Agent prompt section still references four/4 specialist agents"
+  fail "R-005b" "Agent prompt section still references five/5 specialist agents"
 fi
 
 # R-005c: The agent_role enum includes upgrade-compatibility
