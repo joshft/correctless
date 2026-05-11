@@ -193,18 +193,18 @@ else
   fail "R-004a" "UX agent not found in ctdd SKILL.md"
 fi
 
-# R-004b: Cascading update — progress announcement says 5 specialist agents (was 4)
-if grep -qE 'spawning 5 specialist agents' "$CTDD_SKILL"; then
-  pass "R-004b" "Progress announcement references 5 specialist agents"
+# R-004b: Cascading update — progress announcement says 6 specialist agents (was 5)
+if grep -qE 'spawning 6 specialist agents' "$CTDD_SKILL"; then
+  pass "R-004b" "Progress announcement references 6 specialist agents"
 else
-  fail "R-004b" "Progress announcement does not reference 5 specialist agents"
+  fail "R-004b" "Progress announcement does not reference 6 specialist agents"
 fi
 
-# R-004c: Cascading update — spawns five specialist agents (was four)
-if grep -qE 'spawns five specialist agents|spawns 5 specialist agents' "$CTDD_SKILL"; then
-  pass "R-004c" "Agent prompt section references five/5 specialist agents"
+# R-004c: Cascading update — spawns six specialist agents (was five)
+if grep -qE 'spawns six specialist agents|six specialist agents' "$CTDD_SKILL"; then
+  pass "R-004c" "Agent prompt section references six/6 specialist agents"
 else
-  fail "R-004c" "Agent prompt section still references four/4 specialist agents"
+  fail "R-004c" "Agent prompt section still references five/5 specialist agents"
 fi
 
 # R-004d: Cascading update — LENS enum includes ux-review
@@ -573,21 +573,18 @@ else
   fail "CC-001" "LENS line missing original 4 values"
 fi
 
-# CC-002: test-upgrade-compatibility-lens.sh R-005a expects "spawning 4 specialist agents"
-# After R-004, this should be updated to 5. This test checks the new count exists.
-# (The old test R-005a will need updating by the implementation)
-if grep -qE 'spawning 5 specialist agents' "$CTDD_SKILL"; then
-  pass "CC-002" "ctdd says '5 specialist agents' (updated from 4)"
+# CC-002: test-upgrade-compatibility-lens.sh R-005a expects "spawning 6 specialist agents"
+if grep -qE 'spawning 6 specialist agents' "$CTDD_SKILL"; then
+  pass "CC-002" "ctdd says '6 specialist agents'"
 else
-  fail "CC-002" "ctdd does not say '5 specialist agents'"
+  fail "CC-002" "ctdd does not say '6 specialist agents'"
 fi
 
-# CC-003: test-upgrade-compatibility-lens.sh R-005b expects "spawns four specialist agents"
-# After R-004, this should be updated to five.
-if grep -qE 'spawns five specialist agents|spawns 5 specialist agents' "$CTDD_SKILL"; then
-  pass "CC-003" "ctdd says 'spawns five/5 specialist agents' (updated from four/4)"
+# CC-003: test-upgrade-compatibility-lens.sh R-005b expects "six specialist agents"
+if grep -qE 'six specialist agents' "$CTDD_SKILL"; then
+  pass "CC-003" "ctdd says 'six specialist agents'"
 else
-  fail "CC-003" "ctdd does not say 'spawns five/5 specialist agents'"
+  fail "CC-003" "ctdd does not say 'six specialist agents'"
 fi
 
 # CC-004: /creview references to /creview-spec agent count must match actual count (6)

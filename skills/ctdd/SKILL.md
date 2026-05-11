@@ -50,7 +50,7 @@ The TDD workflow can take 15-30+ minutes. The user must see what's happening at 
 4. /simplify: Clean up code quality
 5. QA: Independent review of tests + implementation
 6. (If QA finds issues: Fix round N → re-QA)
-7. Mini-audit: Adversarial specialist review (cross-component, hostile input, resource bounds)
+7. Mini-audit: Adversarial specialist review (cross-component, hostile input, resource bounds, upgrade compatibility, ux-review, integration depth)
 
 **Between every phase**, print a mini pipeline diagram showing progress. Mark completed phases with `✓` and the current phase with `▶`:
 
@@ -559,11 +559,11 @@ The orchestrator tracks attempt counts for all calm reset triggers in its own co
 
 ## Phase: Mini-Audit (tdd-audit)
 
-After QA completes with no BLOCKING findings, advance to `tdd-audit` via `workflow-advance.sh audit-mini` and spawn the mini-audit agents. The mini-audit asks "how does this feature break everything else?" — using five adversarial lenses that are structurally absent from the QA agent's perspective. No convergence loop — fixed rounds per intensity level (standard=1, high=2, critical=3).
+After QA completes with no BLOCKING findings, advance to `tdd-audit` via `workflow-advance.sh audit-mini` and spawn the mini-audit agents. The mini-audit asks "how does this feature break everything else?" — using six adversarial lenses that are structurally absent from the QA agent's perspective. No convergence loop — fixed rounds per intensity level (standard=1, high=2, critical=3).
 
 ### Agent Prompts
 
-Each mini-audit round spawns five specialist agents as forked subagents, running in parallel:
+Each mini-audit round spawns six specialist agents as forked subagents, running in parallel:
 
 1. **Cross-component interaction agent**: "You are testing how this feature interacts with the rest of the system. Read the entrypoints in `.correctless/ARCHITECTURE.md` (look for `correctless:entrypoints:start` / `correctless:entrypoints:end` markers) and the trust boundaries. For each entrypoint whose scope overlaps with the changed files, ask: does this feature change behavior that other components depend on? Does this feature assume invariants that other components could violate? Does this feature introduce state that other components are unaware of? If no entrypoints exist, fall back to `git diff`-scoped analysis: what other files import symbols from the changed files? What callers depend on the changed interfaces?"
 
@@ -592,6 +592,40 @@ Each mini-audit round spawns five specialist agents as forked subagents, running
    - PMB-009: pipeline stopped after 2 of 7 steps with no error, no warning, no truncation artifact — silent truncation breaks the 'run to completion' assumption
 
    For each issue, report it as a finding with the MA- prefix and LENS: ux-review. If the UX agent fails to spawn, returns an error, times out, or returns malformed or incomplete output, the round proceeds without UX findings and notes the absence — the UX lens is advisory and never gates progression."
+
+6. **Integration depth agent**: "You are verifying that `[integration]` tests actually exercise real integration — not just import the entrypoint while stubbing everything behind it. Your job is to catch tests that pass the mechanical test audit (checks 5, 6, 9, 10) but are still unit-tests-in-disguise.
+
+   **Scope**: You operate ONLY on `[integration]` rules that have Entry/Through/Exit contracts in the spec. For `[integration]` rules without contracts, emit one LOW per rule: 'R-xxx is [integration] without Entry/Through/Exit — integration depth not auditable. Consider adding a contract via /cspec.' Do NOT attempt semantic analysis of uncontracted tests. If no `[integration]` rules have contracts, complete with zero findings and note: 'No integration contracts found — integration depth lens has nothing to audit.'
+
+   **Correlation**: Match spec rules to test files using the R-xxx identifier — look for R-xxx in test function names (e.g., `test_r003_*`, `TestR003`), rule ID comments in test blocks (e.g., `# R-003`), or file naming conventions. Use the mechanical R-xxx mapping, not semantic inference of which tests cover which rules. If no test file can be mechanically correlated to a contracted rule via R-xxx identifiers, emit MEDIUM: 'R-xxx has an integration contract but no test could be correlated via R-xxx naming — verify test coverage manually or add R-xxx identifiers to the relevant test.' Do NOT silently skip the rule.
+
+   **Per-component execution evidence check**: For each Through component listed in the contract's 'must NOT be mocked' list, verify the test contains at least one assertion that would fail if that specific component were replaced with a no-op stub. This is execution evidence — proof the component actually ran, not just that it was imported or wired.
+
+   Evidence types (any one suffices per component):
+   - Assertions on Through-component side effects (auth middleware returns 401 on bad token, logger wrote expected entry, config value appears in response body)
+   - Through-component error path assertions (proving the component can fail and the test observes the failure)
+   - Through-component state changes (database row created through real ORM, not hand-inserted; queue message sent through real publisher)
+
+   Look for assertions, expects, asserts, should-statements, or any test framework construct that would fail if the Through component produced no output or different output. This is language-agnostic — use semantic reasoning, not pattern matching. If you cannot determine whether evidence exists for an unfamiliar language, report UNCERTAIN, not CRITICAL.
+
+   **Report per-component**: Report execution evidence status per-component in the DESCRIPTION field of each MA- finding. Components with evidence need not be reported separately — the findings ARE the report. A missing component is a finding — the test satisfies Entry but does not prove Through component X actually fired.
+
+   **Empty Through field**: If a Through field says 'no mock restrictions' or lists no components, note: 'R-xxx has empty Through — no mock restrictions to verify' and move on. No findings are emittable without a Through checklist.
+
+   **Collective Through fields**: If a Through field uses a collective description ('full middleware chain', 'entire request pipeline') without naming individual components, emit LOW: 'R-xxx Through field lists a collective description instead of individual components — cannot verify per-component execution evidence. Consider decomposing via /cspec to name each middleware individually.' Do NOT attempt to infer individual components.
+
+   **What you are NOT checking** (the mechanical test audit already handles these — do not duplicate): Entry grep (check 9), internal import bypass (check 10), hand-rolled mock struct detection (check 6), test-routing around spec-named resources (check 5). Check 7 (execution evidence from test output) and check 8 (production call chain) operate on different inputs — check 7 examines test run artifacts, you examine test source code. You operate at the semantic layer above these structural checks — execution evidence that Through components actually fired, not just that they were structurally referenced.
+
+   **You operate on test source code only** — read test files and infer execution evidence from assertion patterns. Do NOT run tests or require test output logs.
+
+   **Severity calibration:**
+   - CRITICAL: test imports the entrypoint (satisfies Entry) but stubs or mocks a Through component that the contract says must NOT be mocked. Example: test uses `httptest.NewServer(handler)` but replaces AuthMiddleware with a test double — Through contract says auth middleware must NOT be mocked.
+   - HIGH: test satisfies Entry but no assertion would fail if a Through component (e.g., ConfigService) were a no-op — no execution evidence for that component.
+   - LOW: test mocks an external HTTP API that is NOT in the Through list — acceptable isolation of external dependencies.
+   - MEDIUM: Through component has partial evidence (one assertion touches it but doesn't fully prove execution) — flag for human judgment.
+   - UNCERTAIN: unfamiliar language or assertion framework — cannot determine evidence status.
+
+   For each issue, report it as a finding with the MA- prefix and LENS: integration-depth. If the integration depth agent fails to spawn, returns an error, times out, or returns malformed or incomplete output, the round proceeds without integration-depth findings and notes the absence — agent failure is non-blocking (findings from a successfully completed run retain their stated severity)."
 
 ### Severity Calibration for Mini-Audit Agents
 
@@ -622,7 +656,7 @@ Each agent returns findings using the `MA-` prefix (not `QA-`) to distinguish mi
 ```
 FINDING: MA-001
 SEVERITY: CRITICAL|HIGH|MEDIUM|LOW|UNCERTAIN
-LENS: cross-component|hostile-input|resource-bounds|upgrade-compatibility|ux-review
+LENS: cross-component|hostile-input|resource-bounds|upgrade-compatibility|ux-review|integration-depth
 RULE: R-xxx or null
 DESCRIPTION: [what's wrong]
 INSTANCE_FIX: [fix this specific bug]
@@ -694,7 +728,7 @@ Each round after the first receives a "raise the bar" prompt:
 
 ### Progress Announcements
 
-Before each round, announce: "Starting mini-audit round {N}/{total} — spawning 5 specialist agents (cross-component, hostile input, resource bounds, upgrade compatibility, ux-review)."
+Before each round, announce: "Starting mini-audit round {N}/{total} — spawning 6 specialist agents (cross-component, hostile input, resource bounds, upgrade compatibility, ux-review, integration depth)."
 
 As each agent completes, announce immediately: "{Agent name} complete — found {N} findings ({C} critical/high, {M} medium/low). {M} agents still running..."
 
@@ -702,11 +736,11 @@ After all agents complete: "Round {N} complete — {N} total findings ({C} block
 
 ### Agent Failure Handling
 
-If a mini-audit agent fails (context limit, tool error, malformed output, timeout), the round completes with the remaining agents' findings. The orchestrator logs the failure and warns the user which lens was missed: "Warning: {agent name} agent failed ({reason}). Round {N} results are from {remaining lenses} only. The {missing lens} perspective was not evaluated." No automatic retry — retries are expensive and the other four lenses are still valuable.
+If a mini-audit agent fails (context limit, tool error, malformed output, timeout), the round completes with the remaining agents' findings. The orchestrator logs the failure and warns the user which lens was missed: "Warning: {agent name} agent failed ({reason}). Round {N} results are from {remaining lenses} only. The {missing lens} perspective was not evaluated." No automatic retry — retries are expensive and the remaining lenses are still valuable.
 
 ### Zero Findings / Clean Round
 
-When all five agents in a round return zero findings AND all five agents completed successfully, the orchestrator announces "Mini-audit round {N} clean — no findings across all five lenses." If any agent failed, the round is announced as "incomplete" rather than "clean" — zero findings from failed agents is not the same as zero findings from successful agents.
+When all six agents in a round return zero findings AND all six agents completed successfully, the orchestrator announces "Mini-audit round {N} clean — no findings across all six lenses." If any agent failed, the round is announced as "incomplete" rather than "clean" — zero findings from failed agents is not the same as zero findings from successful agents.
 
 At multi-round intensity (high/critical), subsequent rounds still run even if earlier rounds were clean — the fresh-context, no-anchoring design means a later round may find what an earlier one missed.
 
@@ -718,7 +752,7 @@ The mini-audit does NOT use a convergence loop. Each intensity level has a fixed
 
 ### Token Tracking
 
-Token tracking for the mini-audit follows the shared constraints. Skill-specific values: `skill: "ctdd"`, `phase: "mini-audit-round-N"`, `agent_role: "cross-component|hostile-input|resource-bounds|upgrade-compatibility|ux-review"`. The `tdd-audit` → `ctdd` mapping is in `hooks/token-tracking.sh`.
+Token tracking for the mini-audit follows the shared constraints. Skill-specific values: `skill: "ctdd"`, `phase: "mini-audit-round-N"`, `agent_role: "cross-component|hostile-input|resource-bounds|upgrade-compatibility|ux-review|integration-depth"`. The `tdd-audit` → `ctdd` mapping is in `hooks/token-tracking.sh`.
 
 ## After TDD Completes: Next Steps
 
@@ -755,7 +789,7 @@ See "Progress Visibility" section above — task creation and narration are mand
 Log token usage following the shared constraints (`_shared/constraints.md`). Skill-specific values:
 - `skill`: "ctdd"
 - `phase`: "{red|test-audit|green|qa|fix-round-N|mini-audit-round-N}"
-- `agent_role`: "{test-writer|test-auditor|implementation|qa-agent|fix-agent|cross-component|hostile-input|resource-bounds|upgrade-compatibility|ux-review}"
+- `agent_role`: "{test-writer|test-auditor|implementation|qa-agent|fix-agent|cross-component|hostile-input|resource-bounds|upgrade-compatibility|ux-review|integration-depth}"
 
 ### /btw Reminder
 When presenting QA findings for the human to review, mention: "If you need to check something about the codebase without interrupting this review, use /btw."
