@@ -50,11 +50,26 @@ AGENTS=(
 )
 
 # ============================================================================
+# Precomputed / cached data (avoids redundant file reads across check fns)
+# ============================================================================
+
+declare -A AGENT_BODIES
+_cache_agent_bodies() {
+  for agent_name in "${AGENTS[@]}"; do
+    local agent_file="agents/${agent_name}.md"
+    [ -f "$agent_file" ] && AGENT_BODIES["$agent_name"]="$(skill_body "$agent_file")"
+  done
+}
+
+STEP1_BLOCK=""
+_cache_step1_block() {
+  [ -f "$CREVIEW_SPEC_SKILL" ] && STEP1_BLOCK="$(extract_step1_block "$CREVIEW_SPEC_SKILL")"
+}
+
+# ============================================================================
 # Helpers
 # ============================================================================
 
-# Extract the Step 1 agent team section from SKILL.md — from "## Step 1:"
-# to the next "## Step 2:" heading.
 extract_step1_block() {
   local file="$1"
   [ -f "$file" ] || return 1
@@ -196,11 +211,7 @@ check_inv003() {
     fi
   done
 
-  # Must NOT contain general-purpose subagent_type for any of the 6 agents
-  # (Note: self-assessment may still be general-purpose — that's out of scope)
-  local step1_block
-  step1_block="$(extract_step1_block "$CREVIEW_SPEC_SKILL")"
-  if echo "$step1_block" | grep -q 'subagent_type="general-purpose"'; then
+  if echo "$STEP1_BLOCK" | grep -q 'subagent_type="general-purpose"'; then
     fail "INV-003(no-general)" "Step 1 still references subagent_type=\"general-purpose\""
   else
     pass "INV-003(no-general)" "Step 1 does not reference subagent_type=\"general-purpose\""
@@ -219,11 +230,6 @@ check_inv004() {
     return
   fi
 
-  local step1_block
-  step1_block="$(extract_step1_block "$CREVIEW_SPEC_SKILL")"
-
-  # Denylist: blockquoted lines containing agent identity/behavioral patterns
-  # from the original inline prompts
   local -a denylist=(
     "You are a security-focused adversary"
     "You are an assumptions auditor"
@@ -235,7 +241,7 @@ check_inv004() {
 
   local found_any=false
   for pattern in "${denylist[@]}"; do
-    if echo "$step1_block" | grep -q "^> .*${pattern}"; then
+    if echo "$STEP1_BLOCK" | grep -q "^> .*${pattern}"; then
       fail "INV-004(inline:${pattern:0:30})" "Step 1 has blockquoted line containing '${pattern}'"
       found_any=true
     fi
@@ -252,7 +258,7 @@ check_inv004() {
   for num in 1 2 3 4 5 6; do
     local nxt=$((num + 1))
     local agent_section
-    agent_section="$(echo "$step1_block" | awk -v n="$num" -v nxt="$nxt" '
+    agent_section="$(echo "$STEP1_BLOCK" | awk -v n="$num" -v nxt="$nxt" '
       $0 ~ "^### " n "\\." { in_block = 1; next }
       in_block && $0 ~ "^### " nxt "\\." { in_block = 0; next }
       in_block && /^## / { in_block = 0; next }
@@ -298,10 +304,8 @@ check_inv005() {
       continue
     fi
 
-    local body
-    body="$(skill_body "$agent_file")"
+    local body="${AGENT_BODIES[$agent_name]}"
 
-    # Check for each of the 3 fixed preamble file references
     for ref in "${preamble_refs[@]}"; do
       if echo "$body" | grep -q "$ref"; then
         pass "INV-005(${agent_name}:${ref})" "contains reference to $ref"
@@ -347,8 +351,7 @@ check_inv006() {
       continue
     fi
 
-    local body
-    body="$(skill_body "$agent_file")"
+    local body="${AGENT_BODIES[$agent_name]}"
 
     # Check first keyword
     if echo "$body" | grep -qi "$kw1"; then
@@ -481,8 +484,7 @@ check_inv010() {
       continue
     fi
 
-    local body
-    body="$(skill_body "$agent_file")"
+    local body="${AGENT_BODIES[$agent_name]}"
 
     # Denylist pattern 1: "intensity" in conditional context
     if echo "$body" | grep -qiE "if.*intensity|intensity.*standard|intensity.*high|intensity.*low|intensity.*critical"; then
@@ -534,8 +536,7 @@ check_inv011() {
       continue
     fi
 
-    local body
-    body="$(skill_body "$agent_file")"
+    local body="${AGENT_BODIES[$agent_name]}"
 
     if echo "$body" | grep -q "$phrase"; then
       pass "INV-011(${agent_name})" "contains exhaustive phrase '$phrase'"
@@ -559,8 +560,7 @@ check_inv012() {
       continue
     fi
 
-    local body
-    body="$(skill_body "$agent_file")"
+    local body="${AGENT_BODIES[$agent_name]}"
 
     # Must contain output format instruction with "category" or "finding"
     if echo "$body" | grep -qi "category\|finding"; then
@@ -590,9 +590,6 @@ check_prh001() {
     return
   fi
 
-  local step1_block
-  step1_block="$(extract_step1_block "$CREVIEW_SPEC_SKILL")"
-
   # Each of the original inline prompt signatures must be absent
   local -a inline_signatures=(
     "You are a security-focused adversary"
@@ -604,7 +601,7 @@ check_prh001() {
   )
 
   for sig in "${inline_signatures[@]}"; do
-    if echo "$step1_block" | grep -q "^> .*${sig}"; then
+    if echo "$STEP1_BLOCK" | grep -q "^> .*${sig}"; then
       fail "PRH-001(${sig:0:30})" "Step 1 still has blockquoted inline prompt: '$sig'"
     else
       pass "PRH-001(${sig:0:30})" "Step 1 does not have inline prompt: '${sig:0:30}...'"
@@ -659,13 +656,10 @@ check_bnd001() {
       continue
     fi
 
-    local body
-    body="$(skill_body "$agent_file")"
+    local body="${AGENT_BODIES[$agent_name]}"
 
-    # Agents must NOT contain orchestrator-specific logic patterns
-    # checkpoint resume, synthesis, workflow-advance.
-    # Exclude calibration example lines (PMB-xxx references) which may
-    # legitimately mention orchestrator concepts as examples of bugs to catch.
+    # Exclude calibration example lines (PMB-xxx references) which mention
+    # orchestrator concepts as examples of bugs to catch.
     local filtered_body
     filtered_body="$(echo "$body" | grep -v "^- PMB-")"
 
@@ -684,16 +678,6 @@ check_bnd001() {
 check_bnd002() {
   section "BND-002: Shared preamble drift guard"
 
-  # Extract preamble section from each agent and compare byte-equality.
-  # The preamble is the shared instruction block that appears before the
-  # agent-specific lens content. We extract it as the block from the start
-  # of the body up to (but not including) the first lens-specific heading
-  # or the first paragraph that contains a lens-specific keyword.
-  #
-  # Strategy: extract lines from start of body until a line that contains
-  # a lens-unique keyword (from INV-006). The preamble is everything before
-  # the first such line.
-
   local -a preamble_hashes=()
   local -a preamble_agents=()
   local first_hash=""
@@ -705,11 +689,7 @@ check_bnd002() {
       continue
     fi
 
-    # Extract the "## Preamble" section only — this is the shared block
-    # that must be byte-equal across all 6 agents. Agent-specific content
-    # (comment, H1, lens sections) is excluded.
-    local body
-    body="$(skill_body "$agent_file")"
+    local body="${AGENT_BODIES[$agent_name]}"
 
     local preamble
     preamble="$(echo "$body" | awk '
@@ -830,6 +810,9 @@ check_sync() {
 # ============================================================================
 # Run all checks
 # ============================================================================
+
+_cache_step1_block
+_cache_agent_bodies
 
 check_inv001
 check_inv002
