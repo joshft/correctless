@@ -26,7 +26,7 @@ This skill watches the agents watching the code. It sits outside the normal pipe
 - **Rule coverage analysis**: For every spec rule (R-xxx, INV-xxx), checks whether a test exists, whether QA examined it, and whether verification covered it. Outputs a coverage table showing gaps.
 - **Agent thoroughness — QA**: Counts how many spec rules QA actually mentioned in findings or the conversation. Checks which implementation files QA read (from the audit trail) vs. which files were modified. Reports token budget indicators from session-meta as a rough signal ("session used 30% of project average — may have shortcut").
 - **Agent thoroughness — Review**: Checks whether the security checklist fired for applicable categories (auth, input handling, APIs). Checks whether antipatterns were consulted.
-- **Deviation detection**: Flags source files modified during QA (should be read-only), test edits during GREEN that were not logged, overrides with timestamps, and spec updates with reasons.
+- **Deviation detection**: Flags source files modified during QA (should be read-only), test edits during GREEN (prohibited post-M-2 migration — any test edit during GREEN is a deviation), overrides with timestamps, and spec updates with reasons.
 - **Four verdicts**: THOROUGH (all phases ran, all rules covered, no deviations), ADEQUATE (minor gaps that do not affect correctness), INCOMPLETE (significant coverage gaps or skipped checks), SHORTCUT (phase skips, gate bypasses, or far-below-average token usage). A single SHORTCUT criterion dominates — the verdict cannot be higher than SHORTCUT if any gate bypass occurred.
 
 ## Example
@@ -79,7 +79,7 @@ or shortcuts detected.
 | `.correctless/artifacts/workflow-state-*.json` | Nothing (read-only) |
 | Spec file (`.correctless/specs/{task-slug}.md`) | |
 | `.correctless/artifacts/qa-findings-{task-slug}.json` | |
-| `.correctless/artifacts/tdd-test-edits.log` | |
+| `.correctless/artifacts/tdd-test-edits.log` (legacy, if present) | |
 | `.correctless/artifacts/audit-trail-*.jsonl` | |
 | `.correctless/artifacts/override-log.json` | |
 | `docs/verification/{task-slug}-verification.md` | |

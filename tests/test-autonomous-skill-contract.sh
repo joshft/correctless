@@ -17,22 +17,10 @@ SKILLS_DIR="$REPO_DIR/skills"
 CAUTO_SKILL="$SKILLS_DIR/cauto/SKILL.md"
 
 # ============================================================================
-# Helpers
+# Helpers (extract_frontmatter, get_frontmatter_field, parse_tools_list
+# are provided by test-helpers.sh)
 # ============================================================================
 
-# Extract YAML frontmatter from a SKILL.md file (content between first --- pair)
-extract_frontmatter() {
-  local file="$1"
-  sed -n '/^---$/,/^---$/p' "$file" 2>/dev/null
-}
-
-# Extract the value of a YAML key from frontmatter
-frontmatter_value() {
-  local file="$1" key="$2"
-  extract_frontmatter "$file" | grep "^${key}:" | sed "s/^${key}:[[:space:]]*//"
-}
-
-# Check if a file has a section heading (## heading)
 has_section() {
   local file="$1" heading="$2"
   grep -q "^## ${heading}" "$file" 2>/dev/null
@@ -67,7 +55,7 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
 
   skill_count=$((skill_count + 1))
 
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
   if [ -n "$mode" ]; then
     # Validate the value is one of the three allowed values
     case "$mode" in
@@ -103,7 +91,7 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
   skill_name=$(basename "$(dirname "$skill_file")")
   [ "$skill_name" = "_shared" ] && continue
 
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
   [ "$mode" = "autonomous" ] || continue
 
   r002_checked=$((r002_checked + 1))
@@ -139,7 +127,7 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
   skill_name=$(basename "$(dirname "$skill_file")")
   [ "$skill_name" = "_shared" ] && continue
 
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
   [ "$mode" = "interactive" ] || continue
 
   r003_checked=$((r003_checked + 1))
@@ -168,7 +156,7 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
   skill_name=$(basename "$(dirname "$skill_file")")
   [ "$skill_name" = "_shared" ] && continue
 
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
   [ "$mode" = "hybrid" ] || continue
 
   r004_checked=$((r004_checked + 1))
@@ -338,7 +326,7 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
   skill_name=$(basename "$(dirname "$skill_file")")
   [ "$skill_name" = "_shared" ] && continue
 
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
   if [ "$mode" = "hybrid" ]; then
     if grep -q '(recommended)' "$skill_file" 2>/dev/null; then
       r008_found=true
@@ -368,7 +356,7 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
 
   fm=$(extract_frontmatter "$skill_file")
   has_fork=$(echo "$fm" | grep -c 'context: fork' || true)
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
 
   if [ "$has_fork" -gt 0 ] && [ "$mode" = "interactive" ]; then
     r009_violations="${r009_violations}${skill_name} "
@@ -393,7 +381,7 @@ if [ -z "$r009_violations" ]; then
       [ -f "$skill_file" ] || continue
       fm=$(extract_frontmatter "$skill_file")
       if echo "$fm" | grep -q 'context: fork'; then
-        mode=$(frontmatter_value "$skill_file" "interaction_mode")
+        mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
         if [ -n "$mode" ] && [ "$mode" != "interactive" ]; then
           fork_with_mode=$((fork_with_mode + 1))
         fi
@@ -433,7 +421,7 @@ for skill_file in "$SKILLS_DIR"/*/SKILL.md; do
 
   discovered_count=$((discovered_count + 1))
 
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
   case "$mode" in
     autonomous|interactive|hybrid)
       valid_count=$((valid_count + 1))
@@ -470,7 +458,7 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
 
   fm=$(extract_frontmatter "$skill_file")
   has_fork=$(echo "$fm" | grep -c 'context: fork' || true)
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
 
   # Only check hybrid + fork skills
   [ "$has_fork" -gt 0 ] && [ "$mode" = "hybrid" ] || continue
@@ -513,7 +501,7 @@ for skill_file in "$SKILLS_DIR"/*/SKILL.md; do
 
   fm=$(extract_frontmatter "$skill_file")
   has_fork=$(echo "$fm" | grep -c 'context: fork' || true)
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
 
   # Only check hybrid + fork skills
   [ "$has_fork" -gt 0 ] && [ "$mode" = "hybrid" ] || continue
@@ -687,7 +675,7 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
   [ "$skill_name" = "_shared" ] && continue
   [ "$skill_name" = "cauto" ] && continue
 
-  mode=$(frontmatter_value "$skill_file" "interaction_mode")
+  mode=$(get_frontmatter_field "$skill_file" "interaction_mode")
   if [ "$mode" = "hybrid" ]; then
     if ! grep -q 'AUTONOMOUS_DECISIONS_START' "$skill_file" 2>/dev/null; then
       hybrid_format_missing=$((hybrid_format_missing + 1))

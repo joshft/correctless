@@ -23,7 +23,7 @@ nav_order: 4
 
 1. **RED phase** — spawns a test agent that reads the spec rules and writes failing tests. Each test references a rule ID (`// Tests R-001 [unit]: ...`). The test agent creates structural stubs (marked `STUB:TDD`) but writes zero implementation logic.
 2. **Test audit** — a separate agent (not the test writer) reviews test quality before implementation begins. Checks for mock gaps, missing integration tests, and weak assertions. Blocking findings must be fixed before GREEN.
-3. **GREEN phase** — spawns an implementation agent that sees the failing tests and spec but did not write the tests. Implements just enough to make tests pass. Any test edits are logged with reasons.
+3. **GREEN phase** — spawns a dedicated plugin agent (`agents/ctdd-green.md`, ABS-010 pattern) that sees the failing tests and spec but did not write the tests. Implements just enough to make tests pass. The GREEN agent is prohibited from editing test files — if it encounters a test bug, it reports a structured `TEST_BUG:` escalation to the orchestrator instead of modifying the test.
 4. **QA phase** — a third independent agent reviews the implementation against the spec. For each rule: is there a test? Does the implementation actually satisfy the rule, or just the test cases? Every blocking finding requires both an instance fix and a class fix (structural prevention).
 5. **Fix rounds** — if QA finds blocking issues, the workflow returns to GREEN for a fix round, then re-runs QA. Repeats until clean.
 6. **Mini-audit phase** — after QA is clean, spawns six adversarial specialist agents (cross-component interaction, hostile input, resource bounds, upgrade compatibility, UX review, integration depth) to catch issues that the QA agent's rule-satisfaction lens misses. Fixed rounds per intensity level (standard=1, high=2, critical=3). CRITICAL/HIGH findings are blocking; MEDIUM/LOW are advisory. Uses `MA-` prefix for findings to distinguish from QA findings.
@@ -83,7 +83,7 @@ Agent: Spawning test-writing agent — reading spec (5 rules),
 | Approved spec (`.correctless/specs/{slug}.md`) | Test files (project test directory) |
 | `AGENT_CONTEXT.md`, `ARCHITECTURE.md` | Source files (implementation) |
 | `.correctless/config/workflow-config.json` | `.correctless/artifacts/qa-findings-{slug}.json` |
-| `.correctless/antipatterns.md` | `.correctless/artifacts/tdd-test-edits.log` |
+| `.correctless/antipatterns.md` | `.correctless/artifacts/tdd-test-edits.log` (legacy — not written post-M-2 migration) |
 | | `.correctless/artifacts/checkpoint-ctdd-{slug}.json` |
 | | `.correctless/artifacts/token-log-{slug}.json` |
 

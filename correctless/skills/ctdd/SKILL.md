@@ -1,7 +1,7 @@
 ---
 name: ctdd
 description: Enforced TDD workflow. Write failing tests from spec rules, then implement. Use after /creview approves a spec.
-allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Edit
+allowed-tools: Read, Grep, Glob, Bash(*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Edit, Task
 interaction_mode: hybrid
 ---
 
@@ -182,7 +182,7 @@ Task(subagent_type="correctless:ctdd-red",
              <test_file pattern + commands.test from workflow-config.json>")
 ```
 
-The agent definition lives at `agents/ctdd-red.md` and has `tools: Read, Grep, Glob, Write, Edit, Bash` with `context: fork`. The system prompt body in that file contains the behavioral discipline (no task graphs, no approval-seeking, write tests immediately) and the same content-level instructions previously inlined here (rule coverage, integration test contracts, entrypoint awareness, structural stubs with STUB:TDD markers, file location constraints).
+The agent definition lives at `agents/ctdd-red.md` and has `tools: Read, Grep, Glob, Write, Edit, Bash`. The system prompt body in that file contains the behavioral discipline (no task graphs, no approval-seeking, write tests immediately) and the same content-level instructions previously inlined here (rule coverage, integration test contracts, entrypoint awareness, structural stubs with STUB:TDD markers, file location constraints).
 
 Do NOT inline the prompt here. Per ABS-010 / AP-013, the agent file is the single source of truth.
 
@@ -275,31 +275,24 @@ This gate checks that tests exist AND fail (not a build error).
 
 ## Phase: GREEN (tdd-impl)
 
-Spawn an **implementation agent** as a separate forked subagent:
+Invoke the GREEN implementation agent via plugin sub-agent (M-2 migration, 2026-05-11 — extracted to counter harness behavioral drift, same pattern as ctdd-red M-1):
 
-> You are the implementation agent. You did NOT write these tests. Your job is to make them pass by implementing the feature described in the spec.
->
-> Reference the failing test output and implement specifically to make tests pass. Each implementation decision should trace back to a spec rule.
->
-> If you need to edit a test file (e.g., it has a bug — wrong assertion, incorrect setup), you may do so, but every test edit is logged with a reason. Acceptable: the test had a bug, needed an updated fixture. Unacceptable: weakening an assertion to make it pass, deleting a "too strict" test.
->
-> When the implementation agent edits a test file, present the edit to the user:
->
->   1. Approve change (recommended) — the edit is a legitimate fix
->   2. Reject — revert the test edit, find another implementation approach
->   3. Modify — adjust the test edit before accepting
->
->   Or type your own: ___
->
-> Before advancing, all tests must pass.
->
-> **All files MUST be created inside the project directory** — never in /tmp, never in external paths.
->
-> Read: .correctless/AGENT_CONTEXT.md, the spec, .correctless/ARCHITECTURE.md, the failing tests.
-> Write: source files, test files (logged). All files within the project root.
-> Log all test edits to `.correctless/artifacts/tdd-test-edits.log` with timestamp and reason.
->
-> The implementation agent should have `allowed-tools` restricted to: `Read, Grep, Glob, Edit, Write(source and test files inside project root), Write(.correctless/artifacts/tdd-test-edits.log), Bash(test and build commands)`
+```
+Task(subagent_type="correctless:ctdd-green",
+     description="Implement feature to make failing tests pass",
+     prompt="<spec path from workflow-advance.sh status>
+             <pointer to .correctless/AGENT_CONTEXT.md, .correctless/ARCHITECTURE.md, .correctless/antipatterns.md>
+             <test_file pattern + commands.test from workflow-config.json>
+             <failing test output>")
+```
+
+The agent definition lives at `agents/ctdd-green.md` and has `tools: Read, Grep, Glob, Write, Edit, Bash`. The system prompt body in that file contains the behavioral discipline (defensive code override, test-edit prohibition with TEST_BUG escalation, config-derived test command) and the implementation-level instructions previously inlined here.
+
+Do NOT inline the prompt here. Per ABS-010 / AP-013, the agent file is the single source of truth.
+
+**TEST_BUG escalation handling**: If the implementation agent's output contains a `TEST_BUG:` sentinel, the orchestrator must: (1) detect the sentinel, (2) surface the test bug details to the user with actionable options (re-run test audit, fix manually, override), (3) in `/cauto` pipeline context, treat as `escalation_deferred: true` and surface in the end-of-pipeline summary. The orchestrator must not blindly apply the agent's suggested fix.
+
+After the implementation agent completes and tests pass, verify tests exist and pass before advancing:
 
 ### GREEN Phase Calm Reset Prompt (R-001)
 
@@ -389,7 +382,7 @@ Spawn a **QA agent** as a third forked subagent:
 > 4. For rules tagged `[integration]`: is there an actual integration test that exercises the real system path? A unit test with hand-constructed inputs does NOT satisfy an `[integration]` rule.
 >
 > Also check:
-> - Review `.correctless/artifacts/tdd-test-edits.log` — did the implementation agent weaken any tests?
+> - Review `.correctless/artifacts/tdd-test-edits.log` if it exists — did the implementation agent weaken any tests? (Post-M-2 migration: the GREEN agent is prohibited from editing tests, so this log may not exist. Only review it if present.)
 > - Unclosed resources, missing error handling, hardcoded values
 > - Known antipatterns from `.correctless/antipatterns.md`
 > - **Mock gap analysis**: for every test that uses mocks or hand-constructed inputs, ask: "If the wiring between components were broken, would this test still pass?" If yes, that's a BLOCKING finding.
@@ -844,7 +837,7 @@ When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECI
 
 - **You are the orchestrator, not a coder.** Spawn subagents for each phase.
 - **Never let the same agent handle two phases.** RED, GREEN, and QA are separate agents.
-- **Test edits during GREEN are logged, not blocked.** But weakening assertions is a QA finding.
+- **Test edits during GREEN are not permitted.** The GREEN agent must report test bugs via structured `TEST_BUG:` escalation (BND-002) rather than editing tests. The workflow gate still logs test edits during tdd-impl as a safety net — if the prompt-level prohibition fails, the gate captures evidence.
 - **The hook enforces phase gating.** Even if you forget, the gate blocks violations.
 - **If `workflow-advance.sh` fails**, read the error message and present it to the human. Common causes: wrong phase, missing precondition, not on a feature branch.
 - **All files created by any agent must be inside the project directory.** Never write to /tmp or external paths.

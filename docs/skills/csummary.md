@@ -23,7 +23,7 @@ This skill typically runs after `/cdocs` as the final step before merging. It ag
 ## What It Does
 
 - Reads the spec file and identifies rules added during review (rules the original author did not think of).
-- Reads QA findings, verification reports, test edit logs, and audit trails to gather every issue caught.
+- Reads QA findings, verification reports, test edit logs (if present — legacy artifact, not written post-M-2 migration), and audit trails to gather every issue caught.
 - Calculates stats: total issues, issues by phase, QA rounds, spec updates, and branch duration.
 - **Classifies impact**: For each issue, assesses whether it "would have shipped" to production without the workflow, "might have been caught" by a careful developer, or was "cosmetic." The "would have shipped" count is the headline number.
 - Writes the summary to `.correctless/artifacts/summary-{task-slug}.md` and prints it to the conversation.
@@ -70,7 +70,7 @@ Spec: .correctless/specs/rate-limiting.md
 | `.correctless/specs/{task-slug}.md` | `.correctless/artifacts/summary-{task-slug}.md` |
 | `.correctless/artifacts/qa-findings-{task-slug}.json` | |
 | `docs/verification/{task-slug}-verification.md` | |
-| `.correctless/artifacts/tdd-test-edits.log` | |
+| `.correctless/artifacts/tdd-test-edits.log` (legacy, if present) | |
 | `.correctless/artifacts/audit-trail-*.jsonl` | |
 | Workflow state file | |
 | Git log (branch duration, commit count) | |

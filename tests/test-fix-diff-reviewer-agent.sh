@@ -51,79 +51,9 @@ EXPECTED_DOGFOOD_MARKER='<!-- Dogfood prototype (2026-04-10): fix-diff-reviewer-
 EXPECTED_CANONICAL_MARKER='FAIL-CLOSED: Task failure aborts the current round'
 
 # ============================================================================
-# Helpers
+# Helpers (extract_frontmatter, get_frontmatter_field, parse_tools_list
+# are provided by test-helpers.sh)
 # ============================================================================
-
-# Extract frontmatter block (between leading --- lines) from a markdown file.
-# Emits nothing and returns non-zero if frontmatter is absent or malformed.
-#
-# Result is memoized per-file — multiple check functions read the same
-# agent/skill frontmatter, and extraction + field-lookup were previously
-# forking awk ~13 times for the same content.
-extract_frontmatter() {
-  local file="$1"
-  [ -f "$file" ] || return 1
-  local cache_var
-  cache_var="_FM_CACHE_$(printf '%s' "$file" | tr -c 'a-zA-Z0-9' '_')"
-  # Indirect variable expansion is bash-specific but this test file is bash-only.
-  local cached="${!cache_var:-__UNSET__}"
-  if [ "$cached" != "__UNSET__" ]; then
-    printf '%s' "$cached"
-    [ -n "$cached" ] && return 0 || return 1
-  fi
-  local result
-  result="$(awk '
-    BEGIN { state = 0 }
-    NR == 1 {
-      if ($0 == "---") { state = 1; next }
-      else { exit 1 }
-    }
-    state == 1 && $0 == "---" { exit 0 }
-    state == 1 { print }
-  ' "$file" 2>/dev/null || true)"
-  printf -v "$cache_var" '%s' "$result"
-  printf '%s' "$result"
-  [ -n "$result" ] && return 0 || return 1
-}
-
-# Extract a single scalar frontmatter field (key: value) from the agent file.
-get_frontmatter_field() {
-  local file="$1" key="$2"
-  extract_frontmatter "$file" 2>/dev/null | awk -v k="$key" '
-    BEGIN { found = 0 }
-    {
-      # Match "key: value" (allow leading whitespace).
-      if (match($0, "^[[:space:]]*" k ":[[:space:]]*")) {
-        val = substr($0, RSTART + RLENGTH)
-        # Strip trailing whitespace.
-        sub(/[[:space:]]+$/, "", val)
-        print val
-        found = 1
-        exit
-      }
-    }
-    END { exit (found ? 0 : 1) }
-  '
-}
-
-# Parse the `tools:` comma-flow field and emit one tool name per line.
-# Normalizes whitespace and strips empties. Returns non-zero if field missing.
-parse_tools_list() {
-  local file="$1"
-  local raw
-  raw="$(get_frontmatter_field "$file" "tools")" || return 1
-  [ -n "$raw" ] || return 1
-  # Split on comma, trim whitespace, print one per line.
-  printf '%s\n' "$raw" | awk '
-    {
-      n = split($0, a, ",")
-      for (i = 1; i <= n; i++) {
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", a[i])
-        if (a[i] != "") print a[i]
-      }
-    }
-  '
-}
 
 # Extract the step 6a block from caudit SKILL.md, delimited by the HTML
 # sentinel comments `<!-- STEP 6A BEGIN -->` and `<!-- STEP 6A END -->`
