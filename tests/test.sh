@@ -587,6 +587,14 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+if (cd "$REPO_DIR" && bash tests/test-creview-spec-agents.sh); then
+  echo "  PASS: creview-spec agents structural test"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: creview-spec agents structural test — see output above"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "======================"
 echo "Results: $PASS passed, $FAIL failed"

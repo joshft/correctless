@@ -199,7 +199,13 @@ check_enforcement_mechanism "R-005g" 'prompt.level'                        "prom
 section "R-006: creview-spec Design Contract Checker flags missing Enforcement"
 
 # R-006a: Design Contract Checker prompt mentions Enforcement field
+# Post M-3 migration: Design Contract Checker content lives in agent file
+DESIGN_CHECKER_AGENT="agents/review-spec-design-contract.md"
 DESIGN_CHECKER=$(awk '/^### 4\. Design Contract Checker/,/^### 5/' "$CREVIEW_SPEC_SKILL")
+# Append agent file content if it exists (M-3 migration moved inline prompt to agent file)
+if [ -f "$DESIGN_CHECKER_AGENT" ]; then
+  DESIGN_CHECKER="$DESIGN_CHECKER"$'\n'"$(cat "$DESIGN_CHECKER_AGENT")"
+fi
 if echo "$DESIGN_CHECKER" | grep -qi 'Enforcement'; then
   pass "R-006a" "Design Contract Checker prompt mentions Enforcement field"
 else

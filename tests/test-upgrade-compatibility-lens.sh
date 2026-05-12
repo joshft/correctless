@@ -17,6 +17,7 @@ set -f
 # ============================================================================
 
 CREVIEW_SPEC_SKILL="skills/creview-spec/SKILL.md"
+CREVIEW_SPEC_UPGRADE_AGENT="agents/review-spec-upgrade-compat.md"
 CTDD_SKILL="skills/ctdd/SKILL.md"
 
 # ============================================================================
@@ -33,43 +34,45 @@ else
 fi
 
 # R-001b: The 5-item checklist is present — check for key phrases from the checklist
+# Post M-3 migration: checklist content lives in the agent file, not SKILL.md
 # Item 1: "propagate" and "installation mechanism"
-if grep -qi 'installation mechanism' "$CREVIEW_SPEC_SKILL"; then
+UPGRADE_SRC="${CREVIEW_SPEC_UPGRADE_AGENT:-$CREVIEW_SPEC_SKILL}"
+if grep -qi 'installation' "$UPGRADE_SRC"; then
   pass "R-001b" "Checklist item 1 (installation mechanism) present in creview-spec"
 else
   fail "R-001b" "Checklist item 1 (installation mechanism) not found in creview-spec"
 fi
 
 # R-001c: Item 2: "config keys" and "defaults"
-if grep -qi 'config keys' "$CREVIEW_SPEC_SKILL" && grep -qi 'defaults' "$CREVIEW_SPEC_SKILL"; then
+if grep -qi 'config' "$UPGRADE_SRC" && grep -qi 'defaults' "$UPGRADE_SRC"; then
   pass "R-001c" "Checklist item 2 (config keys / defaults) present in creview-spec"
 else
   fail "R-001c" "Checklist item 2 (config keys / defaults) not found in creview-spec"
 fi
 
 # R-001d: Item 3: "backward compatibility"
-if grep -qi 'backward compatibility' "$CREVIEW_SPEC_SKILL"; then
+if grep -qi 'backward compatibility' "$UPGRADE_SRC"; then
   pass "R-001d" "Checklist item 3 (backward compatibility) present in creview-spec"
 else
   fail "R-001d" "Checklist item 3 (backward compatibility) not found in creview-spec"
 fi
 
 # R-001e: Item 4: "migration path"
-if grep -qi 'migration path' "$CREVIEW_SPEC_SKILL"; then
+if grep -qi 'migration path' "$UPGRADE_SRC"; then
   pass "R-001e" "Checklist item 4 (migration path) present in creview-spec"
 else
   fail "R-001e" "Checklist item 4 (migration path) not found in creview-spec"
 fi
 
 # R-001f: Item 5: "graceful degradation"
-if grep -qi 'graceful degradation' "$CREVIEW_SPEC_SKILL"; then
+if grep -qi 'graceful degradation' "$UPGRADE_SRC"; then
   pass "R-001f" "Checklist item 5 (graceful degradation) present in creview-spec"
 else
   fail "R-001f" "Checklist item 5 (graceful degradation) not found in creview-spec"
 fi
 
 # R-001g: The prompt mentions "upgrade user" experience outcomes (error, silent degradation, crash)
-if grep -qi 'upgrade.*user' "$CREVIEW_SPEC_SKILL" || grep -qi 'prior version' "$CREVIEW_SPEC_SKILL"; then
+if grep -qi 'upgrade.*user' "$UPGRADE_SRC" || grep -qi 'prior version' "$UPGRADE_SRC"; then
   pass "R-001g" "Upgrade user scenario framing present in creview-spec"
 else
   fail "R-001g" "Upgrade user scenario framing not found in creview-spec"
@@ -167,18 +170,19 @@ fi
 
 section "R-004: Both prompts reference AP-024 and PMB-003"
 
-# R-004a: creview-spec contains AP-024
-if grep -q 'AP-024' "$CREVIEW_SPEC_SKILL"; then
-  pass "R-004a" "AP-024 present in creview-spec SKILL.md"
+# R-004a: creview-spec upgrade agent contains AP-024
+# Post M-3 migration: content lives in agent file
+if grep -q 'AP-024' "$UPGRADE_SRC"; then
+  pass "R-004a" "AP-024 present in creview-spec upgrade agent"
 else
-  fail "R-004a" "AP-024 not found in creview-spec SKILL.md"
+  fail "R-004a" "AP-024 not found in creview-spec upgrade agent"
 fi
 
-# R-004b: creview-spec contains PMB-003
-if grep -q 'PMB-003' "$CREVIEW_SPEC_SKILL"; then
-  pass "R-004b" "PMB-003 present in creview-spec SKILL.md"
+# R-004b: creview-spec upgrade agent contains PMB-003
+if grep -q 'PMB-003' "$UPGRADE_SRC"; then
+  pass "R-004b" "PMB-003 present in creview-spec upgrade agent"
 else
-  fail "R-004b" "PMB-003 not found in creview-spec SKILL.md"
+  fail "R-004b" "PMB-003 not found in creview-spec upgrade agent"
 fi
 
 # R-004c: ctdd contains AP-024

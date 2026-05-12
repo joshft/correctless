@@ -17,9 +17,17 @@ set -f
 # ============================================================================
 
 CREVIEW_SPEC_SKILL="skills/creview-spec/SKILL.md"
+CREVIEW_SPEC_UX_AGENT="agents/review-spec-ux.md"
 CREVIEW_SKILL="skills/creview/SKILL.md"
 CTDD_SKILL="skills/ctdd/SKILL.md"
 CAUDIT_SKILL="skills/caudit/SKILL.md"
+
+# Post M-3 migration: UX content for creview-spec lives in the agent file.
+# Tests that check for UX content should search both SKILL.md and the agent file.
+# Helper: check if a pattern exists in either the skill or the agent file.
+creview_spec_ux_grep() {
+  grep -qi "$1" "$CREVIEW_SPEC_SKILL" 2>/dev/null || grep -qi "$1" "$CREVIEW_SPEC_UX_AGENT" 2>/dev/null
+}
 
 # ============================================================================
 # R-001 [unit]: Canonical sub-lens enum definition
@@ -28,28 +36,29 @@ CAUDIT_SKILL="skills/caudit/SKILL.md"
 section "R-001: Canonical sub-lens enum"
 
 # R-001a: Base sub-lenses include new-user
-if grep -qi 'new-user' "$CREVIEW_SPEC_SKILL" && grep -qi 'new-user' "$CTDD_SKILL"; then
+# Post M-3: creview-spec UX content now in agent file
+if creview_spec_ux_grep 'new-user' && grep -qi 'new-user' "$CTDD_SKILL"; then
   pass "R-001a" "new-user sub-lens present in creview-spec and ctdd"
 else
   fail "R-001a" "new-user sub-lens not found in both creview-spec and ctdd"
 fi
 
 # R-001b: Base sub-lenses include upgrade
-if grep -qi '"upgrade"\|upgrade.*sub-lens\|sub-lens.*upgrade' "$CREVIEW_SPEC_SKILL"; then
+if creview_spec_ux_grep '"upgrade"\|upgrade.*sub-lens\|sub-lens.*upgrade'; then
   pass "R-001b" "upgrade sub-lens present in creview-spec"
 else
   fail "R-001b" "upgrade sub-lens not found in creview-spec"
 fi
 
 # R-001c: Base sub-lenses include offboarding
-if grep -qi 'offboarding' "$CREVIEW_SPEC_SKILL" && grep -qi 'offboarding' "$CTDD_SKILL"; then
+if creview_spec_ux_grep 'offboarding' && grep -qi 'offboarding' "$CTDD_SKILL"; then
   pass "R-001c" "offboarding sub-lens present in creview-spec and ctdd"
 else
   fail "R-001c" "offboarding sub-lens not found in both creview-spec and ctdd"
 fi
 
 # R-001d: Base sub-lenses include recovery
-if grep -qi 'recovery' "$CREVIEW_SPEC_SKILL" && grep -qi 'recovery' "$CTDD_SKILL"; then
+if creview_spec_ux_grep 'recovery' && grep -qi 'recovery' "$CTDD_SKILL"; then
   pass "R-001d" "recovery sub-lens present in creview-spec and ctdd"
 else
   fail "R-001d" "recovery sub-lens not found in both creview-spec and ctdd"
@@ -121,9 +130,10 @@ else
 fi
 
 # R-002g: UX Auditor evaluates through all 4 base sub-lenses
-if grep -qi 'new-user' "$CREVIEW_SPEC_SKILL" && \
-   grep -qi 'offboarding' "$CREVIEW_SPEC_SKILL" && \
-   grep -qi 'recovery' "$CREVIEW_SPEC_SKILL"; then
+# Post M-3: creview-spec UX content now in agent file
+if creview_spec_ux_grep 'new-user' && \
+   creview_spec_ux_grep 'offboarding' && \
+   creview_spec_ux_grep 'recovery'; then
   pass "R-002g" "UX Auditor references all 4 base sub-lenses in creview-spec"
 else
   fail "R-002g" "UX Auditor does not reference all 4 base sub-lenses in creview-spec"
@@ -320,35 +330,40 @@ fi
 section "R-006: Sub-lens checklist check items"
 
 # R-006a: new-user sub-lens: path discovery without prior context
-if grep -qi 'path discovery\|without prior context\|zero-state' "$CREVIEW_SPEC_SKILL"; then
+# Post M-3: creview-spec UX content now in agent file
+if creview_spec_ux_grep 'path discovery\|without prior context\|zero-state'; then
   pass "R-006a" "new-user check item (path discovery / zero-state) in creview-spec"
 else
   fail "R-006a" "new-user check item (path discovery / zero-state) not found in creview-spec"
 fi
 
 # R-006b: new-user sub-lens: error messages on first run
-if grep -qi 'error.*first run\|first run.*error\|documentation pointer' "$CREVIEW_SPEC_SKILL"; then
+# Post M-3: creview-spec UX content now in agent file
+if creview_spec_ux_grep 'error.*first run\|first run.*error\|documentation pointer'; then
   pass "R-006b" "new-user check item (first run errors) in creview-spec"
 else
   fail "R-006b" "new-user check item (first run errors) not found in creview-spec"
 fi
 
 # R-006c: upgrade sub-lens: behavioral changes between versions
-if grep -qi 'behavioral change\|silent breakage\|migration.*clarity' "$CREVIEW_SPEC_SKILL"; then
+# Post M-3: creview-spec UX content now in agent file
+if creview_spec_ux_grep 'behavioral change\|silent breakage\|migration.*clarity'; then
   pass "R-006c" "upgrade check item (behavioral changes) in creview-spec"
 else
   fail "R-006c" "upgrade check item (behavioral changes) not found in creview-spec"
 fi
 
 # R-006d: offboarding sub-lens: cleanup of generated artifacts
-if grep -qi 'cleanup.*artifact\|residual state\|graceful degradation.*remov' "$CREVIEW_SPEC_SKILL"; then
+# Post M-3: creview-spec UX content now in agent file
+if creview_spec_ux_grep 'cleanup.*artifact\|residual state\|graceful degradation.*remov'; then
   pass "R-006d" "offboarding check item (cleanup) in creview-spec"
 else
   fail "R-006d" "offboarding check item (cleanup) not found in creview-spec"
 fi
 
 # R-006e: recovery sub-lens: resumption paths after interruption
-if grep -qi 'resumption.*path\|output.*persistence\|lost.*finding\|state.*consistency.*fail' "$CREVIEW_SPEC_SKILL"; then
+# Post M-3: creview-spec UX content now in agent file
+if creview_spec_ux_grep 'resumption.*path\|output.*persistence\|lost.*finding\|state.*consistency.*fail'; then
   pass "R-006e" "recovery check item (resumption paths) in creview-spec"
 else
   fail "R-006e" "recovery check item (resumption paths) not found in creview-spec"
@@ -472,11 +487,13 @@ fi
 section "R-009: PMB UX failure calibration examples"
 
 # R-009a: At least 3 of 4 PMBs referenced in creview-spec UX agent
+# Post M-3: PMB calibration examples now in agent file
+UX_SRC="${CREVIEW_SPEC_UX_AGENT:-$CREVIEW_SPEC_SKILL}"
 PMB_COUNT_CREVIEW_SPEC=0
-grep -q 'PMB-004' "$CREVIEW_SPEC_SKILL" && PMB_COUNT_CREVIEW_SPEC=$((PMB_COUNT_CREVIEW_SPEC + 1))
-grep -q 'PMB-006' "$CREVIEW_SPEC_SKILL" && PMB_COUNT_CREVIEW_SPEC=$((PMB_COUNT_CREVIEW_SPEC + 1))
-grep -q 'PMB-008' "$CREVIEW_SPEC_SKILL" && PMB_COUNT_CREVIEW_SPEC=$((PMB_COUNT_CREVIEW_SPEC + 1))
-grep -q 'PMB-009' "$CREVIEW_SPEC_SKILL" && PMB_COUNT_CREVIEW_SPEC=$((PMB_COUNT_CREVIEW_SPEC + 1))
+grep -q 'PMB-004' "$UX_SRC" && PMB_COUNT_CREVIEW_SPEC=$((PMB_COUNT_CREVIEW_SPEC + 1))
+grep -q 'PMB-006' "$UX_SRC" && PMB_COUNT_CREVIEW_SPEC=$((PMB_COUNT_CREVIEW_SPEC + 1))
+grep -q 'PMB-008' "$UX_SRC" && PMB_COUNT_CREVIEW_SPEC=$((PMB_COUNT_CREVIEW_SPEC + 1))
+grep -q 'PMB-009' "$UX_SRC" && PMB_COUNT_CREVIEW_SPEC=$((PMB_COUNT_CREVIEW_SPEC + 1))
 if [ "$PMB_COUNT_CREVIEW_SPEC" -ge 3 ]; then
   pass "R-009a" "At least 3 of 4 PMBs referenced in creview-spec ($PMB_COUNT_CREVIEW_SPEC/4)"
 else
@@ -526,7 +543,8 @@ fi
 section "R-010: UX findings use parent skill's structured output format"
 
 # R-010a: creview-spec UX findings use UX-xxx ID format
-if grep -qE 'UX-[0-9x]+|UX-xxx' "$CREVIEW_SPEC_SKILL"; then
+# Post M-3: UX finding format now in agent file
+if grep -qE 'UX-[0-9x]+|UX-xxx' "$CREVIEW_SPEC_SKILL" || grep -qE 'UX-[0-9x]+|UX-xxx' "$CREVIEW_SPEC_UX_AGENT"; then
   pass "R-010a" "UX-xxx finding ID format in creview-spec"
 else
   fail "R-010a" "UX-xxx finding ID format not found in creview-spec"
