@@ -309,7 +309,7 @@ Phase (color-coded), QA round count, session cost, feature cost (background-cach
 
 The audit trail hook monitors every modification and alerts immediately:
 - `tdd-qa: Source file modified — middleware.ts (this phase should be read-only)`
-- `GREEN: Test file edited — auth.test.ts (logged in test-edit-log)`
+- `GREEN: Test file edited — auth.test.ts (prohibited — TEST_BUG escalation expected)`
 - `QA: Read middleware.ts (3 of 7 modified files reviewed)` (high+ intensity)
 
 ### Session Analytics

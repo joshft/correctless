@@ -624,6 +624,36 @@
         "tests/test-pipeline-completeness-verification.sh"
       ],
       "timestamp": "2026-05-09T04:00:00Z"
+    },
+    {
+      "feature_slug": "ctdd-green-agent-migration",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 5,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "harness_version": 1,
+      "fix_rounds_triggered": 4,
+      "file_paths_touched": [
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/config/workflow-config.json",
+        ".correctless/specs/ctdd-green-agent-migration.md",
+        ".github/workflows/ci.yml",
+        "CONTRIBUTING.md",
+        "agents/ctdd-green.md",
+        "correctless/agents/ctdd-green.md",
+        "correctless/skills/ctdd/SKILL.md",
+        "skills/ctdd/SKILL.md",
+        "tests/test-autonomous-skill-contract.sh",
+        "tests/test-ctdd-green-agent.sh",
+        "tests/test-decisions.sh",
+        "tests/test-fix-diff-reviewer-agent.sh",
+        "tests/test-helpers.sh",
+        "tests/test.sh"
+      ],
+      "timestamp": "2026-05-12T01:00:00Z"
     }
   ]
 }

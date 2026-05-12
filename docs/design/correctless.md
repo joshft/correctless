@@ -196,7 +196,7 @@ project-root/
 │   │
 │   └── artifacts/                     # GITIGNORED — transient working state
 │       ├── workflow-state-*.json       # branch-scoped phase state (one per active branch)
-│       ├── tdd-test-edits.log         # test file edit log during impl phase
+│       ├── tdd-test-edits.log         # test file edit log (legacy — GREEN agent prohibited from test edits post-M-2)
 │       ├── coverage-baseline.out      # coverage snapshot at impl→qa transition
 │       ├── findings/                  # per-round audit/QA findings
 │       │   ├── localhost-inspection-round-1.json
@@ -862,13 +862,13 @@ If `require_external_review` is true, OR if any invariant is flagged `needs_exte
 - Test files (mapping to spec invariant IDs)
 - Implementation files
 - `.correctless/artifacts/workflow-state-{branch-slug}.json` updates
-- `.correctless/artifacts/tdd-test-edits.log` (if tests modified during impl phase)
+- `.correctless/artifacts/tdd-test-edits.log` (legacy — not written post-M-2 migration; GREEN agent prohibited from test edits)
 
 **Sub-skills / Phases**:
 
 This skill manages a state machine with hook-based enforcement.
 
-**Agent separation principle**: the RED phase (test writing) and GREEN phase (implementation) MUST be executed by different agents. If the same agent writes both the tests and the implementation, it will — consciously or not — write tests that are easy to satisfy, or implement code that games the specific test cases rather than broadly satisfying the invariant. The `/ctdd` orchestrator spawns a **test agent** (subagent with `context: fork`) for the RED phase and a separate **implementation agent** (subagent with `context: fork`) for the GREEN phase. The test agent receives the spec rules and ARCHITECTURE.md but never sees an implementation plan. The implementation agent receives the failing tests and the spec but did not write the tests — so it can't exploit knowledge of which edge cases are covered and which aren't. Both agents are restricted to their phase's allowed-tools via frontmatter. The QA phase runs as a third agent — also isolated from both the test author and the implementer.
+**Agent separation principle**: the RED phase (test writing) and GREEN phase (implementation) MUST be executed by different agents. If the same agent writes both the tests and the implementation, it will — consciously or not — write tests that are easy to satisfy, or implement code that games the specific test cases rather than broadly satisfying the invariant. The `/ctdd` orchestrator spawns a **test agent** via `Task(subagent_type="correctless:ctdd-red")` for the RED phase and a separate **implementation agent** via `Task(subagent_type="correctless:ctdd-green")` for the GREEN phase (both migrated to plugin agents per ABS-010 to counter harness behavioral drift — AP-013). The test agent receives the spec rules and ARCHITECTURE.md but never sees an implementation plan. The implementation agent receives the failing tests and the spec but did not write the tests — so it can't exploit knowledge of which edge cases are covered and which aren't. Both agents have pinned tool allowlists (Read, Grep, Glob, Write, Edit, Bash) and explicit behavioral overrides in their agent files. The GREEN agent is prohibited from editing test files — if it encounters a test bug, it reports a structured `TEST_BUG:` escalation to the orchestrator (BND-002). The QA phase runs as a third agent — also isolated from both the test author and the implementer.
 
 #### Phase: `tdd-tests` (RED)
 
@@ -894,13 +894,13 @@ Write tests that encode the spec's invariants. Each test function's doc comment 
 
 #### Phase: `tdd-impl` (GREEN)
 
-**Executed by**: implementation agent (separate forked subagent — did NOT write the tests).
+**Executed by**: implementation agent (`agents/ctdd-green.md` — plugin agent per ABS-010, did NOT write the tests).
 
 Write implementation to make tests pass.
 
 **Allowed file operations**:
 - Create/edit any source file
-- Edit test files: ALLOWED but LOGGED to `.correctless/artifacts/tdd-test-edits.log` with timestamp, file path, and justification. **Acceptable reasons to edit tests during GREEN**: the test had a bug (wrong assertion target, incorrect setup), the test was testing an implementation detail that changed during design (not the invariant itself), or the test needs an updated fixture/mock. **Unacceptable and flagged during QA review**: weakening an assertion to make it pass (changing expected value to match actual output), deleting a test because it's "too strict," removing an error case test because the implementation doesn't handle it. The QA phase reviews this log and flags any edit where the test became less strict as a finding (severity: high).
+- Test file edits: PROHIBITED (BC-001, M-2 migration 2026-05-11). If the GREEN agent encounters a test bug, it stops and reports a structured `TEST_BUG: {file}:{line} — {description}` escalation to the orchestrator. The orchestrator surfaces this to the user with options (re-run test audit, fix manually, override). The workflow gate still logs test edits during tdd-impl as a safety net — if the prompt-level prohibition fails, the gate captures evidence. *Legacy note: pre-M-2, test edits were allowed with logging to `tdd-test-edits.log`.*
 - Create/edit non-source files
 
 **Behavior**:
@@ -943,7 +943,7 @@ Final verification before done.
 - Run full test suite with race detection
 - Check coverage delta: for **existing** packages touched by this feature, coverage must not decrease vs baseline captured at impl→qa transition. For **new** packages (no baseline exists), a minimum coverage threshold applies: all new packages must have at least 60% line coverage (configurable via `workflow.min_new_package_coverage` — defaults to 60%). This prevents the trivially-satisfied case where new code has 0% baseline and any test at all "doesn't decrease."
 - Verify all findings from QA rounds are resolved (diff findings JSON against resolution JSON)
-- Review `.correctless/artifacts/tdd-test-edits.log` — were any tests weakened during impl? (assertion removed, expected value changed to match actual, test deleted)
+- Review `.correctless/artifacts/tdd-test-edits.log` if it exists — were any tests weakened during impl? (Post-M-2 migration: the GREEN agent is prohibited from editing tests, so this log should not exist for new features. Only review if present for legacy or safety-net evidence.)
 - Verify spec invariant coverage: for each INV-xxx in the spec, confirm at least one test references it
 
 **Gate to done**: all checks pass → state moves to `done`, state file removed.
@@ -957,7 +957,7 @@ Reads the branch-scoped `.correctless/artifacts/workflow-state-{branch-slug}.jso
 - Blocks direct edits to any `.correctless/artifacts/workflow-state-*.json` file (only the advance script can modify them)
 - Classifies files based on `patterns.test_file` and `patterns.source_file` from workflow-config.json
 - Returns exit code 2 to block, exit code 0 to allow
-- Logs test-file edits during impl phase to `.correctless/artifacts/tdd-test-edits.log`
+- Logs test-file edits during impl phase as a safety net (post-M-2 migration: GREEN agent is prohibited from editing tests via prompt-level prohibition, but the gate still captures evidence if the prohibition fails)
 - **Bash write detection** (accidental violation catcher, NOT a security boundary): the hook matcher includes `Bash` in addition to `Edit|Write|MultiEdit|CreateFile`. When the tool is `Bash`, the gate inspects the command for common shell write patterns (`>`, `>>`, `tee`, `sed -i`) targeting files that match source file patterns. This catches the common case where Claude reflexively uses shell commands instead of the Edit tool to modify source files. It is NOT bulletproof — the agent could bypass this via `python -c "open(...).write(...)"`, `cp` from a temp file, `git checkout` of a stash, or countless other indirection methods. The hook prevents accidental violations by a well-intentioned agent, not adversarial evasion. If Claude is compliant with the workflow (which it is — the skill prompts instruct compliance), the hook is a safety net. If it were truly adversarial, no PreToolUse hook would save you.
 - **Package manager blocking during TDD**: during `tdd-tests` and `tdd-impl` phases, the gate blocks bash commands that install unmanifested dependencies: `apt-get install`, `brew install`, `curl | bash`, `curl | sh`, `wget ... | bash`, `pip install` (outside of requirements.txt), `go get` (outside of go.mod), `npm install <package>` (as opposed to `npm install` with no args which installs from package.json). This prevents the agent from silently pulling in dependencies to make tests pass without going through the dependency manifest. Legitimate dependency additions must be done via the manifest file (go.mod, package.json, etc.) which gets caught by the ghost dependency check in `/cverify`.
 - **Stub tag enforcement**: during the `tdd-tests` phase, source file edits are allowed only if the file contains the literal string `STUB:TDD` AND does not contain implementation indicators. The gate checks: (1) `STUB:TDD` is present somewhere in the file — this is the language-agnostic part. (2) The file does not contain a blocklist of implementation patterns — this is the imperfect part. The blocklist is configurable per language scope and typically includes: `if ` followed by non-trivial conditions, `for `/`range `/`while `, function calls to external packages, channel operations, mutex operations, etc. This is a heuristic, not a parser — it will occasionally false-positive on complex type definitions or false-negative on clever inline implementations. It catches the 90% case of "agent wrote real logic during RED phase." The 10% that slips through gets caught by the QA phase's test-edit review. Do NOT rely on this as the sole enforcement of TDD discipline — the skill prompt's instructions are the primary control, the gate is the safety net.
@@ -1726,7 +1726,7 @@ Human: "I want to add localhost traffic inspection"
   ├── /ctdd
   │   ├── RED: write tests for each invariant (source edits blocked)
   │   │   └── Gate: tests exist and FAIL
-  │   ├── GREEN: implement (test edits logged)
+  │   ├── GREEN: implement (test edits prohibited — TEST_BUG escalation)
   │   │   └── Gate: tests pass, race detector clean
   │   ├── QA: agent review + mutation testing (all edits blocked)
   │   │   └── Gate: zero critical/high, min rounds met
