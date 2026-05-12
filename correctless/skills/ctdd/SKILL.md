@@ -182,7 +182,7 @@ Task(subagent_type="correctless:ctdd-red",
              <test_file pattern + commands.test from workflow-config.json>")
 ```
 
-The agent definition lives at `agents/ctdd-red.md` and has `tools: Read, Grep, Glob, Write, Edit, Bash` with `context: fork`. The system prompt body in that file contains the behavioral discipline (no task graphs, no approval-seeking, write tests immediately) and the same content-level instructions previously inlined here (rule coverage, integration test contracts, entrypoint awareness, structural stubs with STUB:TDD markers, file location constraints).
+The agent definition lives at `agents/ctdd-red.md` and has `tools: Read, Grep, Glob, Write, Edit, Bash`. The system prompt body in that file contains the behavioral discipline (no task graphs, no approval-seeking, write tests immediately) and the same content-level instructions previously inlined here (rule coverage, integration test contracts, entrypoint awareness, structural stubs with STUB:TDD markers, file location constraints).
 
 Do NOT inline the prompt here. Per ABS-010 / AP-013, the agent file is the single source of truth.
 
@@ -286,7 +286,7 @@ Task(subagent_type="correctless:ctdd-green",
              <failing test output>")
 ```
 
-The agent definition lives at `agents/ctdd-green.md` and has `tools: Read, Grep, Glob, Write, Edit, Bash` with `context: fork`. The system prompt body in that file contains the behavioral discipline (defensive code override, test-edit prohibition with TEST_BUG escalation, config-derived test command) and the implementation-level instructions previously inlined here.
+The agent definition lives at `agents/ctdd-green.md` and has `tools: Read, Grep, Glob, Write, Edit, Bash`. The system prompt body in that file contains the behavioral discipline (defensive code override, test-edit prohibition with TEST_BUG escalation, config-derived test command) and the implementation-level instructions previously inlined here.
 
 Do NOT inline the prompt here. Per ABS-010 / AP-013, the agent file is the single source of truth.
 
