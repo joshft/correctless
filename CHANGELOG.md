@@ -8,6 +8,9 @@ All notable changes to Correctless are documented here.
 - `/cauto` — Semi-auto pipeline orchestrator: runs /ctdd through PR creation with flexible phase resume, tiered decision architecture, and spec-to-PR orchestration
 - `/carchitect` — Structured architecture definition: reverse-engineer from existing code or greenfield directed discovery, produces machine-referenceable entrypoints YAML
 
+### Changed — Agent Migration
+- `/creview-spec` — Migrated 6 inline adversarial agent prompts to dedicated `agents/*.md` plugin agent files (M-3 in general-purpose to agents/*.md migration plan). Agents now have tool pinning (Read/Grep/Glob only), harness-prior suppression, and namespaced dispatch. Resolves AP-013 for /creview-spec
+
 ## [3.0.0] - 2026-04-04
 
 ### Changed — Single Distribution with Dynamic Rigor

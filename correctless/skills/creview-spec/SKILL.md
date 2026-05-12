@@ -1,7 +1,7 @@
 ---
 name: creview-spec
 description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, design contract checker, and UX auditor. Use after /cspec or /cmodel.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Write(.correctless/meta/external-review-history.json)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Write(.correctless/meta/external-review-history.json), Task
 interaction_mode: hybrid
 ---
 
@@ -119,40 +119,66 @@ Spawn these agents in parallel each as a forked subagent:
 > Use Read to examine files, Grep to search for patterns, Glob to find files. Return your findings as your final text response.
 
 ### 1. Red Team Agent
-> You are a security-focused adversary. Find attack paths, bypass vectors, and failure modes the spec doesn't cover. For every trust boundary, describe how you'd attack it. For every invariant, describe a scenario where it holds in tests but fails in production. Your attack paths must be credible for THIS system — read .correctless/AGENT_CONTEXT.md.
+
+Invoke via plugin sub-agent (M-3 migration, 2026-05-12 — extracted to counter AP-013 inline subagent prompts):
+
+```
+Task(subagent_type="correctless:review-spec-red-team",
+     description="Security-focused adversarial spec review",
+     prompt="<spec path> <self-assessment brief> <preamble context pointers>")
+```
+
+The agent definition lives at `agents/review-spec-red-team.md` and has `tools: Read, Grep, Glob` (read-only per TB-005). Do NOT inline the prompt here — the agent file is the single source of truth (ABS-010 / AP-013).
 
 ### 2. Assumptions Auditor
-> You are an assumptions auditor. Find every unstated assumption. Does the spec assume a specific OS? Network connectivity? DNS resolution? Clock synchronization? For each, check if it's in .correctless/ARCHITECTURE.md. Flag what's missing.
+
+```
+Task(subagent_type="correctless:review-spec-assumptions",
+     description="Unstated assumptions audit",
+     prompt="<spec path> <self-assessment brief> <preamble context pointers>")
+```
+
+The agent definition lives at `agents/review-spec-assumptions.md` and has `tools: Read, Grep, Glob`.
 
 ### 3. Testability Auditor
-> You are a test engineering auditor. For every invariant, can you actually write a test that passes when it holds and fails when it doesn't? Flag vague invariants. Propose concrete rewrites.
+
+```
+Task(subagent_type="correctless:review-spec-testability",
+     description="Testability audit of spec invariants",
+     prompt="<spec path> <self-assessment brief> <preamble context pointers>")
+```
+
+The agent definition lives at `agents/review-spec-testability.md` and has `tools: Read, Grep, Glob`.
 
 ### 4. Design Contract Checker
-> You are a design contract auditor. Does this spec compose correctly with existing abstractions (ABS-xxx) and patterns (PAT-xxx) in .correctless/ARCHITECTURE.md? Any conflicts? Any new abstractions that should be documented? Additionally, check every INV-xxx invariant for its `Enforcement:` field. Flag invariants where the `Enforcement:` field is "prompt-level" or absent — for each, suggest a structural enforcement mechanism from PAT-018 (allowed-tools restrictions, sensitive-file-guard, gate precondition, hash verification, CI test assertion, or agent tool-pinning) if one is available. Also cross-reference the spec's invariant `Boundary:` fields against the TB-xxx entries in .correctless/ARCHITECTURE.md — flag any relevant TB-xxx that the spec does not reference. A TB-xxx is relevant if its documented scope (Invariant, Enforced-at, or Test fields) overlaps with the spec's affected files or abstractions.
+
+```
+Task(subagent_type="correctless:review-spec-design-contract",
+     description="Design contract and enforcement audit",
+     prompt="<spec path> <self-assessment brief> <preamble context pointers>")
+```
+
+The agent definition lives at `agents/review-spec-design-contract.md` and has `tools: Read, Grep, Glob`.
 
 ### 5. Upgrade Compatibility Auditor
-> An existing user has this project's tooling installed from a prior version. A new version ships with the changes described in this spec. Your job is to mechanically check the spec against the 5-item checklist below — do not hallucinate what the project looked like before; work from what the spec adds, changes, or removes. (1) New scripts or hooks that setup/install must propagate — does the spec account for installation? Is the installation mechanism complete (glob vs hardcoded list, see AP-024/PMB-003)? (2) New config keys — does the spec require defaults so old configs still work? (3) Schema changes in state files, artifacts, or config — does the spec address backward compatibility for old consumers? (4) Removed or renamed files — does the spec include a migration path? (5) New features that depend on artifacts old versions don't produce — does the spec require graceful degradation? For each finding, state what the upgrade user experiences (error, silent degradation, or crash) and what the spec should add to prevent it.
+
+```
+Task(subagent_type="correctless:review-spec-upgrade-compat",
+     description="Upgrade compatibility checklist audit",
+     prompt="<spec path> <self-assessment brief> <preamble context pointers>")
+```
+
+The agent definition lives at `agents/review-spec-upgrade-compat.md` and has `tools: Read, Grep, Glob`.
 
 ### 6. UX Auditor
-> You are a UX auditor. You evaluate the spec through four sub-lenses — each representing a different user journey stage. Your goal is to find silent failures, missing feedback, lost output, broken interaction patterns, recovery paths, and progress visibility gaps — the class of bugs that QA, security, and performance lenses don't catch.
->
-> **Sub-lens checklist** (evaluate the spec through each sub-lens):
->
-> **"new-user" sub-lens**: Does the spec account for path discovery without prior context? What happens at zero-state (no config, no artifacts, no history)? Are there error messages on first run that guide the user? Are documentation pointers provided when features are unavailable?
->
-> **"upgrade" sub-lens**: Does the spec address behavioral changes between versions? Could updates cause silent breakage? Is migration path clarity ensured? Are artifacts and config backward compatible?
->
-> **"offboarding" sub-lens**: Does the spec handle cleanup of generated artifacts? Is there residual state after feature removal? Does the system degrade gracefully when components are removed?
->
-> **"recovery" sub-lens**: Are error messages actionable on failure? Are there resumption paths after interruption? Is state consistency maintained after failure? Is output persistence ensured (no lost findings/results)?
->
-> **Calibration examples — these are the class of UX bugs this lens should catch:**
-> - PMB-004: skill says "Read the spec artifact" with no path and no `workflow-advance.sh status` call — works when conversation context has the path, fails in fresh sessions where agent hallucinates wrong paths
-> - PMB-006: `context: fork` in SKILL.md makes multi-turn skills run as sub-agents that complete after producing output — user's follow-up response routes to main conversation, not back to the fork, so the approval/write phase never executes
-> - PMB-008: findings presented inline without artifact persistence — findings disappear from terminal before user can read them, no recovery path
-> - PMB-009: pipeline stopped after 2 of 7 steps with no error, no warning, no truncation artifact — silent truncation breaks the "run to completion" assumption
->
-> For each finding, report with ID prefix UX-xxx, category, and description. If the UX agent fails to spawn, returns an error, times out, or returns malformed or incomplete output, the skill proceeds without UX findings and notes the absence — the UX lens is advisory and never gates progression.
+
+```
+Task(subagent_type="correctless:review-spec-ux",
+     description="UX review through 4 sub-lenses",
+     prompt="<spec path> <self-assessment brief> <preamble context pointers>")
+```
+
+The agent definition lives at `agents/review-spec-ux.md` and has `tools: Read, Grep, Glob`. If the UX agent fails to spawn, returns an error, times out, or returns malformed or incomplete output, the skill proceeds without UX findings and notes the absence — the UX lens is advisory and never gates progression.
 
 At `low` intensity: spawn only assumptions + testability auditors.
 At `standard`: add red team.

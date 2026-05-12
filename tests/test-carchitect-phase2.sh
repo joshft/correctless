@@ -21,6 +21,8 @@ CSPEC_SKILL="skills/cspec/SKILL.md"
 CSPEC_DIST="correctless/skills/cspec/SKILL.md"
 CREVIEW_SPEC_SKILL="skills/creview-spec/SKILL.md"
 CREVIEW_SPEC_DIST="correctless/skills/creview-spec/SKILL.md"
+# Post M-3 migration: Design Contract Checker content now in agent file
+CREVIEW_SPEC_DESIGN_AGENT="agents/review-spec-design-contract.md"
 
 # ============================================================================
 # R-001 [unit]: /cspec Step 1 (high+) includes TB-xxx scope matching substep
@@ -245,14 +247,18 @@ fi
 section "R-009: Design Contract Checker cross-references TB-xxx"
 
 # R-009a: creview-spec Design Contract Checker prompt includes TB cross-reference
-if grep -qi 'TB-xxx.*cross-reference\|cross-reference.*TB\|TB.*coverage.*spec\|spec.*TB.*coverage' "$CREVIEW_SPEC_SKILL"; then
+# Post M-3: content may be in SKILL.md or the agent file
+if grep -qi 'TB-xxx.*cross-reference\|cross-reference.*TB\|TB.*coverage.*spec\|spec.*TB.*coverage' "$CREVIEW_SPEC_SKILL" \
+   || grep -qi 'TB-xxx.*cross-reference\|cross-reference.*TB\|TB.*coverage.*spec\|spec.*TB.*coverage' "$CREVIEW_SPEC_DESIGN_AGENT"; then
   pass "R-009a" "creview-spec Design Contract Checker includes TB cross-reference"
 else
   fail "R-009a" "creview-spec Design Contract Checker missing TB cross-reference"
 fi
 
 # R-009b: Design Contract Checker checks for relevant but unreferenced TB-xxx
-if grep -qi 'relevant.*TB.*not reference\|TB.*spec does not reference\|flag.*TB.*not.*reference' "$CREVIEW_SPEC_SKILL"; then
+# Post M-3: content may be in SKILL.md or the agent file
+if grep -qi 'relevant.*TB.*not reference\|TB.*spec does not reference\|flag.*TB.*not.*reference' "$CREVIEW_SPEC_SKILL" \
+   || grep -qi 'relevant.*TB.*not reference\|TB.*spec does not reference\|flag.*TB.*not.*reference' "$CREVIEW_SPEC_DESIGN_AGENT"; then
   pass "R-009b" "Design Contract Checker flags unreferenced relevant TB-xxx"
 else
   fail "R-009b" "Design Contract Checker missing unreferenced TB-xxx check"

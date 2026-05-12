@@ -129,6 +129,7 @@ jobs:
           bash tests/test-ux-review-lens.sh
           bash tests/test-integration-depth-lens.sh
           bash tests/test-ctdd-green-agent.sh
+          bash tests/test-creview-spec-agents.sh
 
       - name: Verify sync
         run: |
