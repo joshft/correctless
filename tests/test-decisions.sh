@@ -147,9 +147,10 @@ test_r006() {
   file_contains_i "$skill" "fix now\|accept risk\|dispute" && local qa="true" || local qa="false"
   assert_eq "R-006: ctdd has QA finding response options" "true" "$qa"
 
-  # Must have test edit approval options (approve/reject)
-  file_contains_i "$skill" "approve change.*(recommended)\|approve.*(recommended).*reject" && local testedit="true" || local testedit="false"
-  assert_eq "R-006: ctdd has test edit approval options" "true" "$testedit"
+  # Must have TEST_BUG escalation options (re-run test audit, fix manually, override)
+  # BC-001: test-edit policy changed from approve/reject to TEST_BUG escalation
+  file_contains_i "$skill" "TEST_BUG.*escalation\|re-run test audit.*fix manually.*override" && local testedit="true" || local testedit="false"
+  assert_eq "R-006: ctdd has test bug escalation options" "true" "$testedit"
 }
 
 # ---------------------------------------------------------------------------

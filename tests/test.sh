@@ -579,6 +579,14 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+if (cd "$REPO_DIR" && bash tests/test-ctdd-green-agent.sh); then
+  echo "  PASS: ctdd-green agent structural test"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: ctdd-green agent structural test — see output above"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "======================"
 echo "Results: $PASS passed, $FAIL failed"
