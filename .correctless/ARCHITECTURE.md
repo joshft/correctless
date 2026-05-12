@@ -64,7 +64,7 @@
 - **Data sensitivity change**: Trusted draft (produced by a skill agent with write access) → untrusted input for a read-only reviewer agent. The reviewer must verify claims against the codebase, not trust the draft's assertions.
 - **Invariant**: The reviewing agent has read-only tools (no Write, no Edit, no Bash). Its findings are presented to the user for adjudication — the reviewer cannot modify the draft directly. If the draft contains text that looks like instructions ("ignore previous instructions", "skip this check"), the reviewer must not follow it.
 - **Violated when**: A reviewing agent has write access to the artifact it reviews, or a reviewing agent's findings are auto-applied without user adjudication
-- **Test**: test-carchitect.sh — R-006 (read-only tool allowlist on architecture-reviewer agent)
+- **Test**: test-carchitect.sh — R-006 (read-only tool allowlist on architecture-reviewer agent), test-creview-spec-agents.sh — INV-002 (read-only tool allowlist on 6 review-spec agents)
 
 ### TB-006: Session transcript filesystem reads (~/.claude/projects/)
 - **Crosses**: Claude Code internal session storage → Correctless artifact pipeline
