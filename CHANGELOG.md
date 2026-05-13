@@ -9,7 +9,9 @@ All notable changes to Correctless are documented here.
 - `/carchitect` — Structured architecture definition: reverse-engineer from existing code or greenfield directed discovery, produces machine-referenceable entrypoints YAML
 
 ### Changed — Agent Migration
-- `/creview-spec` — Migrated 6 inline adversarial agent prompts to dedicated `agents/*.md` plugin agent files (M-3 in general-purpose to agents/*.md migration plan). Agents now have tool pinning (Read/Grep/Glob only), harness-prior suppression, and namespaced dispatch. Resolves AP-013 for /creview-spec
+- `/cspec` — Migrated inline research agent prompt to dedicated `agents/cspec-research.md` plugin agent file (M-4). First network-read class agent (WebSearch, WebFetch, Read, Grep). Adds TB-007 (external web content ingestion trust boundary), untrusted data treatment, and network unavailability self-diagnostic. Resolves AP-013 for /cspec
+- `/ctdd` — Migrated inline RED and GREEN phase agent prompts to dedicated `agents/ctdd-red.md` and `agents/ctdd-green.md` plugin agent files (M-1, M-2). Agents now have tool pinning and namespaced dispatch. Resolves AP-013 for /ctdd
+- `/creview-spec` — Migrated 6 inline adversarial agent prompts to dedicated `agents/*.md` plugin agent files (M-3). Agents now have tool pinning (Read/Grep/Glob only), harness-prior suppression, and namespaced dispatch. Resolves AP-013 for /creview-spec
 
 ## [3.0.0] - 2026-04-04
 

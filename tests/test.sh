@@ -595,6 +595,14 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+if (cd "$REPO_DIR" && bash tests/test-cspec-research-agent.sh); then
+  echo "  PASS: cspec-research agent structural test"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: cspec-research agent structural test — see output above"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "======================"
 echo "Results: $PASS passed, $FAIL failed"

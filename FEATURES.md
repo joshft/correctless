@@ -385,25 +385,31 @@ Over-extracting Bash target extraction (every non-flag token is a candidate, can
 
 Narrow-scope sub-agents with pinned tool allowlists. The tool allowlist serves dual purposes: limiting blast radius AND shaping response style toward the output contract.
 
-### `correctless:ctdd-red` — TDD Test Writer
+### TDD Agents
 
-Mechanical test writer for the RED phase. Reads spec, writes failing tests encoding every rule/invariant/prohibition. Tools: Read, Grep, Glob, Write, Edit, Bash. Behavioral discipline prevents over-deliberation. Reads ARCHITECTURE.md entrypoints for integration test writing.
+**`correctless:ctdd-red`** — Mechanical test writer for the RED phase. Reads spec, writes failing tests encoding every rule/invariant/prohibition. Tools: Read, Grep, Glob, Write, Edit, Bash. Behavioral discipline prevents over-deliberation. Reads ARCHITECTURE.md entrypoints for integration test writing.
 
-### `correctless:architecture-reviewer` — Architecture Reviewer
+**`correctless:ctdd-green`** — Implementation agent for the GREEN phase. Makes tests pass without modifying test files. Tools: Read, Grep, Glob, Write, Edit, Bash. Test-edit prohibition enforced — must escalate via TEST_BUG format if a test is wrong. Uses config-derived test command.
 
-Read-only adversarial reviewer for `.correctless/ARCHITECTURE.md` drafts. Finds patterns the document claims but the codebase violates, missing entrypoints, and smoothed-over inconsistencies. Tools: Read, Grep, Glob. Returns JSON findings.
+### Research Agent
 
-### `correctless:fix-diff-reviewer` — Fix-Diff Reviewer
+**`correctless:cspec-research`** — Research agent for `/cspec`. Searches the web for current best practices, security advisories, dependency health, and recent breaking changes. First network-read class agent — Tools: WebSearch, WebFetch, Read, Grep (no write tools). Web content treated as untrusted advisory data (TB-007). Reports network failures explicitly rather than silently substituting training data.
 
-Read-only reviewer scoped to audit fix-round commits. Catches new bugs, broken invariants, and regressions introduced by fix attempts. Tools: Read, Grep, Glob. Uses UNTRUSTED_DIFF/UNTRUSTED_RULES fences. `jq -e .` parse gate on output. Validated via VP-001/VP-002 pre-merge verification.
+### Review Agents
 
-### `correctless:supervisor` — Lightweight Supervisor
+**`correctless:architecture-reviewer`** — Read-only adversarial reviewer for `.correctless/ARCHITECTURE.md` drafts. Finds patterns the document claims but the codebase violates, missing entrypoints, and smoothed-over inconsistencies. Tools: Read, Grep, Glob. Returns JSON findings.
 
-Activates on escalation, phase transitions, budget warnings, review triage, and override scenarios. Makes terminal decisions (approve/reject/hard_stop). No accumulated state across activations. Configurable mandate levels (conservative/moderate/aggressive). Conservative mandate enforces spec citation validation. Tools: Read, Grep, Glob.
+**`correctless:architecture-compliance-reviewer`** — Read-only reviewer for PR architecture compliance. Checks that PR changes align with documented architecture. Tools: Read, Grep, Glob.
 
-### `correctless:decision-agent` — Ephemeral Decision Agent
+**`correctless:review-spec-red-team`**, **`correctless:review-spec-assumptions`**, **`correctless:review-spec-testability`**, **`correctless:review-spec-design-contract`**, **`correctless:review-spec-upgrade-compat`**, **`correctless:review-spec-ux`** — Six adversarial spec reviewers spawned by `/creview-spec`. Each has a different lens (security/attack surface, unstated assumptions, testability gaps, design contract enforcement, upgrade compatibility, UX failures). Tools: Read, Grep, Glob (read-only). Harness-prior suppression ensures exhaustive output.
 
-Tier 2 decision resolver for Auto Mode Phase 2. Receives minimal context (DR-xxx, spec excerpt, policy section, prior decision summaries). Returns a structured decision and terminates. No state persists between invocations. Tools: Read, Grep, Glob.
+### Audit & Decision Agents
+
+**`correctless:fix-diff-reviewer`** — Read-only reviewer scoped to audit fix-round commits. Catches new bugs, broken invariants, and regressions introduced by fix attempts. Tools: Read, Grep, Glob. Uses UNTRUSTED_DIFF/UNTRUSTED_RULES fences. `jq -e .` parse gate on output. Validated via VP-001/VP-002 pre-merge verification.
+
+**`correctless:supervisor`** — Activates on escalation, phase transitions, budget warnings, review triage, and override scenarios. Makes terminal decisions (approve/reject/hard_stop). No accumulated state across activations. Configurable mandate levels (conservative/moderate/aggressive). Conservative mandate enforces spec citation validation. Tools: Read, Grep, Glob.
+
+**`correctless:decision-agent`** — Tier 2 decision resolver for Auto Mode Phase 2. Receives minimal context (DR-xxx, spec excerpt, policy section, prior decision summaries). Returns a structured decision and terminates. No state persists between invocations. Tools: Read, Grep, Glob.
 
 ---
 
@@ -559,7 +565,7 @@ Install manifest (`.correctless/.install-manifest.json`) records SHA-256 checksu
 
 ### Test Suite
 
-75 test files with ~5,000+ assertions covering all hooks, scripts, skills, agents, and cross-component integration:
+82 test files with ~5,000+ assertions covering all hooks, scripts, skills, agents, and cross-component integration:
 
 - Hook behavior tests (workflow-gate, sensitive-file-guard, auto-format, token-tracking, audit-trail)
 - Script unit tests (lib.sh, antipattern-scan, auto-policy, decision-record, budget-check, etc.)
