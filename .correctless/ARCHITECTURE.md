@@ -74,6 +74,15 @@
 - **Violated when**: Raw message text is included in cost artifacts or passed to agent context, or the script reads `.message.content` for any purpose
 - **Test**: test-session-cost.sh — R-015 (TB-006 entry presence), grep compute-session-cost.sh for `.message.content` (must find none)
 
+### TB-007: External web content ingestion via research agent
+- **Crosses**: External web sources (documentation sites, package registries, advisory databases) → LLM agent context → project spec artifacts
+- **Identity assertion**: Content fetched by cspec-research agent (agents/cspec-research.md) via WebSearch and WebFetch tools. The agent is the first plugin agent with network-read tools.
+- **Data sensitivity change**: Untrusted external web content → advisory research brief → spec invariants drafted by the orchestrator. Multi-hop injection path: web content → research brief → spec → implementation agent.
+- **Invariant**: The research agent has no write tools (WebSearch, WebFetch, Read, Grep only — INV-002). Web content is treated as advisory and untrusted, not as instructions (INV-015 data-treatment directive). The agent includes a skepticism override (INV-007) to counteract training-data staleness and adversarial SEO. The orchestrator (skills/cspec/SKILL.md) writes the research brief to `.correctless/artifacts/research/` and treats it as untrusted reference data when drafting spec invariants. The agent explicitly reports network failures rather than silently substituting training data (INV-016).
+- **Violated when**: The research agent gains write tools; web content is treated as instructions by the agent or orchestrator; the research brief is incorporated into spec invariants without orchestrator verification against project context; network failures are silently masked by training-data substitution
+- **Acknowledged gap**: In `/cauto` autonomous mode, there is no human checkpoint between research brief and spec draft — the orchestrator may incorporate adversarial recommendations before human review. TB-002 (script-generated content → LLM context) overlaps in pattern.
+- **Test**: tests/test-cspec-research-agent.sh — INV-002 (write-free tool allowlist), INV-015 (data-treatment directive), INV-007 (skepticism override), INV-016 (network failure self-diagnostic)
+
 ## Abstractions
 
 ### ABS-001: Shared script library (scripts/lib.sh)

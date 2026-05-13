@@ -24,7 +24,7 @@ nav_order: 2
 
 1. **Socratic brainstorm** — challenges your assumptions with targeted questions: "What problem does this solve? Not the feature — the problem." Scales depth to your confidence level.
 2. **Reads project context** — ARCHITECTURE.md, antipatterns, drift debt, QA history, and recent git log to ground the spec in your codebase's reality
-3. **Researches current best practices** (when needed) — spawns a research subagent for topics where training data may be stale (new library versions, security protocols, rapidly-evolving APIs). Saves findings to an artifact.
+3. **Researches current best practices** (when needed) — spawns a dedicated research agent (`agents/cspec-research.md`) with web search tools for topics where training data may be stale (new library versions, security protocols, rapidly-evolving APIs). Web content is treated as untrusted advisory data. Saves findings to an artifact.
 4. **Drafts the spec** — at standard intensity, produces Rules (R-001, R-002...) with test levels. At high/critical intensity, produces Invariants, Prohibitions, Boundary Conditions, and optionally STRIDE analysis.
 5. **Walks you through the spec** — presents rules in small groups for approval, resolves open questions, checks against known antipatterns, and advances the workflow state when approved
 
@@ -109,5 +109,5 @@ When ARCHITECTURE.md has no TB-xxx or PAT-xxx entries, these features are dorman
 ## Common Issues
 
 - **On the main branch**: The skill will tell you to create a feature branch first. The workflow state machine requires a feature branch.
-- **Research takes a while**: If the skill spawns a research subagent (for new libraries, security topics, or rapidly-evolving APIs), expect 1-3 extra minutes. It announces when research starts and finishes.
+- **Research takes a while**: If the skill spawns the research agent (for new libraries, security topics, or rapidly-evolving APIs), expect 1-3 extra minutes. The agent searches the web for current information. It announces when research starts and finishes.
 - **Spec feels over-specified**: Start with fewer rules. You can always add more during `/creview`. The review skill exists specifically to catch what you missed.

@@ -654,6 +654,32 @@
         "tests/test.sh"
       ],
       "timestamp": "2026-05-12T01:00:00Z"
+    },
+    {
+      "feature_slug": "cspec-agent-migration",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 2,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "harness_version": 1,
+      "fix_rounds_triggered": 0,
+      "file_paths_touched": [
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/config/workflow-config.json",
+        ".correctless/specs/cspec-agent-migration.md",
+        ".github/workflows/ci.yml",
+        "CONTRIBUTING.md",
+        "agents/cspec-research.md",
+        "correctless/agents/cspec-research.md",
+        "correctless/skills/cspec/SKILL.md",
+        "skills/cspec/SKILL.md",
+        "tests/test-cspec-research-agent.sh",
+        "tests/test.sh"
+      ],
+      "timestamp": "2026-05-12T19:30:00Z"
     }
   ]
 }
