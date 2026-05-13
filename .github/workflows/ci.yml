@@ -130,6 +130,7 @@ jobs:
           bash tests/test-integration-depth-lens.sh
           bash tests/test-ctdd-green-agent.sh
           bash tests/test-creview-spec-agents.sh
+          bash tests/test-cspec-research-agent.sh
 
       - name: Verify sync
         run: |
