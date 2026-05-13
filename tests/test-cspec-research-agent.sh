@@ -47,11 +47,30 @@ TEST_RUNNER="tests/test.sh"
 WORKFLOW_CONFIG=".correctless/config/workflow-config.json"
 
 # ============================================================================
+# Precomputed / cached data (avoids redundant file reads across check fns)
+# ============================================================================
+
+AGENT_BODY=""
+STEP2_BLOCK=""
+ABS010_BLOCK=""
+
+_cache_agent_body() {
+  [ -f "$AGENT_SRC" ] && AGENT_BODY="$(skill_body "$AGENT_SRC")"
+}
+
+_cache_step2_block() {
+  [ -f "$CSPEC_SKILL" ] && STEP2_BLOCK="$(_extract_step2_block "$CSPEC_SKILL")"
+}
+
+_cache_abs010_block() {
+  [ -f "$ARCH_FILE" ] && ABS010_BLOCK="$(_extract_abs010_block "$ARCH_FILE")"
+}
+
+# ============================================================================
 # Helpers
 # ============================================================================
 
-# Extract the Step 2 section from SKILL.md — from "### Step 2:" to "### Step 3:"
-extract_step2_block() {
+_extract_step2_block() {
   local file="$1"
   [ -f "$file" ] || return 1
   awk '
@@ -62,8 +81,7 @@ extract_step2_block() {
   ' "$file" 2>/dev/null
 }
 
-# Extract ABS-010 block from ARCHITECTURE.md
-extract_abs010_block() {
+_extract_abs010_block() {
   local file="$1"
   [ -f "$file" ] || return 1
   awk '
@@ -72,6 +90,12 @@ extract_abs010_block() {
     found && /^### ABS-0[1-9][1-9]:/ && !/^### ABS-010:/ { exit }
   ' "$file" 2>/dev/null
 }
+
+ORCHESTRATOR_DENYLIST=(
+  "research signals"
+  "Spawn the research subagent when"
+  "Inferred signals"
+)
 
 # ============================================================================
 # INV-001: Agent file exists with correct frontmatter
@@ -187,23 +211,18 @@ check_inv002() {
 check_inv003() {
   section "INV-003: SKILL.md uses namespaced subagent_type for research agent"
 
-  if [ ! -f "$CSPEC_SKILL" ]; then
-    fail "INV-003(a)" "$CSPEC_SKILL does not exist"
+  if [ -z "$STEP2_BLOCK" ]; then
+    fail "INV-003(a)" "$CSPEC_SKILL does not exist or Step 2 block is empty"
     return
   fi
 
-  local step2_block
-  step2_block="$(extract_step2_block "$CSPEC_SKILL")"
-
-  # Must contain the namespaced subagent_type
-  if echo "$step2_block" | grep -q 'subagent_type="correctless:cspec-research"'; then
+  if echo "$STEP2_BLOCK" | grep -q 'subagent_type="correctless:cspec-research"'; then
     pass "INV-003(a)" "Step 2 contains subagent_type=\"correctless:cspec-research\""
   else
     fail "INV-003(a)" "Step 2 does not contain subagent_type=\"correctless:cspec-research\""
   fi
 
-  # Must NOT contain general-purpose subagent_type for research
-  if echo "$step2_block" | grep -q 'subagent_type="general-purpose"'; then
+  if echo "$STEP2_BLOCK" | grep -q 'subagent_type="general-purpose"'; then
     fail "INV-003(b)" "Step 2 still references subagent_type=\"general-purpose\""
   else
     pass "INV-003(b)" "Step 2 does not reference subagent_type=\"general-purpose\""
@@ -217,15 +236,11 @@ check_inv003() {
 check_inv004() {
   section "INV-004: No inline research agent prompt in SKILL.md"
 
-  if [ ! -f "$CSPEC_SKILL" ]; then
-    fail "INV-004(a)" "$CSPEC_SKILL does not exist"
+  if [ -z "$STEP2_BLOCK" ]; then
+    fail "INV-004(a)" "$CSPEC_SKILL does not exist or Step 2 block is empty"
     return
   fi
 
-  local step2_block
-  step2_block="$(extract_step2_block "$CSPEC_SKILL")"
-
-  # Denylist signatures from the spec
   local -a denylist=(
     "You are a research agent supporting the spec phase"
     "Produce a structured brief"
@@ -234,7 +249,7 @@ check_inv004() {
 
   local found_any=false
   for pattern in "${denylist[@]}"; do
-    if echo "$step2_block" | grep -qF "$pattern"; then
+    if echo "$STEP2_BLOCK" | grep -qF "$pattern"; then
       fail "INV-004(a:$pattern)" "Step 2 still contains denylist signature: '$pattern'"
       found_any=true
     fi
@@ -244,16 +259,14 @@ check_inv004() {
     pass "INV-004(a)" "Step 2 has no denylist inline prompt signatures"
   fi
 
-  # Stale "(forked context)" annotation must be removed or replaced
-  if echo "$step2_block" | grep -qF "(forked context)"; then
+  if echo "$STEP2_BLOCK" | grep -qF "(forked context)"; then
     fail "INV-004(b)" "Step 2 still has stale '(forked context)' annotation"
   else
     pass "INV-004(b)" "Step 2 does not have stale '(forked context)' annotation"
   fi
 
-  # No multi-line blockquoted prompt (4+ consecutive blockquote lines)
   local consecutive_blockquotes
-  consecutive_blockquotes="$(echo "$step2_block" | awk '
+  consecutive_blockquotes="$(echo "$STEP2_BLOCK" | awk '
     /^>/ { count++; next }
     { if (count >= 4) found = 1; count = 0 }
     END { if (count >= 4) found = 1; print (found ? "yes" : "no") }
@@ -273,30 +286,24 @@ check_inv004() {
 check_inv005() {
   section "INV-005: Orchestrator-injected dynamic context placeholders"
 
-  if [ ! -f "$AGENT_SRC" ]; then
-    fail "INV-005(a)" "$AGENT_SRC does not exist — cannot check placeholders"
+  if [ -z "$AGENT_BODY" ]; then
+    fail "INV-005(a)" "$AGENT_SRC does not exist or body is empty"
     return
   fi
 
-  local body
-  body="$(skill_body "$AGENT_SRC")"
-
-  # Must contain {topic} placeholder
-  if echo "$body" | grep -qF "{topic}"; then
+  if echo "$AGENT_BODY" | grep -qF "{topic}"; then
     pass "INV-005(a)" "agent file contains {topic} placeholder"
   else
     fail "INV-005(a)" "agent file does not contain {topic} placeholder"
   fi
 
-  # Must contain {feature_description} placeholder
-  if echo "$body" | grep -qF "{feature_description}"; then
+  if echo "$AGENT_BODY" | grep -qF "{feature_description}"; then
     pass "INV-005(b)" "agent file contains {feature_description} placeholder"
   else
     fail "INV-005(b)" "agent file does not contain {feature_description} placeholder"
   fi
 
-  # Must reference AGENT_CONTEXT.md
-  if echo "$body" | grep -qF "AGENT_CONTEXT.md"; then
+  if echo "$AGENT_BODY" | grep -qF "AGENT_CONTEXT.md"; then
     pass "INV-005(c)" "agent file references AGENT_CONTEXT.md"
   else
     fail "INV-005(c)" "agent file does not reference AGENT_CONTEXT.md"
@@ -310,23 +317,18 @@ check_inv005() {
 check_inv006() {
   section "INV-006: Research-specific content preserved"
 
-  if [ ! -f "$AGENT_SRC" ]; then
-    fail "INV-006(a)" "$AGENT_SRC does not exist — cannot check research content"
+  if [ -z "$AGENT_BODY" ]; then
+    fail "INV-006(a)" "$AGENT_SRC does not exist or body is empty"
     return
   fi
 
-  local body
-  body="$(skill_body "$AGENT_SRC")"
-
-  # Must contain "Current official documentation" (search topics list)
-  if echo "$body" | grep -qF "Current official documentation"; then
+  if echo "$AGENT_BODY" | grep -qF "Current official documentation"; then
     pass "INV-006(a)" "agent file contains 'Current official documentation'"
   else
     fail "INV-006(a)" "agent file does not contain 'Current official documentation'"
   fi
 
-  # Must contain "Dependency Health" (structured brief format)
-  if echo "$body" | grep -qF "Dependency Health"; then
+  if echo "$AGENT_BODY" | grep -qF "Dependency Health"; then
     pass "INV-006(b)" "agent file contains 'Dependency Health'"
   else
     fail "INV-006(b)" "agent file does not contain 'Dependency Health'"
@@ -340,15 +342,12 @@ check_inv006() {
 check_inv007() {
   section "INV-007: Skepticism behavioral override"
 
-  if [ ! -f "$AGENT_SRC" ]; then
-    fail "INV-007(a)" "$AGENT_SRC does not exist — cannot check skepticism"
+  if [ -z "$AGENT_BODY" ]; then
+    fail "INV-007(a)" "$AGENT_SRC does not exist or body is empty"
     return
   fi
 
-  local body
-  body="$(skill_body "$AGENT_SRC")"
-
-  if echo "$body" | grep -qF "BE SKEPTICAL"; then
+  if echo "$AGENT_BODY" | grep -qF "BE SKEPTICAL"; then
     pass "INV-007(a)" "agent file contains 'BE SKEPTICAL' directive"
   else
     fail "INV-007(a)" "agent file does not contain 'BE SKEPTICAL' directive"
@@ -362,15 +361,10 @@ check_inv007() {
 check_inv008() {
   section "INV-008: Output format contract"
 
-  if [ ! -f "$AGENT_SRC" ]; then
-    fail "INV-008(a)" "$AGENT_SRC does not exist — cannot check output format"
+  if [ -z "$AGENT_BODY" ]; then
+    fail "INV-008(a)" "$AGENT_SRC does not exist or body is empty"
     return
   fi
-
-  local body
-  body="$(skill_body "$AGENT_SRC")"
-
-  # All 7 required section headers must appear (AND logic)
   local -a required_sections=(
     "Current State"
     "Key Findings"
@@ -383,7 +377,7 @@ check_inv008() {
 
   local all_found=true
   for section_header in "${required_sections[@]}"; do
-    if echo "$body" | grep -qF "$section_header"; then
+    if echo "$AGENT_BODY" | grep -qF "$section_header"; then
       pass "INV-008($section_header)" "agent file contains section header '$section_header'"
     else
       fail "INV-008($section_header)" "agent file does not contain section header '$section_header'"
@@ -428,37 +422,30 @@ check_inv009() {
 check_inv010() {
   section "INV-010: ABS-010 registry updated with network-read class"
 
-  if [ ! -f "$ARCH_FILE" ]; then
-    fail "INV-010(a)" "$ARCH_FILE does not exist"
+  if [ -z "$ABS010_BLOCK" ]; then
+    fail "INV-010(a)" "$ARCH_FILE does not exist or ABS-010 block is empty"
     return
   fi
 
-  local abs010_block
-  abs010_block="$(extract_abs010_block "$ARCH_FILE")"
-
-  # Must mention cspec-research
-  if echo "$abs010_block" | grep -q "cspec-research"; then
+  if echo "$ABS010_BLOCK" | grep -q "cspec-research"; then
     pass "INV-010(a)" "ABS-010 entry mentions cspec-research"
   else
     fail "INV-010(a)" "ABS-010 entry does not mention cspec-research"
   fi
 
-  # Must mention skills/cspec/SKILL.md as consumer
-  if echo "$abs010_block" | grep -q "skills/cspec/SKILL.md"; then
+  if echo "$ABS010_BLOCK" | grep -q "skills/cspec/SKILL.md"; then
     pass "INV-010(b)" "ABS-010 entry references skills/cspec/SKILL.md as consumer"
   else
     fail "INV-010(b)" "ABS-010 entry does not reference skills/cspec/SKILL.md as consumer"
   fi
 
-  # Must distinguish network-read from local-read-only agents
-  if echo "$abs010_block" | grep -qi "network-read\|network.*read\|WebSearch.*WebFetch"; then
+  if echo "$ABS010_BLOCK" | grep -qi "network-read\|network.*read\|WebSearch.*WebFetch"; then
     pass "INV-010(c)" "ABS-010 entry distinguishes network-read tool class"
   else
     fail "INV-010(c)" "ABS-010 entry does not distinguish network-read tool class"
   fi
 
-  # Test file must be listed in ABS-010's Test line
-  if echo "$abs010_block" | grep -q "test-cspec-research-agent"; then
+  if echo "$ABS010_BLOCK" | grep -q "test-cspec-research-agent"; then
     pass "INV-010(d)" "ABS-010 Test line references test-cspec-research-agent"
   else
     fail "INV-010(d)" "ABS-010 Test line does not reference test-cspec-research-agent"
@@ -494,45 +481,32 @@ check_inv011() {
 check_inv012() {
   section "INV-012: Conditional spawn logic stays in SKILL.md"
 
-  if [ ! -f "$CSPEC_SKILL" ]; then
-    fail "INV-012(a)" "$CSPEC_SKILL does not exist"
+  if [ -z "$STEP2_BLOCK" ]; then
+    fail "INV-012(a)" "$CSPEC_SKILL does not exist or Step 2 block is empty"
     return
   fi
 
-  local step2_block
-  step2_block="$(extract_step2_block "$CSPEC_SKILL")"
-
-  # SKILL.md must still contain at least one of the orchestrator patterns
-  if echo "$step2_block" | grep -qF "research signals" || echo "$step2_block" | grep -qF "Spawn the research subagent when"; then
+  if echo "$STEP2_BLOCK" | grep -qF "research signals" || echo "$STEP2_BLOCK" | grep -qF "Spawn the research subagent when"; then
     pass "INV-012(a)" "SKILL.md Step 2 retains orchestrator spawn logic"
   else
-    fail "INV-012(a)" "SKILL.md Step 2 lost orchestrator spawn logic (no 'research signals' or 'Spawn the research subagent when')"
+    fail "INV-012(a)" "SKILL.md Step 2 lost orchestrator spawn logic"
   fi
 
-  # Agent file must NOT contain orchestrator logic patterns
-  if [ -f "$AGENT_SRC" ]; then
-    local body
-    body="$(skill_body "$AGENT_SRC")"
+  if [ -z "$AGENT_BODY" ]; then
+    fail "INV-012(b)" "$AGENT_SRC does not exist or body is empty"
+    return
+  fi
 
-    local -a agent_denylist=(
-      "research signals"
-      "Spawn the research subagent when"
-      "Inferred signals"
-    )
-
-    local found_any=false
-    for pattern in "${agent_denylist[@]}"; do
-      if echo "$body" | grep -qF "$pattern"; then
-        fail "INV-012(b:$pattern)" "agent file contains orchestrator logic: '$pattern'"
-        found_any=true
-      fi
-    done
-
-    if [ "$found_any" = "false" ]; then
-      pass "INV-012(b)" "agent file does not contain orchestrator logic patterns"
+  local found_any=false
+  for pattern in "${ORCHESTRATOR_DENYLIST[@]}"; do
+    if echo "$AGENT_BODY" | grep -qF "$pattern"; then
+      fail "INV-012(b:$pattern)" "agent file contains orchestrator logic: '$pattern'"
+      found_any=true
     fi
-  else
-    fail "INV-012(b)" "$AGENT_SRC does not exist — cannot check denylist"
+  done
+
+  if [ "$found_any" = "false" ]; then
+    pass "INV-012(b)" "agent file does not contain orchestrator logic patterns"
   fi
 }
 
@@ -562,16 +536,12 @@ check_inv013() {
 check_inv014() {
   section "INV-014: Harness-prior suppression"
 
-  if [ ! -f "$AGENT_SRC" ]; then
-    fail "INV-014(a)" "$AGENT_SRC does not exist — cannot check harness-prior suppression"
+  if [ -z "$AGENT_BODY" ]; then
+    fail "INV-014(a)" "$AGENT_SRC does not exist or body is empty"
     return
   fi
 
-  local body
-  body="$(skill_body "$AGENT_SRC")"
-
-  # At least one of: "do not summarize" or "exhaustive"
-  if echo "$body" | grep -qi "do not summarize\|exhaustive"; then
+  if echo "$AGENT_BODY" | grep -qi "do not summarize\|exhaustive"; then
     pass "INV-014(a)" "agent file contains harness-prior suppression phrase"
   else
     fail "INV-014(a)" "agent file does not contain 'do not summarize' or 'exhaustive'"
@@ -585,38 +555,29 @@ check_inv014() {
 check_inv015() {
   section "INV-015: Data-treatment directive for untrusted web content"
 
-  if [ ! -f "$AGENT_SRC" ]; then
-    fail "INV-015(a)" "$AGENT_SRC does not exist — cannot check data-treatment directive"
+  if [ -z "$AGENT_BODY" ]; then
+    fail "INV-015(a)" "$AGENT_SRC does not exist or body is empty"
     return
   fi
 
-  local body
-  body="$(skill_body "$AGENT_SRC")"
-
-  # Agent file must contain "advisory"
-  if echo "$body" | grep -qi "advisory"; then
+  if echo "$AGENT_BODY" | grep -qi "advisory"; then
     pass "INV-015(a)" "agent file contains 'advisory'"
   else
     fail "INV-015(a)" "agent file does not contain 'advisory'"
   fi
 
-  # Agent file must contain "untrusted" OR "not instructions"
-  if echo "$body" | grep -qi "untrusted\|not instructions"; then
+  if echo "$AGENT_BODY" | grep -qi "untrusted\|not instructions"; then
     pass "INV-015(b)" "agent file contains 'untrusted' or 'not instructions'"
   else
     fail "INV-015(b)" "agent file does not contain 'untrusted' or 'not instructions'"
   fi
 
-  # SKILL.md must contain untrusted/advisory adjacent to research brief
-  if [ ! -f "$CSPEC_SKILL" ]; then
-    fail "INV-015(c)" "$CSPEC_SKILL does not exist"
+  if [ -z "$STEP2_BLOCK" ]; then
+    fail "INV-015(c)" "$CSPEC_SKILL does not exist or Step 2 block is empty"
     return
   fi
 
-  local step2_block
-  step2_block="$(extract_step2_block "$CSPEC_SKILL")"
-
-  if echo "$step2_block" | grep -qi "untrusted\|advisory"; then
+  if echo "$STEP2_BLOCK" | grep -qi "untrusted\|advisory"; then
     pass "INV-015(c)" "SKILL.md Step 2 contains 'untrusted' or 'advisory' near research brief"
   else
     fail "INV-015(c)" "SKILL.md Step 2 does not contain 'untrusted' or 'advisory'"
@@ -630,16 +591,12 @@ check_inv015() {
 check_inv016() {
   section "INV-016: Network unavailability self-diagnostic"
 
-  if [ ! -f "$AGENT_SRC" ]; then
-    fail "INV-016(a)" "$AGENT_SRC does not exist — cannot check self-diagnostic"
+  if [ -z "$AGENT_BODY" ]; then
+    fail "INV-016(a)" "$AGENT_SRC does not exist or body is empty"
     return
   fi
 
-  local body
-  body="$(skill_body "$AGENT_SRC")"
-
-  # Must contain instruction against silent degradation
-  if echo "$body" | grep -qF "DO NOT substitute training data"; then
+  if echo "$AGENT_BODY" | grep -qF "DO NOT substitute training data"; then
     pass "INV-016(a)" "agent file contains 'DO NOT substitute training data' directive"
   else
     fail "INV-016(a)" "agent file does not contain 'DO NOT substitute training data'"
@@ -653,23 +610,18 @@ check_inv016() {
 check_prh001() {
   section "PRH-001: No inline research agent prompt (prohibition)"
 
-  if [ ! -f "$CSPEC_SKILL" ]; then
-    fail "PRH-001(a)" "$CSPEC_SKILL does not exist"
+  if [ -z "$STEP2_BLOCK" ]; then
+    fail "PRH-001(a)" "$CSPEC_SKILL does not exist or Step 2 block is empty"
     return
   fi
 
-  local step2_block
-  step2_block="$(extract_step2_block "$CSPEC_SKILL")"
-
-  # Must not contain the inline prompt identity line as a blockquote
-  if echo "$step2_block" | grep -q "^> You are a research agent supporting the spec phase"; then
+  if echo "$STEP2_BLOCK" | grep -q "^> You are a research agent supporting the spec phase"; then
     fail "PRH-001(a)" "Step 2 still has inline '> You are a research agent' prompt"
   else
     pass "PRH-001(a)" "Step 2 does not have inline agent identity prompt"
   fi
 
-  # Must not contain inline "BE SKEPTICAL" inside blockquote (moved to agent file)
-  if echo "$step2_block" | grep -q "^> .*BE SKEPTICAL"; then
+  if echo "$STEP2_BLOCK" | grep -q "^> .*BE SKEPTICAL"; then
     fail "PRH-001(b)" "Step 2 still has blockquoted 'BE SKEPTICAL' (should be in agent file)"
   else
     pass "PRH-001(b)" "Step 2 does not have blockquoted 'BE SKEPTICAL'"
@@ -711,24 +663,14 @@ check_prh002() {
 check_bnd001() {
   section "BND-001: Agent vs orchestrator separation"
 
-  if [ ! -f "$AGENT_SRC" ]; then
-    fail "BND-001(a)" "$AGENT_SRC does not exist — cannot check separation"
+  if [ -z "$AGENT_BODY" ]; then
+    fail "BND-001(a)" "$AGENT_SRC does not exist or body is empty"
     return
   fi
 
-  local body
-  body="$(skill_body "$AGENT_SRC")"
-
-  # Agent file must NOT contain orchestrator-level patterns
-  local -a denylist=(
-    "research signals"
-    "Spawn the research subagent when"
-    "Inferred signals"
-  )
-
   local found_any=false
-  for pattern in "${denylist[@]}"; do
-    if echo "$body" | grep -qF "$pattern"; then
+  for pattern in "${ORCHESTRATOR_DENYLIST[@]}"; do
+    if echo "$AGENT_BODY" | grep -qF "$pattern"; then
       fail "BND-001(a:$pattern)" "agent file contains orchestrator logic: '$pattern'"
       found_any=true
     fi
@@ -738,18 +680,15 @@ check_bnd001() {
     pass "BND-001(a)" "agent file does not contain orchestrator logic patterns"
   fi
 
-  # SKILL.md must still contain orchestrator logic
-  if [ -f "$CSPEC_SKILL" ]; then
-    local step2_block
-    step2_block="$(extract_step2_block "$CSPEC_SKILL")"
+  if [ -z "$STEP2_BLOCK" ]; then
+    fail "BND-001(b)" "$CSPEC_SKILL does not exist or Step 2 block is empty"
+    return
+  fi
 
-    if echo "$step2_block" | grep -qF "research signals" || echo "$step2_block" | grep -qF "Spawn the research subagent when"; then
-      pass "BND-001(b)" "SKILL.md Step 2 retains orchestrator spawn logic"
-    else
-      fail "BND-001(b)" "SKILL.md Step 2 lost orchestrator spawn logic"
-    fi
+  if echo "$STEP2_BLOCK" | grep -qF "research signals" || echo "$STEP2_BLOCK" | grep -qF "Spawn the research subagent when"; then
+    pass "BND-001(b)" "SKILL.md Step 2 retains orchestrator spawn logic"
   else
-    fail "BND-001(b)" "$CSPEC_SKILL does not exist"
+    fail "BND-001(b)" "SKILL.md Step 2 lost orchestrator spawn logic"
   fi
 }
 
@@ -851,6 +790,10 @@ check_skill_frontmatter() {
 # ============================================================================
 # Run all checks
 # ============================================================================
+
+_cache_agent_body
+_cache_step2_block
+_cache_abs010_block
 
 check_inv001
 check_inv002
