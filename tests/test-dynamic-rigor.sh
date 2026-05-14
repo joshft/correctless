@@ -108,10 +108,10 @@ test_r001_sync_single_dist() {
   if [ -d "$REPO_DIR/correctless/skills" ]; then
     skill_count="$(find "$REPO_DIR/correctless/skills" -name "SKILL.md" | wc -l)"
   fi
-  assert_eq "R-001: correctless/ has 29 skills" "29" "$skill_count"
+  assert_eq "R-001: correctless/ has 30 skills" "30" "$skill_count"
 
-  # R-001: verify each of the 29 skills exists in correctless/
-  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto carchitect cmodelupgrade; do
+  # R-001: verify each of the 30 skills exists in correctless/
+  for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto carchitect cmodelupgrade cdashboard; do
     assert_eq "R-001: correctless/skills/$skill/SKILL.md exists" "true" \
       "$([ -f "$REPO_DIR/correctless/skills/$skill/SKILL.md" ] && echo true || echo false)"
   done

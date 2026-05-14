@@ -1820,7 +1820,7 @@ check_path_discovery_guard() {
 
   # Skills excluded from the path discovery requirement — they don't reference
   # a single spec artifact or use directory-scan patterns instead
-  local EXCLUDED_FROM_DISCOVERY="crelease cupdate-arch carchitect csetup chelp cstatus cquick cexplain cdebug crefactor ccontribute cmaintain cpr-review credteam caudit cdevadv cauto cwtf cmetrics cspec"
+  local EXCLUDED_FROM_DISCOVERY="crelease cupdate-arch carchitect csetup chelp cstatus cquick cexplain cdebug crefactor ccontribute cmaintain cpr-review credteam caudit cdevadv cauto cwtf cmetrics cspec cdashboard"
 
   # Valid discovery tokens (checked as extended regex against the skill body)
   local discovery_pattern="workflow-advance\.sh status|spec_file|path from workflow|\.correctless/specs/"

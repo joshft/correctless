@@ -51,7 +51,7 @@ No new dependencies introduced. The implementation uses only existing project to
 |----------|-------|----------|-------|
 | error-suppression (`\|\| true`) | 5 (source) + 5 (dist) | high | All are intentional — R-011 requires graceful degradation. The `|| true` guards on jq parsing of external JSONL files are load-bearing: malformed transcript entries must be skipped, not crash the script. These are not error suppression in the AP-001 sense. |
 | debug-echo | 5 (source) + 5 (dist) | low | All are stdout output (`echo "$RESULT"`, `error_json` function). These are the script's intended output mechanism, not debug statements. False positive from the scanner. |
-| debug-echo in generate-dashboard.sh | 3 (source) + 3 (dist) | low | Pre-existing in dashboard script, not introduced by this feature. |
+| debug-echo in build-dashboard.sh | 3 (source) + 3 (dist) | low | Pre-existing in dashboard script, not introduced by this feature. |
 | debug-echo in test-session-cost.sh | 16 | low | Test helper `echo "$test_dir"` statements. Normal test infrastructure. |
 
 **No actionable findings.** All "error-suppression" hits are intentional graceful degradation required by R-011. All "debug-echo" hits are either intended output or test infrastructure.
@@ -76,7 +76,7 @@ No new dependencies introduced. The implementation uses only existing project to
 No drift detected between spec and implementation:
 
 - R-001 through R-006 (core script): Script matches spec for all behavioral requirements. branch_slug from lib.sh, artifact path, JSON schema, pricing, deduplication, phase attribution.
-- R-007 (dashboard): generate-dashboard.sh reads cost-*.json, renders USD cost by phase, shows unknown_models asterisk note, falls back to token-log.
+- R-007 (dashboard): build-dashboard.sh reads cost-*.json, renders USD cost by phase, shows unknown_models asterisk note, falls back to token-log.
 - R-008 (cdocs wiring): cdocs SKILL.md has `Bash(*compute-session-cost.sh*)` in allowed-tools frontmatter and instructions to call it as last step.
 - R-009 (cverify wiring): cverify SKILL.md includes `actual_cost_usd` in calibration entry schema with "omit if artifact doesn't exist" instruction.
 - R-010 (cmetrics wiring): cmetrics SKILL.md includes cost-per-bug-caught language with USD from cost artifacts and token-count fallback.

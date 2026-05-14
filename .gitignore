@@ -32,6 +32,9 @@ ROADMAP.md
 dashboard.html
 OPUS_4_7_MIGRATION.md
 
+# Correctless — generated dashboard (per-run output)
+.correctless/dashboard/
+
 # Correctless — install manifest (per-install local state)
 .correctless/.install-manifest.json
 

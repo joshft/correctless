@@ -116,14 +116,14 @@ fi
 sync_file "skills/_shared/constraints.md" "correctless/skills/_shared/constraints.md"
 [ "$CHECK_ONLY" = false ] && info "Shared constraints → correctless/"
 
-# --- All 29 skills ---
-for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto carchitect cmodelupgrade; do
+# --- All 30 skills ---
+for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto carchitect cmodelupgrade cdashboard; do
   if [ "$CHECK_ONLY" = false ]; then
     mkdir -p "correctless/skills/$skill"
   fi
   sync_file "skills/$skill/SKILL.md" "correctless/skills/$skill/SKILL.md"
 done
-[ "$CHECK_ONLY" = false ] && info "All skills (29) → correctless/"
+[ "$CHECK_ONLY" = false ] && info "All skills (30) → correctless/"
 
 # --- test-features templates (harness-fingerprint baseline) ---
 if [ "$CHECK_ONLY" = false ]; then

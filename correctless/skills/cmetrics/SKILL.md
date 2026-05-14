@@ -515,4 +515,4 @@ Use TaskCreate/TaskUpdate:
 - **The "issues caught" number includes deduplication.** If review and QA both caught the same issue, count it once at the earliest phase.
 - **Redact if sharing.** If this output will be shared externally, apply redaction rules from `templates/redaction-rules.md` first.
 
-For a full project dashboard, run `bash .correctless/scripts/generate-dashboard.sh` and open `dashboard.html`.
+For a full project dashboard, run `/cdashboard` and open `.correctless/dashboard/index.html` in a browser.

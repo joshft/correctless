@@ -335,7 +335,7 @@ EOF
 
   # R-001-g: Script requires only bash 4+, jq 1.7+, and POSIX tools (no exotic deps)
   if [ -f "$REPO_DIR/scripts/build-dashboard.sh" ]; then
-    if ! grep -qE '^[^#]*(npm|node |python|pip |ruby|gem |cargo )' "$REPO_DIR/scripts/build-dashboard.sh"; then
+    if ! grep -qE '^[^#<]*(npm |node |python|pip |ruby|gem |cargo )' "$REPO_DIR/scripts/build-dashboard.sh"; then
       pass "R001-g" "No exotic dependencies (npm/python/node/ruby/cargo)"
     else
       fail "R001-g" "Script references exotic dependencies"
@@ -1208,13 +1208,18 @@ test_metrics_section_order() {
     return
   fi
 
+  # Extract only the main JS section (after the last <script> tag, which is the app code)
+  # to avoid matching text in the JSON data block
+  local _js_section
+  _js_section=$(sed -n '/^<script>$/,/<\/script>/p' "$_f")
+
   local pos_qt pos_qrt pos_ppd pos_fr pos_ah
 
-  pos_qt=$(grep -n 'Quality Trajectory' "$_f" | head -1 | cut -d: -f1)
-  pos_qrt=$(grep -n 'QA Rounds' "$_f" | head -1 | cut -d: -f1)
-  pos_ppd=$(grep -n 'Pipeline Phase Distribution' "$_f" | head -1 | cut -d: -f1)
-  pos_fr=$(grep -n 'Fix Rate' "$_f" | head -1 | cut -d: -f1)
-  pos_ah=$(grep -n 'Antipattern' "$_f" | head -1 | cut -d: -f1)
+  pos_qt=$(echo "$_js_section" | grep -n 'Quality Trajectory' | head -1 | cut -d: -f1)
+  pos_qrt=$(echo "$_js_section" | grep -n 'QA Rounds' | head -1 | cut -d: -f1)
+  pos_ppd=$(echo "$_js_section" | grep -n 'Pipeline Phase Distribution' | head -1 | cut -d: -f1)
+  pos_fr=$(echo "$_js_section" | grep -n 'Fix Rate' | head -1 | cut -d: -f1)
+  pos_ah=$(echo "$_js_section" | grep -n 'Antipattern' | head -1 | cut -d: -f1)
 
   if [ -z "$pos_qt" ] || [ -z "$pos_qrt" ] || [ -z "$pos_ppd" ] || [ -z "$pos_fr" ]; then
     fail "ORDER-a" "One or more section headings not found"

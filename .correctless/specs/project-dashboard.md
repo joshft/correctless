@@ -9,11 +9,11 @@
 
 ## What
 
-A bash script (`scripts/generate-dashboard.sh`) that reads `.correctless/` artifacts and generates a self-contained `dashboard.html` in the project root. The dashboard tells the longitudinal story of the project's quality posture — are features getting cleaner over time, where in the pipeline are findings caught, is the antipattern loop compounding. No server, no build step, no external dependencies — just `open dashboard.html` in a browser. Gitignored.
+A bash script (`scripts/build-dashboard.sh`) that reads `.correctless/` artifacts and generates a self-contained `.correctless/dashboard/index.html` in the project root. The dashboard tells the longitudinal story of the project's quality posture — are features getting cleaner over time, where in the pipeline are findings caught, is the antipattern loop compounding. No server, no build step, no external dependencies — just `open .correctless/dashboard/index.html` in a browser. Gitignored.
 
 ## Rules
 
-- **R-001** [unit]: `scripts/generate-dashboard.sh` exists and produces a `dashboard.html` file in the project root when run from the repo root. Exit code 0 on success. The script requires only `bash`, `jq`, and standard Unix tools (sed, awk, grep, find, date). No npm, no python, no external chart libraries fetched at runtime.
+- **R-001** [unit]: `scripts/build-dashboard.sh` exists and produces a `.correctless/dashboard/index.html` file in the project root when run from the repo root. Exit code 0 on success. The script requires only `bash`, `jq`, and standard Unix tools (sed, awk, grep, find, date). No npm, no python, no external chart libraries fetched at runtime.
 
 - **R-002** [unit]: The generated HTML is self-contained — all CSS, JS, and data are inline. No external CDN links, no fetch calls, no network dependencies. The file opens correctly in a browser via `file://` protocol.
 
@@ -50,13 +50,13 @@ A bash script (`scripts/generate-dashboard.sh`) that reads `.correctless/` artif
 
 - **R-005** [unit]: The HTML uses simple, clean styling. Dark/light mode based on `prefers-color-scheme`. The page scrolls vertically as a single narrative — not a grid of cards. Color-coded severity badges (red for BLOCKING/CRITICAL, yellow for MEDIUM/NON-BLOCKING, green for clean/resolved). Horizontal bars for trends (inline `<div>` elements with percentage widths). Readable on a 13" laptop screen without horizontal scrolling.
 
-- **R-006** [unit]: `dashboard.html` is added to `.gitignore` (alongside ROADMAP.md in the existing "Implementation plans" section).
+- **R-006** [unit]: `.correctless/dashboard/index.html` is added to `.gitignore` (alongside ROADMAP.md in the existing "Implementation plans" section).
 
 - **R-007** [unit]: The script handles minimal-data projects gracefully. Each section degrades independently: "No workflow history yet", "No QA findings", "No calibration data", etc. The Quality Trajectory section needs at least 2 features to show a trend — with 1 feature, it shows a single bar with a note "Need more features to show a trend." The dashboard is useful from the first feature.
 
-- **R-008** [unit]: `sync.sh` copies `scripts/generate-dashboard.sh` to the distribution at `correctless/scripts/generate-dashboard.sh` so users get the script when they install the plugin.
+- **R-008** [unit]: `sync.sh` copies `scripts/build-dashboard.sh` to the distribution at `correctless/scripts/build-dashboard.sh` so users get the script when they install the plugin.
 
-- **R-009** [unit]: `/cmetrics` SKILL.md is updated with a one-line mention at the end of its output: "For a full project dashboard, run `bash .correctless/scripts/generate-dashboard.sh` and open `dashboard.html`." This makes the dashboard discoverable at the moment the user is thinking about project-level data.
+- **R-009** [unit]: `/cmetrics` SKILL.md is updated with a one-line mention at the end of its output: "For a full project dashboard, run `bash .correctless/scripts/build-dashboard.sh` and open `.correctless/dashboard/index.html`." This makes the dashboard discoverable at the moment the user is thinking about project-level data.
 
 ## Won't Do
 

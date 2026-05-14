@@ -7,7 +7,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 
 AUDIT_RECORD="$REPO_DIR/scripts/audit-record.sh"
-DASHBOARD_SCRIPT="$REPO_DIR/scripts/generate-dashboard.sh"
+DASHBOARD_SCRIPT="$REPO_DIR/scripts/build-dashboard.sh"
 CMETRICS_SKILL="$REPO_DIR/skills/cmetrics/SKILL.md"
 CAUDIT_SKILL="$REPO_DIR/skills/caudit/SKILL.md"
 WORKFLOW_ADVANCE="$REPO_DIR/hooks/workflow-advance.sh"
@@ -561,21 +561,21 @@ test_r008_dormant
 
 section "R-009: dashboard escape metrics section"
 
-# Tests R-009: generate-dashboard.sh references escape metrics or metrics artifact
+# Tests R-009: build-dashboard.sh references escape metrics or metrics artifact
 test_r009_dashboard_reads_metrics() {
   if grep -qi "escape.*metric\|metrics-.*\.md\|escape.*section" "$DASHBOARD_SCRIPT"; then
-    pass "R-009-dashboard" "generate-dashboard.sh references escape metrics"
+    pass "R-009-dashboard" "build-dashboard.sh references escape metrics"
   else
-    fail "R-009-dashboard" "generate-dashboard.sh has no escape metrics section"
+    fail "R-009-dashboard" "build-dashboard.sh has no escape metrics section"
   fi
 }
 
 # Tests R-009: dashboard dormant when no metrics artifact
 test_r009_dashboard_dormant() {
   if grep -qi "dormant\|no.*metrics\|omit\|skip.*metric" "$DASHBOARD_SCRIPT"; then
-    pass "R-009-dormant" "generate-dashboard.sh handles missing metrics gracefully"
+    pass "R-009-dormant" "build-dashboard.sh handles missing metrics gracefully"
   else
-    fail "R-009-dormant" "generate-dashboard.sh missing dormant handling for escape metrics"
+    fail "R-009-dormant" "build-dashboard.sh missing dormant handling for escape metrics"
   fi
 }
 

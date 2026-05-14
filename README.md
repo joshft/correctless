@@ -5,7 +5,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Skills: 29](https://img.shields.io/badge/skills-29-blue.svg)](docs/skills/)
+[![Skills: 29](https://img.shields.io/badge/skills-30-blue.svg)](docs/skills/)
 [![Version: 3.0.0](https://img.shields.io/badge/version-3.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
@@ -72,7 +72,7 @@ Then restart Claude Code. Git clone users: `cd .claude/skills/workflow && git pu
 
 ## One Plugin, Three Intensity Levels
 
-Correctless ships as a single plugin with 29 skills. You choose the intensity that matches your project's risk profile. Seven skills are gated behind intensity thresholds — they check your project's `workflow.intensity` setting and warn if invoked below their minimum.
+Correctless ships as a single plugin with 30 skills. You choose the intensity that matches your project's risk profile. Seven skills are gated behind intensity thresholds — they check your project's `workflow.intensity` setting and warn if invoked below their minimum.
 
 | Intensity | Overhead | What You Get | Best For |
 |-----------|----------|--------------|----------|
@@ -442,7 +442,7 @@ rm -rf .correctless/
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 29 skills, 3 intensity levels, ~5,000 automated tests, 8 hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 30 skills, 3 intensity levels, ~5,000 automated tests, 8 hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 
