@@ -14,7 +14,7 @@
 - No new dependencies added (bash, jq, standard Unix tools only)
 
 ## Architecture Compliance
-- Source-to-dist sync (PAT-001): edits in `scripts/generate-dashboard.sh`, synced to `correctless/scripts/generate-dashboard.sh` via sync.sh
+- Source-to-dist sync (PAT-001): edits in `scripts/build-dashboard.sh`, synced to `correctless/scripts/build-dashboard.sh` via sync.sh
 - No new patterns introduced; extends existing dashboard generator script
 - POSIX-compatible grep/sed/awk usage (ENV-006)
 - No new hooks, agents, or trust boundaries
@@ -25,7 +25,7 @@
 ## Antipattern Scan
 | Finding | File | Severity | Notes |
 |---------|------|----------|-------|
-| debug-echo (x6) | scripts/generate-dashboard.sh | low | Echo statements are user-facing output ("Error:", data injection), not debug logging — false positives |
+| debug-echo (x6) | scripts/build-dashboard.sh | low | Echo statements are user-facing output ("Error:", data injection), not debug logging — false positives |
 | debug-echo (x20) | tests/test-project-dashboard.sh | low | Echo statements are test runner output (pass/fail), not debug logging — false positives |
 
 No semantic antipatterns detected (reviewed against ai-antipatterns.md checklist: no disconnected middleware, no scope creep, no over-abstraction, no mock-testing-the-mock, no happy-path-only, no silently removed safety guards).

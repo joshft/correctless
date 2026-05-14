@@ -18,7 +18,7 @@
 | R-006 | R-006-trends, R-006-threshold, R-006-insufficient | skills/cmetrics/SKILL.md | PASS | Structural: improving/stable/regressing, 20% threshold, insufficient data handling |
 | R-007 | R-007-distribution, R-007-shift | skills/cmetrics/SKILL.md | PASS | Structural: severity distribution table, shift from previous cycle |
 | R-008 | R-008-dormant | skills/cmetrics/SKILL.md | PASS | Structural: dormant/PAT-019 behavior when no round-JSON |
-| R-009 | R-009-dashboard, R-009-dormant | scripts/generate-dashboard.sh | PASS | Structural + behavioral: escape metrics section, dormant when no data |
+| R-009 | R-009-dashboard, R-009-dormant | scripts/build-dashboard.sh | PASS | Structural + behavioral: escape metrics section, dormant when no data |
 | R-010 | R-010-escape-type, R-010-values, R-010-triage, R-010-per-finding | skills/caudit/SKILL.md | PASS | Structural: escape_type in agent prompt, classification values, triage validation, per-finding |
 
 ## Invariant Coverage
@@ -60,7 +60,7 @@
 - Triage agent (line 496): validates escape_type classification, rejects invalid, defaults to implementation.
 - Findings schema (line 770): escape_type included in JSON example.
 
-### scripts/generate-dashboard.sh
+### scripts/build-dashboard.sh
 - Lines 279-317: Reads round-JSON files, computes escape count, weighted score, severity distribution, root cause breakdown using jq.
 - Lines 726-789: Dashboard HTML renders escape metrics section only when data exists (PAT-019 dormant).
 

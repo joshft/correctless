@@ -37,7 +37,7 @@ Reframe `/caudit` findings as pipeline escapes rather than "post-merge bugs repo
 
 - **R-008** [unit]: When no round-JSON files exist (no audit has been run), the entire escape metrics section is dormant — no error, no warning, just omitted from output. Follows PAT-019.
 
-- **R-009** [unit]: The `generate-dashboard.sh` Escape Metrics section reads the latest `/cmetrics` artifact (`.correctless/artifacts/metrics-*.md`). When no metrics artifact exists, the dashboard section is dormant.
+- **R-009** [unit]: The `build-dashboard.sh` Escape Metrics section reads the latest `/cmetrics` artifact (`.correctless/artifacts/metrics-*.md`). When no metrics artifact exists, the dashboard section is dormant.
 
 - **R-010** [unit]: Each `/caudit` specialist agent includes `escape_type` (`implementation`, `spec`, or `non-escape`) in its finding submission alongside severity. The triage agent validates the classification during finding triage — rejecting invalid values and defaulting to `implementation` when ambiguous. `/caudit` passes the validated classification to `audit-record.sh write-round` during persistence. Classification is distributed across the audit (one decision per finding at submission time), not batched after convergence.
 
@@ -61,8 +61,8 @@ Reframe `/caudit` findings as pipeline escapes rather than "post-merge bugs repo
   - Accept — negligible impact.
 
 ## Complexity Budget
-- **Estimated LOC**: ~80 (audit-record.sh flag parsing + cmetrics SKILL.md sections + generate-dashboard.sh section)
-- **Files touched**: ~4 (scripts/audit-record.sh, skills/cmetrics/SKILL.md, skills/caudit/SKILL.md, scripts/generate-dashboard.sh)
+- **Estimated LOC**: ~80 (audit-record.sh flag parsing + cmetrics SKILL.md sections + build-dashboard.sh section)
+- **Files touched**: ~4 (scripts/audit-record.sh, skills/cmetrics/SKILL.md, skills/caudit/SKILL.md, scripts/build-dashboard.sh)
 - **New abstractions**: 0
 - **Trust boundaries touched**: 0
 - **Risk surface delta**: low

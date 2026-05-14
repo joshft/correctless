@@ -935,16 +935,16 @@ EOF
 
   # Run dashboard
   local output
-  output=$(cd "$TEST_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" 2>&1)
+  output=$(bash "$REPO_DIR/scripts/build-dashboard.sh" "$TEST_DIR" 2>&1)
 
-  if [ -f "$TEST_DIR/dashboard.html" ]; then
+  if [ -f "$TEST_DIR/.correctless/dashboard/index.html" ]; then
     pass "R007-a" "Dashboard generated with cost artifacts"
   else
     fail "R007-a" "Dashboard not generated"
     return
   fi
 
-  local _f="$TEST_DIR/dashboard.html"
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
 
   # Tests R-007 [unit]: cost by phase section shows USD values
   if grep -qiE '\$?2\.54|2\.543' "$_f"; then
@@ -968,9 +968,9 @@ EOF
 {"timestamp":"2026-04-15T10:01:00Z","phase":"tdd-tests","skill":"ctdd","input_tokens":5000,"output_tokens":3000,"total_tokens":8000}
 TLEOF
 
-  output=$(cd "$TEST_DIR" && bash "$REPO_DIR/scripts/generate-dashboard.sh" 2>&1)
+  output=$(bash "$REPO_DIR/scripts/build-dashboard.sh" "$TEST_DIR" 2>&1)
 
-  if grep -qi 'token count only\|run /cdocs\|token' "$TEST_DIR/dashboard.html"; then
+  if grep -qi 'token count only\|run /cdocs\|token' "$TEST_DIR/.correctless/dashboard/index.html"; then
     pass "R007-d" "Dashboard falls back to token-log data with note"
   else
     fail "R007-d" "Dashboard fallback to token-log not working"
@@ -1337,7 +1337,7 @@ test_r014_abs026() {
   fi
 
   # Tests R-014 [unit]: ABS-026 mentions consumers (dashboard, cverify, cmetrics)
-  if grep -A10 'ABS-026' "$arch" | grep -qi 'dashboard\|generate-dashboard\|cverify\|cmetrics'; then
+  if grep -A10 'ABS-026' "$arch" | grep -qi 'dashboard\|build-dashboard\|cverify\|cmetrics'; then
     pass "R014-c" "ABS-026 mentions consumers"
   else
     fail "R014-c" "ABS-026 does not mention consumers"
