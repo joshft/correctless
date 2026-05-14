@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+source "$SCRIPT_DIR/lib.sh"
+
 # ============================================================================
 # STEP 0: Resolve project root
 # ============================================================================
@@ -39,7 +43,7 @@ fi
 # ============================================================================
 
 PROJECT_NAME=$(jq -r '.project.name // "Unknown Project"' "$CONFIG_FILE")
-INTENSITY_FLOOR=$(jq -r '.workflow.intensity // "standard"' "$CONFIG_FILE")
+INTENSITY_FLOOR=$(read_intensity "$CONFIG_FILE")
 
 # ============================================================================
 # STEP 2: Parse workflow history
@@ -363,73 +367,34 @@ read_file_json() {
     '{"name": $name, "path": $path, "content": $content}'
 }
 
+# Helper: collect files matching glob pattern(s) into a JSON array.
+# Uses newline-separated JSON objects + single jq -s call (one jq per category, not per file).
+collect_artifacts() {
+  local entries=""
+  for pattern in "$@"; do
+    if compgen -G "$pattern" >/dev/null 2>&1; then
+      # shellcheck disable=SC2086
+      for f in $pattern; do
+        [ -f "$f" ] || continue
+        entries="${entries}$(read_file_json "$f")"$'\n'
+      done
+    fi
+  done
+  if [ -n "$entries" ]; then
+    echo "$entries" | jq -s '.'
+  else
+    echo "[]"
+  fi
+}
+
 # Collect artifacts by category
-BROWSER_SPECS="[]"
-if compgen -G ".correctless/specs/*.md" >/dev/null 2>&1; then
-  BROWSER_SPECS="[]"
-  for f in .correctless/specs/*.md; do
-    [ -f "$f" ] || continue
-    entry=$(read_file_json "$f")
-    BROWSER_SPECS=$(echo "$BROWSER_SPECS" | jq --argjson e "$entry" '. + [$e]')
-  done
-fi
-
-BROWSER_VERIFICATIONS="[]"
-if compgen -G ".correctless/verification/*.md" >/dev/null 2>&1; then
-  BROWSER_VERIFICATIONS="[]"
-  for f in .correctless/verification/*.md; do
-    [ -f "$f" ] || continue
-    entry=$(read_file_json "$f")
-    BROWSER_VERIFICATIONS=$(echo "$BROWSER_VERIFICATIONS" | jq --argjson e "$entry" '. + [$e]')
-  done
-fi
-
-BROWSER_REVIEW_FINDINGS="[]"
-for pattern in ".correctless/artifacts/review-spec-findings-*.md" ".correctless/artifacts/review-findings-*.md"; do
-  if compgen -G "$pattern" >/dev/null 2>&1; then
-    # shellcheck disable=SC2086
-    for f in $pattern; do
-      [ -f "$f" ] || continue
-      entry=$(read_file_json "$f")
-      BROWSER_REVIEW_FINDINGS=$(echo "$BROWSER_REVIEW_FINDINGS" | jq --argjson e "$entry" '. + [$e]')
-    done
-  fi
-done
-
-BROWSER_RESEARCH="[]"
-if compgen -G ".correctless/artifacts/research/*.md" >/dev/null 2>&1; then
-  for f in .correctless/artifacts/research/*.md; do
-    [ -f "$f" ] || continue
-    entry=$(read_file_json "$f")
-    BROWSER_RESEARCH=$(echo "$BROWSER_RESEARCH" | jq --argjson e "$entry" '. + [$e]')
-  done
-fi
-
-BROWSER_ARCHITECTURE="[]"
-for arch_file in ".correctless/ARCHITECTURE.md" ".correctless/AGENT_CONTEXT.md" ".correctless/antipatterns.md"; do
-  if [ -f "$arch_file" ]; then
-    entry=$(read_file_json "$arch_file")
-    BROWSER_ARCHITECTURE=$(echo "$BROWSER_ARCHITECTURE" | jq --argjson e "$entry" '. + [$e]')
-  fi
-done
-
-BROWSER_QA_FINDINGS="[]"
-if compgen -G ".correctless/artifacts/qa-findings-*.json" >/dev/null 2>&1; then
-  for f in .correctless/artifacts/qa-findings-*.json; do
-    [ -f "$f" ] || continue
-    entry=$(read_file_json "$f")
-    BROWSER_QA_FINDINGS=$(echo "$BROWSER_QA_FINDINGS" | jq --argjson e "$entry" '. + [$e]')
-  done
-fi
-
-BROWSER_AUDIT_HISTORY="[]"
-if compgen -G ".correctless/artifacts/findings/audit-*-history.md" >/dev/null 2>&1; then
-  for f in .correctless/artifacts/findings/audit-*-history.md; do
-    [ -f "$f" ] || continue
-    entry=$(read_file_json "$f")
-    BROWSER_AUDIT_HISTORY=$(echo "$BROWSER_AUDIT_HISTORY" | jq --argjson e "$entry" '. + [$e]')
-  done
-fi
+BROWSER_SPECS=$(collect_artifacts ".correctless/specs/*.md")
+BROWSER_VERIFICATIONS=$(collect_artifacts ".correctless/verification/*.md")
+BROWSER_REVIEW_FINDINGS=$(collect_artifacts ".correctless/artifacts/review-spec-findings-*.md" ".correctless/artifacts/review-findings-*.md")
+BROWSER_RESEARCH=$(collect_artifacts ".correctless/artifacts/research/*.md")
+BROWSER_ARCHITECTURE=$(collect_artifacts ".correctless/ARCHITECTURE.md" ".correctless/AGENT_CONTEXT.md" ".correctless/antipatterns.md")
+BROWSER_QA_FINDINGS=$(collect_artifacts ".correctless/artifacts/qa-findings-*.json")
+BROWSER_AUDIT_HISTORY=$(collect_artifacts ".correctless/artifacts/findings/audit-*-history.md")
 
 # ============================================================================
 # STEP 13: Build the unified data JSON
