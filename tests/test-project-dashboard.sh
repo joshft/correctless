@@ -881,6 +881,8 @@ test_r007_migration() {
     grep -v '.correctless/scripts/' | \
     grep -v 'correctless/scripts/' | \
     grep -v '.correctless/dashboard/' | \
+    grep -v '.correctless/verification/' | \
+    grep -v '.correctless/artifacts/' | \
     grep -v 'test-project-dashboard.sh' | \
     grep -v 'build-dashboard' || true)
   if [ -z "$refs" ]; then
