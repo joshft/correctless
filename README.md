@@ -239,6 +239,7 @@ graph LR
 | [`/cmetrics`](docs/skills/cmetrics.md) | Monthly or for ROI analysis | Token cost, bugs caught, session analytics, trends |
 | [`/cwtf`](docs/skills/cwtf.md) | Suspect agents took shortcuts | Did agents actually follow instructions? |
 | [`/cexplain`](docs/skills/cexplain.md) | Onboarding or exploring a codebase | Guided mermaid diagrams, prose walkthroughs, HTML export |
+| [`/cdashboard`](docs/skills/cdashboard.md) | Visualize project health | HTML dashboard with metrics + artifact browser |
 
 ### Analysis
 

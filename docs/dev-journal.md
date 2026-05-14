@@ -5,6 +5,14 @@ nav_order: 6
 
 # Dev Journal
 
+## 2026-05-14 — Project Dashboard UI
+
+This feature replaces `scripts/generate-dashboard.sh` with a proper skill (`/cdashboard`) backed by `scripts/build-dashboard.sh`. The old script generated a flat HTML dashboard with metrics sections; the new version adds a second view — an Artifact Browser that lets users browse specs, verifications, review findings, research briefs, architecture docs, QA findings, and audit history as rendered markdown directly in the dashboard.
+
+The script collects artifact data by globbing `.correctless/` directories (specs, verification, artifacts, findings) and inlines everything as a JSON block inside a `<script type="application/json">` tag. The browser-side JavaScript renders markdown using marked.js v14.0.0 with DOMPurify v3.2.4 for sanitization — both loaded from CDN with SRI hashes. This addresses TB-003 (LLM-generated content rendered as HTML), since artifact markdown files contain prose written by LLM agents that could include script tags or event handlers. The `</script>` injection vector is closed by escaping all `</` sequences as `<\/` in the inlined JSON before embedding.
+
+The R-007 migration was the most involved part: deleting the old script from source, distribution, and installed locations, then updating all references across ARCHITECTURE.md (ABS-026 consumer list), cmetrics SKILL.md, session-cost tests, sync.sh, FEATURES.md, CLAUDE.md, AGENT_CONTEXT.md, and six test files with hardcoded count assertions. The skill itself is minimal — a 34-line SKILL.md that invokes the bash script and handles the passthrough fallback when artifact reading fails. ABS-032 documents the sole-writer contract. The output directory `.correctless/dashboard/` is gitignored since the dashboard is regenerated on demand.
+
 ## 2026-05-09 — UX Review Lens
 
 4 of 9 post-merge bugs (PMB-004 path hallucination, PMB-006 fork stalling, PMB-008 lost findings, PMB-009 silent truncation) are fundamentally UX failures -- silent breakage, missing recovery paths, lost output -- that no existing review lens would have caught. QA checks correctness, Hacker checks security, Performance checks speed, but nothing asks "does this work from the user's perspective?" This feature adds UX review agents to all four quality review integration points.

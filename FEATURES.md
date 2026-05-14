@@ -230,7 +230,7 @@ Real-time view of current workflow state:
 
 ### `/chelp` — Quick Reference
 
-Shows the workflow pipeline, all 29 available commands with intensity gates annotated, and current status. Intensity-aware display. Keeps output under 50 lines.
+Shows the workflow pipeline, all 30 available commands with intensity gates annotated, and current status. Intensity-aware display. Keeps output under 50 lines.
 
 ---
 

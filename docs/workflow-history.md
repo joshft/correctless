@@ -5,6 +5,9 @@ nav_order: 7
 
 # Workflow History
 
+### 2026-05-14 — Project Dashboard UI
+Branch: feature/project-dashboard-ui. Rules: 12. QA rounds: 2. Findings fixed: 0. Replaced `scripts/generate-dashboard.sh` with `/cdashboard` skill backed by `scripts/build-dashboard.sh`. Two-view HTML dashboard: Metrics (all existing sections preserved) + Artifact Browser (sidebar navigation for 7 artifact categories with marked.js + DOMPurify rendering). CDN dependencies SRI-pinned. Old script and output deleted, all references migrated (R-007). ABS-032 sole-writer contract added.
+
 ### 2026-05-08 — Audit Findings as Escape Metrics
 Branch: feature/audit-escape-metrics. Rules: 10. Invariants: 4. Prohibitions: 2. QA rounds: 1. Overrides: 1. Reframed `/caudit` findings as pipeline escapes with a three-gate taxonomy (per-feature / audit / production), root-cause classification (implementation/spec/non-escape per finding), severity-weighted scoring (critical=5, high=3, medium=2, low=1, info=0), and per-cycle trend tracking. Extended ABS-029 round-JSON schema with optional `escape_type` field validated by `audit-record.sh`. Updated `/cmetrics` to replace single "Bug escape rate" line with full escape breakdown. Dashboard escape metrics section reads from metrics artifacts. Classification happens at specialist submission time during audit, not batched after convergence.
 
