@@ -512,7 +512,7 @@ DASHBOARD_DATA=$(jq -n \
 # Replace </ with <\/ in the JSON to prevent </script> injection
 # This is critical: the HTML parser terminates the script block at the first
 # </script> regardless of JSON string boundaries (TB-003 mitigation)
-DASHBOARD_DATA_ESCAPED=$(echo "$DASHBOARD_DATA" | sed 's/<\//&lt;\//g; s/&lt;\//<\\\//g')
+DASHBOARD_DATA_ESCAPED=$(echo "$DASHBOARD_DATA" | sed 's/<\//<\\\//g')
 
 # ============================================================================
 # STEP 15: Generate HTML
