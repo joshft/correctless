@@ -22,6 +22,10 @@ Generate a self-contained HTML dashboard at `.correctless/dashboard/index.html` 
 
 If the script fails (missing config, unresolvable root), it exits 1 and prints available artifacts to stderr. Relay this to the user with the failure reason included.
 
+## Autonomous Defaults
+
+- **AD-001**: Generate full dashboard — runs `scripts/build-dashboard.sh` to completion and reports the output path. No human input required; this skill runs to completion autonomously.
+
 ## Notes
 
 - The dashboard is a static HTML file — no server, no live reload
