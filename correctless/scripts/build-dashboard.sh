@@ -387,14 +387,18 @@ collect_artifacts() {
   fi
 }
 
-# Collect artifacts by category
-BROWSER_SPECS=$(collect_artifacts ".correctless/specs/*.md")
-BROWSER_VERIFICATIONS=$(collect_artifacts ".correctless/verification/*.md")
-BROWSER_REVIEW_FINDINGS=$(collect_artifacts ".correctless/artifacts/review-spec-findings-*.md" ".correctless/artifacts/review-findings-*.md")
-BROWSER_RESEARCH=$(collect_artifacts ".correctless/artifacts/research/*.md")
-BROWSER_ARCHITECTURE=$(collect_artifacts ".correctless/ARCHITECTURE.md" ".correctless/AGENT_CONTEXT.md" ".correctless/antipatterns.md")
-BROWSER_QA_FINDINGS=$(collect_artifacts ".correctless/artifacts/qa-findings-*.json")
-BROWSER_AUDIT_HISTORY=$(collect_artifacts ".correctless/artifacts/findings/audit-*-history.md")
+# Collect artifacts by category — write to temp files to avoid ARG_MAX limit
+# (large projects can have 1MB+ of artifact data that exceeds the OS command-line limit)
+TMPDIR_DASHBOARD=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_DASHBOARD"' EXIT
+
+collect_artifacts ".correctless/specs/*.md" > "$TMPDIR_DASHBOARD/specs.json"
+collect_artifacts ".correctless/verification/*.md" > "$TMPDIR_DASHBOARD/verifications.json"
+collect_artifacts ".correctless/artifacts/review-spec-findings-*.md" ".correctless/artifacts/review-findings-*.md" > "$TMPDIR_DASHBOARD/review_findings.json"
+collect_artifacts ".correctless/artifacts/research/*.md" > "$TMPDIR_DASHBOARD/research.json"
+collect_artifacts ".correctless/ARCHITECTURE.md" ".correctless/AGENT_CONTEXT.md" ".correctless/antipatterns.md" > "$TMPDIR_DASHBOARD/architecture.json"
+collect_artifacts ".correctless/artifacts/qa-findings-*.json" > "$TMPDIR_DASHBOARD/qa_findings.json"
+collect_artifacts ".correctless/artifacts/findings/audit-*-history.md" > "$TMPDIR_DASHBOARD/audit_history.json"
 
 # ============================================================================
 # STEP 13: Build the unified data JSON
@@ -426,13 +430,13 @@ DASHBOARD_DATA=$(jq -n \
   --argjson cost_warnings "$COST_WARNINGS" \
   --argjson escape_metrics "$ESCAPE_METRICS_JSON" \
   --argjson has_escape_data "$HAS_ESCAPE_DATA" \
-  --argjson browser_specs "$BROWSER_SPECS" \
-  --argjson browser_verifications "$BROWSER_VERIFICATIONS" \
-  --argjson browser_review_findings "$BROWSER_REVIEW_FINDINGS" \
-  --argjson browser_research "$BROWSER_RESEARCH" \
-  --argjson browser_architecture "$BROWSER_ARCHITECTURE" \
-  --argjson browser_qa_findings "$BROWSER_QA_FINDINGS" \
-  --argjson browser_audit_history "$BROWSER_AUDIT_HISTORY" \
+  --slurpfile browser_specs "$TMPDIR_DASHBOARD/specs.json" \
+  --slurpfile browser_verifications "$TMPDIR_DASHBOARD/verifications.json" \
+  --slurpfile browser_review_findings "$TMPDIR_DASHBOARD/review_findings.json" \
+  --slurpfile browser_research "$TMPDIR_DASHBOARD/research.json" \
+  --slurpfile browser_architecture "$TMPDIR_DASHBOARD/architecture.json" \
+  --slurpfile browser_qa_findings "$TMPDIR_DASHBOARD/qa_findings.json" \
+  --slurpfile browser_audit_history "$TMPDIR_DASHBOARD/audit_history.json" \
   '{
     project_name: $project_name,
     intensity_floor: $intensity_floor,
@@ -460,13 +464,13 @@ DASHBOARD_DATA=$(jq -n \
     escape_metrics: $escape_metrics,
     has_escape_data: $has_escape_data,
     browser: {
-      specs: $browser_specs,
-      verifications: $browser_verifications,
-      review_findings: $browser_review_findings,
-      research: $browser_research,
-      architecture: $browser_architecture,
-      qa_findings: $browser_qa_findings,
-      audit_history: $browser_audit_history
+      specs: $browser_specs[0],
+      verifications: $browser_verifications[0],
+      review_findings: $browser_review_findings[0],
+      research: $browser_research[0],
+      architecture: $browser_architecture[0],
+      qa_findings: $browser_qa_findings[0],
+      audit_history: $browser_audit_history[0]
     }
   }')
 
