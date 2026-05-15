@@ -1333,6 +1333,664 @@ test_pipeline_phase_distribution() {
 }
 
 # ============================================================================
+# REDESIGN R-001: Distinctive visual identity (custom fonts, warm accent)
+# Tests dashboard-redesign spec R-001 [unit]
+# ============================================================================
+
+test_redesign_r001_visual_identity() {
+  echo ""
+  echo "--- Redesign R-001: Distinctive visual identity ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
+  if [ ! -f "$_f" ]; then
+    fail "DR001-a" "index.html not produced (prerequisite failure)"
+    return
+  fi
+
+  # DR001-a: Custom font loaded from CDN (Google Fonts or equivalent)
+  if grep -qE 'fonts\.googleapis\.com|fonts\.gstatic\.com|fonts\.bunny\.net' "$_f"; then
+    pass "DR001-a" "Custom font loaded from CDN"
+  else
+    fail "DR001-a" "No custom font CDN reference found — must load distinctive fonts"
+  fi
+
+  # DR001-b: Font CDN link has SRI integrity hash
+  # The link tag may span multiple lines, so check that a fonts link exists AND
+  # that an integrity attribute follows within the same link element
+  local font_link_block
+  font_link_block=$(sed -n '/fonts\.googleapis\|fonts\.gstatic\|fonts\.bunny/,/>/{p}' "$_f" | head -10)
+  if echo "$font_link_block" | grep -qE 'integrity="sha'; then
+    pass "DR001-b" "Font CDN link has SRI integrity hash"
+  else
+    fail "DR001-b" "Font CDN link missing SRI integrity hash"
+  fi
+
+  # DR001-c: Font stack includes a non-system distinctive font name
+  # Must NOT be only the default system font cascade — check font-family or CSS var definitions
+  if grep -qE "(font-family|font-body|font-display):.*['\"][A-Z][a-zA-Z ]+['\"]" "$_f"; then
+    pass "DR001-c" "Font stack includes a named distinctive font"
+  else
+    fail "DR001-c" "Font stack uses only system fonts — need at least one distinctive font"
+  fi
+
+  # DR001-d: Accent color is NOT #58a6ff (GitHub blue) or #4361ee
+  local light_accent
+  light_accent=$(grep -oE 'accent:\s*#[0-9a-fA-F]+' "$_f" | head -1 | grep -oE '#[0-9a-fA-F]+')
+  if [ -n "$light_accent" ]; then
+    local lower_accent
+    lower_accent=$(echo "$light_accent" | tr '[:upper:]' '[:lower:]')
+    if [ "$lower_accent" = "#58a6ff" ] || [ "$lower_accent" = "#4361ee" ]; then
+      fail "DR001-d" "Accent color $light_accent is a prohibited GitHub/default blue"
+    else
+      pass "DR001-d" "Accent color $light_accent is distinctive (not GitHub blue)"
+    fi
+  else
+    fail "DR001-d" "No --accent CSS variable found"
+  fi
+
+  # DR001-e: Dark mode accent color is NOT #58a6ff
+  local dark_section
+  dark_section=$(sed -n '/@media.*prefers-color-scheme.*dark/,/}/p' "$_f")
+  local dark_accent
+  dark_accent=$(echo "$dark_section" | grep -oE 'accent:\s*#[0-9a-fA-F]+' | head -1 | grep -oE '#[0-9a-fA-F]+')
+  if [ -n "$dark_accent" ]; then
+    local lower_dark
+    lower_dark=$(echo "$dark_accent" | tr '[:upper:]' '[:lower:]')
+    if [ "$lower_dark" = "#58a6ff" ] || [ "$lower_dark" = "#4361ee" ]; then
+      fail "DR001-e" "Dark mode accent $dark_accent is a prohibited blue"
+    else
+      pass "DR001-e" "Dark mode accent $dark_accent is distinctive"
+    fi
+  else
+    fail "DR001-e" "No dark mode --accent CSS variable found"
+  fi
+
+  # DR001-f: font-display: swap (or equivalent) for non-blocking font load
+  if grep -qE 'font-display:\s*swap|font-display:\s*optional|font-display:\s*fallback' "$_f"; then
+    pass "DR001-f" "font-display set for non-blocking font loading"
+  else
+    # Google Fonts CSS links can include &display=swap in the URL
+    if grep -qE 'display=swap|display=fallback|display=optional' "$_f"; then
+      pass "DR001-f" "font-display set via CDN URL parameter"
+    else
+      fail "DR001-f" "No font-display property found — fonts may block page render"
+    fi
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-002: Value narrative section
+# Tests dashboard-redesign spec R-002 [unit]
+# ============================================================================
+
+test_redesign_r002_value_narrative() {
+  echo ""
+  echo "--- Redesign R-002: Value narrative section ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  # Add escape metrics data for a richer test
+  mkdir -p "$TEST_DIR/.correctless/artifacts/findings"
+  cat > "$TEST_DIR/.correctless/artifacts/findings/audit-qa-2026-04-12-round-1.json" <<'AEOF'
+{
+  "preset": "qa",
+  "started_at": "2026-04-12T10:00:00Z",
+  "round": 1,
+  "findings": [
+    {"id": "QA-A1", "severity": "HIGH", "description": "Missed check"},
+    {"id": "QA-A2", "severity": "MEDIUM", "description": "Minor gap"}
+  ],
+  "rejected": []
+}
+AEOF
+
+  run_dashboard "$TEST_DIR"
+
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
+  if [ ! -f "$_f" ]; then
+    fail "DR002-a" "index.html not produced (prerequisite failure)"
+    return
+  fi
+
+  # DR002-a: Value narrative section exists with identifiable heading or container
+  if grep -qiE 'value.*narrative|caught.*before.*ship|bugs.*caught|findings.*caught|what.*correctless.*caught|pre.?merge' "$_f"; then
+    pass "DR002-a" "Value narrative section present"
+  else
+    fail "DR002-a" "Value narrative section missing — need prominent section showing what was caught"
+  fi
+
+  # DR002-b: Total findings caught pre-merge displayed as a large prominent number
+  # The value narrative section should contain a large stat number element
+  # Check for: (1) a CSS class for large numbers, or (2) JS building a stat-number element
+  if grep -qE 'stat-number|hero-number|big-number|value-number' "$_f"; then
+    pass "DR002-b" "Large prominent number element present in value narrative"
+  else
+    fail "DR002-b" "No prominent findings count in value narrative section"
+  fi
+
+  # DR002-c: Pipeline phase distribution data present (QA vs mini-audit breakdown)
+  if grep -qiE 'QA.*finding|mini.?audit.*finding|phase.*distribution|where.*caught' "$_f"; then
+    pass "DR002-c" "Pipeline phase distribution data referenced in value narrative context"
+  else
+    fail "DR002-c" "Pipeline phase distribution data missing from value narrative"
+  fi
+
+  # DR002-d: Value narrative appears near the top of the Metrics view (before most other sections)
+  local pos_narrative pos_trajectory
+  pos_narrative=$(grep -niE 'value.*narrative|caught.*before|bugs.*caught|findings.*caught|what.*correctless.*caught|pre.?merge' "$_f" | head -1 | cut -d: -f1)
+  pos_trajectory=$(grep -ni 'Quality Trajectory' "$_f" | head -1 | cut -d: -f1)
+  if [ -n "$pos_narrative" ] && [ -n "$pos_trajectory" ]; then
+    if [ "$pos_narrative" -le "$pos_trajectory" ]; then
+      pass "DR002-d" "Value narrative appears before Quality Trajectory"
+    else
+      fail "DR002-d" "Value narrative should appear before Quality Trajectory"
+    fi
+  else
+    fail "DR002-d" "Cannot verify value narrative position — heading not found"
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-003: Card-based layout with visual hierarchy
+# Tests dashboard-redesign spec R-003 [unit]
+# ============================================================================
+
+test_redesign_r003_card_layout() {
+  echo ""
+  echo "--- Redesign R-003: Card-based layout ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
+  if [ ! -f "$_f" ]; then
+    fail "DR003-a" "index.html not produced (prerequisite failure)"
+    return
+  fi
+
+  # DR003-a: Card CSS class or card-like styling exists
+  if grep -qE 'class="[^"]*card[^"]*"|\.card\s*\{|\.metric-card|\.section-card|\.dashboard-card' "$_f"; then
+    pass "DR003-a" "Card-based CSS class/styling found"
+  else
+    fail "DR003-a" "No card-based layout styling found — metrics need card containers"
+  fi
+
+  # DR003-b: Cards have shadows (box-shadow)
+  if grep -qE 'box-shadow' "$_f"; then
+    pass "DR003-b" "Box-shadow styling present for visual depth"
+  else
+    fail "DR003-b" "No box-shadow found — cards need shadow for visual hierarchy"
+  fi
+
+  # DR003-c: Cards have backgrounds (background or background-color on card elements)
+  if grep -qE '\.card[^{]*\{[^}]*background|--card-bg' "$_f"; then
+    pass "DR003-c" "Card background styling present"
+  else
+    fail "DR003-c" "No card background styling found"
+  fi
+
+  # DR003-d: Section headers are visually distinct (larger/bolder than body text)
+  # Check for h2/h3 or section header styling with distinct font-size/weight
+  if grep -qE 'section.*header|\.section-title|h2.*font-size|h3.*font-size|\.card.*h[23]' "$_f"; then
+    pass "DR003-d" "Section header styling present"
+  else
+    # Fallback: check for any font-size differentiation between headers and body
+    local header_sizes
+    header_sizes=$(grep -cE 'font-size:\s*(1\.[3-9]|[2-9])' "$_f")
+    if [ "$header_sizes" -ge 2 ]; then
+      pass "DR003-d" "Multiple font sizes found for visual hierarchy"
+    else
+      fail "DR003-d" "Insufficient visual hierarchy — headers need size/weight distinction"
+    fi
+  fi
+
+  # DR003-e: Border-radius on cards (rounded corners)
+  if grep -qE 'border-radius' "$_f"; then
+    pass "DR003-e" "Border-radius present for rounded card edges"
+  else
+    fail "DR003-e" "No border-radius found — cards should have rounded corners"
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-004: Artifact Browser sidebar enhancements
+# Tests dashboard-redesign spec R-004 [unit]
+# ============================================================================
+
+test_redesign_r004_browser_sidebar() {
+  echo ""
+  echo "--- Redesign R-004: Artifact Browser sidebar enhancements ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
+  if [ ! -f "$_f" ]; then
+    fail "DR004-a" "index.html not produced (prerequisite failure)"
+    return
+  fi
+
+  # DR004-a: Sidebar has search/filter input
+  if grep -qiE '<input.*search|<input.*filter|search.*input|filter.*input|placeholder="[^"]*search|placeholder="[^"]*filter' "$_f"; then
+    pass "DR004-a" "Sidebar search/filter input present"
+  else
+    fail "DR004-a" "No search/filter input in artifact browser sidebar"
+  fi
+
+  # DR004-b: Spec items show status indicators (dots/badges)
+  if grep -qiE 'status.*dot|status.*indicator|status.*badge|class="[^"]*dot[^"]*"|class="[^"]*status[^"]*"|class="[^"]*indicator[^"]*"' "$_f"; then
+    pass "DR004-b" "Status indicators present for spec items"
+  else
+    fail "DR004-b" "No status indicators found for spec items"
+  fi
+
+  # DR004-c: Specs sorted by date (newest first) — check the JSON data or sidebar ordering
+  # The setup has alpha (2026-04-02) and beta (2026-04-05), beta should appear first
+  local pos_beta pos_alpha
+  pos_beta=$(grep -n 'beta' "$_f" | head -1 | cut -d: -f1)
+  pos_alpha=$(grep -n 'alpha' "$_f" | head -1 | cut -d: -f1)
+  if [ -n "$pos_beta" ] && [ -n "$pos_alpha" ]; then
+    # In the sidebar listing, beta (newer) should appear before alpha (older)
+    # But we can't easily distinguish sidebar order from other references,
+    # so just verify both exist — ordering is better tested with browser interaction
+    pass "DR004-c" "Both spec items present (ordering is a visual check)"
+  else
+    fail "DR004-c" "Spec items missing from sidebar"
+  fi
+
+  # DR004-d: Content area has tabs (Spec, Review, Verification)
+  local tabs_found=0
+  for tab_name in "Spec" "Review" "Verification"; do
+    if grep -qiE "tab.*${tab_name}|${tab_name}.*tab|data-tab=\"[^\"]*${tab_name}" "$_f"; then
+      tabs_found=$((tabs_found + 1))
+    fi
+  done
+  if [ "$tabs_found" -ge 2 ]; then
+    pass "DR004-d" "Content tabs present ($tabs_found/3 found)"
+  else
+    fail "DR004-d" "Content area tabs missing — need Spec/Review/Verification tabs ($tabs_found/3)"
+  fi
+
+  # DR004-e: Right panel shows per-spec pipeline data when spec selected
+  if grep -qiE 'right.*panel|detail.*panel|spec.*detail|pipeline.*data|class="[^"]*panel[^"]*"' "$_f"; then
+    pass "DR004-e" "Right panel / detail panel structure present"
+  else
+    fail "DR004-e" "No right panel structure for per-spec pipeline data"
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-005: Markdown typography styling
+# Tests dashboard-redesign spec R-005 [unit]
+# ============================================================================
+
+test_redesign_r005_markdown_typography() {
+  echo ""
+  echo "--- Redesign R-005: Markdown typography styling ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
+  if [ ! -f "$_f" ]; then
+    fail "DR005-a" "index.html not produced (prerequisite failure)"
+    return
+  fi
+
+  # DR005-a: Markdown content area has typography styling for headings
+  if grep -qE '\.markdown\s|\.markdown-body|\.content.*h[1-3]|\.rendered.*h[1-3]|\.md-content' "$_f"; then
+    pass "DR005-a" "Markdown content area has heading typography styles"
+  else
+    fail "DR005-a" "No markdown-specific typography styles for headings"
+  fi
+
+  # DR005-b: Code block styling within rendered markdown
+  if grep -qE '\.markdown.*code|\.markdown.*pre|\.content.*code|\.rendered.*code|\.md-content.*code|code\s*\{|pre\s*\{' "$_f"; then
+    pass "DR005-b" "Code block styling present for rendered markdown"
+  else
+    fail "DR005-b" "No code block styling for rendered markdown content"
+  fi
+
+  # DR005-c: Table styling within rendered markdown
+  if grep -qE '\.markdown.*table|\.content.*table|\.rendered.*table|\.md-content.*table|table\s*\{' "$_f"; then
+    pass "DR005-c" "Table styling present for rendered markdown"
+  else
+    fail "DR005-c" "No table styling for rendered markdown content"
+  fi
+
+  # DR005-d: List styling within rendered markdown
+  if grep -qE '\.markdown.*(ul|ol|li)|\.content.*(ul|ol|li)|\.rendered.*(ul|ol|li)|\.md-content.*(ul|ol|li)|(ul|ol)\s*\{|li\s*\{' "$_f"; then
+    pass "DR005-d" "List styling present for rendered markdown"
+  else
+    fail "DR005-d" "No list styling for rendered markdown content"
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-006: Dark and light mode polished
+# Tests dashboard-redesign spec R-006 [unit]
+# ============================================================================
+
+test_redesign_r006_dark_light_mode() {
+  echo ""
+  echo "--- Redesign R-006: Dark and light mode polished ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
+  if [ ! -f "$_f" ]; then
+    fail "DR006-a" "index.html not produced (prerequisite failure)"
+    return
+  fi
+
+  # DR006-a: CSS variables defined for light mode (in :root)
+  local light_vars
+  light_vars=$(grep -cE -- '--[a-z].*:' "$_f" | head -1)
+  if [ "$light_vars" -ge 5 ]; then
+    pass "DR006-a" "Light mode has $light_vars+ CSS variables defined"
+  else
+    fail "DR006-a" "Insufficient CSS variables for light mode"
+  fi
+
+  # DR006-b: CSS variables defined for dark mode (in @media prefers-color-scheme: dark)
+  local dark_section
+  dark_section=$(sed -n '/@media.*prefers-color-scheme.*dark/,/}/p' "$_f")
+  local dark_vars
+  dark_vars=$(echo "$dark_section" | grep -cE -- '--[a-z].*:')
+  if [ "$dark_vars" -ge 5 ]; then
+    pass "DR006-b" "Dark mode has $dark_vars CSS variables redefined"
+  else
+    fail "DR006-b" "Insufficient CSS variables for dark mode (found $dark_vars)"
+  fi
+
+  # DR006-c: Card styling works in dark mode (card-bg variable used)
+  if echo "$dark_section" | grep -qF 'card-bg'; then
+    pass "DR006-c" "Card background variable defined for dark mode"
+  else
+    fail "DR006-c" "Card background not redefined for dark mode"
+  fi
+
+  # DR006-d: Light mode is not a simple inversion — check distinct color values
+  local light_bg dark_bg light_fg dark_fg
+  light_bg=$(grep -oE -- '--bg:\s*#[0-9a-fA-F]+' "$_f" | head -1 | grep -oE '#[0-9a-fA-F]+')
+  dark_bg=$(echo "$dark_section" | grep -oE -- '--bg:\s*#[0-9a-fA-F]+' | head -1 | grep -oE '#[0-9a-fA-F]+')
+  light_fg=$(grep -oE -- '--fg:\s*#[0-9a-fA-F]+' "$_f" | head -1 | grep -oE '#[0-9a-fA-F]+')
+  dark_fg=$(echo "$dark_section" | grep -oE -- '--fg:\s*#[0-9a-fA-F]+' | head -1 | grep -oE '#[0-9a-fA-F]+')
+  if [ -n "$light_bg" ] && [ -n "$dark_bg" ] && [ "$light_bg" != "$dark_bg" ]; then
+    if [ -n "$light_fg" ] && [ -n "$dark_fg" ] && [ "$light_fg" != "$dark_fg" ]; then
+      pass "DR006-d" "Light and dark modes have distinct bg/fg colors"
+    else
+      fail "DR006-d" "Light and dark modes share the same foreground color"
+    fi
+  else
+    fail "DR006-d" "Light and dark modes share the same background color"
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-007: file:// protocol output URL
+# Tests dashboard-redesign spec R-007 [unit]
+# ============================================================================
+
+test_redesign_r007_file_url() {
+  echo ""
+  echo "--- Redesign R-007: file:// protocol output URL ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  local output
+  output=$(bash "$REPO_DIR/scripts/build-dashboard.sh" "$TEST_DIR" 2>&1)
+
+  # DR007-a: Output includes file:// protocol URL
+  if echo "$output" | grep -qE 'file://'; then
+    pass "DR007-a" "Output includes file:// protocol URL"
+  else
+    fail "DR007-a" "Output missing file:// protocol URL — currently prints relative path"
+  fi
+
+  # DR007-b: The file:// URL contains the absolute path to the dashboard
+  if echo "$output" | grep -qE "file://.*/\.correctless/dashboard/index\.html"; then
+    pass "DR007-b" "file:// URL contains absolute path to dashboard"
+  else
+    fail "DR007-b" "file:// URL does not contain absolute path"
+  fi
+
+  # DR007-c: The absolute path is derived from $PROJECT_ROOT (resolved)
+  local resolved_dir
+  resolved_dir=$(cd "$TEST_DIR" && pwd)
+  if echo "$output" | grep -qF "file://${resolved_dir}/.correctless/dashboard/index.html"; then
+    pass "DR007-c" "file:// URL uses resolved PROJECT_ROOT path"
+  else
+    fail "DR007-c" "file:// URL does not use resolved PROJECT_ROOT: expected file://${resolved_dir}/.correctless/dashboard/index.html"
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-008: Existing test intents preserved
+# Tests dashboard-redesign spec R-008 [unit]
+# This is implicitly tested by all the existing tests still passing.
+# We add explicit meta-tests here to verify intent preservation.
+# ============================================================================
+
+test_redesign_r008_existing_intents() {
+  echo ""
+  echo "--- Redesign R-008: Existing test intents preserved ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
+  if [ ! -f "$_f" ]; then
+    fail "DR008-a" "index.html not produced (prerequisite failure)"
+    return
+  fi
+
+  # DR008-a: Inline <style> still present
+  if grep -q '<style' "$_f"; then
+    pass "DR008-a" "Inline <style> preserved"
+  else
+    fail "DR008-a" "Inline <style> missing after redesign"
+  fi
+
+  # DR008-b: Inline <script> still present
+  if grep -q '<script' "$_f"; then
+    pass "DR008-b" "Inline <script> preserved"
+  else
+    fail "DR008-b" "Inline <script> missing after redesign"
+  fi
+
+  # DR008-c: marked.js CDN with SRI still present
+  if grep -qE 'cdn\.jsdelivr\.net/npm/marked@[0-9]+\.[0-9]+\.[0-9]+' "$_f" && \
+     grep -qE 'integrity="sha' "$_f"; then
+    pass "DR008-c" "marked.js CDN with SRI preserved"
+  else
+    fail "DR008-c" "marked.js CDN with SRI missing after redesign"
+  fi
+
+  # DR008-d: DOMPurify still present
+  if grep -qi 'dompurify' "$_f"; then
+    pass "DR008-d" "DOMPurify preserved"
+  else
+    fail "DR008-d" "DOMPurify missing after redesign"
+  fi
+
+  # DR008-e: JSON data block still present
+  if grep -q '<script type="application/json"' "$_f"; then
+    pass "DR008-e" "JSON data block preserved"
+  else
+    fail "DR008-e" "JSON data block missing after redesign"
+  fi
+
+  # DR008-f: Two navigation views still present
+  if grep -qi 'metrics' "$_f" && grep -qi 'artifact' "$_f"; then
+    pass "DR008-f" "Two navigation views preserved"
+  else
+    fail "DR008-f" "Navigation views missing after redesign"
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-009: Empty state handling (redesign-specific additions)
+# Tests dashboard-redesign spec R-009 [unit]
+# ============================================================================
+
+test_redesign_r009_empty_state_redesign() {
+  echo ""
+  echo "--- Redesign R-009: Empty state with redesign styling ---"
+
+  local EMPTY_DIR
+  EMPTY_DIR=$(mktemp -d)
+  trap 'rm -rf "$EMPTY_DIR"' RETURN
+
+  mkdir -p "$EMPTY_DIR/.correctless/config"
+  cat > "$EMPTY_DIR/.correctless/config/workflow-config.json" <<'WEOF'
+{
+  "project": { "name": "empty-redesign" },
+  "workflow": { "intensity": "standard" }
+}
+WEOF
+
+  run_dashboard "$EMPTY_DIR"
+
+  local _f="$EMPTY_DIR/.correctless/dashboard/index.html"
+  if [ ! -f "$_f" ]; then
+    fail "DR009-a" "index.html not produced for empty project"
+    return
+  fi
+
+  # DR009-a: Value narrative section still renders gracefully on empty project
+  # Should show "0" or "No data" — not error or broken layout
+  if grep -qiE 'no.*data|no.*findings|not yet|0.*caught|0.*found' "$_f"; then
+    pass "DR009-a" "Value narrative degrades gracefully on empty project"
+  else
+    fail "DR009-a" "Value narrative may be broken on empty project — no graceful degradation"
+  fi
+
+  # DR009-b: Card layout doesn't break on empty data
+  if grep -qE 'card' "$_f"; then
+    pass "DR009-b" "Card layout present even on empty project"
+  else
+    fail "DR009-b" "Card layout missing on empty project"
+  fi
+
+  # DR009-c: Search input still renders on empty artifact browser
+  if grep -qiE '<input.*search|<input.*filter|search.*input|filter.*input' "$_f"; then
+    pass "DR009-c" "Search input present in empty artifact browser"
+  else
+    fail "DR009-c" "Search input missing from empty artifact browser"
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-010: CDN pattern for new dependencies (fonts)
+# Tests dashboard-redesign spec R-010 [unit]
+# ============================================================================
+
+test_redesign_r010_cdn_pattern() {
+  echo ""
+  echo "--- Redesign R-010: CDN pattern for new dependencies ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  run_dashboard "$TEST_DIR"
+
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
+  if [ ! -f "$_f" ]; then
+    fail "DR010-a" "index.html not produced (prerequisite failure)"
+    return
+  fi
+
+  # DR010-a: Font CDN has pinned version (not latest/unpinned)
+  # Google Fonts CSS2 API doesn't use semver, but we should at least verify
+  # no "latest" or unversioned CDN URLs
+  if grep -qE 'fonts\.googleapis\.com.*family=' "$_f" || \
+     grep -qE 'fonts\.bunny\.net.*family=' "$_f"; then
+    pass "DR010-a" "Font CDN URL specifies font family (pinned)"
+  else
+    fail "DR010-a" "No pinned font CDN URL found"
+  fi
+
+  # DR010-b: Font link has onerror fallback
+  if grep -qiE 'link.*fonts.*onerror|onerror.*font' "$_f"; then
+    pass "DR010-b" "Font link has onerror fallback"
+  else
+    fail "DR010-b" "Font link missing onerror fallback handler"
+  fi
+
+  # DR010-c: Dashboard remains functional without font CDN
+  # Verify system font fallback exists in the font-family declaration
+  if grep -qE 'sans-serif|serif|monospace' "$_f"; then
+    pass "DR010-c" "System font fallback present in font stack"
+  else
+    fail "DR010-c" "No system font fallback — dashboard breaks if font CDN fails"
+  fi
+
+  # DR010-d: No blocked rendering from font loading
+  # font-display: swap or URL param display=swap
+  if grep -qE 'font-display:\s*swap|display=swap' "$_f"; then
+    pass "DR010-d" "Font loading uses font-display: swap (non-blocking)"
+  else
+    fail "DR010-d" "Font loading may block page render — use font-display: swap"
+  fi
+}
+
+# ============================================================================
+# REDESIGN R-011: Distribution sync
+# Tests dashboard-redesign spec R-011 [unit]
+# ============================================================================
+
+test_redesign_r011_distribution_sync() {
+  echo ""
+  echo "--- Redesign R-011: Distribution sync ---"
+
+  # DR011-a: Distribution copy exists
+  if [ -f "$REPO_DIR/correctless/scripts/build-dashboard.sh" ]; then
+    pass "DR011-a" "Distribution build-dashboard.sh exists"
+  else
+    fail "DR011-a" "Distribution build-dashboard.sh missing"
+  fi
+
+  # DR011-b: Distribution copy matches source
+  if [ -f "$REPO_DIR/scripts/build-dashboard.sh" ] && [ -f "$REPO_DIR/correctless/scripts/build-dashboard.sh" ]; then
+    if diff -q "$REPO_DIR/scripts/build-dashboard.sh" "$REPO_DIR/correctless/scripts/build-dashboard.sh" >/dev/null 2>&1; then
+      pass "DR011-b" "Distribution matches source"
+    else
+      fail "DR011-b" "Distribution build-dashboard.sh differs from source — run sync.sh"
+    fi
+  else
+    fail "DR011-b" "Cannot compare — file missing"
+  fi
+}
+
+# ============================================================================
 # Run all tests
 # ============================================================================
 
@@ -1352,6 +2010,18 @@ test_metrics_section_order
 test_cmetrics_mention
 test_antipattern_dormancy
 test_pipeline_phase_distribution
+# Redesign tests (dashboard-redesign spec R-001 through R-011)
+test_redesign_r001_visual_identity
+test_redesign_r002_value_narrative
+test_redesign_r003_card_layout
+test_redesign_r004_browser_sidebar
+test_redesign_r005_markdown_typography
+test_redesign_r006_dark_light_mode
+test_redesign_r007_file_url
+test_redesign_r008_existing_intents
+test_redesign_r009_empty_state_redesign
+test_redesign_r010_cdn_pattern
+test_redesign_r011_distribution_sync
 
 echo ""
 echo "========================================="

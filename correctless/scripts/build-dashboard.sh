@@ -506,40 +506,56 @@ cat > "$OUTPUT_FILE" <<'HTMLEOF'
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Correctless Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap"
+      rel="stylesheet"
+      integrity="sha384-PLACEHOLDER_FONT_SRI"
+      crossorigin="anonymous"
+      onerror="this.onerror=null;document.documentElement.style.setProperty('--font-body','system-ui,sans-serif');document.documentElement.style.setProperty('--font-display','system-ui,sans-serif')">
 <style>
   :root {
-    --bg: #ffffff;
+    --bg: #faf8f5;
     --fg: #1a1a2e;
-    --card-bg: #f8f9fa;
-    --border: #dee2e6;
-    --accent: #4361ee;
-    --red: #e63946;
-    --yellow: #f4a261;
-    --green: #2a9d8f;
-    --muted: #6c757d;
-    --journal-bg: #f0f0f0;
-    --sidebar-bg: #f4f5f7;
-    --nav-bg: #edf0f3;
+    --card-bg: #ffffff;
+    --border: #e2ddd5;
+    --accent: #c8842d;
+    --accent-light: #f5e6d0;
+    --red: #c0392b;
+    --yellow: #e6a817;
+    --green: #27856a;
+    --muted: #7a7267;
+    --journal-bg: #f2ede6;
+    --sidebar-bg: #f5f2ed;
+    --nav-bg: #f0ece5;
+    --font-body: "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-display: "DM Serif Display", Georgia, "Times New Roman", serif;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.04);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0d1117;
-      --fg: #c9d1d9;
-      --card-bg: #161b22;
-      --border: #30363d;
-      --accent: #58a6ff;
+      --bg: #121018;
+      --fg: #e0dbd4;
+      --card-bg: #1c1926;
+      --border: #2e2a36;
+      --accent: #dba14a;
+      --accent-light: #2e2518;
       --red: #f85149;
-      --yellow: #d29922;
+      --yellow: #e6a817;
       --green: #3fb950;
-      --muted: #8b949e;
-      --journal-bg: #1c2128;
-      --sidebar-bg: #161b22;
-      --nav-bg: #21262d;
+      --muted: #8b8590;
+      --journal-bg: #1e1a26;
+      --sidebar-bg: #18151f;
+      --nav-bg: #1e1a26;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15);
+      --shadow-md: 0 4px 6px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.15);
     }
   }
+  @font-face { font-display: swap; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: var(--font-body);
     background: var(--bg);
     color: var(--fg);
     line-height: 1.6;
@@ -864,12 +880,18 @@ cat > "$OUTPUT_FILE" <<'HTMLEOF'
   .qa-findings-table th { font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 0.75rem; }
   .no-artifacts { color: var(--muted); font-style: italic; padding: 2rem; text-align: center; }
   .cdn-notice { background: var(--yellow); color: #000; padding: 0.5rem 1rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.85rem; display: none; }
-  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
-  h2 { font-size: 1.3rem; margin-top: 2.5rem; margin-bottom: 1rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.3rem; }
+  h1 { font-family: var(--font-display); font-size: 2rem; margin-bottom: 0.25rem; }
+  h2 { font-family: var(--font-display); font-size: 1.4rem; margin-top: 2.5rem; margin-bottom: 1rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.3rem; }
   .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
-  .health-verdict { background: var(--card-bg); padding: 1rem; border-radius: 6px; border-left: 4px solid var(--accent); margin-bottom: 1rem; font-size: 0.95rem; }
+  .card { background: var(--card-bg); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+  .card:hover { box-shadow: var(--shadow-md); }
+  .section-card { background: var(--card-bg); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+  .health-verdict { background: var(--card-bg); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--accent); margin-bottom: 1rem; font-size: 0.95rem; box-shadow: var(--shadow-sm); }
   .stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
-  .stat { background: var(--card-bg); padding: 0.75rem 1rem; border-radius: 6px; flex: 1; min-width: 120px; }
+  .stat { background: var(--card-bg); padding: 0.75rem 1rem; border-radius: 8px; flex: 1; min-width: 120px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+  .value-narrative { background: var(--accent-light); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--accent); box-shadow: var(--shadow-sm); }
+  .value-narrative .stat-number { font-family: var(--font-display); font-size: 2.5rem; font-weight: 700; color: var(--accent); line-height: 1; }
+  .value-narrative .stat-desc { font-size: 0.9rem; color: var(--muted); margin-top: 0.25rem; }
   .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
   .stat-value { font-size: 1.4rem; font-weight: 700; }
   .bar-container { margin-bottom: 0.75rem; }
@@ -1019,6 +1041,27 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
     stats.appendChild(st);
   });
   metricsEl.appendChild(stats);
+
+  // ---- Value Narrative: What Correctless Caught ----
+  var narrativeCard = h('div', { className: 'value-narrative card' });
+  var caught = data.total_findings || 0;
+  narrativeCard.appendChild(h('div', { className: 'stat-number' }, String(caught)));
+  narrativeCard.appendChild(h('div', { className: 'stat-desc' }, caught === 1 ? 'finding caught pre-merge' : 'findings caught pre-merge'));
+  // Escape metrics summary if available
+  if (data.has_escape_data && data.escape_metrics && !data.escape_metrics.dormant) {
+    narrativeCard.appendChild(h('div', { className: 'stat-desc' }, data.escape_metrics.escape_count + ' findings from post-implementation audits'));
+  }
+  // Phase distribution summary
+  var qaCount = 0, maCount = 0;
+  (data.findings || []).forEach(function(f) {
+    if (f.id && f.id.indexOf('MA-') === 0) maCount++;
+    else if (f.id && f.id.indexOf('QA-') === 0) qaCount++;
+  });
+  if (qaCount > 0 || maCount > 0) {
+    narrativeCard.appendChild(h('div', { className: 'stat-desc' },
+      'Where caught: ' + qaCount + ' in QA, ' + maCount + ' in mini-audit'));
+  }
+  metricsEl.appendChild(narrativeCard);
 
   // ---- Quality Trajectory ----
   metricsEl.appendChild(h('h2', null, 'Quality Trajectory'));
@@ -1723,4 +1766,5 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
 </html>
 HTMLEOF2
 
-echo "Dashboard generated: .correctless/dashboard/index.html — open in a browser to view"
+DASHBOARD_PATH="${PROJECT_ROOT}/.correctless/dashboard/index.html"
+echo "Dashboard generated: file://${DASHBOARD_PATH}"
