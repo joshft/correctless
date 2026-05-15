@@ -5,6 +5,9 @@ nav_order: 7
 
 # Workflow History
 
+### 2026-05-15 — Dashboard Visual Redesign
+Branch: feature/dashboard-redesign. Rules: 11. QA rounds: 1. Findings fixed: 0. Complete visual and UX redesign of the project dashboard. New visual identity: DM Sans + DM Serif Display fonts from Google Fonts CDN with onerror fallback to system fonts, warm amber/gold accent (#c8842d light / #dba14a dark). Card-based layout with shadows and hover effects. Value narrative section showing total findings caught pre-merge with pipeline phase distribution. Polished dark and light modes with distinct color palettes. file:// protocol output URL. 135 tests (89 original + 46 new).
+
 ### 2026-05-14 — Project Dashboard UI
 Branch: feature/project-dashboard-ui. Rules: 12. QA rounds: 2. Findings fixed: 0. Replaced `scripts/generate-dashboard.sh` with `/cdashboard` skill backed by `scripts/build-dashboard.sh`. Two-view HTML dashboard: Metrics (all existing sections preserved) + Artifact Browser (sidebar navigation for 7 artifact categories with marked.js + DOMPurify rendering). CDN dependencies SRI-pinned. Old script and output deleted, all references migrated (R-007). ABS-032 sole-writer contract added.
 
