@@ -216,6 +216,17 @@ If the manifest does not exist or `status` is `"complete"`, produce no output fo
 
 The workflow state is authoritative — the manifest report is a diagnostic signal, not an override of workflow state.
 
+### 6b. Deferred Findings Backlog
+
+Read `.correctless/meta/deferred-findings.json` if it exists. Show the following:
+
+- **Total open findings count** and **severity breakdown** (MEDIUM/LOW/ADVISORY counts)
+- When open findings exceed 20: "Consider running `/ctriage` to review the deferred findings backlog."
+
+**When the file does not exist or has zero open findings, omit this section entirely** (dormant per PAT-019 — no "0 findings" noise).
+
+**Drift detection**: If review artifacts (`.correctless/artifacts/review-spec-findings-*.md` or `.correctless/artifacts/review-findings-*.md` or `.correctless/artifacts/reviews/review-findings-*.md`) contain "pending" findings not present in the backlog, suggest: "Review artifacts contain pending findings not in the backlog. Run `bash scripts/sync-deferred-backlog.sh` to re-sync."
+
 ### 7. Health Check (if requested)
 
 If the human asks "is everything set up correctly?" or similar, validate:

@@ -898,11 +898,13 @@ test_r007_migration() {
     fail "R007-c" "sync.sh missing cdashboard"
   fi
 
-  # R-007-d: sync.sh skill count updated (was 29, should be 30)
-  if grep -qE 'All skills \(30\)' "$REPO_DIR/sync.sh"; then
-    pass "R007-d" "sync.sh skill count updated to 30"
+  # R-007-d: sync.sh skill count matches actual skill directories
+  local expected_count
+  expected_count=$(find "$REPO_DIR/skills" -name "SKILL.md" -not -path "*/_shared/*" | wc -l | tr -d ' ')
+  if grep -qE "All skills \\($expected_count\\)" "$REPO_DIR/sync.sh"; then
+    pass "R007-d" "sync.sh skill count updated to $expected_count"
   else
-    fail "R007-d" "sync.sh skill count not updated to 30"
+    fail "R007-d" "sync.sh skill count not updated to $expected_count"
   fi
 
   # R-007-e: Stale installed copy at .correctless/scripts/generate-dashboard.sh removed

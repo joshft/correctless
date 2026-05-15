@@ -692,32 +692,35 @@ else
   fail "R-011-b" "Docs file missing at $DOCS_FILE"
 fi
 
-# Check README skill count updated (cdashboard addition → 30)
-if grep -qE 'skills-30|30 skills' "$README_MD"; then
-  pass "R-011-c" "README.md skill count updated to 30"
+# Derive expected skill count from actual skill directories (excluding _shared)
+EXPECTED_SKILL_COUNT=$(find skills -maxdepth 2 -name 'SKILL.md' -not -path '*_shared*' 2>/dev/null | wc -l)
+
+# Check README skill count updated
+if grep -qE "skills-${EXPECTED_SKILL_COUNT}|${EXPECTED_SKILL_COUNT} skills" "$README_MD"; then
+  pass "R-011-c" "README.md skill count updated to $EXPECTED_SKILL_COUNT"
 else
-  fail "R-011-c" "README.md skill count not updated to 30"
+  fail "R-011-c" "README.md skill count not updated to $EXPECTED_SKILL_COUNT"
 fi
 
 # Check CONTRIBUTING skill count updated
-if grep -qE '\b30\b.*skill|skills.*\b30\b' "$CONTRIBUTING_MD"; then
-  pass "R-011-d" "CONTRIBUTING.md skill count updated to 30"
+if grep -qE "\\b${EXPECTED_SKILL_COUNT}\\b.*skill|skills.*\\b${EXPECTED_SKILL_COUNT}\\b" "$CONTRIBUTING_MD"; then
+  pass "R-011-d" "CONTRIBUTING.md skill count updated to $EXPECTED_SKILL_COUNT"
 else
-  fail "R-011-d" "CONTRIBUTING.md skill count not updated to 30"
+  fail "R-011-d" "CONTRIBUTING.md skill count not updated to $EXPECTED_SKILL_COUNT"
 fi
 
 # Check sync.sh comment updated
-if grep -qE 'All 30 skills|30 skills' "$SYNC_SH"; then
-  pass "R-011-e" "sync.sh comment updated to 30 skills"
+if grep -qE "All ${EXPECTED_SKILL_COUNT} skills|${EXPECTED_SKILL_COUNT} skills" "$SYNC_SH"; then
+  pass "R-011-e" "sync.sh comment updated to $EXPECTED_SKILL_COUNT skills"
 else
-  fail "R-011-e" "sync.sh comment not updated to 30 skills"
+  fail "R-011-e" "sync.sh comment not updated to $EXPECTED_SKILL_COUNT skills"
 fi
 
 # Check AGENT_CONTEXT skill count updated
-if grep -qE '\b30\b.*skill|skills.*\b30\b|30 skill' "$AGENT_CONTEXT"; then
-  pass "R-011-f" "AGENT_CONTEXT.md skill count updated to 30"
+if grep -qE "\\b${EXPECTED_SKILL_COUNT}\\b.*skill|skills.*\\b${EXPECTED_SKILL_COUNT}\\b|${EXPECTED_SKILL_COUNT} skill" "$AGENT_CONTEXT"; then
+  pass "R-011-f" "AGENT_CONTEXT.md skill count updated to $EXPECTED_SKILL_COUNT"
 else
-  fail "R-011-f" "AGENT_CONTEXT.md skill count not updated to 30"
+  fail "R-011-f" "AGENT_CONTEXT.md skill count not updated to $EXPECTED_SKILL_COUNT"
 fi
 
 # Check distribution directory exists

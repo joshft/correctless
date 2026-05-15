@@ -63,7 +63,7 @@ Correctless (critical intensity):
 
 ### 3. Show Commands
 
-All 30 skills are always visible. Skills gated behind an intensity level are annotated with their minimum.
+All 31 skills are always visible. Skills gated behind an intensity level are annotated with their minimum.
 
 ```
 Feature workflow:
@@ -99,6 +99,7 @@ Other:
   /carchitect    Architecture definition — reverse-engineer or greenfield
   /cmodelupgrade Compare current model+HARNESS_VERSION pipeline metrics vs baseline
   /cdashboard    HTML project dashboard — metrics + artifact browser
+  /ctriage       Bulk triage deferred findings backlog
 ```
 
 ### 4. Show Current Status
