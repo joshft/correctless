@@ -819,6 +819,25 @@ cat > "$OUTPUT_FILE" <<'HTMLEOF'
   .review-section { margin-bottom: 1.5rem; }
   .review-section h3 { font-size: 1rem; margin-bottom: 0.5rem; color: var(--muted); }
   .no-artifacts { padding: 2rem; color: var(--muted); font-size: 0.9rem; }
+  .panel-step-list { margin: 0.4rem 0; }
+  .panel-step-row { font-size: 0.72rem; padding: 1px 0; color: var(--muted); }
+  .panel-step-row.step-done { color: var(--green); }
+  .panel-finding-group { margin: 0.5rem 0; }
+  .panel-finding { font-size: 0.72rem; padding: 2px 0; color: var(--fg); line-height: 1.4; border-bottom: 1px solid var(--border); }
+  .panel-finding.finding-fixed { opacity: 0.5; text-decoration: line-through; }
+  .finding-id { font-weight: 700; color: var(--accent); }
+  .finding-status-fixed { color: var(--green); font-weight: 700; }
+  .panel-decision { font-size: 0.72rem; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .panel-decision.decision-deferred { border-left: 2px solid var(--yellow); padding-left: 6px; }
+  .decision-id { font-weight: 700; font-size: 0.68rem; color: var(--accent); }
+  .decision-detail { color: var(--muted); margin-top: 1px; }
+  .decision-deferred-badge { font-size: 0.6rem; background: var(--yellow); color: #000; padding: 0 4px; border-radius: 2px; margin-left: 4px; }
+  .panel-verif-rules { margin: 0.4rem 0; }
+  .panel-rule-item { font-size: 0.72rem; padding: 1px 0; }
+  .panel-rule-item.rule-fail { color: var(--red); font-weight: 700; }
+  .sev-non-blocking { background: var(--yellow); color: #000; }
+  .sev-uncertain { background: var(--card-bg); color: var(--fg); border: 1px solid var(--border); }
+  .sev-unknown { background: var(--card-bg); color: var(--muted); border: 1px solid var(--border); }
   @media (max-width: 1199px) {
     .spec-panel { display: none !important; }
   }
@@ -1447,7 +1466,7 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
     if (!panelEl) return;
     panelEl.innerHTML = '';
 
-    // Pipeline progress bar
+    // Pipeline — named steps with status
     var manifest = findManifest(slug);
     if (manifest) {
       try {
@@ -1470,15 +1489,27 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
         });
         pipeSection.appendChild(bar);
 
+        // Named step list
+        var stepList = document.createElement('div');
+        stepList.className = 'panel-step-list';
+        steps.forEach(function(step) {
+          var isDone = completed.indexOf(step) !== -1;
+          var row = document.createElement('div');
+          row.className = 'panel-step-row' + (isDone ? ' step-done' : '');
+          row.textContent = (isDone ? '✓ ' : '• ') + step;
+          stepList.appendChild(row);
+        });
+        pipeSection.appendChild(stepList);
+
         var statusLine = document.createElement('div');
         statusLine.className = 'panel-status';
-        statusLine.textContent = completed.length + '/' + steps.length + ' steps — ' + (mData.status || 'unknown');
+        statusLine.textContent = completed.length + '\/' + steps.length + ' — ' + (mData.status || 'unknown');
         pipeSection.appendChild(statusLine);
         panelEl.appendChild(pipeSection);
       } catch(e) {}
     }
 
-    // QA severity summary
+    // QA findings — individual finding list grouped by severity
     var qa = findQaFindings(slug);
     if (qa) {
       try {
@@ -1486,26 +1517,12 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
         if (qData.findings && qData.findings.length > 0) {
           var qaSection = document.createElement('div');
           qaSection.className = 'panel-section';
-          qaSection.appendChild(h('div', { className: 'panel-heading' }, 'QA Findings'));
 
-          var chips = document.createElement('div');
-          chips.className = 'severity-chips';
-          var counts = {};
-          qData.findings.forEach(function(f) {
-            var s = f.severity || 'UNKNOWN';
-            counts[s] = (counts[s] || 0) + 1;
-          });
-          Object.keys(counts).forEach(function(sev) {
-            var chip = document.createElement('span');
-            chip.className = 'severity-chip sev-' + sev.toLowerCase();
-            chip.textContent = sev + ' ' + counts[sev];
-            chips.appendChild(chip);
-          });
-          qaSection.appendChild(chips);
-
-          // Fix progress
           var fixed = qData.findings.filter(function(f) { return f.status === 'fixed' || f.status === 'resolved'; }).length;
           var total = qData.findings.length;
+          qaSection.appendChild(h('div', { className: 'panel-heading' }, 'QA Findings (' + fixed + '\/' + total + ' fixed)'));
+
+          // Fix progress bar
           var progressWrap = document.createElement('div');
           progressWrap.className = 'fix-progress';
           var progressBar = document.createElement('div');
@@ -1513,51 +1530,140 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
           progressBar.style.width = (total > 0 ? Math.round(fixed/total*100) : 0) + '%';
           progressWrap.appendChild(progressBar);
           qaSection.appendChild(progressWrap);
-          qaSection.appendChild(h('div', { className: 'panel-status' }, fixed + '/' + total + ' fixed'));
+
+          // Group by severity, show each finding
+          var sevOrder = ['BLOCKING', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'NON-BLOCKING', 'UNCERTAIN', 'UNKNOWN'];
+          var grouped = {};
+          qData.findings.forEach(function(f) {
+            var s = f.severity || 'UNKNOWN';
+            if (!grouped[s]) grouped[s] = [];
+            grouped[s].push(f);
+          });
+
+          sevOrder.forEach(function(sev) {
+            if (!grouped[sev] || grouped[sev].length === 0) return;
+            var groupEl = document.createElement('div');
+            groupEl.className = 'panel-finding-group';
+
+            var groupLabel = document.createElement('div');
+            groupLabel.className = 'severity-chip sev-' + sev.toLowerCase();
+            groupLabel.textContent = sev + ' (' + grouped[sev].length + ')';
+            groupEl.appendChild(groupLabel);
+
+            grouped[sev].forEach(function(f) {
+              var findingEl = document.createElement('div');
+              findingEl.className = 'panel-finding' + (f.status === 'fixed' || f.status === 'resolved' ? ' finding-fixed' : '');
+              var desc = (f.description || '').substring(0, 120);
+              if ((f.description || '').length > 120) desc += '...';
+              findingEl.innerHTML = '<span class="finding-id">' + (f.id || '') + '<\/span> ' +
+                desc +
+                (f.status === 'fixed' || f.status === 'resolved' ? ' <span class="finding-status-fixed">✓<\/span>' : '');
+              groupEl.appendChild(findingEl);
+            });
+            qaSection.appendChild(groupEl);
+          });
+
           panelEl.appendChild(qaSection);
         }
       } catch(e) {}
     }
 
-    // Autonomous decisions
+    // Autonomous decisions — show each decision
     var decisions = findDecisions(slug);
     if (decisions) {
       var lines = parseJsonl(decisions.content);
       if (lines.length > 0) {
         var decSection = document.createElement('div');
         decSection.className = 'panel-section';
-        decSection.appendChild(h('div', { className: 'panel-heading' }, 'Decisions'));
 
         var deferred = lines.filter(function(d) { return d.escalation_deferred; }).length;
-        var auto = lines.length - deferred;
-        decSection.appendChild(h('div', { className: 'panel-status' },
-          auto + ' auto, ' + deferred + ' deferred'));
+        decSection.appendChild(h('div', { className: 'panel-heading' }, 'Decisions (' + lines.length + ')'));
+
+        lines.forEach(function(d) {
+          var row = document.createElement('div');
+          row.className = 'panel-decision' + (d.escalation_deferred ? ' decision-deferred' : '');
+          var label = (d.decision_id || '?') + ' (' + (d.skill || '') + ')';
+          var detail = d.default_applied || '';
+          if (detail.length > 80) detail = detail.substring(0, 80) + '...';
+          row.innerHTML = '<span class="decision-id">' + label + '<\/span>' +
+            '<div class="decision-detail">' + detail + '<\/div>' +
+            (d.escalation_deferred ? '<span class="decision-deferred-badge">deferred<\/span>' : '');
+          decSection.appendChild(row);
+        });
+
         panelEl.appendChild(decSection);
       }
     }
 
-    // Verification summary
+    // Verification — extract pass/fail counts and rule details
     var verif = findVerification(slug);
     if (verif) {
       var verifSection = document.createElement('div');
       verifSection.className = 'panel-section';
       verifSection.appendChild(h('div', { className: 'panel-heading' }, 'Verification'));
 
-      // Extract pass/fail from verification content
-      var passMatch = verif.content.match(/PASS|VERIFIED|All.*pass/i);
-      var failMatch = verif.content.match(/FAIL|BLOCKED|NOT VERIFIED/i);
-      var badge = document.createElement('span');
-      if (failMatch) {
-        badge.className = 'verif-badge verif-fail';
-        badge.textContent = 'Issues Found';
-      } else if (passMatch) {
-        badge.className = 'verif-badge verif-pass';
-        badge.textContent = 'Verified';
-      } else {
-        badge.className = 'verif-badge verif-unknown';
-        badge.textContent = 'See Report';
+      // Extract result line (e.g. "Result: 40 passed, 0 failed")
+      var resultMatch = verif.content.match(/Result:\s*(\d+)\s*passed,\s*(\d+)\s*failed/i);
+      if (resultMatch) {
+        var passed = parseInt(resultMatch[1], 10);
+        var failed = parseInt(resultMatch[2], 10);
+        var badge = document.createElement('span');
+        badge.className = 'verif-badge ' + (failed > 0 ? 'verif-fail' : 'verif-pass');
+        badge.textContent = passed + ' passed, ' + failed + ' failed';
+        verifSection.appendChild(badge);
       }
-      verifSection.appendChild(badge);
+
+      // Extract rule coverage rows (PASS/FAIL lines from the table)
+      var ruleLines = verif.content.match(/\|\s*(R-\d+[a-z]?)\s*\|[^|]*\|[^|]*\|\s*(PASS|FAIL)\s*\|/gi);
+      if (ruleLines && ruleLines.length > 0) {
+        var failedRules = [];
+        var passedCount = 0;
+        ruleLines.forEach(function(line) {
+          var m = line.match(/\|\s*(R-\d+[a-z]?)\s*\|[^|]*\|[^|]*\|\s*(PASS|FAIL)\s*\|/i);
+          if (m) {
+            if (m[2].toUpperCase() === 'FAIL') {
+              failedRules.push(m[1]);
+            } else {
+              passedCount++;
+            }
+          }
+        });
+
+        if (failedRules.length > 0) {
+          var failList = document.createElement('div');
+          failList.className = 'panel-verif-rules';
+          failedRules.forEach(function(r) {
+            var rEl = document.createElement('div');
+            rEl.className = 'panel-rule-item rule-fail';
+            rEl.textContent = '✗ ' + r;
+            failList.appendChild(rEl);
+          });
+          verifSection.appendChild(failList);
+        }
+
+        if (passedCount > 0 && failedRules.length > 0) {
+          verifSection.appendChild(h('div', { className: 'panel-status' }, passedCount + ' rules passed'));
+        }
+      }
+
+      // Fallback if no structured data found
+      if (!resultMatch && !ruleLines) {
+        var passMatch = verif.content.match(/PASS|VERIFIED|All.*pass/i);
+        var failMatch = verif.content.match(/FAIL|BLOCKED|NOT VERIFIED/i);
+        var fb = document.createElement('span');
+        if (failMatch) {
+          fb.className = 'verif-badge verif-fail';
+          fb.textContent = 'Issues Found';
+        } else if (passMatch) {
+          fb.className = 'verif-badge verif-pass';
+          fb.textContent = 'Verified';
+        } else {
+          fb.className = 'verif-badge verif-unknown';
+          fb.textContent = 'See Report';
+        }
+        verifSection.appendChild(fb);
+      }
+
       panelEl.appendChild(verifSection);
     }
 
