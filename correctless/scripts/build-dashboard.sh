@@ -552,7 +552,6 @@ cat > "$OUTPUT_FILE" <<'HTMLEOF'
       --shadow-md: 0 4px 6px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.15);
     }
   }
-  @font-face { font-display: swap; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: var(--font-body);
@@ -1042,21 +1041,14 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
   });
   metricsEl.appendChild(stats);
 
-  // ---- Value Narrative: What Correctless Caught ----
   var narrativeCard = h('div', { className: 'value-narrative card' });
   var caught = data.total_findings || 0;
   narrativeCard.appendChild(h('div', { className: 'stat-number' }, String(caught)));
   narrativeCard.appendChild(h('div', { className: 'stat-desc' }, caught === 1 ? 'finding caught pre-merge' : 'findings caught pre-merge'));
-  // Escape metrics summary if available
   if (data.has_escape_data && data.escape_metrics && !data.escape_metrics.dormant) {
     narrativeCard.appendChild(h('div', { className: 'stat-desc' }, data.escape_metrics.escape_count + ' findings from post-implementation audits'));
   }
-  // Phase distribution summary
-  var qaCount = 0, maCount = 0;
-  (data.findings || []).forEach(function(f) {
-    if (f.id && f.id.indexOf('MA-') === 0) maCount++;
-    else if (f.id && f.id.indexOf('QA-') === 0) qaCount++;
-  });
+  var qaCount = data.qa_count || 0, maCount = data.ma_count || 0;
   if (qaCount > 0 || maCount > 0) {
     narrativeCard.appendChild(h('div', { className: 'stat-desc' },
       'Where caught: ' + qaCount + ' in QA, ' + maCount + ' in mini-audit'));
