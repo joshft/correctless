@@ -240,6 +240,7 @@ graph LR
 | [`/cwtf`](docs/skills/cwtf.md) | Suspect agents took shortcuts | Did agents actually follow instructions? |
 | [`/cexplain`](docs/skills/cexplain.md) | Onboarding or exploring a codebase | Guided mermaid diagrams, prose walkthroughs, HTML export |
 | [`/cdashboard`](docs/skills/cdashboard.md) | Visualize project health | HTML dashboard with metrics + artifact browser |
+| [`/ctriage`](docs/skills/ctriage.md) | Deferred findings piling up | Wizard-style bulk triage of deferred review findings |
 
 ### Analysis
 

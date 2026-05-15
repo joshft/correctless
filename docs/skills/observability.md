@@ -16,3 +16,5 @@ See what's happening. These skills surface workflow state, historical findings, 
 | [/csummary](csummary) | What the workflow caught (findings, fixes, antipatterns) |
 | [/cmetrics](cmetrics) | Token ROI and session analytics |
 | [/cwtf](cwtf) | Workflow accountability (why was this blocked?) |
+| [/cdashboard](cdashboard) | HTML dashboard with metrics and artifact browser |
+| [/ctriage](ctriage) | Wizard-style triage of deferred review findings |

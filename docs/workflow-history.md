@@ -5,6 +5,9 @@ nav_order: 7
 
 # Workflow History
 
+### 2026-05-15 — Deferred Findings Backlog
+Branch: feature/deferred-findings-backlog. Rules: 12. QA rounds: 1. Findings fixed: 0. Overrides: 0. Centralized deferred review findings into `.correctless/meta/deferred-findings.json` with a dual-purpose sync script (`scripts/sync-deferred-backlog.sh` — seed from existing artifacts and ongoing re-derivation backstop). New `/ctriage` skill (31st) for wizard-style bulk triage with incremental saves. Review skills (`/creview-spec`, `/creview`) write deferred findings on disposition. `/cauto` sweeps open findings before PR. `/cstatus` shows severity breakdown with 20-item threshold warning and drift detection. `/cmetrics` shows 30-day trend, oldest open item, severity distribution. ABS-033 multi-writer advisory contract. Backlog is visibility only — PRH-001 prohibits gate enforcement. 65 tests.
+
 ### 2026-05-15 — Dashboard Visual Redesign
 Branch: feature/dashboard-redesign. Rules: 11. QA rounds: 1. Findings fixed: 0. Complete visual and UX redesign of the project dashboard. New visual identity: DM Sans + DM Serif Display fonts from Google Fonts CDN with onerror fallback to system fonts, warm amber/gold accent (#c8842d light / #dba14a dark). Card-based layout with shadows and hover effects. Value narrative section showing total findings caught pre-merge with pipeline phase distribution. Polished dark and light modes with distinct color palettes. file:// protocol output URL. 135 tests (89 original + 46 new).
 
