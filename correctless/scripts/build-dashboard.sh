@@ -399,6 +399,8 @@ collect_artifacts ".correctless/artifacts/research/*.md" > "$TMPDIR_DASHBOARD/re
 collect_artifacts ".correctless/ARCHITECTURE.md" ".correctless/AGENT_CONTEXT.md" ".correctless/antipatterns.md" > "$TMPDIR_DASHBOARD/architecture.json"
 collect_artifacts ".correctless/artifacts/qa-findings-*.json" > "$TMPDIR_DASHBOARD/qa_findings.json"
 collect_artifacts ".correctless/artifacts/findings/audit-*-history.md" > "$TMPDIR_DASHBOARD/audit_history.json"
+collect_artifacts ".correctless/artifacts/pipeline-manifest-*.json" > "$TMPDIR_DASHBOARD/pipeline_manifests.json"
+collect_artifacts ".correctless/artifacts/autonomous-decisions-*.jsonl" > "$TMPDIR_DASHBOARD/decisions.json"
 
 # ============================================================================
 # STEP 13: Build the unified data JSON
@@ -437,6 +439,8 @@ DASHBOARD_DATA=$(jq -n \
   --slurpfile browser_architecture "$TMPDIR_DASHBOARD/architecture.json" \
   --slurpfile browser_qa_findings "$TMPDIR_DASHBOARD/qa_findings.json" \
   --slurpfile browser_audit_history "$TMPDIR_DASHBOARD/audit_history.json" \
+  --slurpfile browser_pipeline_manifests "$TMPDIR_DASHBOARD/pipeline_manifests.json" \
+  --slurpfile browser_decisions "$TMPDIR_DASHBOARD/decisions.json" \
   '{
     project_name: $project_name,
     intensity_floor: $intensity_floor,
@@ -470,7 +474,9 @@ DASHBOARD_DATA=$(jq -n \
       research: $browser_research[0],
       architecture: $browser_architecture[0],
       qa_findings: $browser_qa_findings[0],
-      audit_history: $browser_audit_history[0]
+      audit_history: $browser_audit_history[0],
+      pipeline_manifests: $browser_pipeline_manifests[0],
+      decisions: $browser_decisions[0]
     }
   }')
 
@@ -573,12 +579,83 @@ cat > "$OUTPUT_FILE" <<'HTMLEOF'
     display: flex;
   }
   .sidebar {
-    width: 260px;
-    min-width: 260px;
+    width: 240px;
+    min-width: 240px;
+    flex-shrink: 0;
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border);
     overflow-y: auto;
-    padding: 1rem 0;
+    padding: 0.5rem 0;
+  }
+  .sidebar-section-label {
+    padding: 0.3rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .sidebar-search, .spec-search {
+    display: block;
+    width: calc(100% - 1.5rem);
+    margin: 0.4rem 0.75rem;
+    padding: 0.3rem 0.5rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--fg);
+    font-size: 0.8rem;
+    font-family: inherit;
+  }
+  .sidebar-search:focus { outline: 1px solid var(--accent); }
+  .spec-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.28rem 0.75rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    border-radius: 3px;
+    color: var(--fg);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .spec-item:hover { background: var(--card-bg); }
+  .spec-item.active { background: var(--accent); color: #fff; }
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--muted);
+  }
+  .status-dot.status-complete { background: var(--green); }
+  .status-dot.status-in_progress { background: var(--yellow); }
+  .status-dot.status-none { background: var(--muted); }
+  .spec-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .blocking-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: var(--red);
+    color: #fff;
+    padding: 0 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .sidebar-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.75rem 0.5rem;
+    padding: 0.4rem 1rem 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
   }
   .sidebar-category {
     padding: 0.4rem 1rem;
@@ -610,12 +687,140 @@ cat > "$OUTPUT_FILE" <<'HTMLEOF'
   .sidebar-file.active { background: var(--accent); color: #fff; }
   .content-area {
     flex: 1;
+    min-width: 0;
     overflow-y: auto;
     padding: 2rem;
   }
+  .content-tabs, .content-tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  .content-tab {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    background: none;
+    border-top: none; border-left: none; border-right: none;
+    font-family: inherit;
+  }
+  .content-tab:hover { color: var(--fg); }
+  .content-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .content-tab:disabled { opacity: 0.4; cursor: default; }
+  .content-tab .tab-badge {
+    display: inline-block;
+    margin-left: 0.35rem;
+    background: var(--red);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 2px;
+    vertical-align: middle;
+  }
   .content-area .rendered-content {
-    max-width: 800px;
+    max-width: 760px;
     line-height: 1.7;
+  }
+  .spec-panel {
+    width: 300px;
+    min-width: 300px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    background: var(--sidebar-bg);
+    border-left: 1px solid var(--border);
+    padding: 1rem;
+    display: none;
+  }
+  .spec-panel.visible { display: block; }
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.75rem;
+  }
+  .panel-title { font-weight: 700; font-size: 0.9rem; }
+  .panel-date { font-size: 0.75rem; color: var(--muted); }
+  .pipeline-bar {
+    display: flex;
+    gap: 2px;
+    height: 20px;
+    margin: 0.5rem 0;
+  }
+  .pipeline-step {
+    flex: 1;
+    border-radius: 2px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.55rem;
+    color: var(--muted);
+    overflow: hidden;
+  }
+  .pipeline-step.done { background: var(--green); border-color: var(--green); color: #fff; }
+  .pipeline-summary { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .panel-section {
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .panel-section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+  }
+  .severity-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0.5rem; }
+  .severity-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  .severity-chip.zero { opacity: 0.3; }
+  .fix-bar-track { background: var(--card-bg); border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 0.25rem; }
+  .fix-bar-fill { height: 100%; background: var(--green); border-radius: 4px; }
+  .fix-bar-label { font-size: 0.7rem; color: var(--muted); }
+  .panel-stat-row { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
+  .panel-stat {
+    flex: 1;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.4rem 0.5rem;
+    text-align: center;
+  }
+  .panel-stat-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); display: block; }
+  .panel-stat-value { font-size: 1.1rem; font-weight: 700; display: block; }
+  .panel-heading { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.4rem; }
+  .panel-status { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .panel-empty { font-size: 0.85rem; color: var(--muted); padding: 1rem 0; }
+  .fix-progress { background: var(--card-bg); border-radius: 4px; height: 8px; overflow: hidden; margin: 0.4rem 0 0.2rem; }
+  .fix-progress-bar { height: 100%; background: var(--green); border-radius: 4px; }
+  .verif-badge { display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 3px; }
+  .verif-pass { background: var(--green); color: #fff; }
+  .verif-fail { background: var(--red); color: #fff; }
+  .verif-unknown { background: var(--card-bg); color: var(--muted); border: 1px solid var(--border); }
+  .sev-blocking, .sev-critical { background: var(--red); color: #fff; }
+  .sev-high { background: #e67e22; color: #fff; }
+  .sev-medium { background: var(--yellow); color: #000; }
+  .sev-low { background: var(--card-bg); color: var(--fg); border: 1px solid var(--border); }
+  .review-section { margin-bottom: 1.5rem; }
+  .review-section h3 { font-size: 1rem; margin-bottom: 0.5rem; color: var(--muted); }
+  .no-artifacts { padding: 2rem; color: var(--muted); font-size: 0.9rem; }
+  @media (max-width: 1199px) {
+    .spec-panel { display: none !important; }
   }
   .content-area .rendered-content h1 { font-size: 1.6rem; margin: 1.5rem 0 0.75rem; }
   .content-area .rendered-content h2 { font-size: 1.3rem; margin: 1.25rem 0 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
@@ -696,12 +901,12 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
 
 <!-- marked.js from CDN with SRI hash -->
 <script src="https://cdn.jsdelivr.net/npm/marked@14.0.0/marked.min.js"
-        integrity="sha384-2FNgXmGeBkCMenDlP/0UI83boC4mInc7i2xHB2K4+NFBJ0kMEPNhPkvMOFqUMEa"
+        integrity="sha384-K6kVcQ04tqVGO7RJ+FjMmvM3Xu/hNQQWEqT4ldRAtw/tYLeDoCGKNeKn5mAdq1nK"
         crossorigin="anonymous"
         onerror="window.__markedFailed=true;document.getElementById('cdn-notice').style.display='block'"></script>
 <!-- DOMPurify from CDN with SRI hash -->
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"
-        integrity="sha384-bKFqMYICShXOF/ViPvz56WgL7GM4Zzx+ABXkEF1oA8hRJ2KVxLK94ZfVN2qHR7B"
+        integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu"
         crossorigin="anonymous"
         onerror="window.__purifyFailed=true;document.getElementById('cdn-notice').style.display='block'"></script>
 
@@ -712,8 +917,9 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
 <div id="browser-view" class="browser-view view">
   <div class="sidebar" id="sidebar"></div>
   <div class="content-area" id="content-area">
-    <div class="no-artifacts" id="browser-placeholder">Select a file from the sidebar to view its contents.</div>
+    <div class="no-artifacts" id="browser-placeholder">Select a spec from the sidebar to view its contents.</div>
   </div>
+  <div class="spec-panel" id="spec-panel"></div>
 </div>
 
 <script>
@@ -984,101 +1190,379 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
   metricsEl.appendChild(h('footer', null, 'Generated by Correctless'));
 
   // ========================================================================
-  // ARTIFACT BROWSER
+  // ARTIFACT BROWSER — Spec-Centric View
   // ========================================================================
 
-  var categories = [
-    { key: 'specs', label: 'Specs', items: data.browser.specs, type: 'md' },
-    { key: 'verifications', label: 'Verifications', items: data.browser.verifications, type: 'md' },
-    { key: 'review_findings', label: 'Review Findings', items: data.browser.review_findings, type: 'md' },
-    { key: 'research', label: 'Research Briefs', items: data.browser.research, type: 'md' },
-    { key: 'architecture', label: 'Architecture', items: data.browser.architecture, type: 'md' },
-    { key: 'qa_findings', label: 'QA Findings', items: data.browser.qa_findings, type: 'json' },
-    { key: 'audit_history', label: 'Audit History', items: data.browser.audit_history, type: 'md' }
-  ];
-
-  var hasAnyArtifacts = false;
-
-  categories.forEach(function(cat) {
-    if (!cat.items || cat.items.length === 0) return;
-    hasAnyArtifacts = true;
-
-    var catEl = document.createElement('div');
-    catEl.className = 'sidebar-category';
-    catEl.textContent = cat.label + ' (' + cat.items.length + ')';
-
-    var filesEl = document.createElement('div');
-    filesEl.className = 'sidebar-files';
-
-    catEl.onclick = function() {
-      filesEl.classList.toggle('expanded');
-    };
-
-    cat.items.forEach(function(item) {
-      var fileEl = document.createElement('div');
-      fileEl.className = 'sidebar-file';
-      fileEl.textContent = item.name;
-      fileEl.onclick = function(e) {
-        e.stopPropagation();
-        document.querySelectorAll('.sidebar-file').forEach(function(f) { f.classList.remove('active'); });
-        fileEl.classList.add('active');
-        showContent(item, cat.type);
-      };
-      filesEl.appendChild(fileEl);
-    });
-
-    sidebarEl.appendChild(catEl);
-    sidebarEl.appendChild(filesEl);
-  });
-
-  if (!hasAnyArtifacts) {
-    sidebarEl.appendChild(h('div', { className: 'no-artifacts' }, 'No artifacts found.'));
-    contentEl.innerHTML = '<div class="no-artifacts">No artifacts found in this project.</div>';
+  // Satellite resolution: match specs to their related artifacts by slug
+  function extractSlug(name) {
+    return name.replace(/\.md$/, '').replace(/\.json$/, '').replace(/\.jsonl$/, '');
   }
 
-  function showContent(item, type) {
+  function findBySlug(items, slug) {
+    if (!items) return null;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].name.indexOf(slug) !== -1) return items[i];
+    }
+    return null;
+  }
+
+  function findVerification(slug) {
+    return findBySlug(data.browser.verifications, slug + '-verification');
+  }
+
+  function findReviewFindings(slug) {
+    var items = data.browser.review_findings || [];
+    var results = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].name.indexOf(slug) !== -1) results.push(items[i]);
+    }
+    return results.length > 0 ? results : null;
+  }
+
+  function findQaFindings(slug) {
+    var items = data.browser.qa_findings || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].name.indexOf(slug) !== -1) return items[i];
+    }
+    return null;
+  }
+
+  function findManifest(slug) {
+    var items = data.browser.pipeline_manifests || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].name.indexOf(slug) !== -1) return items[i];
+    }
+    return null;
+  }
+
+  function findDecisions(slug) {
+    var items = data.browser.decisions || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].name.indexOf(slug) !== -1) return items[i];
+    }
+    return null;
+  }
+
+  function parseJsonl(content) {
+    if (!content) return [];
+    return content.split('\n').filter(function(l) { return l.trim(); }).map(function(l) {
+      try { return JSON.parse(l); } catch(e) { return null; }
+    }).filter(Boolean);
+  }
+
+  function getSpecStatus(slug) {
+    var manifest = findManifest(slug);
+    if (!manifest) return 'none';
+    try {
+      var d = JSON.parse(manifest.content);
+      if (d.status === 'complete') return 'complete';
+      return 'in_progress';
+    } catch(e) { return 'none'; }
+  }
+
+  function getBlockingCount(slug) {
+    var qa = findQaFindings(slug);
+    if (!qa) return 0;
+    try {
+      var d = JSON.parse(qa.content);
+      if (!d.findings) return 0;
+      return d.findings.filter(function(f) {
+        return f.severity === 'BLOCKING' || f.severity === 'CRITICAL';
+      }).length;
+    } catch(e) { return 0; }
+  }
+
+  // Build spec sidebar
+  var specs = data.browser.specs || [];
+  var panelEl = document.getElementById('spec-panel');
+
+  if (specs.length === 0) {
+    sidebarEl.innerHTML = '<div class="no-artifacts">No specs found.</div>';
+    contentEl.innerHTML = '<div class="no-artifacts">No artifacts found in this project.</div>';
+  } else {
+    // Search filter
+    var searchEl = document.createElement('input');
+    searchEl.type = 'text';
+    searchEl.placeholder = 'Filter specs...';
+    searchEl.className = 'spec-search';
+    searchEl.oninput = function() {
+      var q = searchEl.value.toLowerCase();
+      var items = sidebarEl.querySelectorAll('.spec-item');
+      items.forEach(function(el) {
+        el.style.display = el.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+      });
+    };
+    sidebarEl.appendChild(searchEl);
+
+    // Spec items
+    specs.forEach(function(spec) {
+      var slug = extractSlug(spec.name);
+      var status = getSpecStatus(slug);
+      var blocking = getBlockingCount(slug);
+
+      var item = document.createElement('div');
+      item.className = 'spec-item';
+
+      var dot = document.createElement('span');
+      dot.className = 'status-dot status-' + status;
+      item.appendChild(dot);
+
+      var label = document.createElement('span');
+      label.className = 'spec-label';
+      label.textContent = spec.name.replace(/\.md$/, '');
+      item.appendChild(label);
+
+      if (blocking > 0) {
+        var badge = document.createElement('span');
+        badge.className = 'blocking-badge';
+        badge.textContent = blocking;
+        item.appendChild(badge);
+      }
+
+      item.onclick = function() {
+        sidebarEl.querySelectorAll('.spec-item').forEach(function(el) { el.classList.remove('active'); });
+        item.classList.add('active');
+        showSpec(spec, slug);
+      };
+      sidebarEl.appendChild(item);
+    });
+
+    // Other artifacts section
+    var otherCategories = [
+      { key: 'architecture', label: 'Architecture', items: data.browser.architecture, type: 'md' },
+      { key: 'research', label: 'Research Briefs', items: data.browser.research, type: 'md' },
+      { key: 'audit_history', label: 'Audit History', items: data.browser.audit_history, type: 'md' }
+    ];
+
+    var hasOther = otherCategories.some(function(c) { return c.items && c.items.length > 0; });
+    if (hasOther) {
+      var divider = document.createElement('div');
+      divider.className = 'sidebar-divider';
+      divider.textContent = 'Other Artifacts';
+      sidebarEl.appendChild(divider);
+
+      otherCategories.forEach(function(cat) {
+        if (!cat.items || cat.items.length === 0) return;
+        var catEl = document.createElement('div');
+        catEl.className = 'sidebar-category';
+        catEl.textContent = cat.label + ' (' + cat.items.length + ')';
+
+        var filesEl = document.createElement('div');
+        filesEl.className = 'sidebar-files';
+
+        catEl.onclick = function() { filesEl.classList.toggle('expanded'); };
+
+        cat.items.forEach(function(item) {
+          var fileEl = document.createElement('div');
+          fileEl.className = 'sidebar-file';
+          fileEl.textContent = item.name;
+          fileEl.onclick = function(e) {
+            e.stopPropagation();
+            sidebarEl.querySelectorAll('.spec-item, .sidebar-file').forEach(function(f) { f.classList.remove('active'); });
+            fileEl.classList.add('active');
+            showOtherContent(item, cat.type);
+          };
+          filesEl.appendChild(fileEl);
+        });
+
+        sidebarEl.appendChild(catEl);
+        sidebarEl.appendChild(filesEl);
+      });
+    }
+  }
+
+  function showSpec(spec, slug) {
     contentEl.innerHTML = '';
+    if (panelEl) panelEl.style.display = 'block';
+
+    // Tab bar
+    var tabBar = document.createElement('div');
+    tabBar.className = 'content-tabs';
+
+    var tabs = [{ id: 'spec', label: 'Spec' }];
+    var verification = findVerification(slug);
+    if (verification) tabs.push({ id: 'verification', label: 'Verification' });
+    var reviews = findReviewFindings(slug);
+    if (reviews) tabs.push({ id: 'reviews', label: 'Review Findings' });
+
+    var contentArea = document.createElement('div');
+    contentArea.className = 'rendered-content';
+
+    tabs.forEach(function(tab, idx) {
+      var btn = document.createElement('button');
+      btn.className = 'content-tab' + (idx === 0 ? ' active' : '');
+      btn.textContent = tab.label;
+      btn.onclick = function() {
+        tabBar.querySelectorAll('.content-tab').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        renderTabContent(tab.id, spec, slug, verification, reviews, contentArea);
+      };
+      tabBar.appendChild(btn);
+    });
+
+    contentEl.appendChild(tabBar);
+    contentEl.appendChild(contentArea);
+    renderTabContent('spec', spec, slug, verification, reviews, contentArea);
+    showSpecPanel(slug);
+  }
+
+  function renderTabContent(tabId, spec, slug, verification, reviews, area) {
+    area.innerHTML = '';
+    if (tabId === 'spec') {
+      area.innerHTML = renderMarkdown(spec.content);
+    } else if (tabId === 'verification' && verification) {
+      area.innerHTML = renderMarkdown(verification.content);
+    } else if (tabId === 'reviews' && reviews) {
+      reviews.forEach(function(r) {
+        var section = document.createElement('div');
+        section.className = 'review-section';
+        section.innerHTML = '<h3>' + r.name + '<\/h3>' + renderMarkdown(r.content);
+        area.appendChild(section);
+      });
+    }
+  }
+
+  function showOtherContent(item, type) {
+    contentEl.innerHTML = '';
+    if (panelEl) panelEl.style.display = 'none';
+
+    var wrapper = document.createElement('div');
+    wrapper.className = 'rendered-content';
+
     if (type === 'json') {
-      // Parse and render as table
       try {
         var jsonData = JSON.parse(item.content);
-        var wrapper = h('div', { className: 'rendered-content' });
         wrapper.appendChild(h('h2', null, item.name));
-        if (jsonData.findings && Array.isArray(jsonData.findings)) {
-          var table = document.createElement('table');
-          table.className = 'qa-findings-table';
-          var thead = h('thead');
-          var hr = h('tr');
-          ['ID', 'Severity', 'Description', 'Rule', 'Status'].forEach(function(col) { hr.appendChild(h('th', null, col)); });
-          thead.appendChild(hr);
-          table.appendChild(thead);
-          var tbody = h('tbody');
-          jsonData.findings.forEach(function(f) {
-            var row = h('tr');
-            row.appendChild(h('td', null, f.id || ''));
-            var sevTd = h('td');
-            var sevClass = (f.severity === 'BLOCKING' || f.severity === 'CRITICAL') ? 'badge-blocking' : 'badge-nonblocking';
-            sevTd.appendChild(h('span', { className: 'badge ' + sevClass }, f.severity || ''));
-            row.appendChild(sevTd);
-            row.appendChild(h('td', null, f.description || ''));
-            row.appendChild(h('td', null, f.rule_ref || ''));
-            row.appendChild(h('td', null, f.status || ''));
-            tbody.appendChild(row);
-          });
-          table.appendChild(tbody);
-          wrapper.appendChild(table);
-        } else {
-          wrapper.appendChild(h('pre', null, JSON.stringify(jsonData, null, 2)));
-        }
-        contentEl.appendChild(wrapper);
-      } catch (e) {
-        contentEl.innerHTML = '<pre>' + item.content.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</pre>';
+        wrapper.appendChild(h('pre', null, JSON.stringify(jsonData, null, 2)));
+      } catch(e) {
+        wrapper.innerHTML = '<pre>' + item.content.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '<\/pre>';
       }
     } else {
-      // Render markdown
-      var wrapper = h('div', { className: 'rendered-content' });
       wrapper.innerHTML = renderMarkdown(item.content);
-      contentEl.appendChild(wrapper);
+    }
+    contentEl.appendChild(wrapper);
+  }
+
+  function showSpecPanel(slug) {
+    if (!panelEl) return;
+    panelEl.innerHTML = '';
+
+    // Pipeline progress bar
+    var manifest = findManifest(slug);
+    if (manifest) {
+      try {
+        var mData = JSON.parse(manifest.content);
+        var steps = mData.expected_steps || [];
+        var completed = mData.completed_steps || [];
+
+        var pipeSection = document.createElement('div');
+        pipeSection.className = 'panel-section';
+        pipeSection.appendChild(h('div', { className: 'panel-heading' }, 'Pipeline'));
+
+        var bar = document.createElement('div');
+        bar.className = 'pipeline-bar';
+        steps.forEach(function(step) {
+          var seg = document.createElement('div');
+          seg.className = 'pipeline-step' + (completed.indexOf(step) !== -1 ? ' done' : '');
+          seg.title = step;
+          seg.textContent = step.substring(0, 3);
+          bar.appendChild(seg);
+        });
+        pipeSection.appendChild(bar);
+
+        var statusLine = document.createElement('div');
+        statusLine.className = 'panel-status';
+        statusLine.textContent = completed.length + '/' + steps.length + ' steps — ' + (mData.status || 'unknown');
+        pipeSection.appendChild(statusLine);
+        panelEl.appendChild(pipeSection);
+      } catch(e) {}
+    }
+
+    // QA severity summary
+    var qa = findQaFindings(slug);
+    if (qa) {
+      try {
+        var qData = JSON.parse(qa.content);
+        if (qData.findings && qData.findings.length > 0) {
+          var qaSection = document.createElement('div');
+          qaSection.className = 'panel-section';
+          qaSection.appendChild(h('div', { className: 'panel-heading' }, 'QA Findings'));
+
+          var chips = document.createElement('div');
+          chips.className = 'severity-chips';
+          var counts = {};
+          qData.findings.forEach(function(f) {
+            var s = f.severity || 'UNKNOWN';
+            counts[s] = (counts[s] || 0) + 1;
+          });
+          Object.keys(counts).forEach(function(sev) {
+            var chip = document.createElement('span');
+            chip.className = 'severity-chip sev-' + sev.toLowerCase();
+            chip.textContent = sev + ' ' + counts[sev];
+            chips.appendChild(chip);
+          });
+          qaSection.appendChild(chips);
+
+          // Fix progress
+          var fixed = qData.findings.filter(function(f) { return f.status === 'fixed' || f.status === 'resolved'; }).length;
+          var total = qData.findings.length;
+          var progressWrap = document.createElement('div');
+          progressWrap.className = 'fix-progress';
+          var progressBar = document.createElement('div');
+          progressBar.className = 'fix-progress-bar';
+          progressBar.style.width = (total > 0 ? Math.round(fixed/total*100) : 0) + '%';
+          progressWrap.appendChild(progressBar);
+          qaSection.appendChild(progressWrap);
+          qaSection.appendChild(h('div', { className: 'panel-status' }, fixed + '/' + total + ' fixed'));
+          panelEl.appendChild(qaSection);
+        }
+      } catch(e) {}
+    }
+
+    // Autonomous decisions
+    var decisions = findDecisions(slug);
+    if (decisions) {
+      var lines = parseJsonl(decisions.content);
+      if (lines.length > 0) {
+        var decSection = document.createElement('div');
+        decSection.className = 'panel-section';
+        decSection.appendChild(h('div', { className: 'panel-heading' }, 'Decisions'));
+
+        var deferred = lines.filter(function(d) { return d.escalation_deferred; }).length;
+        var auto = lines.length - deferred;
+        decSection.appendChild(h('div', { className: 'panel-status' },
+          auto + ' auto, ' + deferred + ' deferred'));
+        panelEl.appendChild(decSection);
+      }
+    }
+
+    // Verification summary
+    var verif = findVerification(slug);
+    if (verif) {
+      var verifSection = document.createElement('div');
+      verifSection.className = 'panel-section';
+      verifSection.appendChild(h('div', { className: 'panel-heading' }, 'Verification'));
+
+      // Extract pass/fail from verification content
+      var passMatch = verif.content.match(/PASS|VERIFIED|All.*pass/i);
+      var failMatch = verif.content.match(/FAIL|BLOCKED|NOT VERIFIED/i);
+      var badge = document.createElement('span');
+      if (failMatch) {
+        badge.className = 'verif-badge verif-fail';
+        badge.textContent = 'Issues Found';
+      } else if (passMatch) {
+        badge.className = 'verif-badge verif-pass';
+        badge.textContent = 'Verified';
+      } else {
+        badge.className = 'verif-badge verif-unknown';
+        badge.textContent = 'See Report';
+      }
+      verifSection.appendChild(badge);
+      panelEl.appendChild(verifSection);
+    }
+
+    if (panelEl.children.length === 0) {
+      panelEl.appendChild(h('div', { className: 'panel-empty' }, 'No pipeline data for this spec.'));
     }
   }
 
