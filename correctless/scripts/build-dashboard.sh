@@ -363,8 +363,10 @@ read_file_json() {
   name=$(basename "$filepath")
   local content
   content=$(cat "$filepath" 2>/dev/null || echo "")
-  jq -n --arg name "$name" --arg path "$filepath" --arg content "$content" \
-    '{"name": $name, "path": $path, "content": $content}'
+  local mtime
+  mtime=$(stat -c '%Y' "$filepath" 2>/dev/null || stat -f '%m' "$filepath" 2>/dev/null || echo "0")
+  jq -n --arg name "$name" --arg path "$filepath" --arg content "$content" --arg mtime "$mtime" \
+    '{"name": $name, "path": $path, "content": $content, "mtime": ($mtime | tonumber)}'
 }
 
 # Helper: collect files matching glob pattern(s) into a JSON array.
@@ -636,6 +638,12 @@ cat > "$OUTPUT_FILE" <<'HTMLEOF'
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .spec-date {
+    font-size: 0.65rem;
+    color: var(--muted);
+    flex-shrink: 0;
+    margin-left: auto;
   }
   .blocking-badge {
     font-size: 0.65rem;
@@ -1217,6 +1225,35 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
     return name.replace(/\.md$/, '').replace(/\.json$/, '').replace(/\.jsonl$/, '');
   }
 
+  function extractDate(item) {
+    if (!item || !item.content) return item ? (item.mtime || 0) : 0;
+    var m = item.content.match(/\*\*Created\*\*:\s*(\d{4}-\d{2}-\d{2})/);
+    if (m) return new Date(m[1]).getTime() / 1000;
+    var d = item.content.match(/Date:\s*(\d{4}-\d{2}-\d{2})/);
+    if (d) return new Date(d[1]).getTime() / 1000;
+    return item.mtime || 0;
+  }
+
+  function sortByDate(items) {
+    if (!items) return [];
+    return items.slice().sort(function(a, b) {
+      return extractDate(b) - extractDate(a);
+    });
+  }
+
+  function formatDate(item) {
+    if (!item || !item.content) return '';
+    var m = item.content.match(/\*\*Created\*\*:\s*(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+    var d = item.content.match(/Date:\s*(\d{4}-\d{2}-\d{2})/);
+    if (d) return d[1];
+    if (item.mtime) {
+      var dt = new Date(item.mtime * 1000);
+      return dt.toISOString().substring(0, 10);
+    }
+    return '';
+  }
+
   function findBySlug(items, slug) {
     if (!items) return null;
     for (var i = 0; i < items.length; i++) {
@@ -1291,8 +1328,8 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
     } catch(e) { return 0; }
   }
 
-  // Build spec sidebar
-  var specs = data.browser.specs || [];
+  // Build spec sidebar — sorted by date (newest first)
+  var specs = sortByDate(data.browser.specs || []);
   var panelEl = document.getElementById('spec-panel');
 
   if (specs.length === 0) {
@@ -1318,6 +1355,7 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
       var slug = extractSlug(spec.name);
       var status = getSpecStatus(slug);
       var blocking = getBlockingCount(slug);
+      var date = formatDate(spec);
 
       var item = document.createElement('div');
       item.className = 'spec-item';
@@ -1330,6 +1368,13 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
       label.className = 'spec-label';
       label.textContent = spec.name.replace(/\.md$/, '');
       item.appendChild(label);
+
+      if (date) {
+        var dateEl = document.createElement('span');
+        dateEl.className = 'spec-date';
+        dateEl.textContent = date;
+        item.appendChild(dateEl);
+      }
 
       if (blocking > 0) {
         var badge = document.createElement('span');
@@ -1348,9 +1393,9 @@ cat >> "$OUTPUT_FILE" <<'HTMLEOF2'
 
     // Other artifacts section
     var otherCategories = [
-      { key: 'architecture', label: 'Architecture', items: data.browser.architecture, type: 'md' },
-      { key: 'research', label: 'Research Briefs', items: data.browser.research, type: 'md' },
-      { key: 'audit_history', label: 'Audit History', items: data.browser.audit_history, type: 'md' }
+      { key: 'architecture', label: 'Architecture', items: sortByDate(data.browser.architecture || []), type: 'md' },
+      { key: 'research', label: 'Research Briefs', items: sortByDate(data.browser.research || []), type: 'md' },
+      { key: 'audit_history', label: 'Audit History', items: sortByDate(data.browser.audit_history || []), type: 'md' }
     ];
 
     var hasOther = otherCategories.some(function(c) { return c.items && c.items.length > 0; });
