@@ -27,6 +27,7 @@ Invokes `scripts/build-dashboard.sh` to generate a single self-contained HTML fi
 ### Metrics View (default)
 
 All existing project health sections:
+- Value narrative (total findings caught pre-merge, escape metrics, pipeline phase distribution)
 - Project summary and quality trajectory
 - QA rounds trend per feature
 - Pipeline phase distribution
@@ -57,10 +58,10 @@ Missing categories are omitted from the sidebar automatically.
 ```
 User: /cdashboard
 
-Dashboard generated: .correctless/dashboard/index.html — open in a browser to view
+Dashboard generated: file:///home/user/myproject/.correctless/dashboard/index.html
 ```
 
-Open the file in any browser via `file://` protocol.
+The script prints a `file://` URL you can open directly in a browser.
 
 ## What It Reads / Writes
 
@@ -80,8 +81,9 @@ Open the file in any browser via `file://` protocol.
 ## Dependencies
 
 - **bash 4+**, **jq 1.7+**, and POSIX tools (no exotic dependencies)
+- **Google Fonts** (DM Sans + DM Serif Display) loaded from CDN with `onerror` fallback to system fonts
 - **marked.js v14.0.0** + **DOMPurify v3.2.4** loaded from CDN with SRI hashes (browser-side only)
-- If CDN is unreachable, markdown displays as raw text with a visible notice
+- If CDN is unreachable, markdown displays as raw text with a visible notice; fonts degrade to system fonts
 
 ## Dark Mode
 
