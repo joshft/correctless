@@ -426,11 +426,11 @@ fi
 
 section "PRH-002: No probe at standard"
 
-# Already partially tested by INV-001b, but PRH-002 requires explicit prohibition
-if grep -qi "MUST NOT.*standard\|never.*standard.*intensity.*probe\|skip.*probe.*standard\|standard.*skip.*probe" "$CTDD_BODY_FILE"; then
-  pass "PRH-002" "Explicit prohibition of probe round at standard intensity"
+# INV-001b checks general exclusion; PRH-002 checks prohibition language (MUST NOT)
+if grep -qi "probe.*round.*MUST NOT.*run\|MUST NOT.*run.*probe\|probe.*MUST NOT" "$CTDD_BODY_FILE"; then
+  pass "PRH-002" "Prohibition language (MUST NOT) used for standard-intensity exclusion"
 else
-  fail "PRH-002" "No explicit prohibition of probe round at standard intensity"
+  fail "PRH-002" "Standard-intensity exclusion lacks prohibition language (MUST NOT)"
 fi
 
 # ============================================================================
