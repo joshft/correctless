@@ -3,7 +3,7 @@
 
 This project uses Correctless for structured development.
 Read .correctless/AGENT_CONTEXT.md before starting any work.
-Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect, /cmodelupgrade, /cdashboard
+Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect, /cmodelupgrade, /cdashboard, /ctriage
 
 ## GitHub Operations
 
@@ -160,6 +160,11 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 - Root cause: no spec ever required pipeline completeness verification. The autonomous-skill-contract spec (R-009) models `context: fork` as a SKILL.md frontmatter attribute but never modeled the Skill tool's independent forked execution mechanism. PMB-006 fixed multi-turn fork stalls but didn't address context exhaustion during long single-turn pipelines. `/cauto` writes `skill_started`/`skill_completed` audit entries per step, but only IF the step runs — no upfront manifest, no end-of-pipeline assertion.
 - Class fix: two-layer. (1) Pipeline manifest artifact at start with expected_steps + expected_end_phase, updated per step, checked on re-invocation or by `/cstatus`. (2) Post-return phase assertion — after `/cauto` returns, verify workflow state matches expected end state. See AP-030.
 - Source: PMB-009, GitHub issue #108
+
+### 2026-05-15 — Convention introduced: Re-derivation backstop for prompt-level write contracts
+- First instance: ABS-033 (deferred findings backlog, 2026-05-15). Addresses the prompt-level write drift class from PMB-005 / AP-026 without the overhead of sole-writer + gate-enforcement.
+- When a feature introduces a prompt-level write contract (LLM-instructed to write to a file), and the data can be reconstructed from committed artifacts, the spec must include a re-derivation backstop script that reconstructs the file from source-of-truth artifacts. The script serves dual purpose: initial seed on fresh machines and ongoing re-sync when prompt-level writes drift. `/cstatus` detects drift between artifacts and the derived file and suggests running the sync script. This is the lightweight alternative to gate-enforcement (ABS-029 pattern) for advisory data where last-write-wins is acceptable.
+- Source: /cdocs after deferred-findings-backlog
 
 ### 2026-05-06 — Convention confirmed: Structural enforcement over prompt-level instruction
 - Observed in 6+ features (auto-mode-phase-2, auto-mode-phase-3, carchitect-phase1, test-evasion-antipatterns, audit-findings-persistence-contract, structural-enforcement-pat) — treat as established project convention

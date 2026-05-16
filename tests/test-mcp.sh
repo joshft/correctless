@@ -465,10 +465,11 @@ test_r020() {
   done
   assert_eq "R-020: correctless has Serena blocks in all applicable skills" "$dist_serena_expected" "$dist_serena_count"
 
-  # Assert absolute skill count in distribution
-  local dist_total
+  # Assert skill count in distribution matches source
+  local dist_total src_total
   dist_total=$(find "$REPO_DIR/correctless/skills" -name "SKILL.md" | wc -l)
-  assert_eq "R-020: correctless has 30 skills total" "30" "$dist_total"
+  src_total=$(find "$REPO_DIR/skills" -name "SKILL.md" -not -path "*/\\_shared/*" | wc -l)
+  assert_eq "R-020: correctless dist skill count matches source" "$src_total" "$dist_total"
 }
 
 # ---------------------------------------------------------------------------

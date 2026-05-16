@@ -270,6 +270,12 @@ Spawn a sub-agent to execute `/cdocs`. Log `skill_started` before, `skill_comple
 
 After `/cdocs` completes, run `git diff --name-only HEAD` and check if CLAUDE.md appears in the changed files. If it does, trigger R-006(e) escalation — CLAUDE.md changes require human approval. Write the escalation file and halt the pipeline; do not proceed to PR creation until the human approves the CLAUDE.md changes.
 
+### Step 7.5: Backlog Sweep (advisory, non-blocking)
+
+Between `/cdocs` and consolidation, sweep the deferred findings backlog. Read `.correctless/meta/deferred-findings.json` — if the file exists, present ALL findings with status `open` to the user. In autonomous mode: log open findings as advisory in the pipeline summary; do not block. If the backlog file does not exist, the sweep is a no-op. Sweep failure is non-blocking — if it fails, consolidation proceeds normally.
+
+This is an internal orchestration action, not a canonical pipeline step (excluded from the ABS-031 step enum).
+
 ### Step 8: Consolidation — Scoped Commit and Push (R-003, F-001)
 
 Between `/cdocs` completion and PR creation, `/cauto` runs a consolidation step. This step uses scoped staging to prevent accidental commit of secrets or unintended files.

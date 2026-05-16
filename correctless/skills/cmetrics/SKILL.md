@@ -39,6 +39,7 @@ Read everything in the accumulation layer. Skip files that don't exist.
 14. **Session meta** — `glob ~/.claude/usage-data/session-meta/*.json` — filter by `project_path` matching the current project root. Contains exact token counts, tool usage, duration, error rates per session.
 15. **Session facets** — `glob ~/.claude/usage-data/facets/*.json` — match by `session_id` to session-meta entries for this project. Contains AI-analyzed session quality: outcome, friction, satisfaction.
 16. **Override history** — `glob .correctless/meta/overrides/*.json` — preserved override logs from completed `/cauto` runs, for Override Health section
+17. **Deferred findings backlog** — `.correctless/meta/deferred-findings.json` — centralized backlog of deferred review findings (severity breakdown, oldest open, 30-day trend)
 
 ### Derived metrics:
 
@@ -250,6 +251,20 @@ The clustering threshold (0.3) is intentionally lower than the retry-prevention 
 If mean overrides per run > 0.5, emit a warning: "Override rate is elevated ({mean}/run). Check the top reasons — this may indicate a gate misclassification (AP-023)."
 
 If `.correctless/meta/overrides/` doesn't exist or is empty, the section says: "No override data yet. Override tracking starts automatically on the next `/cauto` run."
+
+## Deferred Findings Backlog Trend
+
+Read `.correctless/meta/deferred-findings.json`. If the file does not exist, show: "No deferred findings data."
+
+When the file exists, display:
+
+- **Total open count**: findings where `status` is `open`
+- **Severity breakdown**: count of MEDIUM, LOW, ADVISORY among open findings
+- **Oldest open finding**: date and feature of the earliest `deferred_at` among open findings
+- **Resolved in last 30 days**: count of findings where `resolved_at` is within the last 30 days (UTC comparison)
+- **Added in last 30 days**: count of findings where `deferred_at` is within the last 30 days
+
+All date comparisons use ISO-8601 UTC timestamps. The 30-day trend computation is prompt-level (performed by the LLM agent reading the JSON), not a script.
 
 ## Fix-Round Loop Activation
 

@@ -1,7 +1,7 @@
 ---
 name: creview-spec
 description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, design contract checker, and UX auditor. Use after /cspec or /cmodel.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Write(.correctless/meta/external-review-history.json), Task
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Write(.correctless/meta/external-review-history.json), Write(.correctless/meta/deferred-findings.json), Task
 interaction_mode: hybrid
 ---
 
@@ -252,6 +252,8 @@ For each finding, present the disposition options:
 
   Or type your own: ___
 ```
+
+**Deferred findings backlog**: When the user selects "Defer" (option 4), append the finding to `.correctless/meta/deferred-findings.json`. Auto-assign a DF-NNN ID by incrementing the highest existing ID. Set status to `open`, severity to MEDIUM (or LOW/ADVISORY based on finding severity — never HIGH or CRITICAL), and `deferred_at` to the current UTC timestamp. If the file does not exist, create it with `{"schema_version": 1, "findings": []}` before appending. The `source_file` field should reference the review artifact path; the `finding_id` should be the original finding ID from the review.
 
 Incorporate approved changes into the spec.
 

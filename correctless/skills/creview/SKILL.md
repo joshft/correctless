@@ -1,7 +1,7 @@
 ---
 name: creview
 description: Skeptically review a spec for unstated assumptions, untestable rules, missing edge cases, security gaps, and UX failures. Run after /cspec.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/meta/deferred-findings.json)
 interaction_mode: hybrid
 ---
 
@@ -344,6 +344,8 @@ For each finding, present the disposition options:
 
   Or type your own: ___
 ```
+
+**Deferred findings backlog**: When the user selects "Defer" (option 4), append the finding to `.correctless/meta/deferred-findings.json`. Auto-assign a DF-NNN ID by incrementing the highest existing ID. Set status to `open`, severity to MEDIUM (or LOW/ADVISORY based on finding severity — never HIGH or CRITICAL), and `deferred_at` to the current UTC timestamp. If the file does not exist, create it with `{"schema_version": 1, "findings": []}` before appending. The `source_file` field should reference the review artifact path; the `finding_id` should be the original finding ID from the review.
 
 Incorporate approved changes directly into the spec file. Preserve existing rule numbering — add new rules at the end (R-004, R-005, etc.).
 

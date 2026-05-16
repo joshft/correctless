@@ -131,6 +131,7 @@ jobs:
           bash tests/test-ctdd-green-agent.sh
           bash tests/test-creview-spec-agents.sh
           bash tests/test-cspec-research-agent.sh
+          bash tests/test-deferred-findings-backlog.sh
 
       - name: Verify sync
         run: |
