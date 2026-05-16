@@ -1099,6 +1099,75 @@ else
 fi
 
 # ============================================================================
+# AP-031: Sync script must match real /creview-spec heading format
+# ============================================================================
+
+section "AP-031: Real artifact heading format"
+
+# Test that the sync script handles the actual /creview-spec heading format:
+# "## Finding RS-001: description" (with "Finding" prefix)
+ap031_dir=$(mkworkdir ap031)
+mkdir -p "$ap031_dir/.correctless/artifacts"
+cat > "$ap031_dir/.correctless/artifacts/review-spec-findings-ap031-test.md" << 'ARTIFACT'
+# Review-Spec Findings: ap031-test
+
+## Finding RS-001: Missing validation on user input
+**Source**: Red Team
+**Category**: security
+**Description**: No input validation on the endpoint
+**Status**: pending
+
+---
+
+## Finding RS-002: Upgrade path not documented
+**Source**: Upgrade Compat
+**Category**: migration
+**Description**: No migration guide for config changes
+**Status**: pending
+ARTIFACT
+
+if [ -x "$SYNC_DEFERRED" ]; then
+  output=$(bash "$SYNC_DEFERRED" "$ap031_dir" 2>&1)
+  count=$(jq '.findings | length' "$ap031_dir/.correctless/meta/deferred-findings.json" 2>/dev/null)
+  if [ "$count" = "2" ]; then
+    pass "AP-031a" "sync script imports findings with 'Finding' prefix heading format"
+  else
+    fail "AP-031a" "sync script imported $count findings (expected 2) from 'Finding RS-NNN:' headings"
+  fi
+else
+  fail "AP-031a" "sync script not found"
+fi
+
+# Integration test: run sync against a real review artifact with pending findings
+real_artifact=""
+for _f in "$REPO_DIR"/.correctless/artifacts/review-spec-findings-*.md; do
+  [ -f "$_f" ] || continue
+  if grep -q '^\*\*Status\*\*: pending' "$_f" 2>/dev/null; then
+    real_artifact="$_f"
+    break
+  fi
+done
+if [ -n "$real_artifact" ] && [ -f "$real_artifact" ]; then
+  pending_count=$(grep -c '^\*\*Status\*\*: pending' "$real_artifact" 2>/dev/null || echo 0)
+  if [ "$pending_count" -gt 0 ]; then
+    ap031_int_dir=$(mkworkdir ap031_int)
+    mkdir -p "$ap031_int_dir/.correctless/artifacts"
+    cp "$real_artifact" "$ap031_int_dir/.correctless/artifacts/"
+    output=$(bash "$SYNC_DEFERRED" "$ap031_int_dir" 2>&1)
+    imported=$(jq '.findings | length' "$ap031_int_dir/.correctless/meta/deferred-findings.json" 2>/dev/null)
+    if [ "$imported" -gt 0 ]; then
+      pass "AP-031b" "sync script imports from real artifact ($imported findings from $(basename "$real_artifact"))"
+    else
+      fail "AP-031b" "sync script imported 0 findings from real artifact $(basename "$real_artifact") (has $pending_count pending)"
+    fi
+  else
+    pass "AP-031b" "real artifact $(basename "$real_artifact") has no pending findings — skip integration test (vacuously true)"
+  fi
+else
+  pass "AP-031b" "no real review artifact found — skip integration test (vacuously true)"
+fi
+
+# ============================================================================
 # Cascade checks: chelp skill count, AGENT_CONTEXT skill count
 # ============================================================================
 
