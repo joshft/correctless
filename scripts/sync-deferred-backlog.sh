@@ -183,14 +183,18 @@ scan_artifact() {
       in_finding=false
       current_id=""
     elif [ "$in_finding" = true ]; then
-      # Extract severity
+      # Extract severity (grep may fail with no match — guard with || true)
       if echo "$line" | grep -qi 'severity'; then
-        current_severity=$(echo "$line" | grep -oE '(BLOCKING|HIGH|NON-BLOCKING|MEDIUM|LOW|INFORMATIONAL|ADVISORY)' | head -1)
+        local sev_match
+        sev_match=$(echo "$line" | grep -oE '(BLOCKING|HIGH|NON-BLOCKING|MEDIUM|LOW|INFORMATIONAL|ADVISORY)' | head -1 || true)
+        if [ -n "$sev_match" ]; then
+          current_severity="$sev_match"
+        fi
       fi
-      # Extract status
+      # Extract status (grep may fail with no match — guard with || true)
       if echo "$line" | grep -qi 'status'; then
         local extracted_status
-        extracted_status=$(echo "$line" | grep -oiE '(pending|open|resolved|wont-fix|accepted)' | head -1 | tr '[:upper:]' '[:lower:]')
+        extracted_status=$(echo "$line" | grep -oiE '(pending|open|resolved|wont-fix|accepted)' | head -1 || true)
         if [ -n "$extracted_status" ]; then
           current_status="$extracted_status"
         fi
