@@ -206,7 +206,7 @@ graph LR
 | [`/csetup`](docs/skills/csetup.md) | First run, or re-run for health check | 19-point health check, convention mining, project scaffolding |
 | [`/cspec`](docs/skills/cspec.md) | Starting a new feature | Testable rules with research agent, intensity detection |
 | [`/creview`](docs/skills/creview.md) | After /cspec | Skeptical review + OWASP security checklist |
-| [`/ctdd`](docs/skills/ctdd.md) | After review approves spec | RED, test audit, GREEN, /simplify, QA — all enforced |
+| [`/ctdd`](docs/skills/ctdd.md) | After review approves spec | RED, test audit, GREEN, /simplify, QA, probes, mini-audit — all enforced |
 | [`/cverify`](docs/skills/cverify.md) | After /ctdd completes | Spec-to-code verification, drift detection |
 | [`/cdocs`](docs/skills/cdocs.md) | After /cverify | Update README, AGENT_CONTEXT, ARCHITECTURE, feature docs |
 | [`/carchitect`](docs/skills/carchitect.md) | New project or missing architecture doc | Structured ARCHITECTURE.md — reverse-engineer or greenfield, entrypoints YAML |
@@ -438,7 +438,7 @@ rm -rf .correctless/
 | **Invariant** | A rule that must always be true: "auth tokens expire after 24 hours." Specs are lists of invariants. |
 | **Intensity** | The configured rigor level: standard, high, or critical. Higher intensity unlocks more skills but costs more tokens and time. |
 | **Mini-audit** | After QA clears, six adversarial specialist agents (cross-component interaction, hostile input, resource bounds, upgrade compatibility, UX review, integration depth) hunt for issues the QA lens misses. Runs at the end of `/ctdd`. |
-| **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Available at high+ intensity. |
+| **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Available at high+ intensity via the adversarial probe round. |
 | **STRIDE** | Threat modeling framework: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege. |
 | **RED / GREEN** | TDD phases. RED = write tests that fail. GREEN = write code to make tests pass. |
 

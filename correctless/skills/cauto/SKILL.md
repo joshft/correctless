@@ -290,15 +290,17 @@ The explicit pipeline output path list is a constant — future additions to pip
 .correctless/verification/{task-slug}-verification.md
 .correctless/ARCHITECTURE.md
 .correctless/AGENT_CONTEXT.md
+.correctless/artifacts/probe-results-{branch-slug}.json
 README.md
 CONTRIBUTING.md
 docs/workflow-history.md
 docs/features/*.md
 ```
 
-**Step 8.2: Belt-and-suspenders artifact guard.** Verify nothing under `.correctless/artifacts/` was staged — if anything was, unstage it:
+**Step 8.2: Belt-and-suspenders artifact guard.** Verify nothing under `.correctless/artifacts/` was staged — if anything was, unstage it, **except** probe-results files (TB-004c allowlist exception for committed probe data):
 ```bash
-git reset HEAD .correctless/artifacts/
+# Unstage artifacts except probe-results (probe-results excluded from unstaging per TB-004c)
+git diff --cached --name-only | grep '^\.correctless/artifacts/' | grep -v 'probe-results' | xargs -r git reset HEAD --
 ```
 
 **Step 8.3: Commit.** If there are uncommitted changes after steps 8.1–8.2, commit with message: `"Add pipeline artifacts for {task-slug}"`. If there are no uncommitted changes after steps 8.1–8.2, skip steps 8.3–8.4 (no-op).

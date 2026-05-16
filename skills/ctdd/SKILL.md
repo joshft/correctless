@@ -37,7 +37,7 @@ This workflow optimizes for correctness, not speed. Every step exists because sk
 - At high intensity: QA runs 3 max rounds. Mutation testing is required. Calm resets trigger after 2 failures.
 - At critical intensity: QA runs 5 max rounds (convergence, capped). PBT (property-based testing) recommendations are included in the test audit. Mutation testing is required. Calm resets trigger after 2 failures with supervisor notified.
 
-The full pipeline: **RED → test audit → GREEN → /simplify → QA → mini-audit → done → /cverify → /cdocs → merge.**
+The full pipeline: **RED → test audit → GREEN → /simplify → QA → probe round (high+) → mini-audit → done → /cverify → /cdocs → merge.**
 
 ## Progress Visibility (MANDATORY)
 
@@ -547,8 +547,123 @@ When the failure involves an unclear root cause (hard-to-understand bug), includ
 
 The orchestrator tracks attempt counts for all calm reset triggers in its own conversation context (working memory), not in persisted state. Attempt counts live entirely in orchestrator memory and clear when a new phase begins. No additional files, state fields, or checkpoint entries are needed — the orchestrator simply observes its own conversation history to determine how many attempts have been made.
 - **If no BLOCKING findings**:
-  - **At standard intensity**: `workflow-advance.sh audit-mini` (mini-audit runs at all intensities)
-  - **At high+ intensity**: `workflow-advance.sh audit-mini` (mini-audit subsumes verify-phase at high+ intensity)
+  - **At standard intensity**: `workflow-advance.sh audit-mini` — skip probe round, advance directly to mini-audit
+  - **At high+ intensity**: Run the **Adversarial Probe Round** (below), then `workflow-advance.sh audit-mini`
+
+## Adversarial Probe Round (high+ intensity only)
+
+The probe round is **internal orchestration** — it does NOT trigger a `workflow-advance.sh` phase transition, does NOT appear in the pipeline manifest `expected_steps`, and is NOT a canonical pipeline step. The probe round runs between QA completion and mini-audit, at high+ intensity only. At standard intensity, the probe round MUST NOT run — skip directly to mini-audit.
+
+> **ABS-010 exception**: Probe agents are spawned via the **Agent tool** (not Task) because `isolation: "worktree"` is only available on the Agent tool. Task does not support worktree isolation. This is an explicit, documented exception to ABS-010's "no inline prompts in skill files" rule. Agent tool required for isolation: worktree which Task does not support.
+
+### Intensity Gate
+
+- **High intensity**: Only mutation and config-fuzz probe types activate.
+- **Critical intensity**: All five probe types activate — mutation, config-fuzz, dependency sabotage, permission stripping, and rollback simulation.
+- **Standard intensity**: Probe round MUST NOT run. Skip directly to `workflow-advance.sh audit-mini`.
+
+### Time Budget
+
+In interactive mode, prompt the user for a time budget (in minutes). In autonomous mode, use defaults: **15 minutes at high intensity, 30 minutes at critical intensity**.
+
+Compute probe count from the formula: `floor(budget_minutes * 60 / duration_estimate)` where `duration_estimate` is `commands.test_duration_estimate` from workflow-config.json (default: `commands.test_timeout / 3`, fallback 100s).
+
+**Boundary conditions:**
+- If budget yields **0 probes**: "Budget too small for even one probe — probe round skipped." Skip to mini-audit.
+- If budget yields **1 probe**: "Budget yields 1 probe — consider increasing for statistically useful results." Warn but proceed.
+
+### Base Branch Derivation
+
+The base branch for identifying changed files MUST be derived from git, not hardcoded:
+```bash
+git symbolic-ref refs/remotes/origin/HEAD | sed 's|refs/remotes/origin/||'
+```
+Probe targets MUST be files changed on the current feature branch (compared against the derived base branch). Probes MUST NOT target files outside the feature's diff scope.
+
+### Probe Dispatch
+
+Dispatch all probes in a single message (parallel). Each probe agent is spawned with `isolation: "worktree"` on the Agent tool. Probe modifications happen **exclusively in isolated worktrees** — probes MUST NEVER modify the main working tree. The main tree remains untouched after probe completion.
+
+**If diff is empty** (no changed files on the feature branch): "No changed files — probe round skipped." Skip to mini-audit.
+
+**If worktree creation fails** (disk space, permissions, git errors): "Worktree creation failed — probe round skipped." Report the failure and continue to mini-audit. The probe round is advisory and MUST NOT block pipeline progression — if probe infrastructure fails, continue to mini-audit.
+
+### Probe Types
+
+**High intensity (mutation + config-fuzz):**
+
+1. **Mutation probe**: Read the implementation files from the feature's git diff against the base branch. Apply **exactly one semantically meaningful modification per worktree** — operator swaps, guard removal, boundary condition changes, return value changes. Run the test command (`commands.test` from workflow-config.json) in the worktree. A "surviving mutant" is a modification where the test suite exits 0.
+
+2. **Config-fuzz probe**: Identify input surfaces in the changed files (scripts that parse JSON, markdown, stdin, config files, or environment variables). Generate edge-case inputs: empty strings, nulls, extreme numbers, malformed structure, missing fields, unicode edge cases, paths with spaces. Run the test suite. A "surviving fuzz case" is an input that causes a crash, hang (timeout), or unexpected exit code that no existing test catches.
+
+**Critical intensity only (additional probe types):**
+
+3. **Dependency sabotage**: Modify version pins or remove dependencies. Critical only — MUST NOT activate at high intensity.
+4. **Permission stripping**: Remove file permissions, env vars, or tool access one at a time. Critical only — MUST NOT activate at high intensity.
+5. **Rollback simulation**: Revert individual commits from the feature branch and run tests. Critical only — MUST NOT activate at high intensity.
+
+### Progress Visibility
+
+The orchestrator MUST announce:
+- **Start**: "Spawning N probes in parallel worktrees..."
+- **Per-probe completion**: "Probe 3/8 complete — mutant killed (operator swap in lib.sh:47)" or "Probe 5/8 complete — mutant survived (guard removal in setup.sh:92)"
+- **Summary**: "Probe round complete: 6 killed, 2 survived. Generating tests for survivors..."
+
+### Surviving-Probe Test Generation
+
+For each surviving probe from **high-intensity probe types** (mutation or config-fuzz where tests still pass), spawn a test-generation agent that attempts to write a killing test for the mutant. The test-generation agent receives ONLY:
+- The spec
+- The probe's modification description (e.g., "operator >= swapped to > in function X at line Y")
+- The target file path
+
+The test-generation agent MUST NOT receive the worktree path or the mutated code. This is prompt-level enforcement — the orchestrator does not pass the worktree path.
+
+Test generation gets **one attempt** — no convergence loop. If generation fails after one attempt, the surviving probe is reported as a finding.
+
+**Critical-only probe survivors** (dependency sabotage, permission stripping, rollback simulation) report findings only — NO test generation. These expose resilience/documentation gaps, not assertion gaps.
+
+**Interactive mode**: Generated tests are presented to the user for approval before committing.
+**Autonomous mode**: Generated tests are auto-committed per TB-004 delegation.
+
+Test-generation commits are **deferred to tdd-audit phase** — they are committed during the mini-audit phase when the workflow gate permits test writes. Do not attempt test-gen commits during tdd-qa phase.
+
+### Probe Results Artifact
+
+Write results **incrementally** to `.correctless/artifacts/probe-results-{branch-slug}.json` as each probe completes. Schema:
+
+```json
+{
+  "schema_version": 1,
+  "probe_round": {
+    "intensity": "high|critical",
+    "budget_minutes": 15,
+    "probe_count": 9,
+    "duration_estimate_s": 100
+  },
+  "probes": [
+    {
+      "type": "mutation|config-fuzz|dependency-sabotage|permission-stripping|rollback-simulation",
+      "target_file": "scripts/lib.sh",
+      "modification_description": "operator >= swapped to > at line 47",
+      "outcome": "killed|survived|timed_out|error",
+      "generated_test_path": "tests/test-probe-kill-lib-47.sh"
+    }
+  ],
+  "summary": {
+    "surviving": 2,
+    "killed": 6,
+    "timed_out": 0,
+    "tests_generated": 1,
+    "findings_reported": 1
+  }
+}
+```
+
+Summary fields are computed at the end from the probes array.
+
+### Non-Blocking Fallback
+
+The probe round is **advisory** — it produces test cases and findings but never gates pipeline progression. If all probes time out, or the probe infrastructure fails (worktree creation fails, Agent tool errors), report the failure and continue to mini-audit.
 
 ## Phase: Mini-Audit (tdd-audit)
 
@@ -825,6 +940,9 @@ When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECI
 - **AD-001**: Test strategy — follow spec rule test levels (default). Rationale: spec rules define `[unit]` or `[integration]` levels explicitly; the test agent follows them mechanically.
 - **AD-002**: QA finding triage — auto-fix CRITICAL and HIGH (default). Rationale: BLOCKING findings have concrete instance and class fixes; deferring them increases escape risk.
 - **AD-003**: Spec update needed — `escalate: always`. Default if deferred: flag as open question. Rationale: spec changes reset the pipeline and affect all downstream phases.
+- **AD-004**: Probe round time budget — 15 minutes at high intensity, 30 minutes at critical intensity (default). Rationale: 5 minutes yields too few probes for statistical significance; 15 min at high yields ~9 probes with default 100s estimate.
+- **AD-005**: Probe round failure — continue to mini-audit (default). Rationale: probe infrastructure failure should never block pipeline progression; probes are advisory.
+- **AD-006**: Probe test-generation approval — auto-commit in autonomous mode per TB-004 delegation (default). Rationale: generated tests are validated (must kill the mutant) and reviewed by mini-audit.
 
 ## If Something Goes Wrong
 

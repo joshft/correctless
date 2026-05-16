@@ -324,6 +324,14 @@
 - **Test**: `tests/test-deferred-findings-backlog.sh`
 - **Guards against**: Invisible accumulation of deferred review findings across features
 
+### ABS-034: Probe results artifact contract (.correctless/artifacts/)
+- **What**: JSON artifact at `.correctless/artifacts/probe-results-{branch-slug}.json` capturing adversarial probe round results from `/ctdd`. Schema: array of probe objects with fields for probe description, target invariant, outcome (survived/killed), and evidence. The probe round runs between QA and mini-audit in the `/ctdd` pipeline — it attempts to violate spec invariants through adversarial inputs and boundary conditions. Sole writer: `/ctdd` orchestrator (probe round step). Consumers: none initially (future: `/cmetrics` for probe survival rates). The artifact is committed to the repository via a TB-004c allowlist exception in `/cauto` Step 8.1.
+- **Invariant**: Only the `/ctdd` orchestrator may write this file. File absence triggers dormant degradation in future consumers (PAT-019 — no error, no blocking, graceful no-op). The artifact path uses `branch_slug` from ABS-001 for consistent naming. Future consumers must treat probe results as advisory data (TB-003 pattern).
+- **Enforced at**: `skills/ctdd/SKILL.md` (writer — probe round step), `skills/cauto/SKILL.md` (TB-004c allowlist — committed on push)
+- **Violated when**: A consumer other than `/ctdd` writes to the file; a consumer errors when the file is absent instead of degrading silently; the file is not included in the TB-004c consolidation allowlist
+- **Test**: Structural — probe-results file written during `/ctdd` probe round
+- **Guards against**: Loss of adversarial testing evidence; inability to measure probe effectiveness over time
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.
@@ -489,3 +497,8 @@ See `.claude/rules/canonicalize-path.md`.
 - **Assumption**: Claude Code stores session transcripts as JSONL files under `~/.claude/projects/{project-dir}/`. The directory structure (`{project-dir}/{session-uuid}.jsonl`, `{session-uuid}/subagents/agent-*.jsonl`, `{session-uuid}/subagents/agent-*.meta.json`) and JSONL schema (`.type`, `.message.id`, `.message.model`, `.message.usage.*`, `.gitBranch`, `.timestamp`) are Claude Code internal — not a public API.
 - **Consequence if wrong**: If Claude Code changes its storage layout, `scripts/compute-session-cost.sh` degrades gracefully (exit 0 with error JSON per R-011) but produces no cost data. The dashboard, /cverify, and /cmetrics fall back to token-log or token-count-based estimates. No data loss or failure — the cost pipeline becomes inert until the script is updated.
 - **Test**: test-session-cost.sh — R-002 (session discovery), R-011 (graceful degradation)
+
+### ENV-010: Agent tool worktree isolation contract
+- **Assumption**: The Agent tool's `isolation: "worktree"` mode creates a git worktree at `.claude/worktrees/agent-{id}` and runs the agent on branch `worktree-agent-{id}`. Hooks registered in `.claude/settings.json` do NOT run inside worktrees — the agent operates without workflow-gate, sensitive-file-guard, or audit-trail enforcement. The main working tree is untouched during agent execution. On completion: if the agent made no changes, the worktree is auto-cleaned; if the agent made changes, the worktree persists for the orchestrator to inspect and merge.
+- **Consequence if wrong**: If Claude Code changes worktree lifecycle semantics, agents may: (1) pollute the main tree with intermediate state, (2) trigger hooks inside the worktree causing phase-gate failures on a non-existent workflow branch, (3) leave orphaned worktrees consuming disk. The adversarial probe round in `/ctdd` depends on worktree isolation to safely attempt invariant violations without corrupting the implementation branch.
+- **Test**: Structural — `/ctdd` probe round uses worktree isolation; manual verification that hooks do not fire inside `.claude/worktrees/`

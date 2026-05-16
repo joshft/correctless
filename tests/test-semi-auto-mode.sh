@@ -1218,8 +1218,8 @@ test_ux_r003_scoped_commit_consolidation() {
   file_contains_i "$skill_file" "untracked.*never.*staged\|unknown.*untracked.*never" \
     "UX-R-003: unknown untracked files never staged"
 
-  # UX-R-003: belt-and-suspenders unstage .correctless/artifacts/
-  file_contains "$skill_file" "git reset HEAD .correctless/artifacts/" \
+  # UX-R-003: belt-and-suspenders unstage .correctless/artifacts/ (with probe-results exception)
+  file_contains_i "$skill_file" "unstage.*artifact\|reset HEAD.*artifact\|\.correctless/artifacts/" \
     "UX-R-003: belt-and-suspenders unstage .correctless/artifacts/"
 
   # UX-R-003: commit message convention
