@@ -47,8 +47,10 @@ pass "PRE-002" "cauto SKILL.md exists"
 # We look for a heading containing "Probe" between the QA phase and Mini-Audit.
 # ============================================================================
 
-# Get the body (strip YAML frontmatter)
-CTDD_BODY="$(skill_body "$CTDD_SKILL")"
+# Get the body (strip YAML frontmatter) into a temp file for reliable grep
+CTDD_BODY_FILE="$(mktemp)"
+skill_body "$CTDD_SKILL" > "$CTDD_BODY_FILE"
+trap 'rm -f "$CTDD_BODY_FILE" "$CAUTO_BODY_FILE"' EXIT
 
 # ============================================================================
 # INV-001: Probe round intensity gate
@@ -59,25 +61,25 @@ CTDD_BODY="$(skill_body "$CTDD_SKILL")"
 
 section "INV-001: Probe round intensity gate"
 
-if echo "$CTDD_BODY" | grep -qi "probe.*high.*intensity\|high.*intensity.*probe\|probe round.*high"; then
+if grep -qi "probe.*high.*intensity\|high.*intensity.*probe\|probe round.*high" "$CTDD_BODY_FILE"; then
   pass "INV-001a" "Probe round references high intensity requirement"
 else
   fail "INV-001a" "Probe round does not reference high intensity requirement"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "standard.*skip\|not.*run.*standard\|standard.*no.*probe\|MUST NOT.*standard"; then
+if grep -qi "standard.*skip\|not.*run.*standard\|standard.*no.*probe\|MUST NOT.*standard" "$CTDD_BODY_FILE"; then
   pass "INV-001b" "Probe round excluded at standard intensity"
 else
   fail "INV-001b" "Probe round not excluded at standard intensity"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "mutation.*config.*fuzz\|mutation.*fuzz\|config-fuzz"; then
+if grep -qi "mutation.*config.*fuzz\|mutation.*fuzz\|config-fuzz" "$CTDD_BODY_FILE"; then
   pass "INV-001c" "High intensity probe types listed (mutation, config-fuzz)"
 else
   fail "INV-001c" "High intensity probe types not listed"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "critical.*dependency.*sabotage\|critical.*permission.*strip\|critical.*rollback"; then
+if grep -qi "critical.*dependency.*sabotage\|critical.*permission.*strip\|critical.*rollback" "$CTDD_BODY_FILE"; then
   pass "INV-001d" "Critical-only probe types referenced"
 else
   fail "INV-001d" "Critical-only probe types not referenced"
@@ -90,14 +92,14 @@ fi
 
 section "INV-002: Worktree isolation"
 
-if echo "$CTDD_BODY" | grep -q 'isolation.*worktree\|isolation: "worktree"\|isolation:.*"worktree"'; then
+if grep -q 'isolation.*worktree\|isolation: "worktree"\|isolation:.*"worktree"' "$CTDD_BODY_FILE"; then
   pass "INV-002a" "Worktree isolation keyword present in probe section"
 else
   fail "INV-002a" "Worktree isolation keyword missing from probe section"
 fi
 
 # Must specifically reference Agent tool for probe/worktree dispatch (not generic agent refs)
-if echo "$CTDD_BODY" | grep -qi "probe.*Agent tool\|Agent tool.*probe\|Agent tool.*worktree.*isolation\|spawn.*Agent.*isolation"; then
+if grep -qi "probe.*Agent tool\|Agent tool.*probe\|Agent tool.*worktree.*isolation\|spawn.*Agent.*isolation" "$CTDD_BODY_FILE"; then
   pass "INV-002b" "Agent tool referenced for probe dispatch"
 else
   fail "INV-002b" "Agent tool not referenced for probe dispatch"
@@ -111,19 +113,19 @@ fi
 
 section "INV-003: Time budget"
 
-if echo "$CTDD_BODY" | grep -qi "time budget\|budget.*minutes\|budget_minutes"; then
+if grep -qi "time budget\|budget.*minutes\|budget_minutes" "$CTDD_BODY_FILE"; then
   pass "INV-003a" "Time budget concept present"
 else
   fail "INV-003a" "Time budget concept missing"
 fi
 
-if echo "$CTDD_BODY" | grep -q "duration_estimate\|test_duration_estimate"; then
+if grep -q "duration_estimate\|test_duration_estimate" "$CTDD_BODY_FILE"; then
   pass "INV-003b" "Duration estimate referenced in budget formula"
 else
   fail "INV-003b" "Duration estimate not referenced in budget formula"
 fi
 
-if echo "$CTDD_BODY" | grep -q "15.*minutes\|15 min"; then
+if grep -q "15.*minutes\|15 min" "$CTDD_BODY_FILE"; then
   pass "INV-003c" "Autonomous default budget (15 min high) present"
 else
   fail "INV-003c" "Autonomous default budget (15 min high) missing"
@@ -136,21 +138,21 @@ fi
 
 section "INV-004: Mutation probe semantics"
 
-if echo "$CTDD_BODY" | grep -qi "one.*mutation.*per.*worktree\|exactly one.*modification\|single.*mutation"; then
+if grep -qi "one.*mutation.*per.*worktree\|exactly one.*modification\|single.*mutation" "$CTDD_BODY_FILE"; then
   pass "INV-004a" "Single mutation per worktree constraint present"
 else
   fail "INV-004a" "Single mutation per worktree constraint missing"
 fi
 
 # Match mutation-specific terminology that would appear in the probe section
-if echo "$CTDD_BODY" | grep -qi "operator swap.*guard removal\|operator.*swap.*boundary.*change\|mutation.*operator.*swap"; then
+if grep -qi "operator swap.*guard removal\|operator.*swap.*boundary.*change\|mutation.*operator.*swap" "$CTDD_BODY_FILE"; then
   pass "INV-004b" "Mutation types described (operator swap, guard removal, etc.)"
 else
   fail "INV-004b" "Mutation types not described"
 fi
 
 # Must reference commands.test specifically in the probe context (run test suite in worktree)
-if echo "$CTDD_BODY" | grep -qi "probe.*commands\.test\|worktree.*commands\.test\|run.*commands\.test.*worktree\|mutation.*test.*command"; then
+if grep -qi "probe.*commands\.test\|worktree.*commands\.test\|run.*commands\.test.*worktree\|mutation.*test.*command" "$CTDD_BODY_FILE"; then
   pass "INV-004c" "Probe uses commands.test from config"
 else
   fail "INV-004c" "Probe does not reference commands.test in probe context"
@@ -163,14 +165,14 @@ fi
 
 section "INV-005: Config/input fuzz probe semantics"
 
-if echo "$CTDD_BODY" | grep -qi "input.*surface\|config.*fuzz\|edge-case.*input\|fuzz.*input"; then
+if grep -qi "input.*surface\|config.*fuzz\|edge-case.*input\|fuzz.*input" "$CTDD_BODY_FILE"; then
   pass "INV-005a" "Config-fuzz probe targets input surfaces"
 else
   fail "INV-005a" "Config-fuzz probe input surface targeting missing"
 fi
 
 # Must mention several edge-case types together (not just "null" in isolation)
-if echo "$CTDD_BODY" | grep -qi "empty.*string.*null\|malformed.*structure\|unicode.*edge\|edge-case.*input"; then
+if grep -qi "empty.*string.*null\|malformed.*structure\|unicode.*edge\|edge-case.*input" "$CTDD_BODY_FILE"; then
   pass "INV-005b" "Edge-case input types described"
 else
   fail "INV-005b" "Edge-case input types not described"
@@ -183,26 +185,26 @@ fi
 
 section "INV-006: Critical-only probes gate"
 
-if echo "$CTDD_BODY" | grep -qi "dependency.*sabotage"; then
+if grep -qi "dependency.*sabotage" "$CTDD_BODY_FILE"; then
   pass "INV-006a" "Dependency sabotage probe type defined"
 else
   fail "INV-006a" "Dependency sabotage probe type missing"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "permission.*strip"; then
+if grep -qi "permission.*strip" "$CTDD_BODY_FILE"; then
   pass "INV-006b" "Permission stripping probe type defined"
 else
   fail "INV-006b" "Permission stripping probe type missing"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "rollback.*simulation"; then
+if grep -qi "rollback.*simulation" "$CTDD_BODY_FILE"; then
   pass "INV-006c" "Rollback simulation probe type defined"
 else
   fail "INV-006c" "Rollback simulation probe type missing"
 fi
 
 # Must specifically mention critical-only in context of probes (not findings or severity)
-if echo "$CTDD_BODY" | grep -qi "critical.*intensity.*probe\|critical.*only.*probe\|probe.*critical.*only\|critical.*only.*activate"; then
+if grep -qi "critical.*intensity.*probe\|critical.*only.*probe\|probe.*critical.*only\|critical.*only.*activate" "$CTDD_BODY_FILE"; then
   pass "INV-006d" "Critical-only gate for these probe types"
 else
   fail "INV-006d" "Critical-only gate not stated"
@@ -215,19 +217,19 @@ fi
 
 section "INV-007: Surviving-probe test generation"
 
-if echo "$CTDD_BODY" | grep -qi "test.*generation\|generate.*test.*survivor\|killing test\|test.*kill.*mutant"; then
+if grep -qi "test.*generation\|generate.*test.*survivor\|killing test\|test.*kill.*mutant" "$CTDD_BODY_FILE"; then
   pass "INV-007a" "Test generation for survivors mentioned"
 else
   fail "INV-007a" "Test generation for survivors not mentioned"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "MUST NOT.*worktree path\|not.*receive.*worktree\|without.*worktree path"; then
+if grep -qi "MUST NOT.*worktree path\|not.*receive.*worktree\|without.*worktree path" "$CTDD_BODY_FILE"; then
   pass "INV-007b" "Test-gen agent explicitly excluded from worktree path"
 else
   fail "INV-007b" "Test-gen agent worktree path exclusion not stated"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "one attempt\|single attempt\|generation fails.*finding"; then
+if grep -qi "one attempt\|single attempt\|generation fails.*finding" "$CTDD_BODY_FILE"; then
   pass "INV-007c" "Single attempt for test generation (no convergence loop)"
 else
   fail "INV-007c" "Single attempt constraint not stated"
@@ -241,25 +243,25 @@ fi
 
 section "INV-008: Probe results artifact"
 
-if echo "$CTDD_BODY" | grep -q "probe-results-.*\.json\|probe-results.*branch.*json"; then
+if grep -q "probe-results-.*\.json\|probe-results.*branch.*json" "$CTDD_BODY_FILE"; then
   pass "INV-008a" "Probe results artifact path defined"
 else
   fail "INV-008a" "Probe results artifact path not defined"
 fi
 
-if echo "$CTDD_BODY" | grep -q "schema_version"; then
+if grep -q "schema_version" "$CTDD_BODY_FILE"; then
   pass "INV-008b" "Schema version field present"
 else
   fail "INV-008b" "Schema version field not present"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "incremental\|as each probe completes\|write.*incrementally"; then
+if grep -qi "incremental\|as each probe completes\|write.*incrementally" "$CTDD_BODY_FILE"; then
   pass "INV-008c" "Incremental write instruction present"
 else
   fail "INV-008c" "Incremental write instruction missing"
 fi
 
-if echo "$CTDD_BODY" | grep -q '"outcome"\|outcome.*killed\|survived\|timed_out'; then
+if grep -q '"outcome"\|outcome.*killed\|survived\|timed_out' "$CTDD_BODY_FILE"; then
   pass "INV-008d" "Probe outcome enum values present (killed/survived/timed_out)"
 else
   fail "INV-008d" "Probe outcome enum values missing"
@@ -273,10 +275,12 @@ fi
 
 section "INV-009: Pipeline position"
 
-# Verify probe section appears between QA completion and Mini-Audit heading
-QA_LINE=$(echo "$CTDD_BODY" | grep -n "no BLOCKING findings" | tail -1 | cut -d: -f1)
-MINI_AUDIT_LINE=$(echo "$CTDD_BODY" | grep -n "## Phase: Mini-Audit" | head -1 | cut -d: -f1)
-PROBE_LINE=$(echo "$CTDD_BODY" | grep -ni "probe round\|## .*Probe" | head -1 | cut -d: -f1)
+# Verify probe section appears between QA completion and Mini-Audit heading.
+# The second "If no BLOCKING findings" (line ~543) is the QA→mini-audit transition.
+# The probe round section heading must be between that and "## Phase: Mini-Audit".
+QA_LINE=$(grep -n "If no BLOCKING findings" "$CTDD_BODY_FILE" | tail -1 | cut -d: -f1)
+MINI_AUDIT_LINE=$(grep -n "## Phase: Mini-Audit" "$CTDD_BODY_FILE" | head -1 | cut -d: -f1)
+PROBE_LINE=$(grep -ni "## .*Probe.*Round\|## Adversarial Probe" "$CTDD_BODY_FILE" | head -1 | cut -d: -f1)
 
 if [ -n "$PROBE_LINE" ] && [ -n "$QA_LINE" ] && [ -n "$MINI_AUDIT_LINE" ]; then
   if [ "$PROBE_LINE" -gt "$QA_LINE" ] && [ "$PROBE_LINE" -lt "$MINI_AUDIT_LINE" ]; then
@@ -289,13 +293,13 @@ else
 fi
 
 # Must specifically document probe round as internal orchestration (no phase transition)
-if echo "$CTDD_BODY" | grep -qi "probe.*internal orchestration\|probe.*not.*pipeline step\|probe.*no.*phase transition\|probe.*does not.*workflow-advance"; then
+if grep -qi "probe.*internal orchestration\|probe.*not.*pipeline step\|probe.*no.*phase transition\|probe.*does not.*workflow-advance" "$CTDD_BODY_FILE"; then
   pass "INV-009b" "Probe round documented as internal orchestration (no phase transition)"
 else
   fail "INV-009b" "Probe round not documented as internal orchestration"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "tdd-audit.*commit\|deferred.*tdd-audit\|commit.*during.*mini-audit\|test-gen.*deferred"; then
+if grep -qi "tdd-audit.*commit\|deferred.*tdd-audit\|commit.*during.*mini-audit\|test-gen.*deferred" "$CTDD_BODY_FILE"; then
   pass "INV-009c" "Test-gen commits deferred to tdd-audit phase"
 else
   fail "INV-009c" "Test-gen commit deferral not stated"
@@ -309,7 +313,7 @@ fi
 section "INV-010: Parallel probe dispatch"
 
 # Must specifically mention probes dispatched in parallel/single message
-if echo "$CTDD_BODY" | grep -qi "probes.*single message\|probes.*parallel\|dispatch.*probes.*parallel\|all probes.*single message"; then
+if grep -qi "probes.*single message\|probes.*parallel\|dispatch.*probes.*parallel\|all probes.*single message" "$CTDD_BODY_FILE"; then
   pass "INV-010" "Parallel dispatch instruction present"
 else
   fail "INV-010" "Parallel dispatch instruction missing"
@@ -322,14 +326,14 @@ fi
 
 section "INV-011: Base branch derivation"
 
-if echo "$CTDD_BODY" | grep -q "git symbolic-ref\|symbolic-ref.*refs/remotes/origin/HEAD"; then
+if grep -q "git symbolic-ref\|symbolic-ref.*refs/remotes/origin/HEAD" "$CTDD_BODY_FILE"; then
   pass "INV-011a" "Base branch derived via git symbolic-ref"
 else
   fail "INV-011a" "Base branch derivation via git symbolic-ref missing"
 fi
 
 # Must specifically mention probe targets from changed files (not generic mini-audit diff usage)
-if echo "$CTDD_BODY" | grep -qi "probe.*changed.*files\|probe.*target.*diff\|mutation.*target.*changed\|target.*files.*changed.*branch"; then
+if grep -qi "probe.*changed.*files\|probe.*target.*diff\|mutation.*target.*changed\|target.*files.*changed.*branch" "$CTDD_BODY_FILE"; then
   pass "INV-011b" "Probes target changed files from feature diff"
 else
   fail "INV-011b" "Probe targeting of changed files not stated"
@@ -342,20 +346,20 @@ fi
 
 section "INV-012: Progress visibility"
 
-if echo "$CTDD_BODY" | grep -qi "Spawning.*probes\|spawning.*probe"; then
+if grep -qi "Spawning.*probes\|spawning.*probe" "$CTDD_BODY_FILE"; then
   pass "INV-012a" "Probe round start announcement pattern present"
 else
   fail "INV-012a" "Probe round start announcement pattern missing"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "Probe.*complete\|probe.*killed\|probe.*survived"; then
+if grep -qi "Probe.*complete\|probe.*killed\|probe.*survived" "$CTDD_BODY_FILE"; then
   pass "INV-012b" "Per-probe completion announcement pattern present"
 else
   fail "INV-012b" "Per-probe completion announcement pattern missing"
 fi
 
 # Must specifically announce probe round completion with kill/survive stats
-if echo "$CTDD_BODY" | grep -qi "Probe round complete\|probe.*complete.*killed.*survived\|probes.*killed.*survived"; then
+if grep -qi "Probe round complete\|probe.*complete.*killed.*survived\|probes.*killed.*survived" "$CTDD_BODY_FILE"; then
   pass "INV-012c" "Probe round summary announcement pattern present"
 else
   fail "INV-012c" "Probe round summary announcement pattern missing"
@@ -368,13 +372,13 @@ fi
 
 section "INV-013: ABS-010 exception"
 
-if echo "$CTDD_BODY" | grep -qi "ABS-010.*exception\|exception.*ABS-010"; then
+if grep -qi "ABS-010.*exception\|exception.*ABS-010" "$CTDD_BODY_FILE"; then
   pass "INV-013a" "ABS-010 exception documented"
 else
   fail "INV-013a" "ABS-010 exception not documented"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "Agent tool.*isolation.*worktree\|worktree.*requires.*Agent\|isolation.*worktree.*Agent tool\|Agent.*required.*isolation"; then
+if grep -qi "Agent tool.*isolation.*worktree\|worktree.*requires.*Agent\|isolation.*worktree.*Agent tool\|Agent.*required.*isolation" "$CTDD_BODY_FILE"; then
   pass "INV-013b" "ABS-010 exception rationale present (Agent tool required for worktree)"
 else
   fail "INV-013b" "ABS-010 exception rationale missing"
@@ -388,15 +392,16 @@ fi
 
 section "INV-014: TB-004c allowlist (cauto SKILL.md)"
 
-CAUTO_BODY="$(skill_body "$CAUTO_SKILL")"
+CAUTO_BODY_FILE="$(mktemp)"
+skill_body "$CAUTO_SKILL" > "$CAUTO_BODY_FILE"
 
-if echo "$CAUTO_BODY" | grep -q "probe-results"; then
+if grep -q "probe-results" "$CAUTO_BODY_FILE"; then
   pass "INV-014a" "Probe results path in cauto Step 8.1 allowlist"
 else
   fail "INV-014a" "Probe results path NOT in cauto Step 8.1 allowlist"
 fi
 
-if echo "$CAUTO_BODY" | grep -qi "probe-results.*exception\|exclude.*probe-results\|except.*probe-results\|probe-results.*exclude"; then
+if grep -qi "probe-results.*exception\|exclude.*probe-results\|except.*probe-results\|probe-results.*exclude" "$CAUTO_BODY_FILE"; then
   pass "INV-014b" "Step 8.2 excludes probe results from unstaging"
 else
   fail "INV-014b" "Step 8.2 does not exclude probe results from unstaging"
@@ -409,7 +414,7 @@ fi
 
 section "PRH-001: No main tree modifications"
 
-if echo "$CTDD_BODY" | grep -qi "never.*modify.*main.*tree\|main.*tree.*untouched\|exclusively.*worktree\|worktree.*only"; then
+if grep -qi "never.*modify.*main.*tree\|main.*tree.*untouched\|exclusively.*worktree\|worktree.*only" "$CTDD_BODY_FILE"; then
   pass "PRH-001" "Main working tree protection stated"
 else
   fail "PRH-001" "Main working tree protection not stated"
@@ -422,7 +427,7 @@ fi
 section "PRH-002: No probe at standard"
 
 # Already partially tested by INV-001b, but PRH-002 requires explicit prohibition
-if echo "$CTDD_BODY" | grep -qi "MUST NOT.*standard\|never.*standard.*intensity.*probe\|skip.*probe.*standard\|standard.*skip.*probe"; then
+if grep -qi "MUST NOT.*standard\|never.*standard.*intensity.*probe\|skip.*probe.*standard\|standard.*skip.*probe" "$CTDD_BODY_FILE"; then
   pass "PRH-002" "Explicit prohibition of probe round at standard intensity"
 else
   fail "PRH-002" "No explicit prohibition of probe round at standard intensity"
@@ -436,7 +441,7 @@ fi
 section "PRH-003: Non-blocking on failure"
 
 # Must specifically mention probe failure -> continue to mini-audit (not generic "advisory")
-if echo "$CTDD_BODY" | grep -qi "probe.*fail.*continue\|probe.*advisory\|probe.*non-blocking\|probe.*fallback\|probe.*infrastructure.*fail"; then
+if grep -qi "probe.*fail.*continue\|probe.*advisory\|probe.*non-blocking\|probe.*fallback\|probe.*infrastructure.*fail" "$CTDD_BODY_FILE"; then
   pass "PRH-003" "Probe round failure fallback to mini-audit present"
 else
   fail "PRH-003" "Probe round failure fallback not stated"
@@ -449,7 +454,7 @@ fi
 
 section "BND-001: Empty diff boundary"
 
-if echo "$CTDD_BODY" | grep -qi "no.*changed.*files.*skip\|empty.*diff.*skip\|skip.*probe.*no.*changed"; then
+if grep -qi "no.*changed.*files.*skip\|empty.*diff.*skip\|skip.*probe.*no.*changed" "$CTDD_BODY_FILE"; then
   pass "BND-001" "Empty diff skip behavior documented"
 else
   fail "BND-001" "Empty diff skip behavior not documented"
@@ -462,13 +467,13 @@ fi
 
 section "BND-002: Budget boundary"
 
-if echo "$CTDD_BODY" | grep -qi "budget.*zero.*skip\|budget.*small\|zero.*probe.*skip\|0.*skip"; then
+if grep -qi "budget.*zero.*skip\|budget.*small\|zero.*probe.*skip\|0.*skip" "$CTDD_BODY_FILE"; then
   pass "BND-002a" "Zero-probe budget skip behavior documented"
 else
   fail "BND-002a" "Zero-probe budget skip behavior not documented"
 fi
 
-if echo "$CTDD_BODY" | grep -qi "1.*probe.*warn\|single.*probe.*warn\|one.*probe.*warn\|budget.*1.*warn"; then
+if grep -qi "1.*probe.*warn\|single.*probe.*warn\|one.*probe.*warn\|budget.*1.*warn" "$CTDD_BODY_FILE"; then
   pass "BND-002b" "Single-probe budget warning documented"
 else
   fail "BND-002b" "Single-probe budget warning not documented"
@@ -481,7 +486,7 @@ fi
 
 section "BND-003: Worktree creation failure"
 
-if echo "$CTDD_BODY" | grep -qi "worktree.*fail\|worktree.*creation.*fail\|fail.*worktree"; then
+if grep -qi "worktree.*fail\|worktree.*creation.*fail\|fail.*worktree" "$CTDD_BODY_FILE"; then
   pass "BND-003" "Worktree creation failure handling documented"
 else
   fail "BND-003" "Worktree creation failure handling not documented"
@@ -495,25 +500,28 @@ fi
 section "Autonomous Defaults (AD-004/005/006)"
 
 # Extract the Autonomous Defaults section
-AD_SECTION=$(echo "$CTDD_BODY" | sed -n '/^## Autonomous Defaults/,/^## /p' | head -n -1)
+AD_SECTION_FILE="$(mktemp)"
+sed -n '/^## Autonomous Defaults/,/^## /p' "$CTDD_BODY_FILE" | head -n -1 > "$AD_SECTION_FILE"
 
-if echo "$AD_SECTION" | grep -q "AD-004"; then
+if grep -q "AD-004" "$AD_SECTION_FILE"; then
   pass "AD-004" "AD-004 (time budget default) in Autonomous Defaults section"
 else
   fail "AD-004" "AD-004 missing from Autonomous Defaults section"
 fi
 
-if echo "$AD_SECTION" | grep -q "AD-005"; then
+if grep -q "AD-005" "$AD_SECTION_FILE"; then
   pass "AD-005" "AD-005 (probe failure fallback) in Autonomous Defaults section"
 else
   fail "AD-005" "AD-005 missing from Autonomous Defaults section"
 fi
 
-if echo "$AD_SECTION" | grep -q "AD-006"; then
+if grep -q "AD-006" "$AD_SECTION_FILE"; then
   pass "AD-006" "AD-006 (test-gen auto-commit) in Autonomous Defaults section"
 else
   fail "AD-006" "AD-006 missing from Autonomous Defaults section"
 fi
+
+rm -f "$AD_SECTION_FILE"
 
 # ============================================================================
 # Distribution copy sync — ctdd
@@ -549,7 +557,7 @@ fi
 
 section "Pipeline references"
 
-if echo "$CTDD_BODY" | grep -qi "RED.*GREEN.*QA.*probe\|QA.*probe.*mini-audit\|probe.*mini-audit"; then
+if grep -qi "RED.*GREEN.*QA.*probe\|QA.*probe.*mini-audit\|probe.*mini-audit" "$CTDD_BODY_FILE"; then
   pass "PIPE-001" "Probe round referenced in pipeline progression"
 else
   fail "PIPE-001" "Probe round not referenced in pipeline progression"

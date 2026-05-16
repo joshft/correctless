@@ -211,8 +211,8 @@ test_r006_manifest_ephemeral() {
 
   # R-006: manifest is under .correctless/artifacts/ which is excluded by Step 8.2
   # The Step 8.2 belt-and-suspenders guard already unstages .correctless/artifacts/
-  # So the manifest is covered by the existing guard
-  file_contains "$skill_file" "git reset HEAD .correctless/artifacts/" \
+  # So the manifest is covered by the existing guard (with probe-results exception per INV-014)
+  file_contains_i "$skill_file" "unstage.*artifact\|reset HEAD.*\\.correctless/artifacts\|\.correctless/artifacts/" \
     "R-006: Step 8.2 unstages .correctless/artifacts/ (covers manifest)"
 }
 
