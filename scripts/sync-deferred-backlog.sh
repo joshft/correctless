@@ -160,8 +160,8 @@ scan_artifact() {
   current_feature=$(basename "$artifact_file" .md | sed 's/^review-spec-findings-//;s/^review-findings-//')
 
   while IFS= read -r line; do
-    # Match heading: ## XX-NNN: description
-    if echo "$line" | grep -qE '^##[[:space:]]+[A-Z]+-[0-9]+:'; then
+    # Match heading: ## RS-001: or ## Finding RS-001: (with optional word prefix)
+    if echo "$line" | grep -qE '^##[[:space:]]+(Finding[[:space:]]+)?[A-Z]+-[0-9]+:'; then
       # If we were in a finding, process the previous one
       if [ "$in_finding" = true ] && [ -n "$current_id" ]; then
         process_finding "$rel_path" "$current_id" "$current_desc" "$current_severity" "$current_status" "$current_feature"
@@ -171,8 +171,8 @@ scan_artifact() {
       finding_ordinal=$((finding_ordinal + 1))
       # Extract finding ID (first LETTERS-NNN pattern)
       current_id=$(echo "$line" | grep -oE '[A-Z]+-[0-9]+' | head -1)
-      # Extract description (everything after the ID and colon)
-      current_desc=$(echo "$line" | sed 's/^##[[:space:]]*[A-Z]*-[0-9]*:[[:space:]]*//')
+      # Extract description (everything after the ID and colon, with optional Finding prefix)
+      current_desc=$(echo "$line" | sed 's/^##[[:space:]]*\(Finding[[:space:]]*\)\{0,1\}[A-Z]*-[0-9]*:[[:space:]]*//')
       current_severity=""
       current_status=""
     elif echo "$line" | grep -qE '^##[[:space:]]'; then

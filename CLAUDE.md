@@ -166,6 +166,10 @@ GitHub squash-merges PRs, so the local branch history will diverge from main. `r
 - When a feature introduces a prompt-level write contract (LLM-instructed to write to a file), and the data can be reconstructed from committed artifacts, the spec must include a re-derivation backstop script that reconstructs the file from source-of-truth artifacts. The script serves dual purpose: initial seed on fresh machines and ongoing re-sync when prompt-level writes drift. `/cstatus` detects drift between artifacts and the derived file and suggests running the sync script. This is the lightweight alternative to gate-enforcement (ABS-029 pattern) for advisory data where last-write-wins is acceptable.
 - Source: /cdocs after deferred-findings-backlog
 
+### 2026-05-15 — Postmortem: Test fixtures must match real producer output format (PMB-010)
+- `sync-deferred-backlog.sh` heading regex `^##[[:space:]]+[A-Z]+-[0-9]+:` expected `## RS-001:` but `/creview-spec` outputs `## Finding RS-001:` (with `Finding` prefix per its SKILL.md template). All 65 tests passed against hand-written fixtures using the wrong format. Script silently imported 0 of 25 pending findings. When a script parses another skill's output, at least one test must use a real artifact from the repo (or verbatim copy) — not a hand-written fixture. The spec should pin the exact format being parsed, cross-referenced against the producer's SKILL.md template. See AP-031.
+- Source: PMB-010
+
 ### 2026-05-06 — Convention confirmed: Structural enforcement over prompt-level instruction
 - Observed in 6+ features (auto-mode-phase-2, auto-mode-phase-3, carchitect-phase1, test-evasion-antipatterns, audit-findings-persistence-contract, structural-enforcement-pat) — treat as established project convention
 - Every spec invariant at high+ intensity must include an `Enforcement:` field (PAT-018 mechanisms: allowed-tools, sensitive-file-guard, gate preconditions, hash verification, CI test assertions, agent tool-pinning); the Design Contract Checker in `/creview-spec` flags missing or prompt-level-only enforcement
