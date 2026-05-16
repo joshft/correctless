@@ -604,6 +604,25 @@ check_inv016() {
 }
 
 # ============================================================================
+# INV-017: UNTRUSTED fence wrapping for research brief in orchestrator
+# ============================================================================
+
+check_inv017() {
+  section "INV-017: UNTRUSTED fence wrapping for research brief"
+
+  if [ -z "$STEP2_BLOCK" ]; then
+    fail "INV-017(a)" "$CSPEC_SKILL does not exist or Step 2 block is empty"
+    return
+  fi
+
+  if echo "$STEP2_BLOCK" | grep -q 'UNTRUSTED_RESEARCH_BRIEF'; then
+    pass "INV-017(a)" "SKILL.md Step 2 contains UNTRUSTED_RESEARCH_BRIEF fence"
+  else
+    fail "INV-017(a)" "SKILL.md Step 2 does not wrap research brief in UNTRUSTED fence (structural enforcement for TB-007)"
+  fi
+}
+
+# ============================================================================
 # PRH-001: No inline research agent prompt for migrated agent
 # ============================================================================
 
@@ -811,6 +830,7 @@ check_inv013
 check_inv014
 check_inv015
 check_inv016
+check_inv017
 check_prh001
 check_prh002
 check_bnd001
