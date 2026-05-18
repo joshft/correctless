@@ -243,56 +243,8 @@ test_inv003_cspec_reads_calibration() {
 #   Writes to workflow.intensity_calibration_mode
 # ============================================
 
-test_inv004_csetup_calibration_mode() {
-  echo ""
-  echo "=== INV-004: /csetup calibration mode selection ==="
-
-  local skill_file="$REPO_DIR/skills/csetup/SKILL.md"
-
-  # INV-004: csetup references intensity calibration mode
-  file_contains_i "$skill_file" "intensity.*calibration.*mode\|calibration.*mode" \
-    "INV-004: csetup SKILL.md references calibration mode"
-
-  # INV-004: passive option present
-  file_contains_i "$skill_file" "passive" \
-    "INV-004: passive mode option present"
-
-  # INV-004: active option present (in calibration context, not just bare "active")
-  file_contains_i "$skill_file" "active.*calibration\|calibration.*active\|active.*mode.*intensity\|active.*auto.*raise" \
-    "INV-004: active calibration mode option present"
-
-  # INV-004: hybrid option present
-  file_contains_i "$skill_file" "hybrid" \
-    "INV-004: hybrid mode option present"
-
-  # INV-004: passive is the default
-  file_contains_i "$skill_file" "passive.*default\|default.*passive\|passive.*recommended" \
-    "INV-004: passive is the default/recommended mode"
-
-  # INV-004: writes to workflow.intensity_calibration_mode config field
-  file_contains "$skill_file" "intensity_calibration_mode" \
-    "INV-004: references intensity_calibration_mode config field"
-
-  # BLOCKING-8 fix: verify instruction to write mode to workflow-config.json
-  file_contains_i "$skill_file" "intensity_calibration_mode.*workflow-config\|workflow-config.*intensity_calibration_mode\|write.*intensity_calibration_mode.*config\|intensity_calibration_mode.*written.*config" \
-    "INV-004: instructs writing intensity_calibration_mode to workflow-config.json"
-
-  # INV-004: three calibration mode options presented together (AP-003 mitigation:
-  # verify all three options appear in the same skill with calibration context,
-  # not just the bare keywords "passive"/"active"/"hybrid")
-  local has_passive has_active has_hybrid
-  has_passive=0; has_active=0; has_hybrid=0
-  grep -qi "passive.*calibration\|calibration.*passive" "$skill_file" 2>/dev/null && has_passive=1
-  grep -qi "active.*calibration\|calibration.*active" "$skill_file" 2>/dev/null && has_active=1
-  grep -qi "hybrid.*calibration\|calibration.*hybrid\|hybrid.*mode" "$skill_file" 2>/dev/null && has_hybrid=1
-  if [ "$has_passive" -eq 1 ] && [ "$has_active" -eq 1 ] && [ "$has_hybrid" -eq 1 ]; then
-    echo "  PASS: INV-004: all three calibration modes (passive, active, hybrid) present in csetup"
-    PASS=$((PASS + 1))
-  else
-    echo "  FAIL: INV-004: not all three calibration modes (passive, active, hybrid) present in csetup"
-    FAIL=$((FAIL + 1))
-  fi
-}
+# INV-004 (csetup calibration mode) REMOVED — calibration mode selection
+# removed from /csetup per simplify-intensity-calibration spec
 
 # ============================================
 # INV-005: Calibration mode affects /cspec behavior
@@ -302,58 +254,8 @@ test_inv004_csetup_calibration_mode() {
 #   Override context shown in advisory text
 # ============================================
 
-test_inv005_mode_behaviors() {
-  echo ""
-  echo "=== INV-005: Calibration mode behaviors in /cspec ==="
-
-  local skill_file="$REPO_DIR/skills/cspec/SKILL.md"
-
-  # INV-005: reads intensity_calibration_mode from config
-  file_contains "$skill_file" "intensity_calibration_mode" \
-    "INV-005: cspec reads intensity_calibration_mode from config"
-
-  # INV-005: default to passive when absent
-  file_contains_i "$skill_file" "default.*passive\|absent.*passive\|passive.*default" \
-    "INV-005: cspec defaults to passive when mode absent from config"
-
-  # INV-005: passive mode shows advisory text
-  file_contains_i "$skill_file" "passive.*advisory\|advisory.*text\|advisory.*passive" \
-    "INV-005: passive mode shows advisory text"
-
-  # INV-005: active mode auto-raises
-  file_contains_i "$skill_file" "active.*auto.*raise\|auto-raise\|auto.*raise.*active\|automatically.*raise" \
-    "INV-005: active mode auto-raises the recommendation"
-
-  # INV-005: active mode threshold — QA rounds >= 3
-  file_contains_i "$skill_file" "3.*QA.*round\|QA.*round.*3\|qa_rounds.*3\|3.*round" \
-    "INV-005: active mode threshold is QA rounds >= 3"
-
-  # INV-005: active mode threshold — BLOCKING findings >= 8
-  file_contains_i "$skill_file" "8.*BLOCKING\|BLOCKING.*8\|findings.*8\|8.*finding" \
-    "INV-005: active mode threshold is BLOCKING findings >= 8"
-
-  # INV-005: active mode raises by one level (standard->high, high->critical)
-  file_contains_i "$skill_file" "raise.*one level.*calibration\|calibration.*raise.*one level\|auto-raise.*standard.*high\|auto-raise.*high.*critical\|standard.*high.*high.*critical.*calibration" \
-    "INV-005: active mode raises by one level based on calibration"
-
-  # INV-005: active mode uses recommended_intensity (not actual_intensity)
-  # BLOCKING-3 fix: anchor to active mode + calibration context
-  file_contains_i "$skill_file" "active.*recommended_intensity.*not.*actual\|active.*evaluate.*recommended_intensity\|recommended_intensity.*not.*actual_intensity.*active" \
-    "INV-005: active mode evaluates at recommended_intensity (not actual)"
-
-  # INV-005: hybrid mode starts passive, switches to active at 5 entries
-  file_contains_i "$skill_file" "hybrid.*passive.*5\|5.*entries.*active\|hybrid.*5.*active\|passive.*until.*5" \
-    "INV-005: hybrid mode is passive until 5 entries, then active"
-
-  # INV-005: hybrid threshold is global count, not per-path
-  file_contains_i "$skill_file" "global.*count\|total.*entries\|global.*not.*per-path\|total.*calibration" \
-    "INV-005: hybrid threshold uses global count, not per-path"
-
-  # INV-005: override context shown in calibration advisory — counts of user overrides
-  # BLOCKING-4 fix: tighten to require override counting specific to calibration
-  file_contains_i "$skill_file" "overrode.*recommendation\|override.*count.*calibration\|user.*overrode.*calibration\|cases.*overrode" \
-    "INV-005: calibration advisory text includes override context"
-}
+# INV-005 (mode behaviors) REMOVED — active/hybrid mode behaviors
+# removed from /cspec per simplify-intensity-calibration spec
 
 # ============================================
 # INV-006: Config templates include calibration mode
@@ -363,26 +265,28 @@ test_inv005_mode_behaviors() {
 
 test_inv006_config_templates() {
   echo ""
-  echo "=== INV-006: Config templates include calibration mode ==="
+  echo "=== INV-006: Config templates exist ==="
 
   local lite_cfg="$REPO_DIR/templates/workflow-config.json"
   local full_cfg="$REPO_DIR/templates/workflow-config-full.json"
 
-  # INV-006: lite template has intensity_calibration_mode
-  file_contains "$lite_cfg" "intensity_calibration_mode" \
-    "INV-006: lite workflow-config.json includes intensity_calibration_mode"
+  # INV-006: lite template exists and is valid JSON
+  if [ -f "$lite_cfg" ] && jq empty "$lite_cfg" 2>/dev/null; then
+    echo "  PASS: INV-006: lite workflow-config.json exists and is valid JSON"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: INV-006: lite workflow-config.json missing or invalid JSON"
+    FAIL=$((FAIL + 1))
+  fi
 
-  # INV-006: lite template default is passive
-  file_contains "$lite_cfg" '"intensity_calibration_mode".*"passive"' \
-    "INV-006: lite template default is passive"
-
-  # INV-006: full template has intensity_calibration_mode
-  file_contains "$full_cfg" "intensity_calibration_mode" \
-    "INV-006: full workflow-config-full.json includes intensity_calibration_mode"
-
-  # INV-006: full template default is passive
-  file_contains "$full_cfg" '"intensity_calibration_mode".*"passive"' \
-    "INV-006: full template default is passive"
+  # INV-006: full template exists and is valid JSON
+  if [ -f "$full_cfg" ] && jq empty "$full_cfg" 2>/dev/null; then
+    echo "  PASS: INV-006: full workflow-config-full.json exists and is valid JSON"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: INV-006: full workflow-config-full.json missing or invalid JSON"
+    FAIL=$((FAIL + 1))
+  fi
 }
 
 # ============================================
@@ -558,33 +462,13 @@ test_inv012_show_arithmetic() {
   file_contains_i "$skill_file" "list.*entries\|list.*overlapping\|overlapping.*entries.*list\|feature.*slug.*list" \
     "INV-012: cspec lists overlapping entries"
 
-  # INV-012: shows sum/total, count, and average together in calibration context
-  # BLOCKING-6 fix: accept "sum" or "total" and require compound pattern to avoid false matches
-  file_contains_i "$skill_file" "sum.*count.*average\|total.*count.*average\|sum.*average.*threshold\|total.*average.*threshold" \
-    "INV-012: cspec shows sum/total, count, and average in calibration arithmetic"
-
-  # INV-012: shows count in calibration context
-  # QA-003 fix: tighten to require calibration anchoring, not just "count.*entries"
-  file_contains_i "$skill_file" "count.*calibration\|calibration.*count\|number.*overlapping.*entries\|overlapping.*entries.*average" \
-    "INV-012: cspec shows count in calibration arithmetic"
-
   # INV-012: shows average in calibration context
-  file_contains_i "$skill_file" "average.*calibration\|calibration.*average\|arithmetic mean.*calibration\|calibration.*arithmetic mean" \
+  file_contains_i "$skill_file" "average.*calibration\|calibration.*average\|arithmetic mean.*calibration\|calibration.*arithmetic mean\|Averages:" \
     "INV-012: cspec shows average in calibration arithmetic"
 
-  # INV-012: shows threshold comparison
-  file_contains_i "$skill_file" "threshold.*comparison\|compare.*threshold\|threshold.*3\|threshold.*8" \
-    "INV-012: cspec shows threshold comparison"
-
-  # INV-012: user sees the math, not just the conclusion
-  # (AP-003 mitigation: verify the instruction explicitly states to show
-  # intermediate calculation, not just the final recommendation)
-  file_contains_i "$skill_file" "intermediate.*calculation\|show.*math\|show.*arithmetic\|not just.*conclusion\|user.*see.*math" \
-    "INV-012: cspec instructs showing intermediate calculation"
-
-  # QA-004 fix: verify "Consider" higher intensity phrasing in passive advisory
-  file_contains_i "$skill_file" "Consider.*intensity\|consider.*higher" \
-    "INV-012: passive advisory includes 'Consider higher intensity' recommendation"
+  # INV-012: calibration display is advisory (human reads data and decides)
+  file_contains_i "$skill_file" "advisory.*calibration\|calibration.*advisory\|human.*reads.*data\|human.*decides" \
+    "INV-012: calibration display is advisory"
 }
 
 # ============================================
@@ -661,8 +545,6 @@ echo "============================================="
 test_inv001_cverify_writes_calibration
 test_inv002_calibration_schema
 test_inv003_cspec_reads_calibration
-test_inv004_csetup_calibration_mode
-test_inv005_mode_behaviors
 test_inv006_config_templates
 test_inv007_cspec_read_only
 test_inv008_no_calibration_graceful

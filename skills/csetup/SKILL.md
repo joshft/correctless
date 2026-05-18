@@ -1071,20 +1071,6 @@ Merge strategy:
 - [ ] Documentation updated
 ```
 
-### Intensity Calibration Mode
-
-Present the intensity calibration mode as a structured decision. The calibration loop lets `/cspec` learn from past feature outcomes to improve future intensity recommendations.
-
-```
-Intensity calibration mode:
-  1. Passive (recommended, default) — show calibration advisory during /cspec, no auto-adjustment
-  2. Active — auto-raise intensity floor for paths that historically underperformed based on calibration data
-  3. Hybrid — passive for first 5 calibration entries, then switch to active mode behavior
-
-  Or type your own: ___
-```
-
-Write the selected `intensity_calibration_mode` to `workflow-config.json` under the `workflow` key. If the user doesn't choose, default to `passive`. The calibration mode is written to workflow-config.json as `"intensity_calibration_mode": "passive"` (or `"active"` or `"hybrid"`).
 
 **PR CLI tool goes to CLAUDE.md.** If `gh` is detected: write `Use \`gh\` for GitHub operations (PRs, issues, checks).` If `glab` is detected: write `Use \`glab\` for GitLab operations (MRs, issues, pipelines).` This ensures every downstream skill that creates PRs knows which tool to use.
 

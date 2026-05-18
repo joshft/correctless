@@ -474,7 +474,7 @@ Each skill computes `max(project_intensity, feature_intensity)`:
 
 ### Cross-Skill Calibration (ABS-005)
 
-`/cverify` writes outcome data to `.correctless/meta/intensity-calibration.json`. `/cspec` reads this data as a post-signal modifier. Features exceeding 200K tokens or ≥3 QA rounds or ≥8 findings trigger auto-raise. Configurable modes: passive (advisory), active (auto-raise), hybrid (passive→active after 5 entries). 50-entry recency window.
+`/cverify` writes outcome data to `.correctless/meta/intensity-calibration.json`. `/cspec` reads this data as a post-signal modifier and displays it as advisory context — historical QA rounds, BLOCKING findings, and token usage averages for overlapping file paths. The human reads the data and decides. 50-entry recency window.
 
 ### Intensity Detection Signals
 
@@ -565,7 +565,7 @@ Install manifest (`.correctless/.install-manifest.json`) records SHA-256 checksu
 
 ### Test Suite
 
-82 test files with ~5,000+ assertions covering all hooks, scripts, skills, agents, and cross-component integration:
+85 test files with ~5,000+ assertions covering all hooks, scripts, skills, agents, and cross-component integration:
 
 - Hook behavior tests (workflow-gate, sensitive-file-guard, auto-format, token-tracking, audit-trail)
 - Script unit tests (lib.sh, antipattern-scan, auto-policy, decision-record, budget-check, etc.)

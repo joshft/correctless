@@ -8,6 +8,9 @@ All notable changes to Correctless are documented here.
 - `/cauto` — Semi-auto pipeline orchestrator: runs /ctdd through PR creation with flexible phase resume, tiered decision architecture, and spec-to-PR orchestration
 - `/carchitect` — Structured architecture definition: reverse-engineer from existing code or greenfield directed discovery, produces machine-referenceable entrypoints YAML
 
+### Changed — Simplification
+- **Intensity calibration** — Removed dead active/hybrid calibration modes and 200K token auto-raise threshold from `/cspec`. Calibration is now always advisory: historical data displayed as read-only context for the human, no automated intensity decisions. Data collection by `/cverify` unchanged. Net -238 LOC
+
 ### Changed — Agent Migration
 - `/cspec` — Migrated inline research agent prompt to dedicated `agents/cspec-research.md` plugin agent file (M-4). First network-read class agent (WebSearch, WebFetch, Read, Grep). Adds TB-007 (external web content ingestion trust boundary), untrusted data treatment, and network unavailability self-diagnostic. Resolves AP-013 for /cspec
 - `/ctdd` — Migrated inline RED and GREEN phase agent prompts to dedicated `agents/ctdd-red.md` and `agents/ctdd-green.md` plugin agent files (M-1, M-2). Agents now have tool pinning and namespaced dispatch. Resolves AP-013 for /ctdd
