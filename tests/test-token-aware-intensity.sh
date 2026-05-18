@@ -174,54 +174,8 @@ test_inv002_cspec_reads_actual_tokens() {
     "INV-002d: QA/findings arithmetic includes all overlapping entries (unchanged by actual_tokens)"
 }
 
-# ============================================
-# INV-003: Token threshold for active mode auto-raise
-#   Three conditions OR'd: avg actual_qa_rounds >= 3,
-#   avg actual_findings_count >= 8, OR avg actual_tokens >= 200,000
-#   All three in same clause with "or" connectors
-# ============================================
-
-test_inv003_token_threshold_active_mode() {
-  echo ""
-  echo "=== INV-003: Token threshold for active mode auto-raise ==="
-
-  # INV-003a: cspec references 200,000 or 200000 token threshold
-  file_contains_i "$CSPEC_SKILL" "200,000\|200000" \
-    "INV-003a: cspec references 200,000 token threshold"
-
-  # INV-003b: token threshold connected to actual_tokens in active mode
-  # (AP-003 mitigation: require both threshold and actual_tokens in proximity)
-  file_contains_i "$CSPEC_SKILL" "actual_tokens.*200,000\|200,000.*actual_tokens\|actual_tokens.*200000\|200000.*actual_tokens\|token.*200,000\|200,000.*token" \
-    "INV-003b: 200,000 threshold linked to actual_tokens"
-
-  # INV-003c: all three thresholds appear in the same auto-raise clause
-  # Check that all three exist in the active mode section together
-  local active_section
-  active_section="$(sed -n '/^- \*\*Active mode\|^  - \*\*Active\|active.*auto-raise/,/^- \*\*[A-Z]\|^$/p' "$CSPEC_SKILL" 2>/dev/null | head -30)"
-  local has_qa=0 has_findings=0 has_tokens=0
-  echo "$active_section" | grep -qi "3.*qa\|qa.*3\|qa_rounds.*3\|3.*round" && has_qa=1
-  echo "$active_section" | grep -qi "8.*BLOCKING\|BLOCKING.*8\|findings.*8\|8.*finding" && has_findings=1
-  echo "$active_section" | grep -qi "200,000\|200000" && has_tokens=1
-  if [ "$has_qa" -eq 1 ] && [ "$has_findings" -eq 1 ] && [ "$has_tokens" -eq 1 ]; then
-    echo "  PASS: INV-003c: all three thresholds (QA>=3, findings>=8, tokens>=200K) in active mode clause"
-    PASS=$((PASS + 1))
-  else
-    echo "  FAIL: INV-003c: not all three thresholds present in active mode clause (QA=$has_qa, findings=$has_findings, tokens=$has_tokens)"
-    FAIL=$((FAIL + 1))
-  fi
-
-  # INV-003d: three conditions are disjunctive (OR'd) — "or" connectors
-  # Multi-line safe: check that "or" appears in the same section as all three thresholds
-  local has_or=0
-  echo "$active_section" | grep -qi " or " && has_or=1
-  if [ "$has_or" -eq 1 ] && [ "$has_qa" -eq 1 ] && [ "$has_findings" -eq 1 ] && [ "$has_tokens" -eq 1 ]; then
-    echo "  PASS: INV-003d: three thresholds connected with 'or' (disjunctive)"
-    PASS=$((PASS + 1))
-  else
-    echo "  FAIL: INV-003d: three thresholds not connected with 'or' in active mode section (or=$has_or, qa=$has_qa, findings=$has_findings, tokens=$has_tokens)"
-    FAIL=$((FAIL + 1))
-  fi
-}
+# INV-003 (token threshold for active mode) REMOVED — 200K token threshold
+# and active mode auto-raise removed per simplify-intensity-calibration spec
 
 # ============================================
 # INV-004: Passive mode shows token calibration arithmetic
@@ -231,25 +185,16 @@ test_inv003_token_threshold_active_mode() {
 
 test_inv004_passive_token_arithmetic() {
   echo ""
-  echo "=== INV-004: Passive mode shows token calibration arithmetic ==="
+  echo "=== INV-004: Advisory display shows token calibration data ==="
 
-  # INV-004a: passive mode calibration display mentions actual_tokens
+  # INV-004a: advisory calibration display mentions actual_tokens
   # (AP-006 mitigation: section-anchored to Step 7b / calibration context)
-  section_contains "$CSPEC_SKILL" "Step 7b" "actual_tokens.*passive\|passive.*actual_tokens\|actual_tokens.*advisory\|advisory.*actual_tokens\|actual_tokens.*arithmetic\|arithmetic.*actual_tokens" \
-    "INV-004a: passive mode calibration display includes actual_tokens"
+  section_contains "$CSPEC_SKILL" "Step 7b" "actual_tokens" \
+    "INV-004a: calibration advisory display includes actual_tokens"
 
-  # INV-004b: passive mode display shows sum, count, average for token data
-  file_contains_i "$CSPEC_SKILL" "sum.*count.*average.*token\|token.*sum.*count.*average\|sum.*actual_tokens\|actual_tokens.*sum.*count" \
-    "INV-004b: passive mode shows sum, count, average of actual_tokens"
-
-  # INV-004c: 200,000 threshold comparison shown in passive mode
-  # (AP-003 mitigation: require both threshold and passive/calibration context)
-  file_contains_i "$CSPEC_SKILL" "200,000.*threshold\|threshold.*200,000\|200000.*threshold\|threshold.*200000\|200,000.*token.*threshold\|token.*threshold.*200,000" \
-    "INV-004c: passive mode shows 200,000 threshold comparison"
-
-  # INV-004d: calibration example includes actual_tokens data
-  file_contains_i "$CSPEC_SKILL" "actual_tokens.*example\|example.*actual_tokens\|token.*calibration.*example\|example.*token.*calibration" \
-    "INV-004d: calibration example includes token data"
+  # INV-004b: actual_tokens average shown when non-zero entries exist
+  file_contains_i "$CSPEC_SKILL" "actual_tokens.*non-zero\|non-zero.*actual_tokens\|Token usage average" \
+    "INV-004b: actual_tokens average shown when non-zero entries exist"
 }
 
 # ============================================
@@ -489,9 +434,8 @@ test_inv008_threshold_is_constant() {
   file_not_contains "$FULL_CFG" "calibration_token" \
     "INV-008h: full config does not contain calibration_token*"
 
-  # INV-008i: threshold IS documented in cspec SKILL.md (positive check)
-  file_contains_i "$CSPEC_SKILL" "200,000\|200000" \
-    "INV-008i: 200,000 threshold documented in cspec SKILL.md (behavioral constant)"
+  # INV-008i REMOVED — 200K threshold no longer present in cspec per
+  # simplify-intensity-calibration spec (the behavioral constant was deleted)
 }
 
 # ============================================
@@ -621,7 +565,6 @@ echo "============================================="
 
 test_inv001_cverify_writes_actual_tokens
 test_inv002_cspec_reads_actual_tokens
-test_inv003_token_threshold_active_mode
 test_inv004_passive_token_arithmetic
 test_inv005_missing_actual_tokens_graceful
 test_inv006_cmetrics_per_feature_table

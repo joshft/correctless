@@ -464,37 +464,21 @@ After the 4-signal highest-wins evaluation in Step 7, apply the intensity calibr
 
 **Recency window:** Read at most the 50 most recent entries (sorted by timestamp, newest first). Entries beyond 50 are ignored — this caps file read size and naturally de-escalates as recent features at elevated intensity run clean. Ignore older entries beyond the limit of 50.
 
-**File path overlap:** For each file path in the current feature's scope, find calibration entries whose `file_paths_touched` have any overlap (at least one file path in common). In active mode, filter overlapping entries to those whose `recommended_intensity` matches the current feature's recommended intensity — evaluate thresholds against what the system suggested at the same level. In passive mode, include all overlapping entries regardless of `recommended_intensity`. Compute the arithmetic mean of `actual_qa_rounds` and `actual_findings_count` across the resulting entries.
+**File path overlap:** For each file path in the current feature's scope, find calibration entries whose `file_paths_touched` have any overlap (at least one file path in common). Include all overlapping entries regardless of `recommended_intensity`. Compute the arithmetic mean of `actual_qa_rounds` and `actual_findings_count` across the resulting entries.
 
 **Token-aware calibration (actual_tokens):** Also read `actual_tokens` from each overlapping calibration entry. Compute the arithmetic mean of `actual_tokens` only across entries where `actual_tokens` is present and greater than 0 — entries without `actual_tokens` (or with `actual_tokens: 0`) are excluded from the token-specific arithmetic. Entries without `actual_tokens` still participate in QA rounds and BLOCKING findings arithmetic unchanged — they are only excluded from the token average. This prevents legacy entries written before this feature from diluting the token signal. No error or warning for legacy entries missing `actual_tokens`.
 
-**Read calibration mode:** Read `intensity_calibration_mode` from `workflow-config.json` (under `workflow`). If absent from config, default to `passive`.
+**Advisory display (read-only context for the human):** Calibration is always advisory. Show calibration data during Step 8 presentation when overlapping entries exist. The human reads the data and decides — calibration does not change the recommendation.
 
-**Mode behaviors:**
-
-- **Passive mode:** Show advisory text with full calibration arithmetic during Step 8 presentation. List the overlapping entries with their feature slugs and values, show the sum, count, and average for QA rounds and BLOCKING findings (all overlapping entries), and for actual_tokens (sum, count, and average computed only across entries with token data per the token-aware calibration rules above). State the threshold comparison (threshold: 3 QA rounds or 8 BLOCKING findings or 200,000 tokens). Include an example showing actual_tokens calibration data. Include override context: "In {K} of {N} cases, the user overrode the recommendation." The user sees the math, not just the conclusion — show the intermediate calculation. No automatic adjustment.
-
-- **Active mode:** If overlapping calibration entries show average `actual_qa_rounds` >= 3, or average `actual_findings_count` >= 8, or average `actual_tokens` >= 200,000, auto-raise the recommendation by one level (standard to high, high to critical). In active mode, evaluate at the `recommended_intensity` (not `actual_intensity`) — learn from what the system suggested, not what was used after override. Show the same calibration arithmetic as passive mode but note "auto-raised from {old} to {new} based on calibration data." Calibration can only raise, never lower.
-
-- **Hybrid mode:** Behave as passive until 5+ total calibration entries exist (global count of all entries, not per-path), then switch to active behavior.
-
-**Calibration arithmetic display (INV-012):** When calibration data produces advisory text (passive) or an auto-raise (active), show the intermediate calculation so the user can see the math:
-1. List overlapping entries with feature slugs and values
-2. Show the sum, count, and average for QA rounds, BLOCKING findings, and actual_tokens
-3. State the threshold comparison (>= 3 rounds or >= 8 findings or >= 200,000 threshold for actual_tokens)
-4. Show the number of overlapping entries and their average calibration values
-
-Example passive advisory with actual_tokens calibration example:
+Display format:
 ```
-Calibration: 3 prior features touching these paths averaged 3.7 QA rounds, 6 BLOCKING findings, and 145,000 actual_tokens at recommended_intensity=standard.
-  - feature-a: 4 rounds, 8 findings, 180,000 tokens
-  - feature-b: 3 rounds, 5 findings, 120,000 tokens
-  - feature-c: 4 rounds, 5 findings, 135,000 tokens
-Sum: 11 rounds, 18 findings, 435,000 tokens. Count: 3 entries (3 with token data). Average: 3.7 rounds, 6.0 findings, 145,000 actual_tokens.
-Threshold: 3 rounds or 8 findings or 200,000 tokens. Average rounds (3.7) exceeds threshold (3).
-In 1 of 3 cases, the user overrode the recommendation.
-Consider high intensity.
+Calibration context (advisory — {N} prior features overlapped with these paths):
+- feature-a: 4 QA rounds, 2 BLOCKING findings
+- feature-b: 3 QA rounds, 5 BLOCKING findings
+- Averages: 3.5 QA rounds, 3.5 BLOCKING findings
+- Override history: 1 of 2 features overrode the recommendation
 ```
+When `actual_tokens` entries are non-zero, add: `- Token usage average: {N}`
 
 ### Step 8: Present to Human
 

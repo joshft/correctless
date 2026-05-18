@@ -474,7 +474,7 @@ Each skill computes `max(project_intensity, feature_intensity)`:
 
 ### Cross-Skill Calibration (ABS-005)
 
-`/cverify` writes outcome data to `.correctless/meta/intensity-calibration.json`. `/cspec` reads this data as a post-signal modifier. Features exceeding 200K tokens or ≥3 QA rounds or ≥8 findings trigger auto-raise. Configurable modes: passive (advisory), active (auto-raise), hybrid (passive→active after 5 entries). 50-entry recency window.
+`/cverify` writes outcome data to `.correctless/meta/intensity-calibration.json`. `/cspec` reads this data as a post-signal modifier and displays it as advisory context — historical QA rounds, BLOCKING findings, and token usage averages for overlapping file paths. The human reads the data and decides. 50-entry recency window.
 
 ### Intensity Detection Signals
 

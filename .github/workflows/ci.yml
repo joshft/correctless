@@ -133,6 +133,7 @@ jobs:
           bash tests/test-cspec-research-agent.sh
           bash tests/test-deferred-findings-backlog.sh
           bash tests/test-adversarial-probes.sh
+          bash tests/test-simplify-intensity-calibration.sh
 
       - name: Verify sync
         run: |
