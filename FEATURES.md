@@ -565,7 +565,7 @@ Install manifest (`.correctless/.install-manifest.json`) records SHA-256 checksu
 
 ### Test Suite
 
-82 test files with ~5,000+ assertions covering all hooks, scripts, skills, agents, and cross-component integration:
+85 test files with ~5,000+ assertions covering all hooks, scripts, skills, agents, and cross-component integration:
 
 - Hook behavior tests (workflow-gate, sensitive-file-guard, auto-format, token-tracking, audit-trail)
 - Script unit tests (lib.sh, antipattern-scan, auto-policy, decision-record, budget-check, etc.)
