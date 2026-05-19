@@ -1,0 +1,32 @@
+{
+  "drift_debt": [
+    {
+      "id": "DRIFT-001",
+      "description": "R-003 drift — config parsing moved without updating references",
+      "status": "resolved",
+      "resolved_date": "2026-05-19T03:30:00Z",
+      "resolution_reason": "fix-diff-reviewer migration structural enforcement"
+    },
+    {
+      "id": "DRIFT-003",
+      "description": "Workflow gate does not structurally block test edits during tdd-impl",
+      "status": "wont-fix",
+      "resolved_date": "2026-05-19T03:30:00Z",
+      "resolution_reason": "phase separation addresses the concern"
+    },
+    {
+      "id": "DRIFT-004",
+      "description": "Audit fix rounds lack per-round diff review",
+      "status": "wont-fix",
+      "resolved_date": "2026-05-19T03:30:00Z",
+      "resolution_reason": "per-round diff review is the structural fix"
+    },
+    {
+      "id": "DRIFT-008",
+      "description": "Stale hooks not detected after scripts are updated",
+      "status": "resolved",
+      "resolved_date": "2026-05-19T03:30:00Z",
+      "resolution_reason": "stale-hook detection system covers this"
+    }
+  ]
+}
