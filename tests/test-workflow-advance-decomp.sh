@@ -406,33 +406,38 @@ fi
 
 section "INV-008" "Drift debt items resolved"
 
-# drift-debt.json lives in .correctless/meta/ which is gitignored — skip in CI
+# INV-008(1): drift-debt.json exists (force-added to git despite meta/ gitignore)
 if [ -f "$DRIFT_DEBT" ]; then
-  # INV-008(1): drift-debt.json exists
   pass "INV-008(1)" "drift-debt.json exists"
+else
+  fail "INV-008(1)" "drift-debt.json does not exist"
+fi
 
-  # INV-008(2): Zero open items in drift-debt.json
+# INV-008(2): Zero open items in drift-debt.json
+if [ -f "$DRIFT_DEBT" ]; then
   open_count="$(jq '[.drift_debt[] | select(.status == "open")] | length' "$DRIFT_DEBT" 2>/dev/null)" || open_count="unknown"
   if [ "$open_count" = "0" ]; then
     pass "INV-008(2)" "Zero open drift debt items"
   else
     fail "INV-008(2)" "Found $open_count open drift debt items (expected 0)"
   fi
+else
+  fail "INV-008(2)" "Cannot check — drift-debt.json missing"
+fi
 
-  # INV-008(3): DRIFT-001, DRIFT-003, DRIFT-004, DRIFT-008 are each resolved or wont-fix
-  for drift_id in DRIFT-001 DRIFT-003 DRIFT-004 DRIFT-008; do
+# INV-008(3): DRIFT-001, DRIFT-003, DRIFT-004, DRIFT-008 are each resolved or wont-fix
+for drift_id in DRIFT-001 DRIFT-003 DRIFT-004 DRIFT-008; do
+  if [ -f "$DRIFT_DEBT" ]; then
     status="$(jq -r --arg id "$drift_id" '.drift_debt[] | select(.id == $id) | .status' "$DRIFT_DEBT" 2>/dev/null)"
     if [ "$status" = "resolved" ] || [ "$status" = "wont-fix" ]; then
       pass "INV-008(3)" "$drift_id has status '$status'"
     else
       fail "INV-008(3)" "$drift_id has status '$status' (expected resolved or wont-fix)"
     fi
-  done
-else
-  skip "INV-008(1)" "drift-debt.json not present (gitignored .correctless/meta/)"
-  skip "INV-008(2)" "drift-debt.json not present"
-  skip "INV-008(3)" "drift-debt.json not present"
-fi
+  else
+    fail "INV-008(3)" "Cannot check $drift_id — drift-debt.json missing"
+  fi
+done
 
 # ============================================================================
 # INV-010: CI test command updated

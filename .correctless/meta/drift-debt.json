@@ -2,31 +2,83 @@
   "drift_debt": [
     {
       "id": "DRIFT-001",
-      "description": "R-003 drift — config parsing moved without updating references",
+      "spec_id": "fix-diff-reviewer-migration",
+      "rule_id": "QA-005",
+      "description": "Relocate /caudit step 6a fail-closed behavior from the canonical-marker string discipline into a dedicated hook script (e.g. scripts/caudit-fix-verify.sh) that caudit invokes as a single line. PRH-003 then becomes a structural control-flow assertion on the hook's actual if on Task exit code, rather than a substring cardinality gate on a prose marker. Architectural follow-up.",
+      "detected": "2026-04-11",
       "status": "resolved",
-      "resolved_date": "2026-05-19T03:30:00Z",
-      "resolution_reason": "fix-diff-reviewer migration structural enforcement"
+      "resolved": "2026-05-18",
+      "resolution": "The fix-diff-reviewer migration (PR #53) extracted this into agents/fix-diff-reviewer.md with pinned tool allowlist {Read, Grep, Glob}. The jq -e . parse gate and PRH-003 cardinality check replaced the canonical-marker string discipline with structural enforcement via agent tool pinning + output contract."
+    },
+    {
+      "id": "DRIFT-002",
+      "spec_id": "fix-diff-reviewer-migration",
+      "rule_id": "QA-007",
+      "description": "PRH-006 orchestrator-side secret redaction — belt-and-suspenders layer 2 for INV-019's reviewer-side no-verbatim-content clause. A compromised reviewer via prompt injection could exfiltrate secrets by echoing file contents into finding descriptions. Orchestrator-side scan-and-replace against templates/redaction-rules.md patterns before persisting findings to .correctless/artifacts/findings/ closes the gap. Non-trivial — deserves its own spec and threat model.",
+      "detected": "2026-04-11",
+      "status": "wont-fix",
+      "resolved": "2026-04-18",
+      "resolution": "Secret scanning is a solved problem with purpose-built tools (gitleaks, gitguardian). Correctless should recommend a pre-commit hook for secret scanning in /csetup, not build its own scanner."
     },
     {
       "id": "DRIFT-003",
-      "description": "Workflow gate does not structurally block test edits during tdd-impl",
+      "spec_id": "fix-diff-reviewer-migration",
+      "rule_id": "QA-008",
+      "description": "During /ctdd, the test strengthening pass (test-audit BLOCKING fixes) should be its own git commit BEFORE GREEN begins, so any GREEN-phase test edits are a diff against a known-good baseline. Alternatively: workflow-gate hook should fail-closed on any test-file edit during GREEN unless tagged with an explicit strengthen or rescue marker for QA review. Workflow discipline improvement — tracks a class of bugs where test-edit ordering hides strengthening intent.",
+      "detected": "2026-04-11",
       "status": "wont-fix",
-      "resolved_date": "2026-05-19T03:30:00Z",
-      "resolution_reason": "phase separation addresses the concern"
+      "resolved": "2026-05-18",
+      "resolution": "The workflow gate already blocks test file edits during tdd-impl phase. RED/GREEN agent separation (ABS-010) structurally prevents the GREEN agent from editing tests. The test audit phase runs between RED and GREEN to catch strengthening gaps. The underlying concern (test edits hiding strengthening intent) is addressed by phase separation, not commit discipline."
     },
     {
       "id": "DRIFT-004",
-      "description": "Audit fix rounds lack per-round diff review",
+      "spec_id": "fix-diff-reviewer-migration",
+      "rule_id": "QA-009",
+      "description": "For AP-012-class features (anything touching the audit fix-round verification path), require a live /caudit Olympics run — not just committed fixture replay — before advancing to /cdocs. Adds one Olympics run per feature but eliminates the deferrals-compound failure mode where fixture replay passes and live behavior diverges. Process improvement.",
+      "detected": "2026-04-11",
       "status": "wont-fix",
-      "resolved_date": "2026-05-19T03:30:00Z",
-      "resolution_reason": "per-round diff review is the structural fix"
+      "resolved": "2026-05-18",
+      "resolution": "The fix-diff-reviewer agent (PR #53) runs after every audit fix round and catches regressions before the next round — this is the structural fix for the cascade-regression class (PMB-002). A mandatory Olympics run per feature is cost-prohibitive (~$15-30/run) and the per-round diff review addresses the same failure mode at lower cost."
+    },
+    {
+      "id": "DRIFT-005",
+      "spec_id": "fix-diff-reviewer-migration",
+      "rule_id": "QA-017",
+      "description": "BND-004 proximity check in tests/test-fix-diff-reviewer-agent.sh should assert that the canonical fail-closed marker (FAIL-CLOSED: Task failure aborts the current round) is within 5 lines of the exit 2 or abort construct, not just within 10 lines of the 100 KB keyword. Tightens the structural binding between marker and control flow.",
+      "detected": "2026-04-11",
+      "status": "resolved",
+      "resolved": "2026-04-14",
+      "resolution": "Tightened BND-004(b) from 10→5 lines and BND-004(d) from 10→5 lines"
+    },
+    {
+      "id": "DRIFT-006",
+      "spec_id": "fix-diff-reviewer-migration",
+      "rule_id": "QA-018",
+      "description": "INV-018 rule-scan instruction check currently asserts all six DD-008 instruction elements appear in order within step 6a. Should also assert that patterns 4 and 5 (git show pre-diff + UNTRUSTED_RULES fence) appear within N lines of each other, not just in order, to prevent a wide-separation edit that leaves the pre-diff read and the fence in different code paths.",
+      "detected": "2026-04-11",
+      "status": "resolved",
+      "resolved": "2026-04-14",
+      "resolution": "Added INV-018(proximity) check: patterns 4-5 must be within 20 lines"
+    },
+    {
+      "id": "DRIFT-007",
+      "spec_id": "fix-diff-reviewer-migration",
+      "rule_id": "QA-019",
+      "description": "Promote PRH-003 enforcement from literal-substring cardinality (grep -c counts exactly 1) to regex cardinality (e.g. count lines matching FAIL-CLOSED:.*round), OR migrate the canonical marker into a path-scoped rule file template so the rule text lives in one place and all consumers reference it. Reduces fragility of the current string-matching approach to marker paraphrase.",
+      "detected": "2026-04-11",
+      "status": "resolved",
+      "resolved": "2026-04-14",
+      "resolution": "PRH-003(a) now uses regex (FAIL-CLOSED:.*round) instead of literal substring"
     },
     {
       "id": "DRIFT-008",
-      "description": "Stale hooks not detected after scripts are updated",
+      "spec_id": "audit-findings-persistence-contract",
+      "rule_id": "MA-009/MA-016",
+      "description": "Hook-sync drift class — deferred from audit-findings-persistence-contract mini-audit. MA-009: stale .claude/hooks/workflow-gate.sh rejected the new tdd-audit phase mid-audit, requiring manual sync. MA-016: sensitive-file-guard DEFAULTS update for audit-record.sh does not apply to a user upgrade until /csetup syncs .claude/hooks/. Same shape as harness-fingerprint R2 (ABS-027) but for hooks generally, and same shape as PMB-003 (setup script enumeration) but at the install-vs-source layer. Class fix: structural drift detector that compares hashes of source hooks/*.sh with installed .claude/hooks/*.sh, surfaced through /cstatus or a setup precondition check, and a setup pre-flight that blocks workflow-gate-affecting feature work until the installed hooks match source. This is framework-wide infrastructure, not specific to ABS-029, and warrants its own spec + threat model.",
+      "detected": "2026-04-29",
       "status": "resolved",
-      "resolved_date": "2026-05-19T03:30:00Z",
-      "resolution_reason": "stale-hook detection system covers this"
+      "resolved": "2026-05-18",
+      "resolution": "The stale-hook detection system (PR #79, check_install_freshness in scripts/lib.sh) already compares source checksums against installed checksums and reports source_ahead/modified/missing statuses. /cauto runs this at pipeline startup. The manifest-based freshness system in /csetup completes the coverage."
     }
   ]
 }
