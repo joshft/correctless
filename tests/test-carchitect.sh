@@ -24,7 +24,7 @@ AGENT_DIST="correctless/agents/architecture-reviewer.md"
 EXTRACT_SCRIPT="scripts/extract-entrypoints.sh"
 SYNC_SH="sync.sh"
 ARCH_FILE=".correctless/ARCHITECTURE.md"
-TEST_RUNNER="tests/test.sh"
+TEST_RUNNER="tests/test-core.sh"
 DOCS_FILE="docs/skills/carchitect.md"
 README_MD="README.md"
 CONTRIBUTING_MD="CONTRIBUTING.md"
@@ -890,10 +890,14 @@ fi
 
 section "Wiring: test runner"
 
-if grep -qF 'test-carchitect.sh' "$TEST_RUNNER"; then
-  pass "WIRE-a" "test.sh includes test-carchitect.sh"
+# DA-002: Test runner now uses glob-based discovery (test-*.sh).
+# Check either direct invocation in test-core.sh or glob pattern in workflow-config.json.
+if grep -qF 'test-carchitect.sh' "$TEST_RUNNER" 2>/dev/null; then
+  pass "WIRE-a" "test-core.sh includes test-carchitect.sh"
+elif jq -r '.commands.test // ""' ".correctless/config/workflow-config.json" 2>/dev/null | grep -qE 'test-\*\.sh'; then
+  pass "WIRE-a" "test-carchitect.sh discoverable by glob in commands.test"
 else
-  fail "WIRE-a" "test.sh does not include test-carchitect.sh"
+  fail "WIRE-a" "test-carchitect.sh not discoverable by test runner"
 fi
 
 # ============================================================================

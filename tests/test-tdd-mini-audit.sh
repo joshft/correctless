@@ -18,6 +18,8 @@ set -f
 # ============================================================================
 
 WORKFLOW_ADVANCE="hooks/workflow-advance.sh"
+# DA-002: workflow-advance.sh is decomposed into modules. Search all files.
+WF_ALL_FILES="hooks/workflow-advance.sh scripts/wf/transitions.sh scripts/wf/utility.sh scripts/wf/metadata.sh"
 WORKFLOW_GATE="hooks/workflow-gate.sh"
 TOKEN_TRACKING="hooks/token-tracking.sh"
 SKILL_FILE="skills/ctdd/SKILL.md"
@@ -46,13 +48,9 @@ else
 fi
 
 # R-001c: audit-mini accepts tdd-qa as a source phase
-if grep -qE 'require_phase_oneof.*tdd-qa' "$WORKFLOW_ADVANCE" && grep -qE 'cmd_audit_mini' "$WORKFLOW_ADVANCE"; then
-  # More specific: the cmd_audit_mini function should accept tdd-qa
-  if awk '/cmd_audit_mini/,/^cmd_/' "$WORKFLOW_ADVANCE" | grep -q 'tdd-qa'; then
-    pass "R-001c" "audit-mini accepts tdd-qa as source phase"
-  else
-    fail "R-001c" "audit-mini does not accept tdd-qa as source phase"
-  fi
+# DA-002: cmd_audit_mini may be in a module file
+if cat $WF_ALL_FILES 2>/dev/null | awk '/cmd_audit_mini/,/^cmd_|^}$/' | grep -q 'tdd-qa'; then
+  pass "R-001c" "audit-mini accepts tdd-qa as source phase"
 else
   fail "R-001c" "audit-mini does not accept tdd-qa as source phase"
 fi
@@ -80,47 +78,32 @@ else
 fi
 
 # R-001f: cmd_done accepts tdd-audit as a valid source phase
-if grep -q 'cmd_done' "$WORKFLOW_ADVANCE"; then
-  if awk '/^cmd_done\(\)/,/^}$/' "$WORKFLOW_ADVANCE" | grep -q 'tdd-audit'; then
-    pass "R-001f" "cmd_done accepts tdd-audit as source phase"
-  else
-    fail "R-001f" "cmd_done does not accept tdd-audit as source phase"
-  fi
+# DA-002: cmd_done may be in a module file
+if cat $WF_ALL_FILES 2>/dev/null | awk '/^cmd_done\(\)/,/^}$/' | grep -q 'tdd-audit'; then
+  pass "R-001f" "cmd_done accepts tdd-audit as source phase"
 else
-  fail "R-001f" "cmd_done does not accept tdd-audit in workflow-advance.sh"
+  fail "R-001f" "cmd_done does not accept tdd-audit as source phase"
 fi
 
 # R-001g: cmd_fix accepts tdd-audit as a valid source phase (fix from mini-audit)
-if grep -q 'cmd_fix' "$WORKFLOW_ADVANCE"; then
-  if awk '/^cmd_fix\(\)/,/^}$/' "$WORKFLOW_ADVANCE" | grep -q 'tdd-audit'; then
-    pass "R-001g" "cmd_fix accepts tdd-audit as source phase"
-  else
-    fail "R-001g" "cmd_fix does not accept tdd-audit as source phase"
-  fi
+if cat $WF_ALL_FILES 2>/dev/null | awk '/^cmd_fix\(\)/,/^}$/' | grep -q 'tdd-audit'; then
+  pass "R-001g" "cmd_fix accepts tdd-audit as source phase"
 else
-  fail "R-001g" "cmd_fix does not accept tdd-audit in workflow-advance.sh"
+  fail "R-001g" "cmd_fix does not accept tdd-audit as source phase"
 fi
 
 # R-001h: audit-mini requires tests passing (same gate as done)
-if grep -q 'cmd_audit_mini' "$WORKFLOW_ADVANCE"; then
-  if awk '/^cmd_audit_mini\(\)/,/^}$/' "$WORKFLOW_ADVANCE" | grep -q 'tests_pass'; then
-    pass "R-001h" "audit-mini checks that tests pass"
-  else
-    fail "R-001h" "audit-mini does not check that tests pass"
-  fi
+if cat $WF_ALL_FILES 2>/dev/null | awk '/^cmd_audit_mini\(\)/,/^}$/' | grep -q 'tests_pass'; then
+  pass "R-001h" "audit-mini checks that tests pass"
 else
-  fail "R-001h" "audit-mini function not found"
+  fail "R-001h" "audit-mini does not check that tests pass"
 fi
 
 # R-001i: audit-mini checks min QA rounds (same gate as done)
-if grep -q 'cmd_audit_mini' "$WORKFLOW_ADVANCE"; then
-  if awk '/^cmd_audit_mini\(\)/,/^}$/' "$WORKFLOW_ADVANCE" | grep -q '_require_min_qa_rounds\|min_qa_rounds'; then
-    pass "R-001i" "audit-mini checks QA rounds requirement"
-  else
-    fail "R-001i" "audit-mini does not check QA rounds"
-  fi
+if cat $WF_ALL_FILES 2>/dev/null | awk '/^cmd_audit_mini\(\)/,/^}$/' | grep -q '_require_min_qa_rounds\|min_qa_rounds'; then
+  pass "R-001i" "audit-mini checks QA rounds requirement"
 else
-  fail "R-001i" "audit-mini function not found"
+  fail "R-001i" "audit-mini does not check QA rounds"
 fi
 
 # R-001j: tdd-audit is in workflow-gate.sh known-phase allowlist

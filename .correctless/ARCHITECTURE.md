@@ -88,7 +88,7 @@
 ### ABS-001: Shared script library (scripts/lib.sh)
 - **What**: Shared bash utilities sourced by hooks and phase-transition scripts. Provides path helpers (branch_slug, repo_root, config_file, artifacts_dir), file classification (classify_file, read_patterns, read_intensity), state file locking (ABS-003), and write pattern detection (_has_write_pattern, get_target_file).
 - **Invariant**: Functions in lib.sh have a single definition. Scripts must source lib.sh rather than duplicating functions locally.
-- **Enforced at**: scripts/lib.sh (source), hooks/workflow-advance.sh (consumer), hooks/workflow-gate.sh (consumer), hooks/sensitive-file-guard.sh (consumer), hooks/audit-trail.sh (consumer), hooks/statusline.sh (consumer), scripts/antipattern-scan.sh (consumer), scripts/compute-session-cost.sh (consumer), scripts/build-dashboard.sh (consumer)
+- **Enforced at**: scripts/lib.sh (source), hooks/workflow-advance.sh (consumer), hooks/workflow-gate.sh (consumer), hooks/sensitive-file-guard.sh (consumer), hooks/audit-trail.sh (consumer), hooks/statusline.sh (consumer), scripts/antipattern-scan.sh (consumer), scripts/compute-session-cost.sh (consumer), scripts/build-dashboard.sh (consumer), scripts/wf/transitions.sh (indirect consumer via dispatcher scope), scripts/wf/utility.sh (indirect consumer via dispatcher scope), scripts/wf/metadata.sh (indirect consumer via dispatcher scope)
 - **Violated when**: A hook or script defines branch_slug(), classify_file(), _has_write_pattern(), _acquire_state_lock(), or any other lib.sh function locally instead of sourcing the library
 - **Test**: R-019e in antipattern-scan tests (verifies workflow-advance.sh does not define branch_slug locally), R-021 in test-lib-locking.sh (no flock dependency)
 
@@ -102,7 +102,7 @@
 ### ABS-003: State file locking (scripts/lib.sh)
 - **What**: mkdir-based advisory locking for state file read-modify-write operations. Uses PID-based stale detection and atomic mv-based lock breaking. Defense-in-depth — Claude Code likely serializes hook calls, but locking protects against manual CLI invocations.
 - **Invariant**: All state file modifications must go through write_state() (workflow-advance.sh) or locked_update_state() (lib.sh). No hook or script may modify state files via raw jq-to-file without holding the lock.
-- **Enforced at**: scripts/lib.sh (_acquire_state_lock, _release_state_lock, locked_update_state), hooks/workflow-advance.sh (write_state), hooks/workflow-gate.sh (override decrement)
+- **Enforced at**: scripts/lib.sh (_acquire_state_lock, _release_state_lock, locked_update_state), hooks/workflow-advance.sh (write_state), hooks/workflow-gate.sh (override decrement), scripts/wf/transitions.sh (locked_update_state consumer via dispatcher scope), scripts/wf/utility.sh (locked_update_state consumer via dispatcher scope), scripts/wf/metadata.sh (locked_update_state consumer via dispatcher scope)
 - **Violated when**: A hook or script modifies a workflow-state-*.json file without calling _acquire_state_lock first
 - **Test**: R-015d/e in test-lib-locking.sh (static analysis verifying write_state and gate reference locking functions), R-020d/e in test-gate-path-exceptions.sh
 
@@ -331,6 +331,14 @@
 - **Violated when**: A consumer other than `/ctdd` writes to the file; a consumer errors when the file is absent instead of degrading silently; the file is not included in the TB-004c consolidation allowlist
 - **Test**: Structural — probe-results file written during `/ctdd` probe round
 - **Guards against**: Loss of adversarial testing evidence; inability to measure probe effectiveness over time
+
+### ABS-035: Workflow-advance module contract (scripts/wf/)
+- **What**: `hooks/workflow-advance.sh` is decomposed into a thin dispatcher that sources 3 module files from `scripts/wf/`: `transitions.sh` (phase transition commands), `utility.sh` (operational commands), `metadata.sh` (state modification commands). The dispatcher contains argument parsing, module sourcing, the dispatch table, and all shared helper functions. Command function bodies (`cmd_*`) live exclusively in the modules. The dispatcher sets `SCRIPT_DIR` before sourcing — modules use `$SCRIPT_DIR` for path resolution, never `BASH_SOURCE[0]`.
+- **Invariant**: No `cmd_*` function body in the dispatcher; no shared helper function defined in a module; no `BASH_SOURCE[0]` usage in module code; no function defined in more than one module. Module files are protected by `hooks/sensitive-file-guard.sh`.
+- **Enforced at**: `hooks/sensitive-file-guard.sh` (DEFAULTS), `tests/test-workflow-advance-decomp.sh` (structural tests), `setup` (installs `scripts/wf/` to `.correctless/scripts/wf/`)
+- **Violated when**: A command function body appears in the dispatcher; a helper function is defined in a module; a module uses `BASH_SOURCE[0]`; a function is duplicated across modules
+- **Test**: `tests/test-workflow-advance-decomp.sh` — 253 assertions covering INV-001 through INV-017 and PRH-001 through PRH-003
+- **Guards against**: DA-002 complexity concern — single-file growth making the state machine unmaintainable
 
 ## Patterns
 

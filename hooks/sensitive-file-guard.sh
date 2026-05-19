@@ -245,7 +245,13 @@ scripts/audit-record.sh
 audit-record.sh
 scripts/autonomous-decision-writer.sh
 .correctless/scripts/autonomous-decision-writer.sh
-autonomous-decision-writer.sh"
+autonomous-decision-writer.sh
+scripts/wf/transitions.sh
+scripts/wf/utility.sh
+scripts/wf/metadata.sh
+.correctless/scripts/wf/transitions.sh
+.correctless/scripts/wf/utility.sh
+.correctless/scripts/wf/metadata.sh"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)

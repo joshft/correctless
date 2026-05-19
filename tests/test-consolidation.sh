@@ -340,26 +340,40 @@ test_r007() {
   echo "=== R-007: workflow-advance writes specs/verification to .correctless/ ==="
 
   # Tests R-007 [integration]: spec and verification paths in workflow-advance.sh
+  # DA-002: workflow-advance.sh is decomposed — check dispatcher + modules
   local adv="$REPO_DIR/hooks/workflow-advance.sh"
+  local wf_dir="$REPO_DIR/scripts/wf"
 
-  # Should reference .correctless/specs/
-  file_contains "$adv" '\.correctless/specs/' \
-    && local has_specs="true" || local has_specs="false"
+  # Should reference .correctless/specs/ (in dispatcher or modules)
+  local has_specs="false"
+  if file_contains "$adv" '\.correctless/specs/' \
+     || ([ -d "$wf_dir" ] && grep -rql '\.correctless/specs/' "$wf_dir"/*.sh 2>/dev/null); then
+    has_specs="true"
+  fi
   assert_eq "R-007: workflow-advance references .correctless/specs/" "true" "$has_specs"
 
-  # Should reference .correctless/verification/
-  file_contains "$adv" '\.correctless/verification/' \
-    && local has_ver="true" || local has_ver="false"
+  # Should reference .correctless/verification/ (in dispatcher or modules)
+  local has_ver="false"
+  if file_contains "$adv" '\.correctless/verification/' \
+     || ([ -d "$wf_dir" ] && grep -rql '\.correctless/verification/' "$wf_dir"/*.sh 2>/dev/null); then
+    has_ver="true"
+  fi
   assert_eq "R-007: workflow-advance references .correctless/verification/" "true" "$has_ver"
 
-  # Should NOT reference docs/specs/ as an artifact path
-  file_not_contains "$adv" 'docs/specs/' \
-    && local no_old_specs="true" || local no_old_specs="false"
+  # Should NOT reference docs/specs/ as an artifact path (in any file)
+  local no_old_specs="true"
+  if file_contains "$adv" 'docs/specs/' \
+     || ([ -d "$wf_dir" ] && grep -rql 'docs/specs/' "$wf_dir"/*.sh 2>/dev/null); then
+    no_old_specs="false"
+  fi
   assert_eq "R-007: workflow-advance does not reference docs/specs/" "true" "$no_old_specs"
 
-  # Should NOT reference docs/verification/
-  file_not_contains "$adv" 'docs/verification/' \
-    && local no_old_ver="true" || local no_old_ver="false"
+  # Should NOT reference docs/verification/ (in any file)
+  local no_old_ver="true"
+  if file_contains "$adv" 'docs/verification/' \
+     || ([ -d "$wf_dir" ] && grep -rql 'docs/verification/' "$wf_dir"/*.sh 2>/dev/null); then
+    no_old_ver="false"
+  fi
   assert_eq "R-007: workflow-advance does not reference docs/verification/" "true" "$no_old_ver"
 
   # B-03: Integration test — workflow-advance start creates spec at .correctless/specs/
@@ -1030,7 +1044,7 @@ test_r016() {
 
   # Tests R-016 [integration]: existing tests updated to use new paths
   # Check that test.sh references .correctless/ paths instead of .claude/artifacts/ etc.
-  local test_file="$REPO_DIR/tests/test.sh"
+  local test_file="$REPO_DIR/tests/test-core.sh"
 
   # The main test file should NOT reference .claude/artifacts/ for assertions
   # (It may reference .claude/settings.json which is fine — that stays)

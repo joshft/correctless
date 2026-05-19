@@ -468,7 +468,7 @@ test_r006_full_test_suite() {
 
   # Run the main test suite to verify nothing is broken
   local output
-  output="$(cd "$REPO_DIR" && bash tests/test.sh 2>&1)" || true
+  output="$(cd "$REPO_DIR" && bash tests/test-core.sh 2>&1)" || true
   local exit_code=$?
 
   # The test suite should pass

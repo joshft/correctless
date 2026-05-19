@@ -313,6 +313,16 @@ install_hooks() {
     chmod +x "$_existing_install" 2>/dev/null || true
   done
 
+  # Install scripts/wf/ module files (workflow-advance.sh decomposition)
+  if [ -d "$SCRIPT_DIR/scripts/wf" ]; then
+    mkdir -p "$script_dest/wf"
+    for wf_module in "$SCRIPT_DIR"/scripts/wf/*.sh; do
+      [ -f "$wf_module" ] || continue
+      cp "$wf_module" "$script_dest/wf/$(basename "$wf_module")"
+      chmod +x "$script_dest/wf/$(basename "$wf_module")" 2>/dev/null || true
+    done
+  fi
+
   # ============================================
   # Write install manifest with SHA-256 checksums
   # Sources the source-tree copy of lib.sh for sha256_hash_file.
@@ -335,7 +345,7 @@ install_hooks() {
     # shellcheck disable=SC2064  # Intentional: expand entries_file now, not at signal time
     trap "rm -f '$entries_file'" RETURN
 
-    for dir_prefix in hooks scripts; do
+    for dir_prefix in hooks scripts scripts/wf; do
       local scan_dir="$REPO_ROOT/.correctless/$dir_prefix"
       [ -d "$scan_dir" ] || continue
       for file in "$scan_dir"/*.sh; do
