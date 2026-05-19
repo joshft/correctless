@@ -256,10 +256,6 @@ has_formal_model() {
   [ "$val" = "true" ]
 }
 
-# Used by sourced module scripts/wf/metadata.sh
-# shellcheck disable=SC2034
-DRIFT_DEBT_FILE="$REPO_ROOT/.correctless/meta/drift-debt.json"
-
 # ---------------------------------------------------------------------------
 # Test execution helpers
 # ---------------------------------------------------------------------------
@@ -460,9 +456,8 @@ if [ ! -d "$_WF_MODULE_DIR" ] && [ -d "$REPO_ROOT/.correctless/scripts/wf" ]; th
 fi
 
 for _module in transitions.sh utility.sh metadata.sh; do
-  [ -f "$_WF_MODULE_DIR/$_module" ] || die "Module not found: $_WF_MODULE_DIR/$_module — run setup to install"
   # shellcheck disable=SC1090
-  source "$_WF_MODULE_DIR/$_module"
+  source "$_WF_MODULE_DIR/$_module" || die "Module not found: $_WF_MODULE_DIR/$_module — run setup to install"
 done
 unset _module _WF_MODULE_DIR
 

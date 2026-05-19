@@ -113,7 +113,7 @@ cmd_qa() {
   # QA-R2-004: Use locked_update_state for atomic read-modify-write
   local sf ts
   sf="$(state_file)"
-  ts="$(date -u +%FT%TZ)"
+  ts="$(now_iso)"
   locked_update_state "$sf" \
     '.qa_rounds += 1 | .phase = "tdd-qa" | .phase_entered_at = $t | .override.active = false | .override.remaining_calls = 0' \
     --arg t "$ts" \

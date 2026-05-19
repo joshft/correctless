@@ -7,6 +7,8 @@
 # Do NOT use BASH_SOURCE[0] for path resolution — it resolves to this module
 # file, not the dispatcher.
 
+DRIFT_DEBT_FILE="$REPO_ROOT/.correctless/meta/drift-debt.json"
+
 cmd_set_intensity() {
   local level="${1:-}"
   if [ -z "$level" ]; then
