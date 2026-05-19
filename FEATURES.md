@@ -581,7 +581,7 @@ Install manifest (`.correctless/.install-manifest.json`) records SHA-256 checksu
 
 ### Test Registration Guard
 
-Architecture drift tests verify all `test-*.sh` files are registered in workflow-config.json, ci.yml, AND test.sh. Prevents new test files from being silently skipped.
+Architecture drift tests verify all `test-*.sh` files are discoverable by the glob-based test command in workflow-config.json and ci.yml. Prevents new test files from being silently skipped.
 
 ### jq Version Matrix
 
