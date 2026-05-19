@@ -37,7 +37,7 @@ AGENT_DIST="correctless/agents/ctdd-green.md"
 CTDD_SKILL="skills/ctdd/SKILL.md"
 SYNC_SH="sync.sh"
 ARCH_FILE=".correctless/ARCHITECTURE.md"
-TEST_RUNNER="tests/test.sh"
+TEST_RUNNER="tests/test-core.sh"
 WORKFLOW_CONFIG=".correctless/config/workflow-config.json"
 
 # ============================================================================
@@ -605,21 +605,20 @@ check_vp001() {
 check_wiring() {
   section "WIRING: Test registration"
 
-  # Test must be listed in tests/test.sh
-  if [ -f "$TEST_RUNNER" ]; then
-    if grep -q "test-ctdd-green-agent" "$TEST_RUNNER"; then
-      pass "WIRING(a)" "test-ctdd-green-agent is registered in tests/test.sh"
-    else
-      fail "WIRING(a)" "test-ctdd-green-agent is not registered in tests/test.sh"
-    fi
+  # DA-002: Test runner now uses glob-based discovery. Accept either direct
+  # invocation in test-core.sh or glob pattern in workflow-config.json.
+  if [ -f "$TEST_RUNNER" ] && grep -q "test-ctdd-green-agent" "$TEST_RUNNER"; then
+    pass "WIRING(a)" "test-ctdd-green-agent is registered in tests/test-core.sh"
+  elif jq -r '.commands.test // ""' ".correctless/config/workflow-config.json" 2>/dev/null | grep -qE 'test-\*\.sh'; then
+    pass "WIRING(a)" "test-ctdd-green-agent is discoverable by glob in commands.test"
   else
-    fail "WIRING(a)" "$TEST_RUNNER does not exist"
+    fail "WIRING(a)" "test-ctdd-green-agent is not registered in test runner"
   fi
 
-  # Test must be in workflow-config.json commands.test
+  # Test must be in workflow-config.json commands.test (or discovered by glob)
   if [ -f "$WORKFLOW_CONFIG" ]; then
-    if grep -q "test-ctdd-green-agent" "$WORKFLOW_CONFIG"; then
-      pass "WIRING(b)" "test-ctdd-green-agent is registered in workflow-config.json"
+    if grep -q "test-ctdd-green-agent" "$WORKFLOW_CONFIG" || jq -r '.commands.test // ""' "$WORKFLOW_CONFIG" 2>/dev/null | grep -qE 'test-\*\.sh'; then
+      pass "WIRING(b)" "test-ctdd-green-agent is discoverable by workflow-config.json"
     else
       fail "WIRING(b)" "test-ctdd-green-agent is not registered in workflow-config.json"
     fi

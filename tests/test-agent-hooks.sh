@@ -517,16 +517,18 @@ section "Registration: Test file registration"
 CI_YML=".github/workflows/ci.yml"
 WF_CONFIG=".correctless/config/workflow-config.json"
 
-# REG-001: test-agent-hooks.sh appears in ci.yml
-if grep -q 'test-agent-hooks' "$CI_YML" 2>/dev/null; then
-  pass "REG-001" "test-agent-hooks.sh registered in ci.yml"
+# REG-001: test-agent-hooks.sh discoverable by ci.yml
+# DA-002: CI now uses glob-based discovery (test-*.sh), so literal filename check
+# is replaced with glob pattern check as the primary path.
+if grep -q 'test-agent-hooks' "$CI_YML" 2>/dev/null || grep -qE 'test-\*\.sh' "$CI_YML" 2>/dev/null; then
+  pass "REG-001" "test-agent-hooks.sh discoverable by ci.yml"
 else
   fail "REG-001" "test-agent-hooks.sh NOT registered in ci.yml"
 fi
 
-# REG-002: test-agent-hooks.sh appears in workflow-config.json commands.test
-if grep -q 'test-agent-hooks' "$WF_CONFIG" 2>/dev/null; then
-  pass "REG-002" "test-agent-hooks.sh registered in workflow-config.json"
+# REG-002: test-agent-hooks.sh discoverable by workflow-config.json commands.test
+if grep -q 'test-agent-hooks' "$WF_CONFIG" 2>/dev/null || jq -r '.commands.test // ""' "$WF_CONFIG" 2>/dev/null | grep -qE 'test-\*\.sh'; then
+  pass "REG-002" "test-agent-hooks.sh discoverable by workflow-config.json"
 else
   fail "REG-002" "test-agent-hooks.sh NOT registered in workflow-config.json"
 fi

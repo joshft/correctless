@@ -667,7 +667,7 @@ Also installable via git clone for development.
 
 ### GitHub Actions CI
 
-- Full test suite execution (`bash tests/test.sh`)
+- Full test suite execution (`bash tests/test-core.sh`)
 - ShellCheck linting on all `.sh` files
 - jq version matrix (1.7.1 + 1.8.1)
 - Sync verification (`bash sync.sh --check`)

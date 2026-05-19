@@ -674,16 +674,17 @@ echo "--- Registration: test file in CI and config ---"
 CI_YML="$REPO_DIR/.github/workflows/ci.yml"
 WF_CONFIG="$REPO_DIR/.correctless/config/workflow-config.json"
 
-# REG-001: test-test-harness-extraction.sh in ci.yml
-if [ -f "$CI_YML" ] && grep -q 'test-test-harness-extraction' "$CI_YML"; then
-  pass "REG-001" "test-test-harness-extraction.sh registered in ci.yml"
+# REG-001: test-test-harness-extraction.sh discoverable by ci.yml
+# DA-002: CI now uses glob-based discovery (test-*.sh)
+if [ -f "$CI_YML" ] && (grep -q 'test-test-harness-extraction' "$CI_YML" || grep -qE 'test-\*\.sh' "$CI_YML"); then
+  pass "REG-001" "test-test-harness-extraction.sh discoverable by ci.yml"
 else
   fail "REG-001" "test-test-harness-extraction.sh NOT registered in ci.yml"
 fi
 
-# REG-002: test-test-harness-extraction.sh in workflow-config.json
-if [ -f "$WF_CONFIG" ] && grep -q 'test-test-harness-extraction' "$WF_CONFIG"; then
-  pass "REG-002" "test-test-harness-extraction.sh registered in workflow-config.json"
+# REG-002: test-test-harness-extraction.sh discoverable by workflow-config.json
+if [ -f "$WF_CONFIG" ] && (grep -q 'test-test-harness-extraction' "$WF_CONFIG" || jq -r '.commands.test // ""' "$WF_CONFIG" 2>/dev/null | grep -qE 'test-\*\.sh'); then
+  pass "REG-002" "test-test-harness-extraction.sh discoverable by workflow-config.json"
 else
   fail "REG-002" "test-test-harness-extraction.sh NOT registered in workflow-config.json"
 fi

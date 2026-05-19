@@ -332,6 +332,14 @@
 - **Test**: Structural — probe-results file written during `/ctdd` probe round
 - **Guards against**: Loss of adversarial testing evidence; inability to measure probe effectiveness over time
 
+### ABS-035: Workflow-advance module contract (scripts/wf/)
+- **What**: `hooks/workflow-advance.sh` is decomposed into a thin dispatcher that sources 3 module files from `scripts/wf/`: `transitions.sh` (phase transition commands), `utility.sh` (operational commands), `metadata.sh` (state modification commands). The dispatcher contains argument parsing, module sourcing, the dispatch table, and all shared helper functions. Command function bodies (`cmd_*`) live exclusively in the modules. The dispatcher sets `SCRIPT_DIR` before sourcing — modules use `$SCRIPT_DIR` for path resolution, never `BASH_SOURCE[0]`.
+- **Invariant**: No `cmd_*` function body in the dispatcher; no shared helper function defined in a module; no `BASH_SOURCE[0]` usage in module code; no function defined in more than one module. Module files are protected by `hooks/sensitive-file-guard.sh`.
+- **Enforced at**: `hooks/sensitive-file-guard.sh` (DEFAULTS), `tests/test-workflow-advance-decomp.sh` (structural tests), `setup` (installs `scripts/wf/` to `.correctless/scripts/wf/`)
+- **Violated when**: A command function body appears in the dispatcher; a helper function is defined in a module; a module uses `BASH_SOURCE[0]`; a function is duplicated across modules
+- **Test**: `tests/test-workflow-advance-decomp.sh` — 253 assertions covering INV-001 through INV-017 and PRH-001 through PRH-003
+- **Guards against**: DA-002 complexity concern — single-file growth making the state machine unmaintainable
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.

@@ -603,9 +603,10 @@ else
   fail "R-015a" "Test file tests/test-carchitect-phase4.sh missing"
 fi
 
-# R-015b: Test file is registered in commands.test in workflow-config.json
-if grep -q 'test-carchitect-phase4.sh' "$WORKFLOW_CONFIG"; then
-  pass "R-015b" "test-carchitect-phase4.sh registered in commands.test"
+# R-015b: Test file is discoverable by commands.test in workflow-config.json
+# DA-002: commands.test now uses glob-based discovery (test-*.sh)
+if grep -q 'test-carchitect-phase4.sh' "$WORKFLOW_CONFIG" || jq -r '.commands.test // ""' "$WORKFLOW_CONFIG" 2>/dev/null | grep -qE 'test-\*\.sh'; then
+  pass "R-015b" "test-carchitect-phase4.sh discoverable by commands.test"
 else
   fail "R-015b" "test-carchitect-phase4.sh not registered in commands.test"
 fi

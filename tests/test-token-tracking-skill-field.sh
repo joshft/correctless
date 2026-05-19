@@ -664,8 +664,10 @@ test_r008_phase_sync() {
   #   2. .phase = "PHASE" in jq expressions
   #   3. --arg phase "PHASE" in jq calls
   # -----------------------------------------------
+  # DA-002: workflow-advance.sh is decomposed into modules.
+  # Include all module files when scanning for phase assignments.
   local advance_src
-  advance_src="$(cat "$ADVANCE_SH")"
+  advance_src="$(cat "$ADVANCE_SH" "$REPO_DIR/scripts/wf/"*.sh 2>/dev/null)"
 
   # Extract update_phase targets: update_phase "value"
   local update_phase_targets

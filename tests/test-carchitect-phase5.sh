@@ -570,16 +570,18 @@ else
   fail "R-012a" "Test file tests/test-carchitect-phase5.sh missing"
 fi
 
-# R-012b: Test file is registered in commands.test in workflow-config.json
-if grep -q 'test-carchitect-phase5.sh' "$WORKFLOW_CONFIG"; then
-  pass "R-012b" "test-carchitect-phase5.sh registered in commands.test"
+# R-012b: Test file is discoverable by commands.test in workflow-config.json
+# DA-002: commands.test now uses glob-based discovery (test-*.sh)
+if grep -q 'test-carchitect-phase5.sh' "$WORKFLOW_CONFIG" || jq -r '.commands.test // ""' "$WORKFLOW_CONFIG" 2>/dev/null | grep -qE 'test-\*\.sh'; then
+  pass "R-012b" "test-carchitect-phase5.sh discoverable by commands.test"
 else
   fail "R-012b" "test-carchitect-phase5.sh not registered in commands.test"
 fi
 
-# R-012c: Test file is registered in .github/workflows/ci.yml
-if grep -q 'test-carchitect-phase5.sh' ".github/workflows/ci.yml"; then
-  pass "R-012c" "test-carchitect-phase5.sh registered in CI workflow"
+# R-012c: Test file is discoverable by .github/workflows/ci.yml
+# DA-002: CI now uses glob-based discovery (test-*.sh)
+if grep -q 'test-carchitect-phase5.sh' ".github/workflows/ci.yml" || grep -qE 'test-\*\.sh' ".github/workflows/ci.yml"; then
+  pass "R-012c" "test-carchitect-phase5.sh discoverable by CI workflow"
 else
   fail "R-012c" "test-carchitect-phase5.sh not registered in CI workflow"
 fi

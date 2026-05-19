@@ -53,7 +53,7 @@ CLAUDE_MD="CLAUDE.md"
 README_MD="README.md"
 SYNC_SH="sync.sh"
 CI_YAML=".github/workflows/ci.yml"
-LOCAL_RUNNER="tests/test.sh"
+LOCAL_RUNNER="tests/test-core.sh"
 CSTATUS_SKILL="skills/cstatus/SKILL.md"
 MEASUREMENT_META=".correctless/meta/pat001-measurement-due.json"
 
@@ -630,11 +630,19 @@ check_inv006() {
 check_inv007() {
   local in_ci=0 in_local=0
 
-  # A-003 fix: check tests/test.sh for an actual invocation (not a comment).
+  # DA-002: CI and local runner now use glob-based discovery (tests/test-*.sh).
+  # A glob pattern that matches test-*.sh automatically includes
+  # test-architecture-drift.sh. Accept either explicit invocation or glob.
   if [ -f "$LOCAL_RUNNER" ]; then
     if strip_shell_comments "$LOCAL_RUNNER" | grep -qE '(bash|sh)[[:space:]]+tests/test-architecture-drift\.sh|\./tests/test-architecture-drift\.sh'; then
       in_local=1
     fi
+  fi
+  # Glob-based discovery in workflow-config.json also wires this test
+  local config_file
+  config_file="$(git rev-parse --show-toplevel)/.correctless/config/workflow-config.json"
+  if [ -f "$config_file" ] && jq -r '.commands.test // ""' "$config_file" 2>/dev/null | grep -q 'test-\*\.sh'; then
+    in_local=1
   fi
 
   # A-003 fix: awk state machine to extract YAML "run:" block bodies, then
@@ -680,7 +688,10 @@ check_inv007() {
     ' "$CI_YAML")"
 
     # Strip YAML comments from the extracted run-block bodies and grep for the invocation.
+    # Accept either explicit invocation or glob-based discovery
     if printf '%s\n' "$ci_run_bodies" | strip_shell_comments | grep -qF 'bash tests/test-architecture-drift.sh'; then
+      in_ci=1
+    elif printf '%s\n' "$ci_run_bodies" | strip_shell_comments | grep -qE 'test-\*\.sh'; then
       in_ci=1
     fi
   fi
@@ -1963,32 +1974,54 @@ check_test_registration() {
   local ci_yml="$root/.github/workflows/ci.yml"
   local missing_config="" missing_ci=""
 
-  while IFS= read -r test_file; do
-    local basename
-    basename="$(basename "$test_file")"
+  # DA-002: workflow-config.json and ci.yml now use glob-based discovery
+  # (tests/test-*.sh). Check for glob pattern instead of individual filenames.
+  local config_test_cmd=""
+  [ -f "$config" ] && config_test_cmd="$(jq -r '.commands.test // ""' "$config" 2>/dev/null)"
 
-    # Skip test-helpers.sh — it is a shared harness sourced by other tests,
-    # not a standalone test file. It should NOT be registered in CI or config.
-    [ "$basename" = "test-helpers.sh" ] && continue
-
-    if [ -f "$config" ] && ! grep -q "$basename" "$config" 2>/dev/null; then
-      missing_config="$missing_config $basename"
-    fi
-    if [ -f "$ci_yml" ] && ! grep -q "$basename" "$ci_yml" 2>/dev/null; then
-      missing_ci="$missing_ci $basename"
-    fi
-  done < <(find "$root/tests" -maxdepth 1 -name 'test-*.sh' -type f | sort)
-
-  if [ -z "$missing_config" ]; then
-    pass "REG-001(config)" "all test files registered in workflow-config.json"
-  else
-    fail "REG-001(config)" "missing from workflow-config.json:$missing_config"
+  local config_uses_glob=false ci_uses_glob=false
+  if echo "$config_test_cmd" | grep -q 'test-\*\.sh'; then
+    config_uses_glob=true
+  fi
+  if [ -f "$ci_yml" ] && grep -qE 'test-\*\.sh' "$ci_yml" 2>/dev/null; then
+    ci_uses_glob=true
   fi
 
-  if [ -z "$missing_ci" ]; then
-    pass "REG-001(ci)" "all test files registered in ci.yml"
+  if [ "$config_uses_glob" = true ]; then
+    pass "REG-001(config)" "workflow-config.json uses glob-based test discovery"
   else
-    fail "REG-001(ci)" "missing from ci.yml:$missing_ci"
+    # Fall back to checking individual files for backward compatibility
+    while IFS= read -r test_file; do
+      local basename
+      basename="$(basename "$test_file")"
+      [ "$basename" = "test-helpers.sh" ] && continue
+      if [ -f "$config" ] && ! grep -q "$basename" "$config" 2>/dev/null; then
+        missing_config="$missing_config $basename"
+      fi
+    done < <(find "$root/tests" -maxdepth 1 -name 'test-*.sh' -type f | sort)
+    if [ -z "$missing_config" ]; then
+      pass "REG-001(config)" "all test files registered in workflow-config.json"
+    else
+      fail "REG-001(config)" "missing from workflow-config.json:$missing_config"
+    fi
+  fi
+
+  if [ "$ci_uses_glob" = true ]; then
+    pass "REG-001(ci)" "ci.yml uses glob-based test discovery"
+  else
+    while IFS= read -r test_file; do
+      local basename
+      basename="$(basename "$test_file")"
+      [ "$basename" = "test-helpers.sh" ] && continue
+      if [ -f "$ci_yml" ] && ! grep -q "$basename" "$ci_yml" 2>/dev/null; then
+        missing_ci="$missing_ci $basename"
+      fi
+    done < <(find "$root/tests" -maxdepth 1 -name 'test-*.sh' -type f | sort)
+    if [ -z "$missing_ci" ]; then
+      pass "REG-001(ci)" "all test files registered in ci.yml"
+    else
+      fail "REG-001(ci)" "missing from ci.yml:$missing_ci"
+    fi
   fi
 }
 

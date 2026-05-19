@@ -13,7 +13,7 @@
 
 ## Checklist
 
-- [ ] All test scripts pass (`bash tests/test.sh && bash tests/test-mcp.sh && bash tests/test-bugfixes.sh && bash tests/test-qol.sh && bash tests/test-decisions.sh && bash tests/test-statusline.sh`)
+- [ ] All test scripts pass (`bash tests/test-core.sh && bash tests/test-mcp.sh && bash tests/test-bugfixes.sh && bash tests/test-qol.sh && bash tests/test-decisions.sh && bash tests/test-statusline.sh`)
 - [ ] `bash sync.sh` produces no changes
 - [ ] `shellcheck hooks/*.sh` passes (if hooks modified)
 - [ ] Skill registered in all locations (if new skill — see CONTRIBUTING.md)

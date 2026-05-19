@@ -81,6 +81,10 @@ bash .correctless/scripts/harness-fingerprint.sh check 2>/dev/null || true
 
 The script is **strictly advisory** (PRH-001 of the harness-fingerprint spec) — it always exits 0 and never blocks /cspec. If the output reports `status=version_bumped` AND `notified=true`, surface the line `Harness has changed (model={X} version={Y}). Run /cmodelupgrade to compare metrics against baseline.` to the user one time per session. Then continue immediately to Step 0 below regardless of the script's output.
 
+### Step 0: Drift Debt Cadence Check (advisory)
+
+Before the brainstorm, check `.correctless/meta/drift-debt.json` for open drift debt items. If 2 or more items have `status: "open"`, emit an advisory: **"Drift debt: {N} open items. Consider resolving before adding new features."** This check is advisory only — it does not block /cspec or spec creation. If the file does not exist or has fewer than 2 open items, proceed silently.
+
 ### Step 0: Socratic Brainstorm
 
 Before writing any rules, challenge the developer's assumptions about the feature. This is not optional — even a developer who "knows exactly what they want" benefits from 2-3 questions that reframe the problem.
