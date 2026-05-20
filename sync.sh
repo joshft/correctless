@@ -93,6 +93,16 @@ for script in scripts/*.sh; do
   [ -f "$script" ] || continue
   sync_file "$script" "correctless/scripts/$(basename "$script")"
 done
+# Sync scripts/wf/ subdirectory (workflow-advance decomposition modules)
+if [ -d "scripts/wf" ]; then
+  if [ "$CHECK_ONLY" = false ]; then
+    mkdir -p "correctless/scripts/wf"
+  fi
+  for wf_module in scripts/wf/*.sh; do
+    [ -f "$wf_module" ] || continue
+    sync_file "$wf_module" "correctless/scripts/wf/$(basename "$wf_module")"
+  done
+fi
 [ "$CHECK_ONLY" = false ] && info "Scripts → correctless/"
 
 # --- Helpers (PBT guides) ---

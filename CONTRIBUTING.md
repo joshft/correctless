@@ -7,7 +7,7 @@ Thanks for your interest in contributing! Correctless is a set of Claude Code sk
 ```bash
 git clone https://github.com/joshft/correctless.git
 cd correctless
-bash tests/test.sh        # Infrastructure tests
+bash tests/test-core.sh        # Infrastructure tests
 bash tests/test-mcp.sh    # MCP integration tests
 bash sync.sh              # Propagate source → correctless/ distribution
 bash sync.sh --check      # Verify distributions are in sync (exit 0 = clean)
@@ -20,7 +20,7 @@ skills/               # Source skills (31 SKILL.md files)
 hooks/                # 8 hooks (bash: gate, sensitive-file-guard, state machine, statusline, audit trail, auto-format, token-tracking; agent: import-guard)
 templates/            # Config, doc, and spec templates
 helpers/              # PBT guides per language (high+ intensity)
-tests/                # 85 test files (~5,000 assertions)
+tests/                # 87 test files (~5,000 assertions)
 setup                 # Install script
 sync.sh               # Copies source → correctless/ distribution
 correctless/          # Single distribution (31 skills, intensity-gated)
@@ -37,7 +37,7 @@ docs/design/          # Design specification
 1. Fork the repo and create a branch: `git checkout -b fix/description`
 2. Read the relevant hook or skill file
 3. Make the fix
-4. Run `bash tests/test.sh` — all tests must pass
+4. Run `bash tests/test-core.sh` — all tests must pass
 5. Run `bash sync.sh` — plugins must be in sync
 6. Open a PR with: what was broken, why, and how you fixed it
 
@@ -62,7 +62,7 @@ docs/design/          # Design specification
    - `ARCHITECTURE.md` — update skill count if changed
    - `AGENT_CONTEXT.md` — update skill count and test count if changed
    - `CHANGELOG.md` — add entry in current version section
-4. Run `bash sync.sh && bash tests/test.sh`
+4. Run `bash sync.sh && bash tests/test-core.sh`
 5. Open a PR
 
 ### Modifying a Hook
@@ -92,7 +92,7 @@ Run ShellCheck before submitting: `shellcheck hooks/*.sh`
 jq -r '.commands.test' .correctless/config/workflow-config.json | bash
 
 # Quick smoke test (2 suites):
-bash tests/test.sh && bash tests/test-mcp.sh
+bash tests/test-core.sh && bash tests/test-mcp.sh
 
 # Other checks:
 bash sync.sh --check      # Distributions must be in sync

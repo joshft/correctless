@@ -36,7 +36,7 @@ set -f
 CREVIEW_SPEC_SKILL="skills/creview-spec/SKILL.md"
 SYNC_SH="sync.sh"
 ARCH_FILE=".correctless/ARCHITECTURE.md"
-TEST_RUNNER="tests/test.sh"
+TEST_RUNNER="tests/test-core.sh"
 WORKFLOW_CONFIG=".correctless/config/workflow-config.json"
 
 # The 6 agent files
@@ -767,19 +767,19 @@ check_vp001() {
 check_wiring() {
   section "WIRING: Test registration"
 
-  if [ -f "$TEST_RUNNER" ]; then
-    if grep -q "test-creview-spec-agents" "$TEST_RUNNER"; then
-      pass "WIRING(a)" "test-creview-spec-agents is registered in tests/test.sh"
-    else
-      fail "WIRING(a)" "test-creview-spec-agents is not registered in tests/test.sh"
-    fi
+  # DA-002: Test runner now uses glob-based discovery. Accept either direct
+  # invocation in test-core.sh or glob pattern in workflow-config.json.
+  if [ -f "$TEST_RUNNER" ] && grep -q "test-creview-spec-agents" "$TEST_RUNNER"; then
+    pass "WIRING(a)" "test-creview-spec-agents is registered in tests/test-core.sh"
+  elif jq -r '.commands.test // ""' ".correctless/config/workflow-config.json" 2>/dev/null | grep -qE 'test-\*\.sh'; then
+    pass "WIRING(a)" "test-creview-spec-agents is discoverable by glob in commands.test"
   else
-    fail "WIRING(a)" "$TEST_RUNNER does not exist"
+    fail "WIRING(a)" "test-creview-spec-agents is not registered in test runner"
   fi
 
   if [ -f "$WORKFLOW_CONFIG" ]; then
-    if grep -q "test-creview-spec-agents" "$WORKFLOW_CONFIG"; then
-      pass "WIRING(b)" "test-creview-spec-agents is registered in workflow-config.json"
+    if grep -q "test-creview-spec-agents" "$WORKFLOW_CONFIG" || jq -r '.commands.test // ""' "$WORKFLOW_CONFIG" 2>/dev/null | grep -qE 'test-\*\.sh'; then
+      pass "WIRING(b)" "test-creview-spec-agents is discoverable by workflow-config.json"
     else
       fail "WIRING(b)" "test-creview-spec-agents is not registered in workflow-config.json"
     fi

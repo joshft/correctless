@@ -136,14 +136,19 @@ test_inv001_ci_runs_all_test_suites() {
   local test_cmd
   test_cmd="$(jq -r '.commands.test' "$config_file")"
 
-  # Check each disk test file appears in commands.test
+  # DA-002: commands.test may use glob-based discovery (test-*.sh).
+  # If glob is used, all test-*.sh files are automatically discovered.
   local missing_from_config=0
-  for t in "${disk_tests[@]}"; do
-    if ! echo "$test_cmd" | grep -qF "tests/$t"; then
-      echo "    missing from commands.test: $t"
-      missing_from_config=1
-    fi
-  done
+  if echo "$test_cmd" | grep -qE 'test-\*\.sh'; then
+    missing_from_config=0  # glob discovers all files
+  else
+    for t in "${disk_tests[@]}"; do
+      if ! echo "$test_cmd" | grep -qF "tests/$t"; then
+        echo "    missing from commands.test: $t"
+        missing_from_config=1
+      fi
+    done
+  fi
   assert_eq "INV-001: all disk test files in commands.test" "0" "$missing_from_config"
 
   # Parse CI file — extract lines that run test files
@@ -814,29 +819,51 @@ test_prh002_no_missing_test_suites() {
   local ci_content
   ci_content="$(cat "$ci_file")"
 
+  # DA-002: commands.test may use glob-based discovery (test-*.sh).
+  # If the command uses a glob pattern, all disk test files are automatically
+  # discovered — the disk→config completeness check passes trivially.
+  local config_uses_glob=false
+  if echo "$all_tests" | grep -qE 'test-\*\.sh'; then
+    config_uses_glob=true
+  fi
+
   # Check disk → config completeness
   local disk_to_config_complete="true"
-  for t in "${disk_tests[@]}"; do
-    if ! echo "$all_tests" | grep -qF "tests/$t"; then
-      echo "    PRH-002 disk→config gap: $t"
-      disk_to_config_complete="false"
-    fi
-  done
+  if [ "$config_uses_glob" = true ]; then
+    disk_to_config_complete="true"  # glob discovers all test-*.sh files
+  else
+    for t in "${disk_tests[@]}"; do
+      if ! echo "$all_tests" | grep -qF "tests/$t"; then
+        echo "    PRH-002 disk→config gap: $t"
+        disk_to_config_complete="false"
+      fi
+    done
+  fi
   assert_eq "PRH-002: all disk test files in config" "true" "$disk_to_config_complete"
 
   # Check config → CI completeness
-  local config_to_ci_complete="true"
-  local -a config_entries=()
-  while IFS= read -r entry; do
-    config_entries+=("$entry")
-  done < <(echo "$all_tests" | grep -oE 'tests/test[^ ]*\.sh')
+  # DA-002: If CI also uses glob, the check passes trivially.
+  local ci_uses_glob=false
+  if echo "$ci_content" | grep -qE 'test-\*\.sh'; then
+    ci_uses_glob=true
+  fi
 
-  for ct in "${config_entries[@]}"; do
-    if ! echo "$ci_content" | grep -qF "$ct"; then
-      echo "    PRH-002 config→CI gap: $ct"
-      config_to_ci_complete="false"
-    fi
-  done
+  local config_to_ci_complete="true"
+  if [ "$config_uses_glob" = true ] && [ "$ci_uses_glob" = true ]; then
+    config_to_ci_complete="true"  # both use globs — inherently in sync
+  elif [ "$config_uses_glob" = false ]; then
+    local -a config_entries=()
+    while IFS= read -r entry; do
+      config_entries+=("$entry")
+    done < <(echo "$all_tests" | grep -oE 'tests/test[^ ]*\.sh')
+
+    for ct in "${config_entries[@]}"; do
+      if ! echo "$ci_content" | grep -qF "$ct"; then
+        echo "    PRH-002 config→CI gap: $ct"
+        config_to_ci_complete="false"
+      fi
+    done
+  fi
   assert_eq "PRH-002: all config test files in CI" "true" "$config_to_ci_complete"
 }
 
