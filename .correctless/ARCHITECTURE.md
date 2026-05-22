@@ -340,6 +340,14 @@
 - **Test**: `tests/test-workflow-advance-decomp.sh` — 253 assertions covering INV-001 through INV-017 and PRH-001 through PRH-003
 - **Guards against**: DA-002 complexity concern — single-file growth making the state machine unmaintainable
 
+### ABS-036: Lens recommendation artifact (.correctless/artifacts/)
+- **What**: JSON artifact at `.correctless/artifacts/lens-recommendations-{branch_slug}.json` carrying review-phase lens recommendations and mini-audit outcomes. Writers: `/creview-spec` (high+ intensity), `/creview` (standard intensity). `/ctdd` updates with outcomes after mini-audit. Consumers: `/ctdd` (reads recommendations), `/cmetrics` (lens coverage), `/cwtf` (auditability). Branch-scoped by filename (branch-scoped state pattern). Gitignored. Ephemeral.
+- **Invariant**: File absence triggers dormant degradation (PAT-019) in all consumers. Never gates any pipeline phase transition (PRH-003). Outcome recording is best-effort, non-blocking.
+- **Enforced at**: `skills/creview-spec/SKILL.md` (writer), `skills/creview/SKILL.md` (writer), `skills/ctdd/SKILL.md` (consumer + outcome writer), `skills/cmetrics/SKILL.md` (consumer), `skills/cwtf/SKILL.md` (consumer), `scripts/wf/transitions.sh` (non-blocking warning in `cmd_done`)
+- **Violated when**: a consumer errors on absent artifact; artifact gates a phase transition; `/ctdd` creates outcomes-only artifact when no recommendations exist
+- **Test**: `tests/test-review-driven-lenses.sh`
+- **Guards against**: opaque mini-audit lens selection (lost review context between phases)
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.

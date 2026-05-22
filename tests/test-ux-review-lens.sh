@@ -210,11 +210,11 @@ else
   fail "R-004b" "Progress announcement does not reference 6 specialist agents"
 fi
 
-# R-004c: Cascading update — spawns six specialist agents (was five)
-if grep -qE 'spawns six specialist agents|six specialist agents' "$CTDD_SKILL"; then
-  pass "R-004c" "Agent prompt section references six/6 specialist agents"
+# R-004c: Cascading update — spawns 6 specialist agents (was five)
+if grep -qE 'spawns (the )?6 (default )?specialist agents|six specialist agents' "$CTDD_SKILL"; then
+  pass "R-004c" "Agent prompt section references 6 specialist agents"
 else
-  fail "R-004c" "Agent prompt section still references five/5 specialist agents"
+  fail "R-004c" "Agent prompt section does not reference 6 specialist agents"
 fi
 
 # R-004d: Cascading update — LENS enum includes ux-review
@@ -598,11 +598,11 @@ else
   fail "CC-002" "ctdd does not say '6 specialist agents'"
 fi
 
-# CC-003: test-upgrade-compatibility-lens.sh R-005b expects "six specialist agents"
-if grep -qE 'six specialist agents' "$CTDD_SKILL"; then
-  pass "CC-003" "ctdd says 'six specialist agents'"
+# CC-003: test-upgrade-compatibility-lens.sh R-005b expects 6 specialist agents (word or numeral)
+if grep -qE 'spawns (the )?6 (default )?specialist agents|six specialist agents' "$CTDD_SKILL"; then
+  pass "CC-003" "ctdd says '6 specialist agents'"
 else
-  fail "CC-003" "ctdd does not say 'six specialist agents'"
+  fail "CC-003" "ctdd does not say '6 specialist agents'"
 fi
 
 # CC-004: /creview references to /creview-spec agent count must match actual count (6)

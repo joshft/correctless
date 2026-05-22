@@ -195,6 +195,17 @@ cmd_done() {
     fi
   fi
 
+  # INV-006: Non-blocking lens outcome warning
+  # If a lens-recommendations artifact exists but has no outcomes field, warn (not gate)
+  local branch_slug_val lens_artifact
+  branch_slug_val="$(branch_slug)" || true
+  lens_artifact="$REPO_ROOT/.correctless/artifacts/lens-recommendations-${branch_slug_val}.json"
+  if [ -f "$lens_artifact" ]; then
+    if ! jq -e '.outcomes' "$lens_artifact" >/dev/null 2>&1; then
+      info "WARNING: Lens recommendation artifact exists but has no outcomes field. Consider recording lens outcomes for auditability."
+    fi
+  fi
+
   update_phase "done"
   info "TDD complete. Next MANDATORY step: run /cverify"
 }
