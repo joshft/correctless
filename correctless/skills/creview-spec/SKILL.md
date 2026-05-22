@@ -229,6 +229,39 @@ Agents: {list of agents that completed}
 
 If the artifact already exists (checkpoint resume), append new findings rather than overwriting.
 
+## Step 3.7: Write Lens Recommendations (High+ Intensity)
+
+At `high` or `critical` effective intensity, after persisting findings and before presenting to the user, write lens recommendations to `.correctless/artifacts/lens-recommendations-{branch_slug}.json`. Derive `branch_slug` via `workflow-advance.sh status` (the `Branch:` line) or by sourcing `scripts/lib.sh` for the `branch_slug()` function (AP-009 mitigation).
+
+Based on the synthesized findings, each review agent may recommend specific adversarial lenses for the mini-audit phase. Analyze findings for risk patterns that warrant specialized mini-audit attention and generate recommendations.
+
+Write the artifact with `schema_version: 1`:
+```json
+{
+  "schema_version": 1,
+  "branch": "{branch}",
+  "recommended_lenses": [
+    {
+      "lens_name": "{kebab-case-name}",
+      "rationale": "why this lens matters for this feature",
+      "focus_areas": ["specific thing 1", "specific thing 2"],
+      "severity_guidance": "what constitutes CRITICAL vs HIGH vs MEDIUM for this lens",
+      "source_agent": "red-team|assumptions|testability|design-contract|upgrade-compat|ux",
+      "source_finding": "RS-003 or null",
+      "source_finding_summary": "one-line summary of the finding for display without cross-artifact lookup"
+    }
+  ]
+}
+```
+
+The `lens_name` must be kebab-case, unique within the array. The `source_agent` identifies which review agent recommended the lens. The `source_finding` and `source_finding_summary` fields link the recommendation to the originating finding for auditability by `/cwtf`.
+
+**Deduplication**: If two review agents independently recommend the same `lens_name`, merge: union of `focus_areas` arrays, comma-separated `source_agent` list, and the higher `severity_guidance` (per CRITICAL > HIGH > MEDIUM > LOW ordering).
+
+**Empty recommendations**: If no findings warrant specialized mini-audit attention, write `"recommended_lenses": []` — this is valid and signals "no feature-specific lenses needed."
+
+At `standard` intensity: skip this step (lens recommendations are provided by `/creview` at standard intensity).
+
 ## Step 4: Present to Human
 
 **Before presenting, verify the artifact exists and is non-empty.** If `.correctless/artifacts/review-spec-findings-{slug}.md` is missing or empty, re-write findings from agent outputs before proceeding. Do not present findings from conversation context alone — the artifact is the recovery path if the display is interrupted (AP-029).

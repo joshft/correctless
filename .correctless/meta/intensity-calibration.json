@@ -733,6 +733,39 @@
         "tests/test-workflow-advance-decomp.sh"
       ],
       "timestamp": "2026-05-18T12:00:00Z"
+    },
+    {
+      "feature_slug": "review-driven-mini-audit-lenses",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "harness_version": 1,
+      "fix_rounds_triggered": 0,
+      "file_paths_touched": [
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/specs/review-driven-mini-audit-lenses.md",
+        ".correctless/specs/review-driven-mini-audit.md",
+        "CONTRIBUTING.md",
+        "correctless/scripts/wf/transitions.sh",
+        "correctless/skills/cmetrics/SKILL.md",
+        "correctless/skills/creview-spec/SKILL.md",
+        "correctless/skills/creview/SKILL.md",
+        "correctless/skills/ctdd/SKILL.md",
+        "correctless/skills/cwtf/SKILL.md",
+        "scripts/wf/transitions.sh",
+        "skills/cmetrics/SKILL.md",
+        "skills/creview-spec/SKILL.md",
+        "skills/creview/SKILL.md",
+        "skills/ctdd/SKILL.md",
+        "skills/cwtf/SKILL.md",
+        "tests/test-review-driven-lenses.sh",
+        "tests/test-upgrade-compatibility-lens.sh",
+        "tests/test-ux-review-lens.sh"
+      ],
+      "timestamp": "2026-05-22T23:00:00Z"
     }
   ]
 }

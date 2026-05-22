@@ -437,7 +437,7 @@ rm -rf .correctless/
 | **Spec** | A document defining what "correct" means for a feature: testable rules, edge cases, security assumptions. A spec that can't be tested is incomplete. |
 | **Invariant** | A rule that must always be true: "auth tokens expire after 24 hours." Specs are lists of invariants. |
 | **Intensity** | The configured rigor level: standard, high, or critical. Higher intensity unlocks more skills but costs more tokens and time. |
-| **Mini-audit** | After QA clears, six adversarial specialist agents (cross-component interaction, hostile input, resource bounds, upgrade compatibility, UX review, integration depth) hunt for issues the QA lens misses. Runs at the end of `/ctdd`. |
+| **Mini-audit** | After QA clears, six default adversarial specialist agents (cross-component interaction, hostile input, resource bounds, upgrade compatibility, UX review, integration depth) hunt for issues the QA lens misses — plus up to 2 recommended lenses from the review phase tailored to the feature's risk profile. Runs at the end of `/ctdd`. |
 | **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Available at high+ intensity via the adversarial probe round. |
 | **STRIDE** | Threat modeling framework: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege. |
 | **RED / GREEN** | TDD phases. RED = write tests that fail. GREEN = write code to make tests pass. |

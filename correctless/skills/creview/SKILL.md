@@ -1,7 +1,7 @@
 ---
 name: creview
 description: Skeptically review a spec for unstated assumptions, untestable rules, missing edge cases, security gaps, and UX failures. Run after /cspec.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/meta/deferred-findings.json)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/artifacts/lens-recommendations-*), Write(.correctless/meta/deferred-findings.json)
 interaction_mode: hybrid
 ---
 
@@ -320,6 +320,35 @@ For each relevant historical pattern class, present:
 ## Persist Findings (Mandatory)
 
 **Before presenting findings to the user, write them to `.correctless/artifacts/reviews/review-findings-{slug}.md`** (derive slug from the spec file basename). This is not optional — conversation output is ephemeral and findings will be lost if the display fails (AP-029). The artifact is the source of truth; the presentation below renders from it.
+
+## Write Lens Recommendations
+
+After persisting findings, write lens recommendations to `.correctless/artifacts/lens-recommendations-{branch_slug}.json`. Derive `branch_slug` via `workflow-advance.sh status` (the `Branch:` line) or by sourcing `scripts/lib.sh` for the `branch_slug()` function (AP-009 mitigation).
+
+Based on the review findings, recommend specific adversarial lenses for the mini-audit phase. Analyze findings for risk patterns that warrant specialized mini-audit attention and generate recommendations.
+
+Write the artifact with `schema_version: 1`:
+```json
+{
+  "schema_version": 1,
+  "branch": "{branch}",
+  "recommended_lenses": [
+    {
+      "lens_name": "{kebab-case-name}",
+      "rationale": "why this lens matters for this feature",
+      "focus_areas": ["specific thing 1", "specific thing 2"],
+      "severity_guidance": "what constitutes CRITICAL vs HIGH vs MEDIUM for this lens",
+      "source_agent": "single-pass-review",
+      "source_finding": "R-003 or null",
+      "source_finding_summary": "one-line summary of the finding for display without cross-artifact lookup"
+    }
+  ]
+}
+```
+
+The `lens_name` must be kebab-case, unique within the array. `/creview` always uses `source_agent: "single-pass-review"` as the documented constant. The `source_finding` and `source_finding_summary` fields link the recommendation to the originating finding for auditability by `/cwtf`.
+
+**Empty recommendations**: If no findings warrant specialized mini-audit attention, write `"recommended_lenses": []` — this is valid and signals "no feature-specific lenses needed."
 
 ## Output
 

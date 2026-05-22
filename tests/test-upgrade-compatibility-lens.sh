@@ -212,11 +212,11 @@ else
   fail "R-005a" "Progress announcement does not reference 6 specialist agents"
 fi
 
-# R-005b: "Each mini-audit round spawns six specialist agents" (or "6 specialist agents")
-if grep -qE 'spawns six specialist agents|six specialist agents' "$CTDD_SKILL"; then
-  pass "R-005b" "Agent prompt section references six/6 specialist agents"
+# R-005b: "Each mini-audit round spawns ... 6 ... specialist agents" (word or numeral)
+if grep -qE 'spawns (the )?6 (default )?specialist agents|six specialist agents' "$CTDD_SKILL"; then
+  pass "R-005b" "Agent prompt section references 6 specialist agents"
 else
-  fail "R-005b" "Agent prompt section still references five/5 specialist agents"
+  fail "R-005b" "Agent prompt section does not reference 6 specialist agents"
 fi
 
 # R-005c: The agent_role enum includes upgrade-compatibility
