@@ -98,21 +98,6 @@ _now_epoch() {
 # 90-day staleness threshold in seconds
 STALENESS_THRESHOLD=$((90 * 24 * 60 * 60))
 
-# Check if a date is within 90 days
-_is_within_90_days() {
-  local date_epoch="$1"
-  local now_epoch
-  now_epoch="$(_now_epoch)"
-
-  if [ -z "$date_epoch" ] || [ -z "$now_epoch" ]; then
-    # If we can't determine dates, include the entry (fail-open for advisory data)
-    return 0
-  fi
-
-  local age=$(( now_epoch - date_epoch ))
-  [ "$age" -le "$STALENESS_THRESHOLD" ]
-}
-
 # Truncate a string to max_len characters
 _truncate() {
   local str="$1"
@@ -122,6 +107,14 @@ _truncate() {
   else
     echo "$str"
   fi
+}
+
+# Convert epoch to YYYY-MM-DD with GNU-first-BSD-fallback (EA-003)
+_epoch_to_date() {
+  local epoch="$1"
+  date -d "@$epoch" +%Y-%m-%d 2>/dev/null \
+    || date -r "$epoch" +%Y-%m-%d 2>/dev/null \
+    || echo "unknown"
 }
 
 # ============================================================================
@@ -245,9 +238,7 @@ _extract_devadv_themes() {
       local mtime_epoch
       mtime_epoch=$(_file_mtime_epoch "$report")
       if [ -n "$mtime_epoch" ]; then
-        file_date=$(date -d "@$mtime_epoch" +%Y-%m-%d 2>/dev/null) \
-          || file_date=$(date -r "$mtime_epoch" +%Y-%m-%d 2>/dev/null) \
-          || file_date="unknown"
+        file_date=$(_epoch_to_date "$mtime_epoch")
       fi
     fi
 
@@ -364,11 +355,11 @@ _extract_override_patterns() {
 
   all_reasons+="]"
 
-  # Collapse by reason hash (first 8 chars of sha256)
-  entries=$(echo "$all_reasons" | jq '
+  # Collapse by reason, compute sha256 hash for id (first 8 chars)
+  local grouped
+  grouped=$(echo "$all_reasons" | jq '
     group_by(.reason)
     | map({
-        id: (.[0].reason | @base64 | .[0:8]),
         date: (sort_by(.date) | reverse | .[0].date),
         summary: (.[0].reason[:200]),
         file_refs: [],
@@ -378,8 +369,6 @@ _extract_override_patterns() {
       })
   ' 2>/dev/null)
 
-  # Fix id to be sha256 hash instead of base64
-  # Use a jq-native approach: hash the reason string
   local final_entries="["
   local efirst=true
 
@@ -393,14 +382,9 @@ _extract_override_patterns() {
       reason_hash=$(echo -n "$reason_text" | shasum -a 256 2>/dev/null | head -c 8)
     fi
 
-    if [ "$efirst" = true ]; then
-      efirst=false
-    else
-      final_entries+=","
-    fi
-
+    if [ "$efirst" = true ]; then efirst=false; else final_entries+=","; fi
     final_entries+=$(echo "$entry_json" | jq --arg id "$reason_hash" '.id = $id' 2>/dev/null)
-  done < <(echo "$entries" | jq -c '.[]' 2>/dev/null)
+  done < <(echo "$grouped" | jq -c '.[]' 2>/dev/null)
 
   final_entries+="]"
   echo "$final_entries"
@@ -429,9 +413,7 @@ _extract_lens_recommendations() {
     file_mtime=$(_file_mtime_epoch "$lens_file")
     local file_date=""
     if [ -n "$file_mtime" ]; then
-      file_date=$(date -d "@$file_mtime" +%Y-%m-%d 2>/dev/null) \
-        || file_date=$(date -r "$file_mtime" +%Y-%m-%d 2>/dev/null) \
-        || file_date="unknown"
+      file_date=$(_epoch_to_date "$file_mtime")
     fi
 
     while IFS= read -r lens_entry; do
@@ -502,9 +484,7 @@ _extract_debug_clusters() {
     file_mtime=$(_file_mtime_epoch "$debug_file")
     local file_date=""
     if [ -n "$file_mtime" ]; then
-      file_date=$(date -d "@$file_mtime" +%Y-%m-%d 2>/dev/null) \
-        || file_date=$(date -r "$file_mtime" +%Y-%m-%d 2>/dev/null) \
-        || file_date="unknown"
+      file_date=$(_epoch_to_date "$file_mtime")
     fi
 
     # Extract Root Cause text (or first ## heading as fallback)
@@ -656,37 +636,11 @@ debug_clusters=$(_extract_debug_clusters)
 phase_effectiveness=$(_extract_phase_effectiveness)
 
 # ============================================================================
-# INV-003: Recency filter — exclude entries older than 90 days
+# INV-003: Recency filter — exclude entries older than 90 days, sort newest first
 # ============================================================================
 
-_filter_by_recency() {
-  local section_json="$1"
-  local now_epoch
-  now_epoch=$(_now_epoch)
-
-  echo "$section_json" | jq --arg now "$now_epoch" --arg threshold "$STALENESS_THRESHOLD" '
-    map(
-      select(
-        (.date // "") as $d |
-        if $d == "" or $d == "unknown" or $d == "null" then true
-        else
-          # Try to parse date — include if we cant parse (fail-open)
-          ($d | split("T") | .[0]) as $date_part |
-          if ($date_part | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")) then
-            # Use now_epoch and threshold for comparison
-            # jq cant do epoch conversion natively, so we mark for shell filtering
-            true
-          else true
-          end
-        end
-      )
-    )
-    | sort_by(.date) | reverse
-  ' 2>/dev/null
-}
-
-# Shell-based recency filter (since jq can't do epoch math portably)
-_shell_recency_filter() {
+# Shell-based recency filter + sort (jq can't do epoch math portably)
+_filter_and_sort_by_recency() {
   local section_json="$1"
   local now_epoch
   now_epoch=$(_now_epoch)
@@ -723,33 +677,14 @@ _shell_recency_filter() {
   done < <(echo "$section_json" | jq -c '.[]' 2>/dev/null)
 
   filtered+="]"
-  echo "$filtered"
-}
-
-# Sort by recency (newest first) within each section
-_sort_by_recency() {
-  local section_json="$1"
-  echo "$section_json" | jq 'sort_by(.date) | reverse' 2>/dev/null
+  # Sort newest first
+  echo "$filtered" | jq 'sort_by(.date) | reverse' 2>/dev/null
 }
 
 # Apply recency filter and sort to each section
-deferred_findings=$(_shell_recency_filter "$deferred_findings")
-deferred_findings=$(_sort_by_recency "$deferred_findings")
-
-devadv_themes=$(_shell_recency_filter "$devadv_themes")
-devadv_themes=$(_sort_by_recency "$devadv_themes")
-
-override_patterns=$(_shell_recency_filter "$override_patterns")
-override_patterns=$(_sort_by_recency "$override_patterns")
-
-lens_recommendations=$(_shell_recency_filter "$lens_recommendations")
-lens_recommendations=$(_sort_by_recency "$lens_recommendations")
-
-debug_clusters=$(_shell_recency_filter "$debug_clusters")
-debug_clusters=$(_sort_by_recency "$debug_clusters")
-
-phase_effectiveness=$(_shell_recency_filter "$phase_effectiveness")
-phase_effectiveness=$(_sort_by_recency "$phase_effectiveness")
+for _sect in deferred_findings devadv_themes override_patterns lens_recommendations debug_clusters phase_effectiveness; do
+  eval "$_sect=\$(_filter_and_sort_by_recency \"\$$_sect\")"
+done
 
 # ============================================================================
 # INV-002: File-scope filtering
@@ -782,12 +717,9 @@ _apply_scope_filter() {
   echo "$filtered"
 }
 
-deferred_findings=$(_apply_scope_filter "$deferred_findings")
-devadv_themes=$(_apply_scope_filter "$devadv_themes")
-override_patterns=$(_apply_scope_filter "$override_patterns")
-lens_recommendations=$(_apply_scope_filter "$lens_recommendations")
-debug_clusters=$(_apply_scope_filter "$debug_clusters")
-phase_effectiveness=$(_apply_scope_filter "$phase_effectiveness")
+for _sect in deferred_findings devadv_themes override_patterns lens_recommendations debug_clusters phase_effectiveness; do
+  eval "$_sect=\$(_apply_scope_filter \"\$$_sect\")"
+done
 
 # ============================================================================
 # INV-004: Brief size cap (30 entries, per-section minimum)
