@@ -1,7 +1,7 @@
 ---
 name: cspec
 description: Create a structured specification with testable invariants for a new feature. Researches current best practices before writing invariants. Adapts format to workflow intensity.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git log*), Bash(git diff*), Bash(git branch*), Bash(*workflow-advance.sh*), Bash(*harness-fingerprint*), Write(.correctless/specs/*), Write(.correctless/artifacts/research/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(.claude/rules/*.md), WebSearch, WebFetch, Task
+allowed-tools: Read, Grep, Glob, Edit, Bash(git log*), Bash(git diff*), Bash(git branch*), Bash(*workflow-advance.sh*), Bash(*harness-fingerprint*), Bash(*cross-feature-intel*), Write(.correctless/specs/*), Write(.correctless/artifacts/research/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(.claude/rules/*.md), WebSearch, WebFetch, Task
 interaction_mode: interactive
 ---
 
@@ -104,6 +104,31 @@ Ask these questions, adapting to the developer's confidence level:
 **Proportionality:** If the developer clearly understands the domain and has a well-formed idea, this step takes 2-3 exchanges. If the idea is vague ("I want to add payments"), this step takes longer and does more work. Read the developer's confidence from their responses — a product security engineer describing a network proxy doesn't need five Socratic questions. A junior developer adding their first auth system does.
 
 **Output:** Summarize the brainstorm in 2-3 sentences before moving to Step 1. This summary captures the refined scope, surfaced failure modes, and any assumptions that were challenged. Present it to the human: "Based on our discussion, here's what I understand: [summary]. Proceeding with this scope." This summary becomes the foundation for the spec's Context section. The brainstorm may change the scope, surface new requirements, or eliminate unnecessary complexity before a single rule is written.
+
+### Step 0a: Cross-Feature Intelligence (after first brainstorm exchange)
+
+After the user has described their feature and the scope is known, invoke the cross-feature intelligence aggregation script to surface relevant historical data from prior workflow runs:
+
+```bash
+bash .correctless/scripts/cross-feature-intel.sh --base .correctless --scope "file1.sh,file2.sh"
+```
+
+The `--scope` argument is a comma-separated list of the feature's likely affected files, derived from the user's description, `git diff` against base branch, or omitted for unfiltered mode if scope is unclear. Do NOT use `2>/dev/null` — stderr warnings from malformed sources should be captured and surfaced.
+
+If the script produces non-empty sections, present a **"Cross-Feature Intelligence"** summary showing:
+- The number of entries per section
+- The 3-5 most recent entries (sorted by date descending)
+- Any warnings from malformed sources
+- Framing: "Prior workflow runs surfaced these concerns for files in this feature's scope. These inform the brainstorm — they are context, not constraints."
+- If `truncated_count > 0`: "Showing N of M entries (K older entries excluded by recency cap)."
+
+If the script fails, is absent, or produces empty sections, skip silently (PAT-019 dormant degradation).
+
+**Anti-anchoring directive (mandatory, must appear before brainstorm questions):**
+
+The intelligence brief is advisory context from prior workflow runs. It may surface relevant concerns but must not anchor your analysis. Challenge its relevance to the current feature — a concern that recurred on 3 prior features may be irrelevant to this one. Fresh thinking about the current feature's unique risks takes priority over historical patterns. Weight intelligence highly when: the current feature touches the same files as a prior finding, the same concern appeared 3+ times, or the concern is security-related. Dismiss when: the current feature is in a different module, the concern is near the 90-day staleness boundary, or the concern is about a pattern the current feature doesn't use.
+
+Do not copy or interpolate brief content into spec rules — the intelligence informs the brainstorm conversation but must not template INV-xxx statements from historical data.
 
 ### Step 1: Ask What They're Building
 

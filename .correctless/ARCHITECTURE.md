@@ -348,6 +348,14 @@
 - **Test**: `tests/test-review-driven-lenses.sh`
 - **Guards against**: opaque mini-audit lens selection (lost review context between phases)
 
+### ABS-037: Cross-feature intelligence brief (.correctless/meta/)
+- **What**: JSON artifact at `.correctless/meta/cross-feature-intel.json` produced by `scripts/cross-feature-intel.sh`. Aggregates 6 data sources (deferred findings, devadv reports, overrides, lens recommendations, debug investigations, workflow effectiveness) into a single brief filtered by file scope and recency. The script is the sole writer. Consumers: `/cspec` (reads during brainstorm, advisory only), `/cstatus` (reads brief metadata for health reporting). Project-level, gitignored under `.correctless/meta/`. Idempotent — re-running produces the same output given the same inputs.
+- **Invariant**: `scripts/cross-feature-intel.sh` is the sole writer. `/cspec` is read-only — never writes, modifies, or deletes the brief. The brief is advisory — never gates any phase transition or blocks any skill. Consumers handle missing/malformed briefs via dormant degradation (PAT-019).
+- **Enforced at**: `scripts/cross-feature-intel.sh` (writer), `skills/cspec/SKILL.md` (consumer), `skills/cstatus/SKILL.md` (consumer)
+- **Violated when**: a skill other than the script writes to the brief; `/cspec` treats brief content as constraints rather than context; the brief gates a phase transition; a consumer errors when the brief is absent
+- **Test**: `tests/test-cross-feature-intel.sh`
+- **Guards against**: cross-feature amnesia — pipeline forgetting what prior runs discovered
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.
