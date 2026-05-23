@@ -112,6 +112,20 @@ Check whether the review agent was thorough:
 
 **Recommended action**: "Review did not check for CSRF despite the spec touching API endpoints. Run `/creview` again or verify CSRF protection manually."
 
+## Step 5.5: Lens Auditability (INV-010)
+
+Check whether the mini-audit ran the right lenses for this feature. The LENS field is an open enum — handle unknown lens values gracefully from recommended lenses.
+
+**Dormant (PAT-019)**: When the lens recommendation artifact for the current branch does not exist (`.correctless/artifacts/lens-recommendations-{branch_slug}.json`), skip all lens auditability checks with no error and no warning. Only perform these checks when the artifact exists.
+
+When the artifact exists, check:
+
+**(a) Recommended lenses none ran**: If the `recommended_lenses` array is non-empty but the `outcomes` field shows no recommended lenses with `ran: true`, warn: "Review recommended {N} lenses but mini-audit ran none — was the recommendation ignored?"
+
+**(b) CRITICAL finding lens not executed**: For each recommended lens linked to a CRITICAL review finding (check `source_finding` and look up its severity), if the lens has `ran: false` in outcomes, warn: "Lens {lens_name} recommended due to CRITICAL finding {source_finding}: {source_finding_summary} was not executed." The `source_finding_summary` field provides the display text without requiring cross-artifact lookup.
+
+**(c) Lens selection rationale**: Report the full lens selection from the artifact — which lenses were recommended, which were selected (ran), and which were excluded (budget exceeded or other reason from `failure_reason`).
+
 ## Step 6: Deviation Detection
 
 Cross-reference what happened against what should have happened:

@@ -231,6 +231,22 @@ Per audit cycle:
 **Average convergence:** {N} rounds
 **Recurring patterns:** {patterns that keep appearing across runs}
 
+## Mini-Audit Lens Coverage
+
+Read lens data from two sources: (1) qa-findings JSON files (`.correctless/artifacts/qa-findings-*.json`) for LENS fields on MA- findings, and (2) lens recommendation artifacts (`.correctless/artifacts/lens-recommendations-*.json`) for recommended vs. actually-ran data. The LENS field is an open enum — handle unknown lens values gracefully (do not error on unrecognized lens names from recommended lenses).
+
+**Dormant (PAT-019)**: When no lens recommendation artifacts exist under `.correctless/artifacts/`, the Mini-Audit Lens Coverage section is dormant — omitted from output entirely, no error, no warning. Only display this section when at least one `lens-recommendations-*.json` file exists.
+
+When data exists, report:
+
+**(a) Lenses ran across recent features** — from qa-findings JSON LENS fields. Count how many times each lens value appeared across features.
+
+**(b) Recommended lenses vs actually ran** — from lens recommendation artifacts. For each feature with a recommendation artifact, show which recommended lenses were suggested and which actually ran (from the `outcomes` field).
+
+**(c) Finding yield per lens** — findings count divided by times the lens ran. Lenses with zero yield across 3+ features may be stale.
+
+**(d) Promotion candidates** — lenses recommended 3+ times across features are flagged as candidates for promotion to the core lens set or for a new PAT-xxx entry in `.correctless/ARCHITECTURE.md`.
+
 ## Velocity
 - **Average feature duration:** {N} days (branch creation to merge)
 - **Features per month:** {N}
