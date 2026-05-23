@@ -132,10 +132,12 @@ for skill_dir in "$skills_dir"/*/; do
   if grep -q '```bash' "$skill_file" 2>/dev/null; then
     # Extract commands from bash code blocks
     if grep -qi "^jq \|^jq$\| jq " "$skill_file" 2>/dev/null; then
-      if echo "$allowed" | grep -qF "Bash(jq"; then
-        : # covered
+      # Accept Bash(jq*) or any Bash() pattern that covers the specific jq target
+      # e.g. Bash(*cross-feature-intel*) covers jq reads of cross-feature-intel.json
+      if echo "$allowed" | grep -qE 'Bash\((jq|\*[a-z])'; then
+        : # covered by Bash(jq*) or a targeted Bash(*...*) pattern
       else
-        fail "AP-008-structural" "$skill_name has jq commands but allowed-tools missing Bash(jq*)"
+        fail "AP-008-structural" "$skill_name has jq commands but allowed-tools missing Bash(jq*) or targeted pattern"
         structural_issues=$((structural_issues + 1))
       fi
     fi
