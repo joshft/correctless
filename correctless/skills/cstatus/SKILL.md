@@ -237,6 +237,8 @@ Check the state of the cross-feature intelligence brief and its data sources. Th
 
 3. **Current**: When the brief exists and is less than 7 days old, display brief age and entry count per section.
 
+**Threshold proximity reporting**: When the brief exists (states 2 or 3), report threshold proximity for entries — the occurrence-level breakdown showing how many entries are at each count below the threshold. For example: "5 entries at 2/3 occurrences, 3 entries at 1/3, 2 entries above threshold." This provides diagnostic visibility for users investigating why intelligence is not surfacing in reviews. Read occurrence counts via `jq '[.sections | to_entries[] | .value[] | .occurrences // 0]' .correctless/meta/cross-feature-intel.json`.
+
 **Dormant when the script itself (`scripts/cross-feature-intel.sh` or `.correctless/scripts/cross-feature-intel.sh`) does not exist** — pre-upgrade projects should see no intelligence health output (PAT-019). When the script does not exist, omit this section entirely.
 
 ### 7. Health Check (if requested)

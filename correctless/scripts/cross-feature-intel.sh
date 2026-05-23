@@ -38,6 +38,7 @@ fi
 
 BASE_DIR=""
 SCOPE_ARG=""
+MIN_OCCURRENCES=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -47,6 +48,10 @@ while [ $# -gt 0 ]; do
       ;;
     --scope)
       SCOPE_ARG="$2"
+      shift 2
+      ;;
+    --min-occurrences)
+      MIN_OCCURRENCES="$2"
       shift 2
       ;;
     *)
@@ -826,25 +831,253 @@ TRUNCATED_COUNT=0
 _apply_cap
 
 # ============================================================================
-# Build output JSON
+# INV-007: Occurrence tracking — persists across regenerations
+# Uses locked_update_file() from lib.sh (ABS-003 pattern) for the
+# read-modify-write cycle on the brief file.
 # ============================================================================
 
-# Build scope array for output
+BRIEF_FILE="$BASE_DIR/meta/cross-feature-intel.json"
+
+_apply_occurrence_tracking() {
+  # Collect all current entry IDs from the new generation
+  local new_ids="["
+  local nfirst=true
+  for _sect in deferred_findings devadv_themes override_patterns lens_recommendations debug_clusters phase_effectiveness; do
+    local sect_data
+    eval "sect_data=\$$_sect"
+    while IFS= read -r entry; do
+      [ -z "$entry" ] && continue
+      local eid
+      eid=$(echo "$entry" | jq -r '.id // empty' 2>/dev/null)
+      [ -z "$eid" ] && continue
+      if [ "$nfirst" = true ]; then nfirst=false; else new_ids+=","; fi
+      new_ids+="\"$eid\""
+    done < <(echo "$sect_data" | jq -c '.[]' 2>/dev/null)
+  done
+  new_ids+="]"
+
+  # Read existing brief for prior occurrence counts and dormant counts
+  local prior_occurrences="{}"
+  local prior_dormant="{}"
+  if [ -f "$BRIEF_FILE" ]; then
+    # Extract occurrences from existing entries (keyed by id)
+    prior_occurrences=$(jq '
+      [.sections | to_entries[] | .value[] | select(.id != null)]
+      | map({key: .id, value: (.occurrences // 0)})
+      | from_entries
+    ' "$BRIEF_FILE" 2>/dev/null) || prior_occurrences="{}"
+
+    # Extract _dormant_counts
+    prior_dormant=$(jq '._dormant_counts // {}' "$BRIEF_FILE" 2>/dev/null) || prior_dormant="{}"
+  fi
+
+  # For each section, update occurrence counts
+  for _sect in deferred_findings devadv_themes override_patterns lens_recommendations debug_clusters phase_effectiveness; do
+    local sect_data
+    eval "sect_data=\$$_sect"
+    local updated="["
+    local ufirst=true
+
+    while IFS= read -r entry; do
+      [ -z "$entry" ] && continue
+      local eid
+      eid=$(echo "$entry" | jq -r '.id // empty' 2>/dev/null)
+
+      local new_occ=1
+      if [ -n "$eid" ]; then
+        # Check if entry was in prior brief
+        local prior_count
+        prior_count=$(echo "$prior_occurrences" | jq --arg id "$eid" '.[$id] // null' 2>/dev/null)
+        if [ "$prior_count" != "null" ] && [ -n "$prior_count" ]; then
+          # Entry existed before — increment
+          new_occ=$(( prior_count + 1 ))
+        else
+          # Check dormant counts — entry may be re-entering
+          local dormant_count
+          dormant_count=$(echo "$prior_dormant" | jq --arg id "$eid" '.[$id] // null' 2>/dev/null)
+          if [ "$dormant_count" != "null" ] && [ -n "$dormant_count" ]; then
+            # Validate dormant count is a number (BND-003 corruption handling)
+            if [[ "$dormant_count" =~ ^[0-9]+$ ]]; then
+              new_occ=$(( dormant_count + 1 ))
+            fi
+            # else: corrupted value, restart at 1 (fail-open)
+          fi
+        fi
+      fi
+
+      if [ "$ufirst" = true ]; then ufirst=false; else updated+=","; fi
+      updated+=$(echo "$entry" | jq --argjson occ "$new_occ" '. + {occurrences: $occ}' 2>/dev/null)
+    done < <(echo "$sect_data" | jq -c '.[]' 2>/dev/null)
+
+    updated+="]"
+    eval "$_sect=\$updated"
+  done
+
+  # Build _dormant_counts: entries in prior brief that are NOT in new generation
+  # Preserve their count for future re-appearance
+  local new_dormant="{"
+  local dfirst=true
+  local now_epoch
+  now_epoch=$(_now_epoch)
+
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    # Check if this entry is in the new generation
+    local in_new
+    in_new=$(echo "$new_ids" | jq --arg id "$key" 'map(select(. == $id)) | length' 2>/dev/null)
+    if [ "$in_new" = "0" ] 2>/dev/null; then
+      # Entry left the brief — check prior brief for its count
+      local count
+      count=$(echo "$prior_occurrences" | jq --arg id "$key" '.[$id] // null' 2>/dev/null)
+      if [ "$count" != "null" ] && [ -n "$count" ]; then
+        if [ "$dfirst" = true ]; then dfirst=false; else new_dormant+=","; fi
+        new_dormant+="\"$key\":$count"
+      fi
+    fi
+  done < <(echo "$prior_occurrences" | jq -r 'keys[]' 2>/dev/null)
+
+  # Also preserve existing dormant entries that are not in new generation
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    local in_new
+    in_new=$(echo "$new_ids" | jq --arg id "$key" 'map(select(. == $id)) | length' 2>/dev/null)
+    if [ "$in_new" = "0" ] 2>/dev/null; then
+      # Check we haven't already added this key
+      if ! echo "$new_dormant" | grep -q "\"$key\""; then
+        local dval
+        dval=$(echo "$prior_dormant" | jq --arg id "$key" '.[$id] // null' 2>/dev/null)
+        if [ "$dval" != "null" ] && [ -n "$dval" ] && [[ "$dval" =~ ^[0-9]+$ ]]; then
+          if [ "$dfirst" = true ]; then dfirst=false; else new_dormant+=","; fi
+          new_dormant+="\"$key\":$dval"
+        fi
+      fi
+    fi
+  done < <(echo "$prior_dormant" | jq -r 'keys[]' 2>/dev/null)
+
+  new_dormant+="}"
+
+  # Dormant eviction: remove entries older than 90 days and cap at 100
+  # Since we don't track dormant entry dates, we evict by cap only
+  # (90-day eviction applies to the main brief entries via the recency filter)
+  local dormant_evicted
+  dormant_evicted=$(echo "$new_dormant" | jq '
+    # Cap at 100 entries — evict oldest (alphabetically first as proxy)
+    if (keys | length) > 100 then
+      [to_entries | sort_by(.key) | reverse | .[:100] | from_entries][0]
+    else . end
+  ' 2>/dev/null) || dormant_evicted="$new_dormant"
+
+  DORMANT_COUNTS="$dormant_evicted"
+}
+
+_apply_occurrence_tracking
+
+# ============================================================================
+# INV-007: Write brief file to disk via locked_update_file()
+# The script is stateful — each run mutates occurrence counts.
+# ABS-037: sole writer of .correctless/meta/cross-feature-intel.json
+# ============================================================================
+
+# ============================================================================
+# Shared metadata: compute scope and warnings arrays once for both
+# the on-disk brief and stdout output.
+# ============================================================================
+
 scope_json="[]"
 if [ ${#SCOPE_FILES[@]} -gt 0 ]; then
   scope_json=$(printf '%s\n' "${SCOPE_FILES[@]}" | jq -R . | jq -s . 2>/dev/null) || scope_json="[]"
 fi
 
-# Build warnings array from temp file
 warnings_json="[]"
 if [ -s "$WARNINGS_FILE" ]; then
   warnings_json=$(jq -R . < "$WARNINGS_FILE" | jq -s . 2>/dev/null) || warnings_json="[]"
 fi
 
-# Build generated_at timestamp
 generated_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")
 
-# Assemble final JSON
+# ============================================================================
+# INV-007: Write brief file to disk (atomic tmp+mv)
+# The script is stateful — each run mutates occurrence counts.
+# ABS-037: sole writer of .correctless/meta/cross-feature-intel.json
+#
+# locked_update_file() from lib.sh is designed for jq-filter-on-existing-file
+# transforms. Here we write the complete JSON from scratch, so we use
+# the same atomic tmp+mv pattern directly.
+# ============================================================================
+
+_write_brief_to_disk() {
+  mkdir -p "$(dirname "$BRIEF_FILE")"
+
+  local full_json
+  full_json=$(jq -n \
+    --argjson schema_version 1 \
+    --arg generated_at "$generated_at" \
+    --argjson scope "$scope_json" \
+    --argjson truncated_count "$TRUNCATED_COUNT" \
+    --argjson warnings "$warnings_json" \
+    --argjson df "$deferred_findings" \
+    --argjson dv "$devadv_themes" \
+    --argjson op "$override_patterns" \
+    --argjson lr "$lens_recommendations" \
+    --argjson dc "$debug_clusters" \
+    --argjson pe "$phase_effectiveness" \
+    --argjson dormant "$DORMANT_COUNTS" \
+    '{
+      schema_version: $schema_version,
+      generated_at: $generated_at,
+      scope: $scope,
+      truncated_count: $truncated_count,
+      warnings: $warnings,
+      sections: {
+        deferred_findings: $df,
+        devadv_themes: $dv,
+        override_patterns: $op,
+        lens_recommendations: $lr,
+        debug_clusters: $dc,
+        phase_effectiveness: $pe
+      },
+      _dormant_counts: $dormant
+    }' 2>/dev/null)
+
+  if [ -n "$full_json" ]; then
+    echo "$full_json" > "${BRIEF_FILE}.$$.tmp" 2>/dev/null
+    if [ -f "${BRIEF_FILE}.$$.tmp" ]; then
+      mv "${BRIEF_FILE}.$$.tmp" "$BRIEF_FILE" 2>/dev/null || rm -f "${BRIEF_FILE}.$$.tmp"
+    fi
+  fi
+}
+
+_write_brief_to_disk
+
+# ============================================================================
+# INV-002: --min-occurrences stdout filter
+# Filters stdout only — the on-disk file always has all entries.
+# ============================================================================
+
+_apply_min_occurrences_filter() {
+  if [ -z "$MIN_OCCURRENCES" ]; then
+    return  # No filter — all entries pass through
+  fi
+
+  local min_n="$MIN_OCCURRENCES"
+
+  for _sect in deferred_findings devadv_themes override_patterns lens_recommendations debug_clusters phase_effectiveness; do
+    local sect_data
+    eval "sect_data=\$$_sect"
+    local filtered
+    filtered=$(echo "$sect_data" | jq --argjson min "$min_n" '
+      [.[] | select((.occurrences // 0) >= $min)]
+    ' 2>/dev/null) || filtered="$sect_data"
+    eval "$_sect=\$filtered"
+  done
+}
+
+_apply_min_occurrences_filter
+
+# ============================================================================
+# Build output JSON (stdout — after --min-occurrences filter if applicable)
+# ============================================================================
+
 jq -n \
   --argjson schema_version 1 \
   --arg generated_at "$generated_at" \
