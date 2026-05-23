@@ -4,7 +4,7 @@
 # RED phase: these tests MUST FAIL — entries and checks don't exist yet.
 # Run from repo root: bash tests/test-test-evasion-antipatterns.sh
 
-set -uo pipefail
+set -u
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PASS=0

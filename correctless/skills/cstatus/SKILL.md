@@ -227,6 +227,18 @@ Read `.correctless/meta/deferred-findings.json` if it exists. Show the following
 
 **Drift detection**: If review artifacts (`.correctless/artifacts/review-spec-findings-*.md` or `.correctless/artifacts/review-findings-*.md` or `.correctless/artifacts/reviews/review-findings-*.md`) contain "pending" findings not present in the backlog, suggest: "Review artifacts contain pending findings not in the backlog. Run `bash scripts/sync-deferred-backlog.sh` to re-sync."
 
+### 6c. Cross-Feature Intelligence Health
+
+Check the state of the cross-feature intelligence brief and its data sources. Three states:
+
+1. **No data**: When `.correctless/meta/cross-feature-intel.json` does not exist AND no data sources have content (no deferred findings, no devadv reports, no overrides, no lens recommendations, no debug investigations, no workflow effectiveness data), display: "No cross-feature intelligence available yet — data accumulates as features complete review, audit, or debug phases."
+
+2. **Stale**: When the brief exists but is older than 7 days (based on file mtime), display brief age, entry count per section, and remediation: "Cross-feature intelligence brief is {N} days old. Will refresh on next /cspec run, or run: bash .correctless/scripts/cross-feature-intel.sh"
+
+3. **Current**: When the brief exists and is less than 7 days old, display brief age and entry count per section.
+
+**Dormant when the script itself (`scripts/cross-feature-intel.sh` or `.correctless/scripts/cross-feature-intel.sh`) does not exist** — pre-upgrade projects should see no intelligence health output (PAT-019). When the script does not exist, omit this section entirely.
+
 ### 7. Health Check (if requested)
 
 If the human asks "is everything set up correctly?" or similar, validate:
