@@ -35,13 +35,18 @@ mkworkdir() {
   echo "$d"
 }
 
+# Helper: run cross-feature-intel.sh with --base and optional extra args
+# Usage: run_intel <base_dir> [extra_args...]
+run_intel() {
+  local base="$1"; shift
+  bash "$INTEL_SCRIPT" --base "$base/.correctless" "$@" 2>&1
+}
+
 # Helper: create a fixture directory with all 6 data source directories
 setup_fixture_dirs() {
   local base="$1"
   mkdir -p "$base/.correctless/meta/overrides"
   mkdir -p "$base/.correctless/artifacts/devadv"
-  mkdir -p "$base/.correctless/artifacts"
-  mkdir -p "$base/.correctless/meta"
 }
 
 # Helper: write a valid deferred-findings fixture
@@ -360,7 +365,7 @@ inv001c_dir=$(mkworkdir inv001c)
 setup_fixture_dirs "$inv001c_dir"
 # Empty dirs, no source files at all
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv001c_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv001c_dir")
   rc=$?
   if [ $rc -eq 0 ] && echo "$output" | jq -e '.sections' >/dev/null 2>&1; then
     pass "INV-001c" "script handles all missing sources gracefully (exit 0, valid JSON)"
@@ -382,7 +387,7 @@ write_debug_investigation "$inv001d_dir"
 write_workflow_effectiveness "$inv001d_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv001d_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv001d_dir")
   rc=$?
   if [ $rc -eq 0 ]; then
     section_count=$(echo "$output" | jq -r '.sections | keys | length' 2>/dev/null)
@@ -412,7 +417,7 @@ write_debug_investigation "$inv002a_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
   # With scope matching the debug investigation's file refs
-  output=$(bash "$INTEL_SCRIPT" --base "$inv002a_dir/.correctless" --scope "hooks/workflow-gate.sh,tests/test-core.sh" 2>&1)
+  output=$(run_intel "$inv002a_dir" --scope "hooks/workflow-gate.sh,tests/test-core.sh")
   debug_count=$(echo "$output" | jq -r '.sections.debug_clusters | length' 2>/dev/null)
   if [ "$debug_count" -gt 0 ] 2>/dev/null; then
     pass "INV-002a" "entries with matching file_refs included when scope overlaps"
@@ -429,7 +434,7 @@ setup_fixture_dirs "$inv002b_dir"
 write_deferred_findings "$inv002b_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv002b_dir/.correctless" --scope "some/unrelated/file.sh" 2>&1)
+  output=$(run_intel "$inv002b_dir" --scope "some/unrelated/file.sh")
   df_count=$(echo "$output" | jq -r '.sections.deferred_findings | length' 2>/dev/null)
   if [ "$df_count" -gt 0 ] 2>/dev/null; then
     pass "INV-002b" "entries without file_refs included unconditionally"
@@ -447,7 +452,7 @@ write_deferred_findings "$inv002c_dir"
 write_debug_investigation "$inv002c_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv002c_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv002c_dir")
   df_count=$(echo "$output" | jq -r '.sections.deferred_findings | length' 2>/dev/null)
   debug_count=$(echo "$output" | jq -r '.sections.debug_clusters | length' 2>/dev/null)
   if [ "$df_count" -gt 0 ] 2>/dev/null && [ "$debug_count" -gt 0 ] 2>/dev/null; then
@@ -465,7 +470,7 @@ setup_fixture_dirs "$inv002d_dir"
 write_debug_investigation "$inv002d_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv002d_dir/.correctless" --scope "totally/unrelated/path.py" 2>&1)
+  output=$(run_intel "$inv002d_dir" --scope "totally/unrelated/path.py")
   debug_count=$(echo "$output" | jq -r '.sections.debug_clusters | length' 2>/dev/null)
   if [ "$debug_count" = "0" ] 2>/dev/null; then
     pass "INV-002d" "entries with non-overlapping file_refs excluded"
@@ -522,7 +527,7 @@ cat > "$inv003a_dir/.correctless/meta/deferred-findings.json" << 'FIXTURE'
 FIXTURE
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv003a_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv003a_dir")
   old_present=$(echo "$output" | jq -r '.sections.deferred_findings[] | select(.id == "DF-001")' 2>/dev/null)
   recent_present=$(echo "$output" | jq -r '.sections.deferred_findings[] | select(.id == "DF-002")' 2>/dev/null)
   if [ -z "$old_present" ] && [ -n "$recent_present" ]; then
@@ -572,7 +577,7 @@ cat > "$inv003b_dir/.correctless/meta/deferred-findings.json" << 'FIXTURE'
 FIXTURE
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv003b_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv003b_dir")
   first_id=$(echo "$output" | jq -r '.sections.deferred_findings[0].id' 2>/dev/null)
   if [ "$first_id" = "DF-002" ]; then
     pass "INV-003b" "entries sorted newest first within sections"
@@ -603,7 +608,7 @@ findings_json+=']}'
 echo "$findings_json" > "$inv004a_dir/.correctless/meta/deferred-findings.json"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv004a_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv004a_dir")
   total_entries=$(echo "$output" | jq '[.sections[] | length] | add' 2>/dev/null)
   truncated=$(echo "$output" | jq -r '.truncated_count' 2>/dev/null)
   if [ "$total_entries" -le 30 ] 2>/dev/null && [ "$truncated" -gt 0 ] 2>/dev/null; then
@@ -630,7 +635,7 @@ write_devadv_report_inline "$inv004b_dir" "2026-05-01"
 write_debug_investigation "$inv004b_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv004b_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv004b_dir")
   devadv_count=$(echo "$output" | jq '.sections.devadv_themes | length' 2>/dev/null)
   debug_count=$(echo "$output" | jq '.sections.debug_clusters | length' 2>/dev/null)
   total=$(echo "$output" | jq '[.sections[] | length] | add' 2>/dev/null)
@@ -656,7 +661,7 @@ setup_fixture_dirs "$inv005a_dir"
 write_deferred_findings "$inv005a_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv005a_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv005a_dir")
   schema_ok=true
   echo "$output" | jq -e '.schema_version == 1' >/dev/null 2>&1 || schema_ok=false
   echo "$output" | jq -e '.generated_at' >/dev/null 2>&1 || schema_ok=false
@@ -720,7 +725,7 @@ cat > "$inv005c_dir/.correctless/meta/deferred-findings.json" << FIXTURE
 FIXTURE
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv005c_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv005c_dir")
   summary_len=$(echo "$output" | jq -r '.sections.deferred_findings[0].summary | length' 2>/dev/null)
   if [ "$summary_len" -le 200 ] 2>/dev/null; then
     pass "INV-005c" "entry summary truncated to 200 chars (got $summary_len)"
@@ -735,7 +740,7 @@ fi
 if [ -x "$INTEL_SCRIPT" ]; then
   inv005d_dir=$(mkworkdir inv005d)
   setup_fixture_dirs "$inv005d_dir"
-  output=$(bash "$INTEL_SCRIPT" --base "$inv005d_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv005d_dir")
   sections_ok=true
   for section in deferred_findings devadv_themes override_patterns lens_recommendations debug_clusters phase_effectiveness; do
     echo "$output" | jq -e ".sections.$section | type == \"array\"" >/dev/null 2>&1 || sections_ok=false
@@ -755,7 +760,7 @@ setup_fixture_dirs "$inv005e_dir"
 echo "NOT VALID JSON{{{" > "$inv005e_dir/.correctless/meta/deferred-findings.json"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv005e_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv005e_dir")
   warning_count=$(echo "$output" | jq '.warnings | length' 2>/dev/null)
   if [ "$warning_count" -gt 0 ] 2>/dev/null; then
     pass "INV-005e" "warnings populated for malformed sources ($warning_count warnings)"
@@ -870,7 +875,7 @@ setup_fixture_dirs "$inv008_dir"
 write_deferred_findings "$inv008_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv008_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv008_dir")
 
   # INV-008a: Only open findings extracted
   open_count=$(echo "$output" | jq '[.sections.deferred_findings[] | select(.id == "DF-001" or .id == "DF-003")] | length' 2>/dev/null)
@@ -909,7 +914,7 @@ write_devadv_report_inline "$inv009_dir" "2026-05-10"
 write_devadv_report_subsection "$inv009_dir" "2026-05-16"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv009_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv009_dir")
 
   # INV-009a: DA-NNN headings extracted
   da_ids=$(echo "$output" | jq -r '.sections.devadv_themes[].id' 2>/dev/null | sort)
@@ -971,7 +976,7 @@ setup_fixture_dirs "$inv010_dir"
 write_overrides "$inv010_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv010_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv010_dir")
 
   # INV-010a: Override entries extracted
   override_count=$(echo "$output" | jq '.sections.override_patterns | length' 2>/dev/null)
@@ -1025,7 +1030,7 @@ setup_fixture_dirs "$inv011_dir"
 write_lens_recommendations "$inv011_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv011_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv011_dir")
 
   # INV-011a: Lens recommendations extracted
   lens_count=$(echo "$output" | jq '.sections.lens_recommendations | length' 2>/dev/null)
@@ -1079,7 +1084,7 @@ setup_fixture_dirs "$inv012_dir"
 write_debug_investigation "$inv012_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv012_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv012_dir")
 
   # INV-012a: Debug investigation extracted
   debug_count=$(echo "$output" | jq '.sections.debug_clusters | length' 2>/dev/null)
@@ -1250,7 +1255,7 @@ setup_fixture_dirs "$inv016_dir"
 write_workflow_effectiveness "$inv016_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$inv016_dir/.correctless" 2>&1)
+  output=$(run_intel "$inv016_dir")
 
   # INV-016a: Phase effectiveness entries extracted
   pe_count=$(echo "$output" | jq '.sections.phase_effectiveness | length' 2>/dev/null)
@@ -1371,7 +1376,7 @@ setup_fixture_dirs "$bnd001_dir"
 # All directories empty — no source files
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$bnd001_dir/.correctless" 2>&1)
+  output=$(run_intel "$bnd001_dir")
   rc=$?
 
   # BND-001a: Valid JSON output
@@ -1421,7 +1426,7 @@ write_debug_investigation "$bnd002_dir"
 # Only debug investigations have file_refs — use a scope that doesn't match
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$bnd002_dir/.correctless" --scope "totally/different/path.go" 2>&1)
+  output=$(run_intel "$bnd002_dir" --scope "totally/different/path.go")
   debug_count=$(echo "$output" | jq '.sections.debug_clusters | length' 2>/dev/null)
   if [ "$debug_count" = "0" ]; then
     pass "BND-002" "entries with non-matching file_refs excluded by scope filter"
@@ -1445,7 +1450,7 @@ echo "THIS IS NOT JSON!!!" > "$bnd003_dir/.correctless/meta/deferred-findings.js
 write_devadv_report_inline "$bnd003_dir" "2026-05-10"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$bnd003_dir/.correctless" 2>&1)
+  output=$(run_intel "$bnd003_dir")
   rc=$?
 
   # BND-003a: Script does not crash on malformed input
@@ -1550,7 +1555,7 @@ write_debug_investigation "$integ_dir"
 write_workflow_effectiveness "$integ_dir"
 
 if [ -x "$INTEL_SCRIPT" ]; then
-  output=$(bash "$INTEL_SCRIPT" --base "$integ_dir/.correctless" 2>&1)
+  output=$(run_intel "$integ_dir")
   rc=$?
 
   # Full pipeline produces valid JSON
