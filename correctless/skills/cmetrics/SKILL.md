@@ -45,19 +45,19 @@ Read everything in the accumulation layer. Skip files that don't exist.
 
 **Features completed** — count of spec files in `.correctless/specs/`
 
-**Total issues caught** — sum of:
+**Total issues caught pre-merge** — sum of per-feature gate catches only:
 - Rules added during review (count rules in final spec minus rules in initial draft — approximate by counting total rules per spec)
 - QA findings across all `qa-findings-*.json` files
 - Verification findings from all verification reports
-- Olympics findings from all audit history files
 
-**Issues by phase** — categorize each issue by which phase caught it:
+Audit findings are NOT included — any issue found outside the per-feature TDD workflow (review → test audit → QA → verify) is an escape by definition. Audit findings belong in the escape column (see "Escape Rate" below).
+
+**Issues by phase** — categorize each issue by which per-feature phase caught it:
 - Spec: rules that reference antipatterns or templates
 - Review: rules added after initial draft (higher-numbered rules in the spec)
 - Test audit: findings from QA rounds labeled as test-quality issues
 - QA: all findings in qa-findings files
 - Verify: findings in verification reports
-- Audit: findings in Olympics history
 
 **Escape rate (three-gate breakdown)** — replaces the single "Bug escape rate" line with a three-gate model:
 - **Per-feature escapes**: issues caught by a later per-feature gate. Derived from `qa-findings-*.json` — count of BLOCKING findings across all files. NON-BLOCKING and UNCERTAIN findings are excluded (advisory observations, not escaped defects). Note: QA findings use BLOCKING/NON-BLOCKING/UNCERTAIN severity vocabulary, distinct from audit findings' critical/high/medium/low/info vocabulary.
@@ -140,18 +140,18 @@ Print to conversation AND write to `.correctless/artifacts/metrics-{date}.md`:
 
 ## Overview
 - **Features completed:** {N} (from spec count)
-- **Total issues caught:** {N}
-- **Bug escape rate:** {N} escaped / {M} caught ({percentage}%)
+- **Issues caught pre-merge:** {N} (per-feature gates only — review, test audit, QA, verify)
+- **Issues escaped to audit:** {N} (found by /caudit after landing on main)
+- **Issues escaped to production:** {N} (PMBs)
 - **Workflow active since:** {date of first spec file}
 
-## Issues by Phase
+## Issues by Phase (Pre-Merge Gates)
 | Phase | Issues Caught | % of Total | Notes |
 |-------|--------------|------------|-------|
 | Review | {N} | {%} | {e.g., "Security checklist added 40% of these"} |
 | Test Audit | {N} | {%} | |
 | QA | {N} | {%} | {e.g., "3 class fixes added structural tests"} |
 | Verify | {N} | {%} | |
-| Audit (Olympics) | {N} | {%} | |
 
 ## Escape Rate (Three-Gate Breakdown)
 
@@ -293,12 +293,13 @@ If fewer than 3 high+ features exist, omit the warning: "Insufficient data — f
 If `fix_rounds_triggered` > 0 in recent features, report the activation count: "Fix-round loop activated in {N}/{M} recent high+ features ({total} fix rounds total)."
 
 ## ROI Estimate
-- **Issues caught:** {N}
-- **Estimated fix time if found in production:** {N} × 2 hours avg = {N} hours
+- **Issues caught pre-merge:** {N} (per-feature gates only)
+- **Issues escaped to audit:** {N} (caught post-merge by /caudit)
+- **Estimated fix time if found in production:** {pre-merge caught} × 2 hours avg = {N} hours
 - **Workflow time invested:** {features} × {overhead per feature} = {N} hours
 - **Net time saved:** {production fix time} - {workflow time} = {N} hours
 
-{This is a rough estimate. Production bugs take 2-10x longer to fix than pre-merge bugs due to debugging, hotfixes, rollbacks, and incident response. The 2-hour average is conservative.}
+{This is a rough estimate. Production bugs take 2-10x longer to fix than pre-merge bugs due to debugging, hotfixes, rollbacks, and incident response. The 2-hour average is conservative. Audit escapes are excluded from ROI — they were caught post-merge, so the per-feature workflow didn't prevent them.}
 
 ## Health Analysis
 - **QA Round Trend:** {e.g., "Averaging 2.3 rounds — trending down from 3.1 last quarter."}
