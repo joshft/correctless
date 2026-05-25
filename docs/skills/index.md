@@ -6,7 +6,7 @@ has_children: true
 
 # Skills
 
-Correctless ships 31 skills — slash commands that enforce a structured development workflow. Each skill is a specific step in the pipeline, from writing specs to merging code.
+Correctless ships 32 skills — slash commands that enforce a structured development workflow. Each skill is a specific step in the pipeline, from writing specs to merging code.
 
 Skills are organized into five categories:
 

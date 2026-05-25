@@ -889,11 +889,11 @@ else
   fail "INV-011b" "sync-deferred-backlog.sh does not exist"
 fi
 
-# INV-011c: skill count is updated (30 → 31)
-if grep -q '31' "$SYNC_SCRIPT" && grep -qi 'all.*31\|31.*skill' "$SYNC_SCRIPT"; then
-  pass "INV-011c" "sync.sh skill count updated to 31"
+# INV-011c: skill count is updated (31 → 32)
+if grep -q '32' "$SYNC_SCRIPT" && grep -qi 'all.*32\|32.*skill' "$SYNC_SCRIPT"; then
+  pass "INV-011c" "sync.sh skill count updated to 32"
 else
-  fail "INV-011c" "sync.sh still has old skill count (not 31)"
+  fail "INV-011c" "sync.sh still has old skill count (not 32)"
 fi
 
 # INV-011d: distribution ctriage exists
@@ -1173,19 +1173,19 @@ fi
 
 section "Cascade: skill count updates"
 
-# chelp skill count should reference 31
-if grep -q '31' "$CHELP_SKILL"; then
-  pass "CASCADE-001" "/chelp references skill count 31"
+# chelp skill count should reference 32
+if grep -q '32' "$CHELP_SKILL"; then
+  pass "CASCADE-001" "/chelp references skill count 32"
 else
-  fail "CASCADE-001" "/chelp still has old skill count (not 31)"
+  fail "CASCADE-001" "/chelp still has old skill count (not 32)"
 fi
 
-# AGENT_CONTEXT skill count should reference 31
+# AGENT_CONTEXT skill count should reference 32
 agent_ctx="$REPO_DIR/.correctless/AGENT_CONTEXT.md"
-if grep -q '31 skill' "$agent_ctx"; then
-  pass "CASCADE-002" "AGENT_CONTEXT.md references 31 skills"
+if grep -q '32 skill' "$agent_ctx"; then
+  pass "CASCADE-002" "AGENT_CONTEXT.md references 32 skills"
 else
-  fail "CASCADE-002" "AGENT_CONTEXT.md still has old skill count (not 31 skills)"
+  fail "CASCADE-002" "AGENT_CONTEXT.md still has old skill count (not 32 skills)"
 fi
 
 # ============================================================================

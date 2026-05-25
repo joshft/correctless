@@ -357,6 +357,15 @@
 - **Test**: `tests/test-cross-feature-intel.sh`, `tests/test-review-intel-consumer.sh`
 - **Guards against**: cross-feature amnesia — pipeline forgetting what prior runs discovered
 
+### ABS-038: Archive file contract (.correctless/)
+- **What**: Three archive files — `.correctless/ARCHITECTURE_DEPRECATED.md` (architecture entries), `.correctless/antipatterns-archived.md` (antipatterns), `.correctless/CLAUDE_LEARNINGS_ARCHIVED.md` (CLAUDE.md learnings). Committed to the repo (not gitignored). Each file has a header comment explaining its purpose, created on first use (BND-001).
+- **Sole writer**: `/cprune` (via the SKILL.md orchestrator, not the scanner script — the scanner only detects candidates, the skill executes the archive operations).
+- **Invariant**: Only `/cprune` writes to archive files. Archived entries retain their original IDs. New entries in the active file must increment past the highest ID ever used (active + archived). Archive files are SFG-protected (INV-016).
+- **Enforced at**: `skills/cprune/SKILL.md` (writer), `hooks/sensitive-file-guard.sh` (SFG protection), `tests/test-cprune.sh` (behavioral tests)
+- **Violated when**: a tool other than `/cprune` writes to an archive file; an archived entry's ID is reused for a new active entry; an archive file is gitignored
+- **Test**: `tests/test-cprune.sh` — INV-004, INV-016, BND-001
+- **Guards against**: AP-005 (stale docs — the archive preserves context), AP-022 (dead code in security paths — SFG protection)
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.
