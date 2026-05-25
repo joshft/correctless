@@ -165,8 +165,8 @@ if [ "$CHECK_ONLY" = true ]; then
     fi
   fi
 
-  # Hooks and scripts: check for stale .sh files
-  for dir in hooks scripts; do
+  # Hooks, scripts, and scripts/wf: check for stale .sh files
+  for dir in hooks scripts scripts/wf; do
     if [ -d "correctless/$dir" ]; then
       for dist_file in "correctless/$dir"/*.sh; do
         [ -f "$dist_file" ] || continue
@@ -176,6 +176,16 @@ if [ "$CHECK_ONLY" = true ]; then
       done
     fi
   done
+
+  # Templates: check for stale .md and .json files
+  if [ -d "correctless/templates" ]; then
+    for dist_tmpl in correctless/templates/*.md correctless/templates/*.json; do
+      [ -f "$dist_tmpl" ] || continue
+      if [ ! -f "templates/$(basename "$dist_tmpl")" ]; then
+        DIRTY=true
+      fi
+    done
+  fi
 
   # Hooks: check for stale .json files (agent hooks like import-guard.json)
   if [ -d "correctless/hooks" ]; then

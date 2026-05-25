@@ -363,7 +363,7 @@ eval "$(jq -r '
   @sh "CFG_IS_MONOREPO=\(.is_monorepo // false)",
   @sh "CFG_TEST_PATTERN=\(.patterns.test_file // "")",
   @sh "CFG_SOURCE_PATTERN=\(.patterns.source_file // "")"
-' "$CONFIG_FILE" 2>/dev/null)" || true
+' "$CONFIG_FILE" 2>/dev/null)" || { echo "BLOCKED: workflow-config.json is corrupt or unreadable." >&2; exit 2; }
 
 # ---------------------------------------------------------------------------
 # Package resolution for monorepos (longest-prefix match with caching)

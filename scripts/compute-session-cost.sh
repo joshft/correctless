@@ -44,7 +44,8 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     --phase)
-      CACHE_PHASE="${2:-}"
+      [ $# -ge 2 ] || { echo "Error: --phase requires a value" >&2; exit 1; }
+      CACHE_PHASE="$2"
       shift 2
       ;;
     -*)

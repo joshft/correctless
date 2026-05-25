@@ -993,7 +993,7 @@ cat > "$TMPDIR_014/.correctless/meta/drift-debt.json" << 'DRIFT_EOF'
     "id": "DD-001",
     "status": "resolved",
     "detected": "2026-01-01",
-    "resolved_at": "2026-01-15T00:00:00Z",
+    "resolved": "2026-01-15",
     "description": "Old resolved debt"
   },
   {
@@ -1022,7 +1022,7 @@ cat > "$TMPDIR_014b/.correctless/meta/drift-debt.json" << 'DRIFT_EOF'
     "id": "DD-003",
     "status": "wont-fix",
     "detected": "2026-01-01",
-    "resolved_at": "2026-01-15T00:00:00Z",
+    "resolved": "2026-01-15",
     "description": "Old wont-fix debt"
   }
 ]}
