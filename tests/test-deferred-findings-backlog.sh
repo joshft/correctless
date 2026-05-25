@@ -868,9 +868,9 @@ fi
 
 section "INV-011: Distribution sync"
 
-# INV-011a: sync.sh includes ctriage skill
-if grep -q 'ctriage' "$SYNC_SCRIPT"; then
-  pass "INV-011a" "sync.sh includes ctriage skill"
+# INV-011a: sync.sh includes ctriage skill (hardcoded or glob-based per AP-024)
+if grep -q 'ctriage' "$SYNC_SCRIPT" || grep -q 'skills/\*/' "$SYNC_SCRIPT"; then
+  pass "INV-011a" "sync.sh includes ctriage skill (or glob-based)"
 else
   fail "INV-011a" "sync.sh missing ctriage in skill list"
 fi
@@ -889,9 +889,9 @@ else
   fail "INV-011b" "sync-deferred-backlog.sh does not exist"
 fi
 
-# INV-011c: skill count is updated (31 → 32)
-if grep -q '32' "$SYNC_SCRIPT" && grep -qi 'all.*32\|32.*skill' "$SYNC_SCRIPT"; then
-  pass "INV-011c" "sync.sh skill count updated to 32"
+# INV-011c: skill count is updated (hardcoded 32 or dynamic count)
+if grep -qE 'All 32 skills|32 skills|All skills \(' "$SYNC_SCRIPT"; then
+  pass "INV-011c" "sync.sh skill count updated to 32 (or dynamic)"
 else
   fail "INV-011c" "sync.sh still has old skill count (not 32)"
 fi
