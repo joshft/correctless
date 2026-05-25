@@ -14,6 +14,6 @@ Skills are organized into five categories:
 |:---------|:------:|:--------|
 | [Core Workflow](core-workflow) | 9 | The spec-to-merge pipeline |
 | [Code Quality](code-quality) | 5 | Fixes, refactoring, exploration |
-| [Observability](observability) | 7 | Status, metrics, accountability, triage |
+| [Observability](observability) | 8 | Status, metrics, accountability, triage, pruning |
 | [High+ Intensity](high-intensity) | 8 | Adversarial review, formal modeling, auditing |
 | [Open Source](open-source) | 2 | Contributing and maintaining OSS |

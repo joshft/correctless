@@ -18,3 +18,4 @@ See what's happening. These skills surface workflow state, historical findings, 
 | [/cwtf](cwtf) | Workflow accountability (why was this blocked?) |
 | [/cdashboard](cdashboard) | HTML dashboard with metrics and artifact browser |
 | [/ctriage](ctriage) | Wizard-style triage of deferred review findings |
+| [/cprune](cprune) | Archive stale docs, clean orphaned artifacts, fix count drift |

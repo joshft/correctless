@@ -241,6 +241,7 @@ graph LR
 | [`/cexplain`](docs/skills/cexplain.md) | Onboarding or exploring a codebase | Guided mermaid diagrams, prose walkthroughs, HTML export |
 | [`/cdashboard`](docs/skills/cdashboard.md) | Visualize project health | HTML dashboard with metrics + artifact browser |
 | [`/ctriage`](docs/skills/ctriage.md) | Deferred findings piling up | Wizard-style bulk triage of deferred review findings |
+| [`/cprune`](docs/skills/cprune.md) | Periodic maintenance | Archive stale docs, clean orphaned artifacts, fix count drift |
 
 ### Analysis
 
