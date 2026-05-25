@@ -16,14 +16,14 @@ bash sync.sh --check      # Verify distributions are in sync (exit 0 = clean)
 ## Project Structure
 
 ```
-skills/               # Source skills (31 SKILL.md files)
+skills/               # Source skills (32 SKILL.md files)
 hooks/                # 8 hooks (bash: gate, sensitive-file-guard, state machine, statusline, audit trail, auto-format, token-tracking; agent: import-guard)
 templates/            # Config, doc, and spec templates
 helpers/              # PBT guides per language (high+ intensity)
-tests/                # 90 test files (~5,000 assertions)
+tests/                # 91 test files (~5,000 assertions)
 setup                 # Install script
 sync.sh               # Copies source → correctless/ distribution
-correctless/          # Single distribution (31 skills, intensity-gated)
+correctless/          # Single distribution (32 skills, intensity-gated)
 docs/skills/          # Per-skill documentation pages
 docs/design/          # Design specification
 ```

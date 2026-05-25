@@ -5,7 +5,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/joshft/correctless/badge)](https://scorecard.dev/viewer/?uri=github.com/joshft/correctless)
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Skills: 31](https://img.shields.io/badge/skills-31-blue.svg)](docs/skills/)
+[![Skills: 32](https://img.shields.io/badge/skills-32-blue.svg)](docs/skills/)
 [![Version: 3.0.0](https://img.shields.io/badge/version-3.0.0-green.svg)](CHANGELOG.md)
 
 Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
@@ -72,7 +72,7 @@ Then restart Claude Code. Git clone users: `cd .claude/skills/workflow && git pu
 
 ## One Plugin, Three Intensity Levels
 
-Correctless ships as a single plugin with 31 skills. You choose the intensity that matches your project's risk profile. Seven skills are gated behind intensity thresholds — they check your project's `workflow.intensity` setting and warn if invoked below their minimum.
+Correctless ships as a single plugin with 32 skills. You choose the intensity that matches your project's risk profile. Seven skills are gated behind intensity thresholds — they check your project's `workflow.intensity` setting and warn if invoked below their minimum.
 
 | Intensity | Overhead | What You Get | Best For |
 |-----------|----------|--------------|----------|
@@ -241,6 +241,7 @@ graph LR
 | [`/cexplain`](docs/skills/cexplain.md) | Onboarding or exploring a codebase | Guided mermaid diagrams, prose walkthroughs, HTML export |
 | [`/cdashboard`](docs/skills/cdashboard.md) | Visualize project health | HTML dashboard with metrics + artifact browser |
 | [`/ctriage`](docs/skills/ctriage.md) | Deferred findings piling up | Wizard-style bulk triage of deferred review findings |
+| [`/cprune`](docs/skills/cprune.md) | Periodic maintenance | Archive stale docs, clean orphaned artifacts, fix count drift |
 
 ### Analysis
 
@@ -444,7 +445,7 @@ rm -rf .correctless/
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 31 skills, 3 intensity levels, ~5,000 automated tests, 8 hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+**Correctless 3.0.0 — Early release.** 32 skills, 3 intensity levels, ~5,000 automated tests, 8 hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
 
 ## License
 

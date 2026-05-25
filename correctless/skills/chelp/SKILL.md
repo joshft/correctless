@@ -63,7 +63,7 @@ Correctless (critical intensity):
 
 ### 3. Show Commands
 
-All 31 skills are always visible. Skills gated behind an intensity level are annotated with their minimum.
+All 32 skills are always visible. Skills gated behind an intensity level are annotated with their minimum.
 
 ```
 Feature workflow:

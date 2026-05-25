@@ -264,6 +264,12 @@ Spawn a sub-agent to execute `/cverify`. Log `skill_started` before, `skill_comp
 
 At high or critical intensity, spawn a sub-agent to execute `/cupdate-arch`. Skip at standard intensity (cupdate-arch requires high+ intensity). Log `skill_started` before, `skill_completed` after.
 
+### Step 6.5: Invoke `/cprune` (autonomous, non-blocking)
+
+Invoke `/cprune` in autonomous mode as an internal orchestration action (not a canonical pipeline step — excluded from the ABS-031 step name enum). At **high+ intensity**, this runs after `/cupdate-arch` (Step 6). At **standard intensity**, this runs after `/cverify` (Step 5) — since `/cupdate-arch` is skipped at standard, orphaned artifacts and count corrections would otherwise never run.
+
+Pass `mode: autonomous` in the Task prompt. `/cprune` executes low-risk actions (orphaned artifact cleanup, count corrections, 90+ day spec archiving) and returns a summary. Include the summary under a "Pruning" heading in the end-of-pipeline summary. `/cprune` failure is non-blocking — if it fails, log the failure and continue the pipeline.
+
 ### Step 7: Invoke `/cdocs`
 
 Spawn a sub-agent to execute `/cdocs`. Log `skill_started` before, `skill_completed` after.
@@ -290,6 +296,9 @@ The explicit pipeline output path list is a constant — future additions to pip
 .correctless/verification/{task-slug}-verification.md
 .correctless/ARCHITECTURE.md
 .correctless/AGENT_CONTEXT.md
+.correctless/ARCHITECTURE_DEPRECATED.md
+.correctless/antipatterns-archived.md
+.correctless/CLAUDE_LEARNINGS_ARCHIVED.md
 .correctless/artifacts/probe-results-{branch-slug}.json
 README.md
 CONTRIBUTING.md

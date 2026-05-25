@@ -252,6 +252,18 @@ If the human asks "is everything set up correctly?" or similar, validate:
 
 Report any issues with fix instructions.
 
+## Pruning Recommended Signal (INV-013)
+
+Run a lightweight staleness check using `scripts/prune-scan.sh` (or `.correctless/scripts/prune-scan.sh`). If the scanner script does not exist (file does not exist at either path), this section is dormant per PAT-019 — no error, no warning, no output.
+
+When the scanner is available, check two categories:
+1. Orphaned artifacts: `bash scripts/prune-scan.sh --category artifacts --base .` — count results
+2. Architecture staleness: `bash scripts/prune-scan.sh --category architecture --base .` — count results
+
+Surface the signal when either: (a) more than 10 orphaned artifact files exist, or (b) more than 3 architecture entries have all-dead file references.
+
+Signal text: "Pruning recommended: {N} orphaned artifacts, {M} stale architecture entries. Run `/cprune` to clean up."
+
 ## Autonomous Defaults
 
 - **AD-001**: Display scope — show full pipeline status with next steps (default). No human input required; this skill runs to completion autonomously.
