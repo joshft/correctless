@@ -73,12 +73,14 @@ case "$TOOL_NAME" in
     fi
     # R-024: workflow-advance.sh invocations always allowed — but ONLY when it's
     # the primary command, not mentioned as a substring in a compound command.
-    # HACK-R1-005: substring match allowed "cp evil.ts src/; echo workflow-advance.sh"
-    # to bypass the gate. Extract the first command before any ;/&&/|| and check that.
+    # HACK-R1-005/R2: extract first simple command before ALL compound operators.
     _cmd_no_comment="${COMMAND%%#*}"
     _primary_cmd="${_cmd_no_comment%%;*}"
     _primary_cmd="${_primary_cmd%%&&*}"
     _primary_cmd="${_primary_cmd%%||*}"
+    _primary_cmd="${_primary_cmd%%|*}"
+    _primary_cmd="${_primary_cmd%%&*}"
+    _primary_cmd="${_primary_cmd%%$'\n'*}"
     [[ "$_primary_cmd" == *"workflow-advance.sh"* ]] && exit 0
     # Fall through to phase checking with the command as context
     ;;

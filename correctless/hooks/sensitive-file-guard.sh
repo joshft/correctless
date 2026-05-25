@@ -259,22 +259,33 @@ scripts/wf/metadata.sh
 .correctless/scripts/wf/metadata.sh
 scripts/lib.sh
 .correctless/scripts/lib.sh
-lib.sh
 .correctless/config/workflow-config.json
-workflow-config.json
 scripts/override-scrutiny.sh
 .correctless/scripts/override-scrutiny.sh
-override-scrutiny.sh
 scripts/review-triage.sh
 .correctless/scripts/review-triage.sh
-review-triage.sh
 scripts/supervisor-mandate.sh
 .correctless/scripts/supervisor-mandate.sh
-supervisor-mandate.sh
+scripts/intent-hash.sh
+.correctless/scripts/intent-hash.sh
 .correctless/meta/intensity-calibration.json
-intensity-calibration.json
 .correctless/meta/pat001-measurement-due.json
-pat001-measurement-due.json"
+.claude/settings.json
+.claude/settings.local.json
+.claude/hooks/workflow-gate.sh
+.claude/hooks/sensitive-file-guard.sh
+.claude/hooks/audit-trail.sh
+.claude/hooks/statusline.sh
+.claude/hooks/auto-format.sh
+.claude/hooks/token-tracking.sh
+.claude/hooks/workflow-advance.sh
+.claude/rules/hooks-pretooluse.md
+.claude/rules/canonicalize-path.md
+agents/fix-diff-reviewer.md
+agents/supervisor.md
+agents/decision-agent.md
+agents/ctdd-red.md
+agents/ctdd-green.md"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)
