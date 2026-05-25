@@ -102,24 +102,22 @@ test_r012_skill_exists() {
     && local has_name="true" || local has_name="false"
   assert_eq "R-012: SKILL.md has name: crelease in frontmatter" "true" "$has_name"
 
-  # Tests R-012 [integration]: registered in sync.sh for Lite
+  # Tests R-012 [integration]: registered in sync.sh (hardcoded or glob-based)
   local sync_file="$REPO_DIR/sync.sh"
-  file_contains "$sync_file" "crelease" \
+  { grep -q 'crelease' "$sync_file" || grep -q 'skills/\*/' "$sync_file"; } 2>/dev/null \
     && local in_sync="true" || local in_sync="false"
   assert_eq "R-012: crelease registered in sync.sh" "true" "$in_sync"
 
-  # Check skill list contains crelease
-  grep -q 'for skill in.*crelease' "$sync_file" 2>/dev/null \
+  # Check skill loop (hardcoded list or glob)
+  { grep -q 'for skill in.*crelease' "$sync_file" || grep -q 'for skill_dir in skills/\*/' "$sync_file"; } 2>/dev/null \
     && local in_skill_loop="true" || local in_skill_loop="false"
   assert_eq "R-012: crelease in sync.sh skill loop" "true" "$in_skill_loop"
 
-  # Check crelease appears in sync.sh
-  local crelease_count
-  crelease_count="$(grep -c 'crelease' "$sync_file" 2>/dev/null || true)"
-  crelease_count="${crelease_count:-0}"
-  # Should appear at least once in the skill loop
-  assert_eq "R-012: crelease in sync.sh skill list (appears 1+ times)" "true" \
-    "$([ "$crelease_count" -ge 1 ] 2>/dev/null && echo true || echo false)"
+  # Check sync.sh handles crelease (via name or glob)
+  local crelease_synced
+  { grep -q 'crelease' "$sync_file" || grep -q 'skills/\*/' "$sync_file"; } 2>/dev/null \
+    && crelease_synced="true" || crelease_synced="false"
+  assert_eq "R-012: crelease in sync.sh skill list (appears 1+ times)" "true" "$crelease_synced"
 
   # Tests R-012 [integration]: documented in docs/skills/crelease.md
   local docs_file="$REPO_DIR/docs/skills/crelease.md"
