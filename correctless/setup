@@ -56,6 +56,7 @@ detect_config() {
   local lang="$1"
   local name
   name="$(basename "$REPO_ROOT")"
+  name="${name//\"/}"
 
   case "$lang" in
     go)

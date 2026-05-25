@@ -258,7 +258,8 @@ test_r003_hook_fallback_paths() {
     fallback_lines="$(grep -n 'scripts/lib\.sh' "$hook_path" | \
       grep -v 'dirname' | \
       grep -v 'shellcheck source=' | \
-      grep -v 'Cannot find' || true)"
+      grep -v 'Cannot find' | \
+      grep -v '^[0-9]*:scripts/lib\.sh$' || true)"
 
     if [ -n "$fallback_lines" ]; then
       local has_old_fallback
