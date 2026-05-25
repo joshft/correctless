@@ -424,7 +424,7 @@ canonicalize_path() {
 
 _has_write_pattern() {
   local cmd="$1"
-  [[ "$cmd" =~ \>\>|[0-9]*\>[^\&] ]] && return 0
+  [[ "$cmd" =~ \>\>|\>\&|[0-9]*\>[^\&] ]] && return 0
 
   # Single token scan — glob-disabled to keep `*.foo` literal — looking for
   # writers, sed -i / perl -i shapes, or interpreter+eval-flag chains.
@@ -432,13 +432,15 @@ _has_write_pattern() {
   case $- in *f*) ;; *) f_was_set=0 ;; esac
   set -f
   # shellcheck disable=SC2141
-  local IFS=$' \t\n;|&()`'
+  local IFS=$' \t\n;|&()`"'"'"
   local tok base has_interp=0 has_evalflag=0 rc=1
   for tok in $cmd; do
     case "$tok" in
       cp|mv|tee|install|rm|rmdir|unlink|dd|curl|wget|rsync|patch|truncate|shred|ln) rc=0; break ;;
       tar|unzip|7z|cpio|ar|touch|chmod|chown|chgrp|scp|sftp|mkdir) rc=0; break ;;
       ed|vim|vi|nvim|ex|view|nano|emacs) rc=0; break ;;
+      eval|source|exec) rc=0; break ;;
+      find) [[ "$cmd" =~ -delete|-execdir ]] && { rc=0; break; } ;;
       python|python3|node|ruby) rc=0; break ;;
       git) [[ "$cmd" =~ git[[:space:]]+(checkout|restore|reset|stash|clean|apply|am|merge|rebase|cherry-pick) ]] && { rc=0; break; } ;;
       sed) [[ "$cmd" =~ sed[[:space:]]+-i ]] && { rc=0; break; } ;;
@@ -448,10 +450,13 @@ _has_write_pattern() {
     # `/usr/bin/env perl` style paths down to their executable name.
     base="${tok##*/}"
     case "$base" in
-      bash|sh|zsh|dash|perl|python|python3|ruby|php|lua|tclsh|Rscript|nim|node) has_interp=1 ;;
+      bash|sh|zsh|dash|perl|python|python3|ruby|php|lua|tclsh|Rscript|nim|node|npx|base64) has_interp=1 ;;
     esac
     case "$tok" in
-      -c|-e|-r|-E|-pe|-ne|-pi|-ni|-lpi|--execute) has_evalflag=1 ;;
+      -c|-e|-r|-E|-pe|-ne|-pi|-ni|-lpi|--execute|-d|--decode) has_evalflag=1 ;;
+    esac
+    case "$tok" in
+      "<<<"|"<<") has_evalflag=1 ;;
     esac
     if [ "$has_interp" = 1 ] && [ "$has_evalflag" = 1 ]; then
       rc=0; break

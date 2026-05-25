@@ -8,6 +8,11 @@
             "type": "command",
             "command": ".claude/hooks/workflow-gate.sh",
             "timeout_ms": 5000
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/sensitive-file-guard.sh",
+            "timeout_ms": 5000
           }
         ]
       }

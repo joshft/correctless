@@ -26,6 +26,25 @@ build_mandate_context() {
   local _spec_file="$3"
   local _state_file="$4"
 
+  # ABS-012: Verify intent hash before building supervisor context
+  if [ -f "$_state_file" ]; then
+    local _intent_hash _intent_file
+    _intent_hash="$(jq -r '.intent_hash // empty' "$_state_file" 2>/dev/null)" || true
+    _intent_file="$(jq -r '.intent_file // empty' "$_state_file" 2>/dev/null)" || true
+    if [ -n "$_intent_hash" ] && [ -n "$_intent_file" ] && [ -f "$_intent_file" ]; then
+      local _sm_dir
+      _sm_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+      if [ -f "$_sm_dir/intent-hash.sh" ]; then
+        # shellcheck source=intent-hash.sh
+        source "$_sm_dir/intent-hash.sh"
+        if ! intent_verify "$_intent_file" "$_intent_hash"; then
+          echo '{"error":"intent_hash_mismatch","decision":"hard_stop","reasoning":"Intent summary tampered — hash mismatch detected at supervisor activation (ABS-012)."}'
+          return 1
+        fi
+      fi
+    fi
+  fi
+
   # Build preferences
   local preferences="{}"
   if [ -f "$_preferences_file" ]; then

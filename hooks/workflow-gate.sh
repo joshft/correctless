@@ -72,12 +72,15 @@ case "$TOOL_NAME" in
     if ! _has_write_pattern "$COMMAND"; then
       exit 0
     fi
-    # R-024: workflow-advance.sh invocations always allowed (after write detection
-    # to avoid bypassing the gate for commands that merely mention the script name)
-    # QA-R1-002: Strip shell comments before matching to prevent bypass via
-    # appending "# workflow-advance.sh" as a comment to arbitrary commands
+    # R-024: workflow-advance.sh invocations always allowed — but ONLY when it's
+    # the primary command, not mentioned as a substring in a compound command.
+    # HACK-R1-005: substring match allowed "cp evil.ts src/; echo workflow-advance.sh"
+    # to bypass the gate. Extract the first command before any ;/&&/|| and check that.
     _cmd_no_comment="${COMMAND%%#*}"
-    [[ "$_cmd_no_comment" == *"workflow-advance.sh"* ]] && exit 0
+    _primary_cmd="${_cmd_no_comment%%;*}"
+    _primary_cmd="${_primary_cmd%%&&*}"
+    _primary_cmd="${_primary_cmd%%||*}"
+    [[ "$_primary_cmd" == *"workflow-advance.sh"* ]] && exit 0
     # Fall through to phase checking with the command as context
     ;;
   *)
@@ -89,9 +92,9 @@ esac
 # Read state
 # ---------------------------------------------------------------------------
 
-# Deliberate fail-open: lib.sh absence means a broken installation. Exit 0 prevents
-# false blocking. Previously had an inline fallback; removed in hook-config-consolidation.
-_source_lib || exit 0
+# HACK-R1-006: fail-closed when lib.sh is missing (PAT-001 clause 5). Previous
+# fail-open exit 0 allowed complete gate bypass if lib.sh was corrupted or deleted.
+_source_lib || { echo "BLOCKED: lib.sh not found — required for workflow gate" >&2; exit 2; }
 
 _gate_branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
 [ -n "$_gate_branch" ] || exit 0  # detached HEAD: no workflow, allow all
