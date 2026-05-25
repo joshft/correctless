@@ -160,7 +160,7 @@ _extract_bash_targets() {
   while [ $i -lt ${#tokens[@]} ]; do
     tok="${tokens[$i]}"
     case "$tok" in
-      ">"|">>"|"1>"|"2>"|"&>")
+      ">"|">>"|"1>"|"2>"|"&>"|">&")
         # Whitespace-separated redirect (INV-007); next token is the target.
         if [ $((i + 1)) -lt ${#tokens[@]} ]; then
           _strip_quotes "${tokens[$((i + 1))]}"
@@ -190,7 +190,7 @@ _extract_bash_targets() {
   done
 
   # Inline-attached redirects (INV-007) — `cmd>file`, `cmd2>file`, `cmd&>file`.
-  local re='(>{1,2}|[12]>|&>)([^[:space:]\;\|]+)' rest="$cmd"
+  local re='(>{1,2}|[12]>|&>|>&)([^[:space:]\;\|]+)' rest="$cmd"
   while [[ "$rest" =~ $re ]]; do
     _strip_quotes "${BASH_REMATCH[2]}"
     rest="${rest#*${BASH_REMATCH[0]}}"
@@ -234,6 +234,7 @@ id_ed25519.*
 .correctless/artifacts/intent-*.md
 .correctless/artifacts/workflow-state-*.json
 .correctless/artifacts/decision-record-*.md
+.correctless/artifacts/autonomous-decisions-*.jsonl
 .correctless/meta/harness-fingerprint.json
 .correctless/meta/model-baselines.json
 scripts/harness-fingerprint.sh
@@ -241,7 +242,51 @@ scripts/harness-fingerprint.sh
 harness-fingerprint.sh
 scripts/audit-record.sh
 .correctless/scripts/audit-record.sh
-audit-record.sh"
+audit-record.sh
+scripts/autonomous-decision-writer.sh
+.correctless/scripts/autonomous-decision-writer.sh
+autonomous-decision-writer.sh
+scripts/prune-scan.sh
+.correctless/scripts/prune-scan.sh
+prune-scan.sh
+.correctless/ARCHITECTURE_DEPRECATED.md
+.correctless/antipatterns-archived.md
+.correctless/CLAUDE_LEARNINGS_ARCHIVED.md
+scripts/wf/transitions.sh
+scripts/wf/utility.sh
+scripts/wf/metadata.sh
+.correctless/scripts/wf/transitions.sh
+.correctless/scripts/wf/utility.sh
+.correctless/scripts/wf/metadata.sh
+scripts/lib.sh
+.correctless/scripts/lib.sh
+.correctless/config/workflow-config.json
+scripts/override-scrutiny.sh
+.correctless/scripts/override-scrutiny.sh
+scripts/review-triage.sh
+.correctless/scripts/review-triage.sh
+scripts/supervisor-mandate.sh
+.correctless/scripts/supervisor-mandate.sh
+scripts/intent-hash.sh
+.correctless/scripts/intent-hash.sh
+.correctless/meta/intensity-calibration.json
+.correctless/meta/pat001-measurement-due.json
+.claude/settings.json
+.claude/settings.local.json
+.claude/hooks/workflow-gate.sh
+.claude/hooks/sensitive-file-guard.sh
+.claude/hooks/audit-trail.sh
+.claude/hooks/statusline.sh
+.claude/hooks/auto-format.sh
+.claude/hooks/token-tracking.sh
+.claude/hooks/workflow-advance.sh
+.claude/rules/hooks-pretooluse.md
+.claude/rules/canonicalize-path.md
+agents/fix-diff-reviewer.md
+agents/supervisor.md
+agents/decision-agent.md
+agents/ctdd-red.md
+agents/ctdd-green.md"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)

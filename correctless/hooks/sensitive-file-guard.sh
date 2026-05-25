@@ -159,7 +159,7 @@ _extract_bash_targets() {
   while [ $i -lt ${#tokens[@]} ]; do
     tok="${tokens[$i]}"
     case "$tok" in
-      ">"|">>"|"1>"|"2>"|"&>")
+      ">"|">>"|"1>"|"2>"|"&>"|">&")
         # Whitespace-separated redirect (INV-007); next token is the target.
         if [ $((i + 1)) -lt ${#tokens[@]} ]; then
           _strip_quotes "${tokens[$((i + 1))]}"
@@ -189,7 +189,7 @@ _extract_bash_targets() {
   done
 
   # Inline-attached redirects (INV-007) — `cmd>file`, `cmd2>file`, `cmd&>file`.
-  local re='(>{1,2}|[12]>|&>)([^[:space:]\;\|]+)' rest="$cmd"
+  local re='(>{1,2}|[12]>|&>|>&)([^[:space:]\;\|]+)' rest="$cmd"
   while [[ "$rest" =~ $re ]]; do
     _strip_quotes "${BASH_REMATCH[2]}"
     rest="${rest#*${BASH_REMATCH[0]}}"
@@ -256,7 +256,25 @@ scripts/wf/utility.sh
 scripts/wf/metadata.sh
 .correctless/scripts/wf/transitions.sh
 .correctless/scripts/wf/utility.sh
-.correctless/scripts/wf/metadata.sh"
+.correctless/scripts/wf/metadata.sh
+scripts/lib.sh
+.correctless/scripts/lib.sh
+.correctless/config/workflow-config.json
+scripts/override-scrutiny.sh
+.correctless/scripts/override-scrutiny.sh
+scripts/review-triage.sh
+.correctless/scripts/review-triage.sh
+scripts/supervisor-mandate.sh
+.correctless/scripts/supervisor-mandate.sh
+scripts/intent-hash.sh
+.correctless/scripts/intent-hash.sh
+.correctless/meta/intensity-calibration.json
+.correctless/meta/pat001-measurement-due.json
+agents/fix-diff-reviewer.md
+agents/supervisor.md
+agents/decision-agent.md
+agents/ctdd-red.md
+agents/ctdd-green.md"
 
 # ============================================
 # STEP 7: Read custom patterns from config (INV-005)

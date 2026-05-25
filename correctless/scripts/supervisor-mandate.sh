@@ -26,6 +26,34 @@ build_mandate_context() {
   local _spec_file="$3"
   local _state_file="$4"
 
+  # ABS-012: Verify intent hash before building supervisor context
+  if [ -f "$_state_file" ]; then
+    local _intent_hash _intent_file
+    _intent_hash="$(jq -r '.intent_hash // empty' "$_state_file" 2>/dev/null)" || true
+    _intent_file="$(jq -r '.intent_file // empty' "$_state_file" 2>/dev/null)" || true
+    local _phase
+    _phase="$(jq -r '.phase // empty' "$_state_file" 2>/dev/null)" || true
+    if [ -n "$_intent_hash" ] && [ -n "$_intent_file" ]; then
+      if [ ! -f "$_intent_file" ]; then
+        echo '{"error":"intent_file_missing","decision":"hard_stop","reasoning":"Intent file not found at '"$_intent_file"' — cannot verify integrity (ABS-012)."}'
+        return 1
+      fi
+      local _sm_dir
+      _sm_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+      if [ -f "$_sm_dir/intent-hash.sh" ]; then
+        # shellcheck source=intent-hash.sh
+        source "$_sm_dir/intent-hash.sh"
+        if ! intent_verify "$_intent_file" "$_intent_hash"; then
+          echo '{"error":"intent_hash_mismatch","decision":"hard_stop","reasoning":"Intent summary tampered — hash mismatch detected at supervisor activation (ABS-012)."}'
+          return 1
+        fi
+      else
+        echo '{"error":"intent_hash_script_missing","decision":"hard_stop","reasoning":"intent-hash.sh not found — cannot verify intent integrity (ABS-012). Re-run setup."}'
+        return 1
+      fi
+    fi
+  fi
+
   # Build preferences
   local preferences="{}"
   if [ -f "$_preferences_file" ]; then
