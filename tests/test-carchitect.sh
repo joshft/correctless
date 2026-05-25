@@ -678,9 +678,9 @@ fi
 
 section "R-011: Registration"
 
-# Check sync.sh includes carchitect
-if grep -q 'carchitect' "$SYNC_SH"; then
-  pass "R-011-a" "sync.sh includes carchitect"
+# Check sync.sh syncs skills (glob-based per AP-024, or hardcoded list)
+if grep -qE 'carchitect|skills/\*/' "$SYNC_SH"; then
+  pass "R-011-a" "sync.sh syncs carchitect skill (via glob or explicit list)"
 else
   fail "R-011-a" "sync.sh does not include carchitect"
 fi
@@ -709,9 +709,9 @@ else
   fail "R-011-d" "CONTRIBUTING.md skill count not updated to $EXPECTED_SKILL_COUNT"
 fi
 
-# Check sync.sh comment updated
-if grep -qE "All ${EXPECTED_SKILL_COUNT} skills|${EXPECTED_SKILL_COUNT} skills" "$SYNC_SH"; then
-  pass "R-011-e" "sync.sh comment updated to $EXPECTED_SKILL_COUNT skills"
+# Check sync.sh reports skill count (hardcoded or dynamic)
+if grep -qE "All ${EXPECTED_SKILL_COUNT} skills|${EXPECTED_SKILL_COUNT} skills|All skills \(" "$SYNC_SH"; then
+  pass "R-011-e" "sync.sh reports skill count ($EXPECTED_SKILL_COUNT or dynamic)"
 else
   fail "R-011-e" "sync.sh comment not updated to $EXPECTED_SKILL_COUNT skills"
 fi
