@@ -1351,8 +1351,8 @@ test_prereq_wiring() {
   fi
 
   # sync.sh syncs cmodelupgrade skill and harness-fingerprint script
-  if grep -qE 'cmodelupgrade' "$SYNC"; then
-    pass "PRE-004a" "sync.sh handles cmodelupgrade skill"
+  if grep -qE 'cmodelupgrade|skills/\*/' "$SYNC"; then
+    pass "PRE-004a" "sync.sh handles cmodelupgrade skill (or glob-based)"
   else
     fail "PRE-004a" "sync.sh missing cmodelupgrade entry"
   fi

@@ -892,8 +892,8 @@ test_r007_migration() {
   fi
 
   # R-007-c: sync.sh includes cdashboard in skill list
-  if grep -q 'cdashboard' "$REPO_DIR/sync.sh"; then
-    pass "R007-c" "sync.sh includes cdashboard in skill list"
+  if grep -q 'cdashboard' "$REPO_DIR/sync.sh" || grep -q 'skills/\*/' "$REPO_DIR/sync.sh"; then
+    pass "R007-c" "sync.sh includes cdashboard (or glob-based)"
   else
     fail "R007-c" "sync.sh missing cdashboard"
   fi
