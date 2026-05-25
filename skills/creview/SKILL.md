@@ -1,7 +1,7 @@
 ---
 name: creview
 description: Skeptically review a spec for unstated assumptions, untestable rules, missing edge cases, security gaps, and UX failures. Run after /cspec.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(*cross-feature-intel*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/artifacts/lens-recommendations-*), Write(.correctless/meta/deferred-findings.json)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(jq*cross-feature-intel.json*), Write(.correctless/specs/*), Write(.correctless/artifacts/reviews/*), Write(.correctless/artifacts/token-log-*), Write(.correctless/artifacts/lens-recommendations-*), Write(.correctless/meta/deferred-findings.json)
 interaction_mode: hybrid
 ---
 

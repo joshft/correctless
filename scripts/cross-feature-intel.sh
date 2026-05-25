@@ -43,14 +43,17 @@ MIN_OCCURRENCES=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --base)
+      [ $# -ge 2 ] || { shift; break; }
       BASE_DIR="$2"
       shift 2
       ;;
     --scope)
+      [ $# -ge 2 ] || { shift; break; }
       SCOPE_ARG="$2"
       shift 2
       ;;
     --min-occurrences)
+      [ $# -ge 2 ] || { shift; break; }
       MIN_OCCURRENCES="$2"
       shift 2
       ;;
@@ -434,9 +437,9 @@ _extract_lens_recommendations() {
         all_lenses+=","
       fi
 
-      local json_rationale
-      json_rationale=$(echo "$rationale" | jq -Rs '.' 2>/dev/null)
-      all_lenses+="{\"lens_name\":\"$lens_name\",\"rationale\":$json_rationale,\"date\":\"$file_date\"}"
+      local json_entry
+      json_entry=$(jq -n --arg ln "$lens_name" --arg r "$rationale" --arg d "$file_date" '{lens_name:$ln,rationale:$r,date:$d}')
+      all_lenses+="$json_entry"
     done < <(jq -c '.recommended_lenses[]' "$lens_file" 2>/dev/null)
   done
 

@@ -354,6 +354,10 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Bulk-read config: patterns + monorepo flag in one jq call
+# Pre-initialize before eval — jq failure on corrupt config produces empty
+# output, eval "" returns 0, leaving variables unset under set -u (same
+# lesson as the state-file read on line 203).
+CFG_IS_MONOREPO="false" CFG_TEST_PATTERN="" CFG_SOURCE_PATTERN=""
 eval "$(jq -r '
   @sh "CFG_IS_MONOREPO=\(.is_monorepo // false)",
   @sh "CFG_TEST_PATTERN=\(.patterns.test_file // "")",

@@ -6,7 +6,7 @@
 
 ## What This Project Does
 
-Claude Code plugin framework that enforces a correctness-oriented development workflow. Ships as a single `correctless/` distribution with 29 skills and configurable intensity levels (standard, high, critical). Standard intensity (~10-15 min/feature) covers core TDD workflow; high/critical intensity (~1-2 hr/feature) adds formal modeling, adversarial review, and convergence auditing. The core principle: never let an agent grade its own work — each workflow phase uses a separate agent with a different lens.
+Claude Code plugin framework that enforces a correctness-oriented development workflow. Ships as a single `correctless/` distribution with 32 skills and configurable intensity levels (standard, high, critical). Standard intensity (~10-15 min/feature) covers core TDD workflow; high/critical intensity (~1-2 hr/feature) adds formal modeling, adversarial review, and convergence auditing. The core principle: never let an agent grade its own work — each workflow phase uses a separate agent with a different lens.
 
 ## Key Components
 
@@ -16,9 +16,9 @@ Claude Code plugin framework that enforces a correctness-oriented development wo
 | Hooks | `hooks/` | workflow-gate.sh (PreToolUse gating), sensitive-file-guard.sh (PreToolUse file protection), workflow-advance.sh (state machine), statusline.sh, audit-trail.sh, auto-format.sh (PostToolUse formatting), token-tracking.sh (PostToolUse token logging), import-guard.json (agent hook) |
 | Templates | `templates/` | Scaffolding for new projects: ARCHITECTURE.md, AGENT_CONTEXT.md, antipatterns, configs |
 | Helpers | `helpers/` | PBT guides per language (high+ intensity) |
-| Distribution | `correctless/` | Single 29-skill distribution target — never edit directly |
+| Distribution | `correctless/` | Single 32-skill distribution target — never edit directly |
 | Setup | `setup` | Idempotent install script: detect stack, scaffold, register hooks |
-| Tests | `tests/test*.sh` | 78 test files (~5,000 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, and test-evasion antipattern validation |
+| Tests | `tests/test*.sh` | 91 test files (~5,000 shell tests) covering all hooks, scripts, skills, agents, Phase 2 components, Phase 3 components, and test-evasion antipattern validation |
 | Sync | `sync.sh` | Propagates source edits to the `correctless/` distribution |
 
 ## Design Patterns
