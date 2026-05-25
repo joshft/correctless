@@ -456,7 +456,7 @@ _has_write_pattern() {
       -c|-e|-r|-E|-pe|-ne|-pi|-ni|-lpi|--execute|-d|--decode) has_evalflag=1 ;;
     esac
     case "$tok" in
-      "<<<"|"<<") has_evalflag=1 ;;
+      "<<<") has_evalflag=1 ;;
     esac
     if [ "$has_interp" = 1 ] && [ "$has_evalflag" = 1 ]; then
       rc=0; break
