@@ -62,25 +62,13 @@ emit_candidate() {
     "$bulk_warning"
 }
 
-# Convert a bash array of paths to a JSON array
+# Convert a bash array of paths to a JSON array (single jq call)
 paths_to_json_array() {
-  local arr=("$@")
-  if [ ${#arr[@]} -eq 0 ]; then
+  if [ $# -eq 0 ]; then
     echo "[]"
     return
   fi
-  local json="["
-  local first=true
-  for p in "${arr[@]}"; do
-    if [ "$first" = true ]; then
-      first=false
-    else
-      json+=","
-    fi
-    json+="$(jq -n --arg v "$p" '$v')"
-  done
-  json+="]"
-  echo "$json"
+  printf '%s\n' "$@" | jq -R . | jq -sc .
 }
 
 # Check if a file path exists relative to BASE_DIR
@@ -123,25 +111,42 @@ emit_candidates_array() {
   echo "$result"
 }
 
-# Simple JSON array output without bulk_warning computation
+# Simple JSON array output without bulk_warning computation.
+# Usage: emit_simple_array array_name
 emit_simple_array() {
   local -n _items="$1"
   if [ ${#_items[@]} -eq 0 ]; then
     echo "[]"
     return
   fi
-  local result="["
-  local first=true
-  for c in "${_items[@]}"; do
-    if [ "$first" = true ]; then
-      first=false
+  local IFS=","
+  echo "[${_items[*]}]"
+}
+
+# Classify a newline-delimited list of paths into dead_paths and live_paths arrays.
+# Caller must declare: local dead_paths=() live_paths=()
+classify_paths() {
+  local paths="$1"
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    if file_exists "$p"; then
+      live_paths+=("$p")
     else
-      result+=","
+      dead_paths+=("$p")
     fi
-    result+="$c"
-  done
-  result+="]"
-  echo "$result"
+  done <<< "$paths"
+}
+
+# Load branch names from --branches-file or git.
+# Outputs one branch name per line.
+load_branches() {
+  if [ -n "$BRANCHES_FILE" ] && [ -f "$BRANCHES_FILE" ]; then
+    sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s/^\* //' "$BRANCHES_FILE"
+  else
+    (cd "$BASE_DIR" && git branch -a 2>/dev/null | sed 's/^[[:space:]]*//;s/^\* //;s|remotes/origin/||') || \
+    (cd "$BASE_DIR" && git branch 2>/dev/null | sed 's/^[[:space:]]*//;s/^\* //') || \
+    true
+  fi
 }
 
 # Extract file paths from a text block using spec-defined rules (INV-003)
@@ -202,18 +207,11 @@ scan_architecture() {
   local current_id=""
   local current_text=""
   local in_entry=false
-  # Read ARCHITECTURE.md and parse entries at ### level (ABS/PAT/TB/ENV)
-  # Sub-entries at #### level are part of the parent
+  # Parse entries at ### level (ABS/PAT/TB/ENV); sub-entries (####) are part of the parent
   while IFS= read -r line; do
-    # Check for level-3 heading (new entry)
     if [[ "$line" =~ ^###[[:space:]]+(ABS|PAT|TB|ENV)-([0-9]+[a-z]?):.* ]]; then
-      local entry_type="${BASH_REMATCH[1]}"
-      local entry_num="${BASH_REMATCH[2]}"
-      local new_id="${entry_type}-${entry_num}"
+      local new_id="${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
 
-      # If this is a sub-entry (has a letter suffix like 099a), skip separate processing
-      # Actually, sub-entries are #### level per spec. ### entries are always top-level.
-      # Process previous entry if any
       if [ -n "$current_id" ] && [ "$in_entry" = true ]; then
         _process_arch_entry "$current_id" "$current_text"
       fi
@@ -249,34 +247,18 @@ _process_arch_entry() {
   local entry_id="$1"
   local entry_text="$2"
 
-  # Extract file paths from the entry text
   local paths
   paths="$(extract_file_paths "$entry_text" | sort -u)"
+  [ -z "$paths" ] && return
 
-  if [ -z "$paths" ]; then
-    # No extractable file paths — pure prose, not a candidate
-    return
-  fi
-
-  local dead_paths=()
-  local live_paths=()
-
-  while IFS= read -r p; do
-    [ -z "$p" ] && continue
-    if file_exists "$p"; then
-      live_paths+=("$p")
-    else
-      dead_paths+=("$p")
-    fi
-  done <<< "$paths"
+  local dead_paths=() live_paths=()
+  classify_paths "$paths"
 
   # Entry is a candidate only when ALL paths are dead (PRH-003)
   if [ ${#live_paths[@]} -eq 0 ] && [ ${#dead_paths[@]} -gt 0 ]; then
-    local dead_json
-    dead_json="$(paths_to_json_array "${dead_paths[@]}")"
-    local live_json="[]"
     local candidate
-    candidate="$(emit_candidate "$entry_id" "architecture" "All referenced files are dead" "medium" "$dead_json" "$live_json" "false")"
+    candidate="$(emit_candidate "$entry_id" "architecture" "All referenced files are dead" "medium" \
+      "$(paths_to_json_array "${dead_paths[@]}")" "[]" "false")"
     candidates+=("$candidate")
   fi
 }
@@ -335,36 +317,20 @@ _process_ap_entry() {
   local entry_title="$2"
   local entry_text="$3"
 
-  # Check if class-level by title keywords (INV-011)
-  if echo "$entry_title" | grep -qiE "$class_keywords"; then
-    return  # Class-level — never a candidate
-  fi
+  # Class-level antipatterns are never candidates (INV-011)
+  echo "$entry_title" | grep -qiE "$class_keywords" && return
 
-  # Extract file paths
   local paths
   paths="$(extract_file_paths "$entry_text" | sort -u)"
+  [ -z "$paths" ] && return
 
-  if [ -z "$paths" ]; then
-    return  # No file refs — not a candidate
-  fi
-
-  local dead_paths=()
-  local live_paths=()
-
-  while IFS= read -r p; do
-    [ -z "$p" ] && continue
-    if file_exists "$p"; then
-      live_paths+=("$p")
-    else
-      dead_paths+=("$p")
-    fi
-  done <<< "$paths"
+  local dead_paths=() live_paths=()
+  classify_paths "$paths"
 
   if [ ${#live_paths[@]} -eq 0 ] && [ ${#dead_paths[@]} -gt 0 ]; then
-    local dead_json
-    dead_json="$(paths_to_json_array "${dead_paths[@]}")"
     local candidate
-    candidate="$(emit_candidate "$entry_id" "antipatterns" "All referenced files are dead" "medium" "$dead_json" "[]" "false")"
+    candidate="$(emit_candidate "$entry_id" "antipatterns" "All referenced files are dead" "medium" \
+      "$(paths_to_json_array "${dead_paths[@]}")" "[]" "false")"
     candidates+=("$candidate")
   fi
 }
@@ -428,23 +394,7 @@ scan_claude_md() {
     _process_claude_entry "$current_id" "$current_title" "$current_text"
   fi
 
-  if [ ${#candidates[@]} -eq 0 ]; then
-    echo "[]"
-    return
-  fi
-
-  local result="["
-  local first=true
-  for c in "${candidates[@]}"; do
-    if [ "$first" = true ]; then
-      first=false
-    else
-      result+=","
-    fi
-    result+="$c"
-  done
-  result+="]"
-  echo "$result"
+  emit_simple_array candidates
 }
 
 _process_claude_entry() {
@@ -452,36 +402,20 @@ _process_claude_entry() {
   local entry_title="$2"
   local entry_text="$3"
 
-  # Check class-level by title (INV-008): Convention confirmed, Convention introduced, Postmortem
-  if echo "$entry_title" | grep -qE "Convention confirmed|Convention introduced|Postmortem"; then
-    return  # Class-level — never a candidate
-  fi
+  # Class-level learnings are never candidates (INV-008)
+  echo "$entry_title" | grep -qE "Convention confirmed|Convention introduced|Postmortem" && return
 
-  # Extract file paths from body
   local paths
   paths="$(echo "$entry_text" | grep -oE '`[a-zA-Z_./-]+\.(sh|md|json|py|ts|js|yml|yaml)`' | sed 's/^`//;s/`$//' | sort -u)" || true
+  [ -z "$paths" ] && return
 
-  if [ -z "$paths" ]; then
-    return  # No file refs — general principle, not a candidate
-  fi
-
-  local dead_paths=()
-  local live_paths=()
-
-  while IFS= read -r p; do
-    [ -z "$p" ] && continue
-    if file_exists "$p"; then
-      live_paths+=("$p")
-    else
-      dead_paths+=("$p")
-    fi
-  done <<< "$paths"
+  local dead_paths=() live_paths=()
+  classify_paths "$paths"
 
   if [ ${#live_paths[@]} -eq 0 ] && [ ${#dead_paths[@]} -gt 0 ]; then
-    local dead_json
-    dead_json="$(paths_to_json_array "${dead_paths[@]}")"
     local candidate
-    candidate="$(emit_candidate "$entry_date — $entry_title" "claude-md" "All referenced files are dead" "high" "$dead_json" "[]" "false")"
+    candidate="$(emit_candidate "$entry_date — $entry_title" "claude-md" "All referenced files are dead" "high" \
+      "$(paths_to_json_array "${dead_paths[@]}")" "[]" "false")"
     candidates+=("$candidate")
   fi
 }
@@ -494,16 +428,8 @@ scan_artifacts() {
     return
   fi
 
-  # Get list of all branches
-  local branches=""
-  if [ -n "$BRANCHES_FILE" ] && [ -f "$BRANCHES_FILE" ]; then
-    branches="$(cat "$BRANCHES_FILE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^\* //')"
-  else
-    # Try git branch -a; fall back to git branch (BND-003: no remote)
-    branches="$(cd "$BASE_DIR" && git branch -a 2>/dev/null | sed 's/^[[:space:]]*//;s/^\* //' | sed 's|remotes/origin/||')" || \
-    branches="$(cd "$BASE_DIR" && git branch 2>/dev/null | sed 's/^[[:space:]]*//;s/^\* //')" || \
-    branches=""
-  fi
+  local branches
+  branches="$(load_branches)"
 
   # Compute slugs for all branches
   local branch_slugs=()
@@ -545,31 +471,14 @@ scan_artifacts() {
     done
 
     if [ "$found" = false ]; then
-      local dead_json
-      dead_json="$(paths_to_json_array ".correctless/artifacts/$fname")"
       local candidate
-      candidate="$(emit_candidate "$fname" "artifacts" "Artifact for deleted/unknown branch" "low" "$dead_json" "[]" "false")"
+      candidate="$(emit_candidate "$fname" "artifacts" "Artifact for deleted/unknown branch" "low" \
+        "$(paths_to_json_array ".correctless/artifacts/$fname")" "[]" "false")"
       candidates+=("$candidate")
     fi
   done
 
-  if [ ${#candidates[@]} -eq 0 ]; then
-    echo "[]"
-    return
-  fi
-
-  local result="["
-  local first=true
-  for c in "${candidates[@]}"; do
-    if [ "$first" = true ]; then
-      first=false
-    else
-      result+=","
-    fi
-    result+="$c"
-  done
-  result+="]"
-  echo "$result"
+  emit_simple_array candidates
 }
 
 # ---- deferred ----
@@ -593,31 +502,14 @@ scan_deferred() {
     [ -z "$source_file" ] && continue
 
     if ! file_exists "$source_file"; then
-      local dead_json
-      dead_json="$(paths_to_json_array "$source_file")"
       local candidate
-      candidate="$(emit_candidate "$fid" "deferred" "Source review artifact deleted" "medium" "$dead_json" "[]" "false")"
+      candidate="$(emit_candidate "$fid" "deferred" "Source review artifact deleted" "medium" \
+        "$(paths_to_json_array "$source_file")" "[]" "false")"
       candidates+=("$candidate")
     fi
   done <<< "$findings"
 
-  if [ ${#candidates[@]} -eq 0 ]; then
-    echo "[]"
-    return
-  fi
-
-  local result="["
-  local first=true
-  for c in "${candidates[@]}"; do
-    if [ "$first" = true ]; then
-      first=false
-    else
-      result+=","
-    fi
-    result+="$c"
-  done
-  result+="]"
-  echo "$result"
+  emit_simple_array candidates
 }
 
 # ---- counts ----
@@ -641,56 +533,24 @@ scan_counts() {
   content="$(cat "$agent_ctx")"
 
   # Extract stated counts using label-anchored matching (INV-006)
-  # Match patterns like "N skills", "N test files", "N scripts", "N agents"
-  local stated_skills stated_tests stated_scripts stated_agents
-
-  stated_skills="$(echo "$content" | grep -oE '[0-9]+ skill' | head -1 | grep -oE '[0-9]+')" || stated_skills=""
-  stated_tests="$(echo "$content" | grep -oE '[0-9]+ test' | head -1 | grep -oE '[0-9]+')" || stated_tests=""
-  stated_scripts="$(echo "$content" | grep -oE '[0-9]+ script' | head -1 | grep -oE '[0-9]+')" || stated_scripts=""
-  stated_agents="$(echo "$content" | grep -oE '[0-9]+ agent' | head -1 | grep -oE '[0-9]+')" || stated_agents=""
-
-  # Check each count
-  if [ -n "$stated_skills" ] && [ "$stated_skills" != "$actual_skills" ]; then
-    local candidate
-    candidate="$(emit_candidate "skills-count" "counts" "Stated $stated_skills skills but found $actual_skills" "low" "[]" "[]" "false")"
-    candidates+=("$candidate")
-  fi
-
-  if [ -n "$stated_tests" ] && [ "$stated_tests" != "$actual_tests" ]; then
-    local candidate
-    candidate="$(emit_candidate "tests-count" "counts" "Stated $stated_tests test files but found $actual_tests" "low" "[]" "[]" "false")"
-    candidates+=("$candidate")
-  fi
-
-  if [ -n "$stated_scripts" ] && [ "$stated_scripts" != "$actual_scripts" ]; then
-    local candidate
-    candidate="$(emit_candidate "scripts-count" "counts" "Stated $stated_scripts scripts but found $actual_scripts" "low" "[]" "[]" "false")"
-    candidates+=("$candidate")
-  fi
-
-  if [ -n "$stated_agents" ] && [ "$stated_agents" != "$actual_agents" ]; then
-    local candidate
-    candidate="$(emit_candidate "agents-count" "counts" "Stated $stated_agents agents but found $actual_agents" "low" "[]" "[]" "false")"
-    candidates+=("$candidate")
-  fi
-
-  if [ ${#candidates[@]} -eq 0 ]; then
-    echo "[]"
-    return
-  fi
-
-  local result="["
-  local first=true
-  for c in "${candidates[@]}"; do
-    if [ "$first" = true ]; then
-      first=false
-    else
-      result+=","
+  # Check each resource type: label, stated count, actual count
+  local label stated actual
+  for label in skills tests scripts agents; do
+    stated="$(echo "$content" | grep -oE "[0-9]+ ${label%s}" | head -1 | grep -oE '[0-9]+')" || stated=""
+    case "$label" in
+      skills)  actual="$actual_skills" ;;
+      tests)   actual="$actual_tests" ;;
+      scripts) actual="$actual_scripts" ;;
+      agents)  actual="$actual_agents" ;;
+    esac
+    if [ -n "$stated" ] && [ "$stated" != "$actual" ]; then
+      local candidate
+      candidate="$(emit_candidate "${label}-count" "counts" "Stated $stated ${label} but found $actual" "low" "[]" "[]" "false")"
+      candidates+=("$candidate")
     fi
-    result+="$c"
   done
-  result+="]"
-  echo "$result"
+
+  emit_simple_array candidates
 }
 
 # ---- crossrefs ----
@@ -711,9 +571,7 @@ scan_crossrefs() {
       if [ -n "$current_id" ] && [ "$in_entry" = true ]; then
         _process_crossref_entry "$current_id" "$current_text"
       fi
-      local entry_type="${BASH_REMATCH[1]}"
-      local entry_num="${BASH_REMATCH[2]}"
-      current_id="${entry_type}-${entry_num}"
+      current_id="${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
       current_text="$line"
       in_entry=true
     elif [[ "$line" =~ ^####[[:space:]]+(ABS|PAT|TB|ENV)-([0-9]+[a-z]):.* ]]; then
@@ -734,55 +592,25 @@ scan_crossrefs() {
     _process_crossref_entry "$current_id" "$current_text"
   fi
 
-  if [ ${#candidates[@]} -eq 0 ]; then
-    echo "[]"
-    return
-  fi
-
-  local result="["
-  local first=true
-  for c in "${candidates[@]}"; do
-    if [ "$first" = true ]; then
-      first=false
-    else
-      result+=","
-    fi
-    result+="$c"
-  done
-  result+="]"
-  echo "$result"
+  emit_simple_array candidates
 }
 
 _process_crossref_entry() {
   local entry_id="$1"
   local entry_text="$2"
 
-  # Extract all paths
   local paths
   paths="$(extract_file_paths "$entry_text" | sort -u)"
   [ -z "$paths" ] && return
 
-  local dead_paths=()
-  local live_paths=()
+  local dead_paths=() live_paths=()
+  classify_paths "$paths"
 
-  while IFS= read -r p; do
-    [ -z "$p" ] && continue
-    if file_exists "$p"; then
-      live_paths+=("$p")
-    else
-      dead_paths+=("$p")
-    fi
-  done <<< "$paths"
-
-  # Cross-ref check: entry has BOTH live and dead paths — it's a stale cross-ref, not archive candidate
+  # Cross-ref: entry has BOTH live and dead paths — stale cross-ref, not archive candidate
   if [ ${#live_paths[@]} -gt 0 ] && [ ${#dead_paths[@]} -gt 0 ]; then
-    # Check specifically for Enforced at cross-refs that reference dead skill paths
-    local dead_json
-    dead_json="$(paths_to_json_array "${dead_paths[@]}")"
-    local live_json
-    live_json="$(paths_to_json_array "${live_paths[@]}")"
     local candidate
-    candidate="$(emit_candidate "$entry_id" "crossrefs" "Stale cross-references to deleted files" "medium" "$dead_json" "$live_json" "false")"
+    candidate="$(emit_candidate "$entry_id" "crossrefs" "Stale cross-references to deleted files" "medium" \
+      "$(paths_to_json_array "${dead_paths[@]}")" "$(paths_to_json_array "${live_paths[@]}")" "false")"
     candidates+=("$candidate")
   fi
 }
@@ -795,15 +623,8 @@ scan_specs() {
     return
   fi
 
-  # Get branches list
-  local branches=""
-  if [ -n "$BRANCHES_FILE" ] && [ -f "$BRANCHES_FILE" ]; then
-    branches="$(cat "$BRANCHES_FILE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^\* //')"
-  else
-    branches="$(cd "$BASE_DIR" && git branch -a 2>/dev/null | sed 's/^[[:space:]]*//;s/^\* //' | sed 's|remotes/origin/||')" || \
-    branches="$(cd "$BASE_DIR" && git branch 2>/dev/null | sed 's/^[[:space:]]*//;s/^\* //')" || \
-    branches=""
-  fi
+  local branches
+  branches="$(load_branches)"
 
   local now_epoch
   now_epoch="$(date +%s)"
@@ -877,31 +698,14 @@ scan_specs() {
         risk="low"  # 90+ days = auto-execute in autonomous mode
       fi
 
-      local dead_json
-      dead_json="$(paths_to_json_array ".correctless/specs/$spec_name.md")"
       local candidate
-      candidate="$(emit_candidate "$spec_name" "specs" "Spec for merged branch ($spec_branch), ${age} seconds post-merge" "$risk" "$dead_json" "[]" "false")"
+      candidate="$(emit_candidate "$spec_name" "specs" "Spec for merged branch ($spec_branch), ${age} seconds post-merge" "$risk" \
+        "$(paths_to_json_array ".correctless/specs/$spec_name.md")" "[]" "false")"
       candidates+=("$candidate")
     fi
   done
 
-  if [ ${#candidates[@]} -eq 0 ]; then
-    echo "[]"
-    return
-  fi
-
-  local result="["
-  local first=true
-  for c in "${candidates[@]}"; do
-    if [ "$first" = true ]; then
-      first=false
-    else
-      result+=","
-    fi
-    result+="$c"
-  done
-  result+="]"
-  echo "$result"
+  emit_simple_array candidates
 }
 
 # ---- driftdebt ----
@@ -949,23 +753,7 @@ scan_driftdebt() {
     fi
   done <<< "$entries"
 
-  if [ ${#candidates[@]} -eq 0 ]; then
-    echo "[]"
-    return
-  fi
-
-  local result="["
-  local first=true
-  for c in "${candidates[@]}"; do
-    if [ "$first" = true ]; then
-      first=false
-    else
-      result+=","
-    fi
-    result+="$c"
-  done
-  result+="]"
-  echo "$result"
+  emit_simple_array candidates
 }
 
 # ============================================

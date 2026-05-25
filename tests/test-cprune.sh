@@ -24,15 +24,8 @@ setup_fixture_dir() {
   git -C "$tmpdir" config user.email "test@test.com" 2>/dev/null
   git -C "$tmpdir" config user.name "Test" 2>/dev/null
   # Create basic structure
-  mkdir -p "$tmpdir/.correctless/artifacts"
-  mkdir -p "$tmpdir/.correctless/meta"
-  mkdir -p "$tmpdir/.correctless/specs"
-  mkdir -p "$tmpdir/.correctless/config"
-  mkdir -p "$tmpdir/scripts"
-  mkdir -p "$tmpdir/hooks"
-  mkdir -p "$tmpdir/skills"
-  mkdir -p "$tmpdir/agents"
-  mkdir -p "$tmpdir/tests"
+  mkdir -p "$tmpdir/.correctless"/{artifacts,meta,specs,config} \
+           "$tmpdir"/{scripts,hooks,skills,agents,tests}
   # Copy lib.sh for sourcing
   cp "$REPO_DIR/scripts/lib.sh" "$tmpdir/scripts/lib.sh"
   echo "$tmpdir"
@@ -1110,6 +1103,8 @@ fi
 section "INV-017: TB-004c consolidation allowlist"
 
 # Tests INV-017 [unit]: cauto SKILL.md Step 8.1 includes archive file paths
+# Note: grep -qF directly on file (not assert_contains pipe) because cauto SKILL.md
+# is ~44KB — large enough that echo|grep -q triggers SIGPIPE under pipefail.
 if [ -f "skills/cauto/SKILL.md" ]; then
   if grep -qF "ARCHITECTURE_DEPRECATED.md" "skills/cauto/SKILL.md"; then
     pass "INV-017-a" "cauto allowlist includes ARCHITECTURE_DEPRECATED.md"
@@ -1205,8 +1200,6 @@ section "PRH-001: Never permanently delete documentation entries"
 
 # Tests PRH-001 [unit]: SKILL.md and scanner reference archive-before-remove
 if [ -f "skills/cprune/SKILL.md" ]; then
-  body_prh001="$(cat "skills/cprune/SKILL.md")"
-  # Check for archive ordering language
   if grep -qE "archive.*before.*remov|write.*archive.*before|archive.*then.*remov" "skills/cprune/SKILL.md" 2>/dev/null; then
     pass "PRH-001-a" "SKILL.md enforces archive-before-remove ordering"
   else
@@ -1224,8 +1217,6 @@ section "PRH-002: Never modify CLAUDE.md in autonomous mode"
 
 # Tests PRH-002 [unit]: SKILL.md excludes CLAUDE.md from autonomous mode
 if [ -f "skills/cprune/SKILL.md" ]; then
-  body_prh002="$(cat "skills/cprune/SKILL.md")"
-  # Check for CLAUDE.md exclusion in autonomous mode
   if grep -qE "claude.*autonomous.*exclu|autonomous.*claude.*skip|autonomous.*never.*CLAUDE|CLAUDE.*interactive.only|interactive-only.*CLAUDE" "skills/cprune/SKILL.md" 2>/dev/null; then
     pass "PRH-002-a" "SKILL.md excludes CLAUDE.md from autonomous mode"
   else
@@ -1284,7 +1275,6 @@ section "BND-001: Empty archive files"
 
 # Tests BND-001 [unit]: SKILL.md describes archive file creation with header
 if [ -f "skills/cprune/SKILL.md" ]; then
-  body_bnd001="$(cat "skills/cprune/SKILL.md")"
   if grep -qE "header.*comment|created.*first.*use|first.*entry.*append" "skills/cprune/SKILL.md" 2>/dev/null; then
     pass "BND-001-a" "SKILL.md describes archive file creation with header"
   else
@@ -1382,10 +1372,8 @@ TMPDIR_BND003="$(setup_fixture_dir)"
 git -C "$TMPDIR_BND003" commit --allow-empty -m "init" -q 2>/dev/null
 # No remote configured — default git init has no remote
 touch "$TMPDIR_BND003/.correctless/artifacts/workflow-state-feature-local-only-cccccc.json"
-result_bnd003="$(bash "$SCANNER" --category artifacts --base "$TMPDIR_BND003" 2>&1)" || true
-# Should not error, and should detect orphaned artifact using local branches only
-stdout_bnd003="$(bash "$SCANNER" --category artifacts --base "$TMPDIR_BND003" 2>/dev/null)" || true
-assert_json_valid "BND-003-a" "Scanner produces valid JSON with no remote" "$stdout_bnd003"
+result_bnd003="$(bash "$SCANNER" --category artifacts --base "$TMPDIR_BND003" 2>/dev/null)" || true
+assert_json_valid "BND-003-a" "Scanner produces valid JSON with no remote" "$result_bnd003"
 cleanup_fixture "$TMPDIR_BND003"
 
 # ============================================
@@ -1412,8 +1400,6 @@ section "ABS-038: Archive file contract"
 
 # Tests ABS-038 [unit]: SKILL.md is the sole writer for archive files
 if [ -f "skills/cprune/SKILL.md" ]; then
-  body_abs038="$(cat "skills/cprune/SKILL.md")"
-  # Check that SKILL.md mentions sole writer or exclusive writer
   if grep -qE "sole.*writer|only.*cprune.*writes|exclusive.*write" "skills/cprune/SKILL.md" 2>/dev/null; then
     pass "ABS-038-a" "SKILL.md declares sole-writer for archive files"
   else
@@ -1425,10 +1411,10 @@ fi
 
 # Tests ABS-038 [unit]: allowed-tools includes Write for all three archive files
 if [ -f "skills/cprune/SKILL.md" ]; then
-  body_abs038b="$(cat "skills/cprune/SKILL.md")"
-  assert_contains "ABS-038-b" "allowed-tools includes ARCHITECTURE_DEPRECATED" "ARCHITECTURE_DEPRECATED" "$body_abs038b"
-  assert_contains "ABS-038-c" "allowed-tools includes antipatterns-archived" "antipatterns-archived" "$body_abs038b"
-  assert_contains "ABS-038-d" "allowed-tools includes CLAUDE_LEARNINGS_ARCHIVED" "CLAUDE_LEARNINGS_ARCHIVED" "$body_abs038b"
+  body_abs038="$(cat "skills/cprune/SKILL.md")"
+  assert_contains "ABS-038-b" "allowed-tools includes ARCHITECTURE_DEPRECATED" "ARCHITECTURE_DEPRECATED" "$body_abs038"
+  assert_contains "ABS-038-c" "allowed-tools includes antipatterns-archived" "antipatterns-archived" "$body_abs038"
+  assert_contains "ABS-038-d" "allowed-tools includes CLAUDE_LEARNINGS_ARCHIVED" "CLAUDE_LEARNINGS_ARCHIVED" "$body_abs038"
 else
   fail "ABS-038-b" "skills/cprune/SKILL.md does not exist"
   fail "ABS-038-c" "skills/cprune/SKILL.md does not exist"
