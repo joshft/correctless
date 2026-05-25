@@ -79,8 +79,9 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 # --- All templates (common + high-intensity) ---
-for tmpl in ARCHITECTURE.md AGENT_CONTEXT.md antipatterns.md workflow-config.json redaction-rules.md workflow-config-full.json workflow-effectiveness.json drift-debt.json external-review-history.json spec-lite.md spec-full.md preferences.md auto-policy.json; do
-  sync_file "templates/$tmpl" "correctless/templates/$tmpl"
+for tmpl in templates/*.md templates/*.json; do
+  [ -f "$tmpl" ] || continue
+  sync_file "$tmpl" "correctless/templates/$(basename "$tmpl")"
 done
 sync_dir "templates/invariants" "correctless/templates/invariants"
 [ "$CHECK_ONLY" = false ] && info "Templates → correctless/"
@@ -126,14 +127,18 @@ fi
 sync_file "skills/_shared/constraints.md" "correctless/skills/_shared/constraints.md"
 [ "$CHECK_ONLY" = false ] && info "Shared constraints → correctless/"
 
-# --- All 32 skills ---
-for skill in csetup cspec cmodel creview creview-spec ctdd cverify caudit cupdate-arch cdocs cpostmortem cdevadv credteam crefactor cpr-review ccontribute cmaintain cstatus csummary cmetrics cdebug chelp cwtf cquick crelease cexplain cauto carchitect cmodelupgrade cdashboard ctriage cprune; do
+# --- All skills (glob-based per AP-024) ---
+for skill_dir in skills/*/; do
+  [ -d "$skill_dir" ] || continue
+  skill="$(basename "$skill_dir")"
+  [ "$skill" = "_shared" ] && continue
   if [ "$CHECK_ONLY" = false ]; then
     mkdir -p "correctless/skills/$skill"
   fi
   sync_file "skills/$skill/SKILL.md" "correctless/skills/$skill/SKILL.md"
 done
-[ "$CHECK_ONLY" = false ] && info "All skills (32) → correctless/"
+skill_count=$(find skills -mindepth 1 -maxdepth 1 -type d ! -name '_shared' | wc -l | tr -d ' ')
+[ "$CHECK_ONLY" = false ] && info "All skills ($skill_count) → correctless/"
 
 # --- test-features templates (harness-fingerprint baseline) ---
 if [ "$CHECK_ONLY" = false ]; then
@@ -160,8 +165,8 @@ if [ "$CHECK_ONLY" = true ]; then
     fi
   fi
 
-  # Hooks and scripts: check for stale .sh files
-  for dir in hooks scripts; do
+  # Hooks, scripts, and scripts/wf: check for stale .sh files
+  for dir in hooks scripts scripts/wf; do
     if [ -d "correctless/$dir" ]; then
       for dist_file in "correctless/$dir"/*.sh; do
         [ -f "$dist_file" ] || continue
@@ -171,6 +176,16 @@ if [ "$CHECK_ONLY" = true ]; then
       done
     fi
   done
+
+  # Templates: check for stale .md and .json files
+  if [ -d "correctless/templates" ]; then
+    for dist_tmpl in correctless/templates/*.md correctless/templates/*.json; do
+      [ -f "$dist_tmpl" ] || continue
+      if [ ! -f "templates/$(basename "$dist_tmpl")" ]; then
+        DIRTY=true
+      fi
+    done
+  fi
 
   # Hooks: check for stale .json files (agent hooks like import-guard.json)
   if [ -d "correctless/hooks" ]; then

@@ -981,9 +981,14 @@ test_pre007_sync_includes_cauto() {
 
   local sync="$REPO_DIR/sync.sh"
 
-  # PRE-007: sync.sh skill list must include cauto
-  file_contains "$sync" "cauto" \
-    "PRE-007: sync.sh skill list includes cauto"
+  # PRE-007: sync.sh skill list must include cauto (or glob-based per AP-024)
+  if grep -q 'cauto' "$sync" || grep -q 'skills/\*/' "$sync"; then
+    echo "  PASS: PRE-007: sync.sh skill list includes cauto (or glob-based)"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: PRE-007: sync.sh skill list missing cauto"
+    FAIL=$((FAIL + 1))
+  fi
 }
 
 # ============================================

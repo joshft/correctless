@@ -43,14 +43,17 @@ MIN_OCCURRENCES=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --base)
+      [ $# -ge 2 ] || { shift; break; }
       BASE_DIR="$2"
       shift 2
       ;;
     --scope)
+      [ $# -ge 2 ] || { shift; break; }
       SCOPE_ARG="$2"
       shift 2
       ;;
     --min-occurrences)
+      [ $# -ge 2 ] || { shift; break; }
       MIN_OCCURRENCES="$2"
       shift 2
       ;;
@@ -307,7 +310,9 @@ _extract_devadv_themes() {
           json_severity=$(echo "$severity" | jq -Rs '.' 2>/dev/null)
         fi
 
-        all_entries+="{\"id\":\"$da_id\",\"date\":\"$file_date\",\"summary\":$json_summary,\"file_refs\":[],\"severity\":$json_severity,\"source\":\"$filename\"}"
+        local json_entry
+        json_entry=$(jq -n --arg id "$da_id" --arg d "$file_date" --argjson s "$json_summary" --argjson sev "$json_severity" --arg src "$filename" '{id:$id,date:$d,summary:$s,file_refs:[],severity:$sev,source:$src}')
+        all_entries+="$json_entry"
       fi
     done < "$report"
   done
@@ -352,9 +357,9 @@ _extract_override_patterns() {
       else
         all_reasons+=","
       fi
-      local json_reason
-      json_reason=$(echo "$reason" | jq -Rs '.' 2>/dev/null)
-      all_reasons+="{\"reason\":$json_reason,\"date\":\"$completed_at\"}"
+      local json_entry
+      json_entry=$(jq -n --arg r "$reason" --arg d "$completed_at" '{reason:$r,date:$d}')
+      all_reasons+="$json_entry"
     done < <(jq -r '.overrides[].reason' "$override_file" 2>/dev/null)
   done
 
@@ -434,9 +439,9 @@ _extract_lens_recommendations() {
         all_lenses+=","
       fi
 
-      local json_rationale
-      json_rationale=$(echo "$rationale" | jq -Rs '.' 2>/dev/null)
-      all_lenses+="{\"lens_name\":\"$lens_name\",\"rationale\":$json_rationale,\"date\":\"$file_date\"}"
+      local json_entry
+      json_entry=$(jq -n --arg ln "$lens_name" --arg r "$rationale" --arg d "$file_date" '{lens_name:$ln,rationale:$r,date:$d}')
+      all_lenses+="$json_entry"
     done < <(jq -c '.recommended_lenses[]' "$lens_file" 2>/dev/null)
   done
 
@@ -550,18 +555,12 @@ _extract_debug_clusters() {
     done < "$debug_file"
 
     # Extract paths matching project conventions
-    local refs_array="["
-    local refs_first=true
-    while IFS= read -r ref; do
-      [ -z "$ref" ] && continue
-      if [ "$refs_first" = true ]; then
-        refs_first=false
-      else
-        refs_array+=","
-      fi
-      refs_array+="\"$ref\""
-    done < <(echo "$fix_text" | grep -oE '(scripts/[^ )]+|hooks/[^ )]+|skills/[^ )]+|tests/[^ )]+|\.correctless/[^ )]+)' 2>/dev/null | sort -u)
-    refs_array+="]"
+    local refs_json="[]"
+    local refs_raw
+    refs_raw=$(echo "$fix_text" | grep -oE '(scripts/[^ )]+|hooks/[^ )]+|skills/[^ )]+|tests/[^ )]+|\.correctless/[^ )]+)' 2>/dev/null | sort -u) || true
+    if [ -n "$refs_raw" ]; then
+      refs_json=$(printf '%s\n' "$refs_raw" | jq -R . | jq -s .)
+    fi
 
     if [ "$first" = true ]; then
       first=false
@@ -569,10 +568,9 @@ _extract_debug_clusters() {
       all_entries+=","
     fi
 
-    local json_summary
-    json_summary=$(echo "$summary" | jq -Rs '.' 2>/dev/null)
-
-    all_entries+="{\"id\":\"$slug\",\"date\":\"$file_date\",\"summary\":$json_summary,\"file_refs\":$refs_array,\"severity\":null,\"source\":\"$filename\"}"
+    local json_entry
+    json_entry=$(jq -n --arg id "$slug" --arg d "$file_date" --arg s "$summary" --argjson refs "$refs_json" --arg src "$filename" '{id:$id,date:$d,summary:$s,file_refs:$refs,severity:null,source:$src}')
+    all_entries+="$json_entry"
   done
 
   all_entries+="]"

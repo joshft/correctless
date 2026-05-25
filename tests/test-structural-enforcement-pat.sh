@@ -262,16 +262,16 @@ fi
 
 section "R-008: sync.sh propagates modified skill files"
 
-# R-008a: sync.sh copies cspec skill
-if grep -q 'cspec' "$SYNC_SH"; then
-  pass "R-008a" "sync.sh references cspec skill"
+# R-008a: sync.sh copies cspec skill (hardcoded or glob-based)
+if grep -q 'cspec' "$SYNC_SH" || grep -q 'skills/\*/' "$SYNC_SH"; then
+  pass "R-008a" "sync.sh references cspec skill (or glob-based)"
 else
   fail "R-008a" "sync.sh does not reference cspec skill"
 fi
 
-# R-008b: sync.sh copies creview-spec skill
-if grep -q 'creview-spec' "$SYNC_SH"; then
-  pass "R-008b" "sync.sh references creview-spec skill"
+# R-008b: sync.sh copies creview-spec skill (hardcoded or glob-based)
+if grep -q 'creview-spec' "$SYNC_SH" || grep -q 'skills/\*/' "$SYNC_SH"; then
+  pass "R-008b" "sync.sh references creview-spec skill (or glob-based)"
 else
   fail "R-008b" "sync.sh does not reference creview-spec skill"
 fi

@@ -1,7 +1,7 @@
 ---
 name: creview-spec
 description: Multi-agent adversarial review of a spec. Spawns red team, assumptions auditor, testability auditor, design contract checker, and UX auditor. Use after /cspec or /cmodel.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(*cross-feature-intel*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Write(.correctless/meta/external-review-history.json), Write(.correctless/meta/deferred-findings.json), Task
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(jq*cross-feature-intel.json*), Write(.correctless/artifacts/*), Write(.correctless/specs/*), Write(.correctless/meta/external-review-history.json), Write(.correctless/meta/deferred-findings.json), Task
 interaction_mode: hybrid
 ---
 

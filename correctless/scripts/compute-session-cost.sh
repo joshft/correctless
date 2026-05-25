@@ -44,7 +44,8 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     --phase)
-      CACHE_PHASE="${2:-}"
+      [ $# -ge 2 ] || { echo "Error: --phase requires a value" >&2; exit 1; }
+      CACHE_PHASE="$2"
       shift 2
       ;;
     -*)
@@ -163,7 +164,7 @@ if compgen -G "$SESSION_DIR/*.jsonl" >/dev/null 2>&1; then
   for jsonl_file in "$SESSION_DIR"/*.jsonl; do
     [ -f "$jsonl_file" ] || continue
     # Check if any entry has matching gitBranch (early exit per R-013)
-    if jq -R 'try (fromjson | select(.gitBranch == "'"$TARGET_BRANCH"'")) catch empty' "$jsonl_file" 2>/dev/null | head -1 | grep -q '.'; then
+    if jq -R --arg branch "$TARGET_BRANCH" 'try (fromjson | select(.gitBranch == $branch)) catch empty' "$jsonl_file" 2>/dev/null | head -1 | grep -q '.'; then
       # Extract session ID from filename
       local_session_id="$(basename "$jsonl_file" .jsonl)"
       MATCHING_SESSIONS+=("$local_session_id")
@@ -173,7 +174,7 @@ fi
 
 # No matching sessions — exit gracefully (R-011)
 if [ ${#MATCHING_SESSIONS[@]} -eq 0 ]; then
-  echo '{"branch":"'"$TARGET_BRANCH"'","feature":"","computed_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","sessions":[],"total_cost_usd":0,"total_input_tokens":0,"total_output_tokens":0,"total_cache_write_tokens":0,"total_cache_read_tokens":0,"by_phase":[],"by_subagent":[{"description":"orchestrator","agent_type":"parent","cost_usd":0,"tokens":0,"turns":0}],"pricing_used":{},"model_breakdown":[],"unknown_models":[],"warnings":[]}'
+  jq -n --arg branch "$TARGET_BRANCH" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{branch:$branch,feature:"",computed_at:$ts,sessions:[],total_cost_usd:0,total_input_tokens:0,total_output_tokens:0,total_cache_write_tokens:0,total_cache_read_tokens:0,by_phase:[],by_subagent:[{description:"orchestrator",agent_type:"parent",cost_usd:0,tokens:0,turns:0}],pricing_used:{},model_breakdown:[],unknown_models:[],warnings:[]}'
   exit 0
 fi
 
@@ -212,7 +213,7 @@ for session_id in "${MATCHING_SESSIONS[@]}"; do
 
   # Parent transcript
   if [ -f "$session_jsonl" ]; then
-    jq -R 'try (fromjson | select(.gitBranch == "'"$TARGET_BRANCH"'" and .type == "assistant") |
+    jq -R --arg branch "$TARGET_BRANCH" --arg sid "$session_id" 'try (fromjson | select(.gitBranch == $branch and .type == "assistant") |
       {
         msg_id: .message.id,
         model: (.message.model // "unknown"),
@@ -222,7 +223,7 @@ for session_id in "${MATCHING_SESSIONS[@]}"; do
         cache_read: (.message.usage.cache_read_input_tokens // 0),
         timestamp: .timestamp,
         source: "parent",
-        session: "'"$session_id"'"
+        session: $sid
       }) catch empty' "$session_jsonl" >> "$ALL_ENTRIES_FILE" 2>/dev/null || true
   fi
 
@@ -242,9 +243,9 @@ for session_id in "${MATCHING_SESSIONS[@]}"; do
         local_agent_desc=$(jq -r '.description // "unknown"' "$local_meta_file" 2>/dev/null || echo "unknown")
         local_agent_type=$(jq -r '.type // "unknown"' "$local_meta_file" 2>/dev/null || echo "unknown")
       fi
-      echo "{\"agent_basename\":\"$local_agent_basename\",\"description\":\"$local_agent_desc\",\"agent_type\":\"$local_agent_type\",\"session\":\"$session_id\"}" >> "$SUBAGENT_META_FILE"
+      jq -n --arg ab "$local_agent_basename" --arg d "$local_agent_desc" --arg at "$local_agent_type" --arg sid "$session_id" '{agent_basename:$ab,description:$d,agent_type:$at,session:$sid}' >> "$SUBAGENT_META_FILE"
 
-      jq -R 'try (fromjson | select(.type == "assistant") |
+      jq -R --arg src "agent:$local_agent_basename" --arg sid "$session_id" 'try (fromjson | select(.type == "assistant") |
         {
           msg_id: .message.id,
           model: (.message.model // "unknown"),
@@ -253,8 +254,8 @@ for session_id in "${MATCHING_SESSIONS[@]}"; do
           cache_write: (.message.usage.cache_creation_input_tokens // 0),
           cache_read: (.message.usage.cache_read_input_tokens // 0),
           timestamp: .timestamp,
-          source: "agent:'"$local_agent_basename"'",
-          session: "'"$session_id"'"
+          source: $src,
+          session: $sid
         }) catch empty' "$agent_jsonl" >> "$ALL_ENTRIES_FILE" 2>/dev/null || true
     done
 
@@ -268,7 +269,7 @@ for session_id in "${MATCHING_SESSIONS[@]}"; do
         agent-*) continue ;;
       esac
 
-      jq -R 'try (fromjson | select(.type == "assistant") |
+      jq -R --arg src "infra:$local_infra_basename" --arg sid "$session_id" 'try (fromjson | select(.type == "assistant") |
         {
           msg_id: .message.id,
           model: (.message.model // "unknown"),
@@ -277,8 +278,8 @@ for session_id in "${MATCHING_SESSIONS[@]}"; do
           cache_write: (.message.usage.cache_creation_input_tokens // 0),
           cache_read: (.message.usage.cache_read_input_tokens // 0),
           timestamp: .timestamp,
-          source: "infra:'"$local_infra_basename"'",
-          session: "'"$session_id"'"
+          source: $src,
+          session: $sid
         }) catch empty' "$infra_jsonl" >> "$ALL_ENTRIES_FILE" 2>/dev/null || true
     done
   fi

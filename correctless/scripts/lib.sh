@@ -583,7 +583,7 @@ check_install_freshness() {
   done <<< "$file_entries"
 
   # Scan for new files not in manifest
-  for dir_prefix in hooks scripts; do
+  for dir_prefix in hooks scripts scripts/wf; do
     local scan_dir="$correctless_dir/$dir_prefix"
     [ -d "$scan_dir" ] || continue
     for file in "$scan_dir"/*.sh; do

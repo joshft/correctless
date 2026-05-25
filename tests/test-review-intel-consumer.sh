@@ -417,7 +417,7 @@ fi
 # Line number comparison: review-context anti-anchoring line must come before the brief jq read
 # Use the review-specific directive text (not the generic historical pattern "anchoring" text)
 anchoring_line_spec=$(grep -n 'Weight.*contradicts.*agent\|Dismiss.*independently found' "$CREVIEW_SPEC_SKILL" | head -1 | cut -d: -f1)
-brief_data_line_spec=$(grep -n 'cross-feature-intel\.json' "$CREVIEW_SPEC_SKILL" | head -1 | cut -d: -f1)
+brief_data_line_spec=$(grep -n 'cross-feature-intel\.json' "$CREVIEW_SPEC_SKILL" | grep -v 'allowed-tools' | head -1 | cut -d: -f1)
 if [ -n "$anchoring_line_spec" ] && [ -n "$brief_data_line_spec" ] && [ "$anchoring_line_spec" -lt "$brief_data_line_spec" ] 2>/dev/null; then
   pass "INV-005e" "creview-spec: anti-anchoring directive appears before brief data"
 else
@@ -425,7 +425,7 @@ else
 fi
 
 anchoring_line_rev=$(grep -n 'Weight.*contradicts.*agent\|Dismiss.*independently found' "$CREVIEW_SKILL" | head -1 | cut -d: -f1)
-brief_data_line_rev=$(grep -n 'cross-feature-intel\.json' "$CREVIEW_SKILL" | head -1 | cut -d: -f1)
+brief_data_line_rev=$(grep -n 'cross-feature-intel\.json' "$CREVIEW_SKILL" | grep -v 'allowed-tools' | head -1 | cut -d: -f1)
 if [ -n "$anchoring_line_rev" ] && [ -n "$brief_data_line_rev" ] && [ "$anchoring_line_rev" -lt "$brief_data_line_rev" ] 2>/dev/null; then
   pass "INV-005f" "creview: anti-anchoring directive appears before brief data"
 else
@@ -559,20 +559,20 @@ fi
 
 section "INV-008: Allowed-tools updated for both review skills"
 
-# Tests INV-008 [unit]: creview-spec allowed-tools includes Bash(*cross-feature-intel*)
+# Tests INV-008 [unit]: creview-spec allowed-tools includes cross-feature-intel read glob
 creview_spec_tools=$(head -10 "$CREVIEW_SPEC_SKILL")
-if echo "$creview_spec_tools" | grep -q 'Bash(\*cross-feature-intel\*)'; then
-  pass "INV-008a" "creview-spec allowed-tools includes Bash(*cross-feature-intel*)"
+if echo "$creview_spec_tools" | grep -q 'Bash(jq\*cross-feature-intel.json\*)'; then
+  pass "INV-008a" "creview-spec allowed-tools includes narrowed Bash(jq*cross-feature-intel.json*)"
 else
-  fail "INV-008a" "creview-spec allowed-tools must include Bash(*cross-feature-intel*)"
+  fail "INV-008a" "creview-spec allowed-tools must include Bash(jq*cross-feature-intel.json*)"
 fi
 
-# Tests INV-008 [unit]: creview allowed-tools includes Bash(*cross-feature-intel*)
+# Tests INV-008 [unit]: creview allowed-tools includes cross-feature-intel read glob
 creview_tools=$(head -10 "$CREVIEW_SKILL")
-if echo "$creview_tools" | grep -q 'Bash(\*cross-feature-intel\*)'; then
-  pass "INV-008b" "creview allowed-tools includes Bash(*cross-feature-intel*)"
+if echo "$creview_tools" | grep -q 'Bash(jq\*cross-feature-intel.json\*)'; then
+  pass "INV-008b" "creview allowed-tools includes narrowed Bash(jq*cross-feature-intel.json*)"
 else
-  fail "INV-008b" "creview allowed-tools must include Bash(*cross-feature-intel*)"
+  fail "INV-008b" "creview allowed-tools must include Bash(jq*cross-feature-intel.json*)"
 fi
 
 # ============================================================================

@@ -20,9 +20,9 @@ BRANCHES_FILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --category) CATEGORY="$2"; shift 2 ;;
-    --base) BASE_DIR="$2"; shift 2 ;;
-    --branches-file) BRANCHES_FILE="$2"; shift 2 ;;
+    --category) [ $# -ge 2 ] || { echo "Error: --category requires a value" >&2; exit 1; }; CATEGORY="$2"; shift 2 ;;
+    --base) [ $# -ge 2 ] || { echo "Error: --base requires a value" >&2; exit 1; }; BASE_DIR="$2"; shift 2 ;;
+    --branches-file) [ $# -ge 2 ] || { echo "Error: --branches-file requires a value" >&2; exit 1; }; BRANCHES_FILE="$2"; shift 2 ;;
     *) echo "Unknown argument: $1" >&2; shift ;;
   esac
 done
@@ -490,7 +490,7 @@ scan_deferred() {
   fi
 
   local findings
-  findings="$(jq -c '.[] | select(.status == "open")' "$def_file" 2>/dev/null)" || { echo "[]"; return; }
+  findings="$(jq -c '.findings[] | select(.status == "open")' "$def_file" 2>/dev/null)" || { echo "[]"; return; }
 
   local candidates=()
   while IFS= read -r finding; do
@@ -723,7 +723,7 @@ scan_driftdebt() {
   local candidates=()
 
   local entries
-  entries="$(jq -c '.[]' "$debt_file" 2>/dev/null)" || { echo "[]"; return; }
+  entries="$(jq -c '.drift_debt[]' "$debt_file" 2>/dev/null)" || { echo "[]"; return; }
 
   while IFS= read -r entry; do
     [ -z "$entry" ] && continue
@@ -737,8 +737,8 @@ scan_driftdebt() {
     fi
 
     # Use resolved_at if available, else created_at
-    resolved_at="$(echo "$entry" | jq -r '.resolved_at // empty')"
-    created_at="$(echo "$entry" | jq -r '.created_at // empty')"
+    resolved_at="$(echo "$entry" | jq -r '(.resolved_at // .resolved_date // .resolved) // empty')"
+    created_at="$(echo "$entry" | jq -r '(.created_at // .detected) // empty')"
     local date_str="${resolved_at:-$created_at}"
     [ -z "$date_str" ] && continue
 

@@ -892,8 +892,8 @@ test_r007_migration() {
   fi
 
   # R-007-c: sync.sh includes cdashboard in skill list
-  if grep -q 'cdashboard' "$REPO_DIR/sync.sh"; then
-    pass "R007-c" "sync.sh includes cdashboard in skill list"
+  if grep -q 'cdashboard' "$REPO_DIR/sync.sh" || grep -q 'skills/\*/' "$REPO_DIR/sync.sh"; then
+    pass "R007-c" "sync.sh includes cdashboard (or glob-based)"
   else
     fail "R007-c" "sync.sh missing cdashboard"
   fi
@@ -901,8 +901,8 @@ test_r007_migration() {
   # R-007-d: sync.sh skill count matches actual skill directories
   local expected_count
   expected_count=$(find "$REPO_DIR/skills" -name "SKILL.md" -not -path "*/_shared/*" | wc -l | tr -d ' ')
-  if grep -qE "All skills \\($expected_count\\)" "$REPO_DIR/sync.sh"; then
-    pass "R007-d" "sync.sh skill count updated to $expected_count"
+  if grep -qE "All ${expected_count} skills|${expected_count} skills|All skills \\(" "$REPO_DIR/sync.sh"; then
+    pass "R007-d" "sync.sh skill count updated to $expected_count (or dynamic)"
   else
     fail "R007-d" "sync.sh skill count not updated to $expected_count"
   fi

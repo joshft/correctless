@@ -934,8 +934,8 @@ check_inv010_self_scan() {
   ' "$self")"
 
   local bad=0
-  if echo "$stripped" | grep -qF 'grep -P'; then
-    fail "INV-010" "self-scan: forbidden 'grep -P' usage"
+  if echo "$stripped" | grep -qE 'grep[[:space:]]+-[[:alpha:]]*P'; then
+    fail "INV-010" "self-scan: forbidden 'grep -P' or 'grep -oP' usage"
     bad=1
   fi
   # GNU awk extensions
@@ -1925,7 +1925,7 @@ check_ap005_stale_counts() {
 
   # Test file count in CONTRIBUTING.md
   local claimed_tests actual_tests
-  claimed_tests="$(grep -oP '\d+(?= test files)' "$root/CONTRIBUTING.md" 2>/dev/null | head -1)" || claimed_tests=""
+  claimed_tests="$(grep -oE '[0-9]+ test files' "$root/CONTRIBUTING.md" 2>/dev/null | head -1 | grep -oE '[0-9]+')" || claimed_tests=""
   actual_tests="$(find "$root/tests" -maxdepth 1 -name 'test-*.sh' -type f | wc -l | tr -d ' ')"
   if [ -n "$claimed_tests" ] && [ "$claimed_tests" -eq "$actual_tests" ]; then
     pass "AP-005(tests)" "CONTRIBUTING.md claims $claimed_tests test files, actual is $actual_tests"
@@ -1937,7 +1937,7 @@ check_ap005_stale_counts() {
 
   # Skill count in CONTRIBUTING.md
   local claimed_skills actual_skills
-  claimed_skills="$(grep -oP '\d+(?= SKILL\.md files)' "$root/CONTRIBUTING.md" 2>/dev/null | head -1)" || claimed_skills=""
+  claimed_skills="$(grep -oE '[0-9]+ SKILL\.md files' "$root/CONTRIBUTING.md" 2>/dev/null | head -1 | grep -oE '[0-9]+')" || claimed_skills=""
   actual_skills="$(find "$root/skills" -name 'SKILL.md' -type f | wc -l | tr -d ' ')"
   if [ -n "$claimed_skills" ] && [ "$claimed_skills" -eq "$actual_skills" ]; then
     pass "AP-005(skills)" "CONTRIBUTING.md claims $claimed_skills skills, actual is $actual_skills"
@@ -1949,7 +1949,7 @@ check_ap005_stale_counts() {
 
   # Skill count in README.md badge
   local readme_skills
-  readme_skills="$(grep -oP '(?<=skills-)\d+' "$root/README.md" 2>/dev/null | head -1)" || readme_skills=""
+  readme_skills="$(grep -oE 'skills-[0-9]+' "$root/README.md" 2>/dev/null | head -1 | grep -oE '[0-9]+')" || readme_skills=""
   if [ -n "$readme_skills" ] && [ "$readme_skills" -eq "$actual_skills" ]; then
     pass "AP-005(readme-badge)" "README badge claims $readme_skills skills, actual is $actual_skills"
   elif [ -n "$readme_skills" ]; then

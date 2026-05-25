@@ -779,7 +779,7 @@ section "INV-010: Stale deferred findings detection"
 # Tests INV-010 [behavioral]: finding with dead source_file is flagged
 TMPDIR_010="$(setup_fixture_dir)"
 cat > "$TMPDIR_010/.correctless/meta/deferred-findings.json" << 'DEF_EOF'
-[
+{"schema_version":1,"findings":[
   {
     "id": "DF-001",
     "status": "open",
@@ -792,7 +792,7 @@ cat > "$TMPDIR_010/.correctless/meta/deferred-findings.json" << 'DEF_EOF'
     "source_file": ".correctless/artifacts/review-spec-findings-existing.md",
     "description": "Another finding"
   }
-]
+]}
 DEF_EOF
 # Create the existing source file for DF-002
 touch "$TMPDIR_010/.correctless/artifacts/review-spec-findings-existing.md"
@@ -809,14 +809,14 @@ cleanup_fixture "$TMPDIR_010"
 # Tests INV-010 [behavioral]: findings with status other than open are skipped
 TMPDIR_010b="$(setup_fixture_dir)"
 cat > "$TMPDIR_010b/.correctless/meta/deferred-findings.json" << 'DEF_EOF'
-[
+{"schema_version":1,"findings":[
   {
     "id": "DF-003",
     "status": "wont-fix",
     "source_file": ".correctless/artifacts/nonexistent.md",
     "description": "Already resolved"
   }
-]
+]}
 DEF_EOF
 result_010b="$(bash "$SCANNER" --category deferred --base "$TMPDIR_010b" 2>/dev/null)" || true
 assert_json_array_length "INV-010-b" "Non-open findings are NOT flagged" "0" "$result_010b"
@@ -825,14 +825,14 @@ cleanup_fixture "$TMPDIR_010b"
 # Tests INV-010 [behavioral]: risk is medium for deferred findings
 TMPDIR_010c="$(setup_fixture_dir)"
 cat > "$TMPDIR_010c/.correctless/meta/deferred-findings.json" << 'DEF_EOF'
-[
+{"schema_version":1,"findings":[
   {
     "id": "DF-004",
     "status": "open",
     "source_file": ".correctless/artifacts/nonexistent-review.md",
     "description": "Stale finding"
   }
-]
+]}
 DEF_EOF
 result_010c="$(bash "$SCANNER" --category deferred --base "$TMPDIR_010c" 2>/dev/null)" || true
 if [ "$(echo "$result_010c" | jq 'length' 2>/dev/null)" -gt 0 ]; then
@@ -988,21 +988,21 @@ section "INV-014: Drift debt pruning"
 # Tests INV-014 [behavioral]: resolved drift debt >90 days is flagged
 TMPDIR_014="$(setup_fixture_dir)"
 cat > "$TMPDIR_014/.correctless/meta/drift-debt.json" << 'DRIFT_EOF'
-[
+{"drift_debt":[
   {
     "id": "DD-001",
     "status": "resolved",
-    "created_at": "2026-01-01T00:00:00Z",
-    "resolved_at": "2026-01-15T00:00:00Z",
+    "detected": "2026-01-01",
+    "resolved": "2026-01-15",
     "description": "Old resolved debt"
   },
   {
     "id": "DD-002",
     "status": "open",
-    "created_at": "2026-01-01T00:00:00Z",
+    "detected": "2026-01-01",
     "description": "Still open debt"
   }
-]
+]}
 DRIFT_EOF
 result_014="$(bash "$SCANNER" --category driftdebt --base "$TMPDIR_014" 2>/dev/null)" || true
 if [ "$(echo "$result_014" | jq 'length' 2>/dev/null)" -eq 1 ]; then
@@ -1017,15 +1017,15 @@ cleanup_fixture "$TMPDIR_014"
 # Tests INV-014 [behavioral]: wont-fix drift debt >90 days is also flagged
 TMPDIR_014b="$(setup_fixture_dir)"
 cat > "$TMPDIR_014b/.correctless/meta/drift-debt.json" << 'DRIFT_EOF'
-[
+{"drift_debt":[
   {
     "id": "DD-003",
     "status": "wont-fix",
-    "created_at": "2026-01-01T00:00:00Z",
-    "resolved_at": "2026-01-15T00:00:00Z",
+    "detected": "2026-01-01",
+    "resolved": "2026-01-15",
     "description": "Old wont-fix debt"
   }
-]
+]}
 DRIFT_EOF
 result_014b="$(bash "$SCANNER" --category driftdebt --base "$TMPDIR_014b" 2>/dev/null)" || true
 if [ "$(echo "$result_014b" | jq 'length' 2>/dev/null)" -gt 0 ]; then
@@ -1039,15 +1039,15 @@ cleanup_fixture "$TMPDIR_014b"
 TMPDIR_014c="$(setup_fixture_dir)"
 recent_date="$(date -u -d "-30 days" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v-30d '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)"
 cat > "$TMPDIR_014c/.correctless/meta/drift-debt.json" << DRIFT_EOF
-[
+{"drift_debt":[
   {
     "id": "DD-004",
     "status": "resolved",
-    "created_at": "2026-05-01T00:00:00Z",
+    "detected": "2026-05-01",
     "resolved_at": "${recent_date}",
     "description": "Recently resolved debt"
   }
-]
+]}
 DRIFT_EOF
 result_014c="$(bash "$SCANNER" --category driftdebt --base "$TMPDIR_014c" 2>/dev/null)" || true
 assert_json_array_length "INV-014-c" "Resolved debt <90 days is NOT flagged" "0" "$result_014c"
@@ -1155,18 +1155,18 @@ fi
 
 section "INV-019: sync.sh skill list update"
 
-# Tests INV-019 [unit]: sync.sh includes cprune in skill list
-if grep -q "cprune" "sync.sh" 2>/dev/null; then
-  pass "INV-019-a" "sync.sh includes cprune in skill list"
+# Tests INV-019 [unit]: sync.sh uses glob for skills (AP-024 fix)
+if grep -q 'skills/\*/' "sync.sh" 2>/dev/null; then
+  pass "INV-019-a" "sync.sh uses glob for skill directories"
 else
-  fail "INV-019-a" "sync.sh should include cprune in skill list"
+  fail "INV-019-a" "sync.sh should use glob for skill directories (AP-024)"
 fi
 
-# Tests INV-019 [unit]: sync.sh comment says 32 skills
-if grep -q "32 skill\|All 32\|skills (32)" "sync.sh" 2>/dev/null; then
-  pass "INV-019-b" "sync.sh says 32 skills (updated from 31)"
+# Tests INV-019 [unit]: sync.sh uses glob for templates (AP-024 fix)
+if grep -q 'templates/\*\.md\|templates/\*\.json' "sync.sh" 2>/dev/null; then
+  pass "INV-019-b" "sync.sh uses glob for templates"
 else
-  fail "INV-019-b" "sync.sh should say 32 skills (updated from 31)"
+  fail "INV-019-b" "sync.sh should use glob for templates (AP-024)"
 fi
 
 # ============================================
