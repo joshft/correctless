@@ -100,24 +100,22 @@ test_r011_skill_exists() {
     && local has_name="true" || local has_name="false"
   assert_eq "R-011: SKILL.md has name: cexplain in frontmatter" "true" "$has_name"
 
-  # Tests R-011 [integration]: registered in sync.sh for Lite
+  # Tests R-011 [integration]: registered in sync.sh (hardcoded or glob-based)
   local sync_file="$REPO_DIR/sync.sh"
-  file_contains "$sync_file" "cexplain" \
+  { grep -q 'cexplain' "$sync_file" || grep -q 'skills/\*/' "$sync_file"; } 2>/dev/null \
     && local in_sync="true" || local in_sync="false"
   assert_eq "R-011: cexplain registered in sync.sh" "true" "$in_sync"
 
-  # Check Lite skill list specifically
-  grep -q 'for skill in.*cexplain' "$sync_file" 2>/dev/null \
+  # Check skill loop (hardcoded list or glob)
+  { grep -q 'for skill in.*cexplain' "$sync_file" || grep -q 'for skill_dir in skills/\*/' "$sync_file"; } 2>/dev/null \
     && local in_lite_loop="true" || local in_lite_loop="false"
   assert_eq "R-011: cexplain in sync.sh Lite skill loop" "true" "$in_lite_loop"
 
-  # Check unified skill loop contains cexplain
-  local cexplain_count
-  cexplain_count="$(grep -c 'cexplain' "$sync_file" 2>/dev/null || true)"
-  cexplain_count="${cexplain_count:-0}"
-  # Should appear at least once (in the unified skill loop)
-  assert_eq "R-011: cexplain in sync.sh skill loop (appears 1+ times)" "true" \
-    "$([ "$cexplain_count" -ge 1 ] 2>/dev/null && echo true || echo false)"
+  # Check sync.sh handles cexplain (via name or glob)
+  local cexplain_synced
+  { grep -q 'cexplain' "$sync_file" || grep -q 'skills/\*/' "$sync_file"; } 2>/dev/null \
+    && cexplain_synced="true" || cexplain_synced="false"
+  assert_eq "R-011: cexplain in sync.sh skill loop (appears 1+ times)" "true" "$cexplain_synced"
 
   # Tests R-011 [integration]: documented in docs/skills/cexplain.md
   local docs_file="$REPO_DIR/docs/skills/cexplain.md"

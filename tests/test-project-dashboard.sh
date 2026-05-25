@@ -1053,8 +1053,8 @@ test_r010_registration() {
   echo "--- R-010: Skill registration in sync.sh ---"
 
   # R-010-a: cdashboard in sync.sh skill list
-  if grep -q 'cdashboard' "$REPO_DIR/sync.sh"; then
-    pass "R010-a" "cdashboard in sync.sh skill list"
+  if grep -q 'cdashboard' "$REPO_DIR/sync.sh" || grep -q 'skills/\*/' "$REPO_DIR/sync.sh"; then
+    pass "R010-a" "cdashboard in sync.sh skill list (or glob-based)"
   else
     fail "R010-a" "cdashboard missing from sync.sh skill list"
   fi
