@@ -602,7 +602,7 @@ emit_json() {
     local items_json
     items_json="$(echo "$raw_data" | jq -R 'split("\u001f") | {id: .[0], pattern: .[1], severity: .[2], file: .[3], line: (.[4] | tonumber? // 0), description: .[5], category: .[6]}' | jq -s '.')" || items_json="[]"
 
-    result_json="$(jq -n --argjson f "$items_json" '{findings: $f}')"
+    result_json="$(echo "$items_json" | jq '{findings: .}')"
   else
     result_json="$(jq -n '{findings: []}')"
   fi
