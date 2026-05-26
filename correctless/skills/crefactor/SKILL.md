@@ -42,13 +42,13 @@ Mark each task complete as it finishes.
 
 After capturing the refactor intent (below), check for `.correctless/artifacts/checkpoint-crefactor-{slug}.json` (derive slug from the intent filename). If no intent file exists yet, no checkpoint can exist — proceed normally. Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
-- **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify each phase:
+- **If found and <72 hours old**: Read `completed_phases`. Before skipping, verify each phase:
   - After `coverage-assessed`: refactor intent artifact exists
   - After `characterization-tests`: characterization test files exist and pass
   - After `phase-N` (refactor phases): run test suite — tests must pass
   - After `qa`: `.correctless/artifacts/qa-findings-refactor-{slug}.json` exists
   If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}." Skip completed phases. If verification fails (e.g., tests no longer pass after a refactor phase): restart from the phase that failed.
-- **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
+- **If found but >72 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
 - **If not found**: Start from the beginning as normal.
 
 After each major phase (`coverage-assessed`, `characterization-tests`, `phase-1`, `phase-2`, ..., `qa`) completes, write/update the checkpoint:

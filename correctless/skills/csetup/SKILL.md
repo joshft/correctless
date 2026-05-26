@@ -151,18 +151,22 @@ Then run the setup script to do the mechanical work:
 ```bash
 # Backward-compat: check correctless-lite path for users migrating from the old
 # two-distribution layout. Once migration adoption is complete, remove that line.
+setup_found=false
 for dir in \
   ~/.claude/plugins/cache/correctless/correctless/*/ \
   ~/.claude/plugins/cache/correctless/correctless-lite/*/ \
   .claude/skills/workflow/; do
   if [ -f "${dir}setup" ]; then
     "${dir}setup"
+    setup_found=true
     break
   fi
 done
 
 # If no setup script found, tell the human
-echo "Could not find Correctless setup script. Provide the install path or run setup manually."
+if [ "$setup_found" = false ]; then
+  echo "Could not find Correctless setup script. Provide the install path or run setup manually."
+fi
 ```
 
 ## Step 2.5: MCP Server Integration (Serena + Context7)
@@ -1110,7 +1114,7 @@ Check workflow state anytime: `.correctless/hooks/workflow-advance.sh status`"
 Start a feature: `git checkout -b feature/my-feature` then `/cspec`.
 Or review a PR: `/cpr-review {number}`.
 
-Current commands: `/csetup`, `/cspec`, `/creview`, `/ctdd`, `/cverify`, `/cdocs`, `/crefactor`, `/cpr-review`, `/ccontribute`, `/cmaintain`, `/cstatus`, `/csummary`, `/cmetrics`, `/cdebug`, `/chelp`, `/cwtf`, `/cquick`, `/crelease`, `/cexplain`, `/cauto`
+Current commands: `/csetup`, `/cspec`, `/creview`, `/creview-spec`, `/cmodel`, `/ctdd`, `/cverify`, `/caudit`, `/cupdate-arch`, `/cdocs`, `/cpostmortem`, `/cdevadv`, `/credteam`, `/crefactor`, `/cpr-review`, `/ccontribute`, `/cmaintain`, `/cstatus`, `/csummary`, `/cmetrics`, `/cdebug`, `/chelp`, `/cwtf`, `/cquick`, `/crelease`, `/cexplain`, `/cauto`, `/carchitect`, `/cmodelupgrade`, `/cdashboard`, `/ctriage`, `/cprune`
 Check workflow state: `.correctless/hooks/workflow-advance.sh status`"
 
 If the human says they want to start a feature, ask what they want to build and suggest they run `/cspec`. **Do not auto-invoke `/cspec`.**

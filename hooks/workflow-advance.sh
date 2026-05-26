@@ -490,6 +490,7 @@ case "$cmd" in
   set-intensity)  cmd_set_intensity "$@" ;;
   resolve-drift)  cmd_resolve_drift "$@" ;;
   reset)          cmd_reset ;;
+  gc)             cmd_gc ;;
   override)       cmd_override "$@" ;;
   diagnose)       cmd_diagnose "$@" ;;
   status)         cmd_status ;;
@@ -521,6 +522,7 @@ case "$cmd" in
     echo "Utilities:"
     echo "  set-intensity lvl  Set feature intensity (standard|high|critical)"
     echo "  reset              Remove all workflow state for current branch"
+    echo "  gc                 Remove state files for deleted branches"
     echo "  override \"reason\" Temporarily bypass gate for 10 tool calls"
     echo "  diagnose \"file\"   Show why a file would be blocked/allowed"
     echo "  status             Print current workflow state"

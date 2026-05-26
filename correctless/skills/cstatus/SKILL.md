@@ -152,6 +152,10 @@ Available commands:
   /cexplain       Guided codebase exploration
   /cauto          Semi-auto pipeline — orchestrates ctdd through PR
   /cmodelupgrade  Harness regression report (after model upgrade or version_bumped advisory)
+  /carchitect     Architecture definition — reverse-engineer or greenfield
+  /cdashboard     HTML project dashboard — metrics + artifact browser
+  /ctriage        Bulk triage deferred findings backlog
+  /cprune         Documentation and artifact pruning
 
 State management:
   .correctless/hooks/workflow-advance.sh status      Current phase

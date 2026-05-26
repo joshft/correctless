@@ -100,6 +100,7 @@ Other:
   /cmodelupgrade Compare current model+HARNESS_VERSION pipeline metrics vs baseline
   /cdashboard    HTML project dashboard — metrics + artifact browser
   /ctriage       Bulk triage deferred findings backlog
+  /cprune        Documentation and artifact pruning
 ```
 
 ### 4. Show Current Status

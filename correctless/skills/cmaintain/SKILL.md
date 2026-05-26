@@ -1,7 +1,7 @@
 ---
 name: cmaintain
 description: Maintainer review for incoming PRs. Use when you need to decide whether to merge a contribution. Checks scope, conventions, and maintenance burden.
-allowed-tools: Read, Grep, Glob, Bash(*)
+allowed-tools: Read, Grep, Glob, Write(.correctless/artifacts/pr-reviews/*), Bash(*)
 interaction_mode: hybrid
 ---
 
@@ -162,6 +162,8 @@ Quick security scan focused on "did this contribution introduce a vulnerability"
 This is lighter than `/cpr-review`'s full security checklist — focused on what the contribution introduced, not a full audit.
 
 ## Step 8: Generate Maintainer Review
+
+**Persist before presenting (AP-029).** Before displaying the review to the user, write it to `.correctless/artifacts/pr-reviews/maintainer-review-{pr-number}.md`. This is the recovery path if the terminal display is interrupted or context is compacted.
 
 Present the review to the maintainer:
 

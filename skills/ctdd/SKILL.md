@@ -92,14 +92,14 @@ The RED phase (test writing) and GREEN phase (implementation) MUST be executed b
 
 After reading the workflow state (step 6 below), check for `.correctless/artifacts/checkpoint-ctdd-{slug}.json` (derive slug from the workflow state file's spec_file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
-- **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify the current phase:
+- **If found and <72 hours old**: Read `completed_phases`. Before skipping, verify the current phase:
   - After `red`: test files exist and fail when run
   - After `test-audit`: test files exist (audit feedback already applied)
   - After `green`: run test suite — tests must pass
   - After `simplify`: run test suite — tests must still pass
   - After `qa`: `.correctless/artifacts/qa-findings-{slug}.json` exists
-  If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}." Skip completed phases. If verification fails: restart from the phase that failed verification.
-- **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
+  If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}." Skip completed phases. Restore `green_attempts` and `calm_reset_fired` from the checkpoint to preserve escalation state across sessions. If verification fails: restart from the phase that failed verification.
+- **If found but >72 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
 - **If not found**: Start from the beginning as normal.
 
 After each major phase (`red`, `test-audit`, `green`, `simplify`, `qa`) completes, write/update the checkpoint:
@@ -110,6 +110,8 @@ After each major phase (`red`, `test-audit`, `green`, `simplify`, `qa`) complete
   "branch": "{current-branch}",
   "completed_phases": ["red", "test-audit"],
   "current_phase": "green",
+  "green_attempts": 0,
+  "calm_reset_fired": false,
   "timestamp": "ISO"
 }
 ```

@@ -293,6 +293,25 @@ install_hooks() {
     cp "$hook" "$hook_dest/$basename_hook"
     chmod +x "$hook_dest/$basename_hook" 2>/dev/null || true
   done
+  # UX-004: Warn if sensitive-file-guard DEFAULTS changed during upgrade
+  if [ -f "$hook_dest/sensitive-file-guard.sh" ]; then
+    local _old_defaults _new_defaults
+    _old_defaults=$(grep -c '^\s*"' "$hook_dest/sensitive-file-guard.sh" 2>/dev/null || echo 0)
+    _new_defaults=$(grep -c '^\s*"' "$SCRIPT_DIR/hooks/sensitive-file-guard.sh" 2>/dev/null || echo 0)
+    if [ "$_new_defaults" -gt "$_old_defaults" ] 2>/dev/null; then
+      warn "sensitive-file-guard now protects $((_new_defaults - _old_defaults)) additional file patterns. Some previously-permitted agent edits may be blocked. Check DEFAULTS in .correctless/hooks/sensitive-file-guard.sh if you see unexpected BLOCKED errors."
+    fi
+  fi
+  # Remove stale hooks no longer in the distribution
+  for installed_hook in "$hook_dest"/*.sh; do
+    [ -f "$installed_hook" ] || continue
+    local _ih_base
+    _ih_base="$(basename "$installed_hook")"
+    if [ ! -f "$SCRIPT_DIR/hooks/$_ih_base" ]; then
+      rm -f "$installed_hook"
+      info "Removed stale hook: $_ih_base"
+    fi
+  done
   ok "Installed hooks to .correctless/hooks/"
 
   # Install phase-transition scripts (sourced by hooks and invoked by skills)
@@ -1135,6 +1154,11 @@ ok "Created .correctless/ directory structure"
 CONFIG_DEST="$REPO_ROOT/.correctless/config/workflow-config.json"
 HAS_INTENSITY="false"
 if [ -f "$CONFIG_DEST" ]; then
+  # UX-014: Validate schema_version for future migration support
+  _cfg_version="$(jq -r '.schema_version // 0' "$CONFIG_DEST" 2>/dev/null)"
+  if [ "$_cfg_version" -lt 1 ] 2>/dev/null; then
+    warn "workflow-config.json has no schema_version — may be from an older Correctless version"
+  fi
   skip "workflow-config.json (already exists)"
   if jq -e '.workflow.intensity' "$CONFIG_DEST" >/dev/null 2>&1; then
     HAS_INTENSITY="true"
@@ -1235,7 +1259,7 @@ else
 This project uses Correctless for structured development.
 Read .correctless/AGENT_CONTEXT.md before starting any work.
 Do NOT Read AGENT_CONTEXT.md from the project root — it may be stale or absent.
-Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect, /cmodelupgrade
+Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect, /cmodelupgrade, /cdashboard, /ctriage, /cprune
 CMDEOF
   ok "Updated CLAUDE.md"
 fi
