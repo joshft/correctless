@@ -303,7 +303,7 @@ ALL_PATTERNS="${ALL_PATTERNS,,}"
 # on both sides). Glob bytes (`*.pem`, `secrets.*`) survive per INV-004.
 _canonical_arr=()
 while IFS= read -r pat; do
-  [ -n "$pat" ] && canonicalize_path "$pat"; _canonical_arr+=( "$_CANONICAL_RESULT" )
+  [ -n "$pat" ] && { canonicalize_path "$pat"; _canonical_arr+=( "$_CANONICAL_RESULT" ); }
 done <<< "$ALL_PATTERNS"
 _IFS_save="${IFS-}"; IFS=$'\n'
 CANONICAL_PATTERNS="${_canonical_arr[*]}"
