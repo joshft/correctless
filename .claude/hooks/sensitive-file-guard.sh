@@ -271,17 +271,6 @@ scripts/intent-hash.sh
 .correctless/scripts/intent-hash.sh
 .correctless/meta/intensity-calibration.json
 .correctless/meta/pat001-measurement-due.json
-.claude/settings.json
-.claude/settings.local.json
-.claude/hooks/workflow-gate.sh
-.claude/hooks/sensitive-file-guard.sh
-.claude/hooks/audit-trail.sh
-.claude/hooks/statusline.sh
-.claude/hooks/auto-format.sh
-.claude/hooks/token-tracking.sh
-.claude/hooks/workflow-advance.sh
-.claude/rules/hooks-pretooluse.md
-.claude/rules/canonicalize-path.md
 agents/fix-diff-reviewer.md
 agents/supervisor.md
 agents/decision-agent.md
@@ -315,7 +304,7 @@ ALL_PATTERNS="${ALL_PATTERNS,,}"
 # on both sides). Glob bytes (`*.pem`, `secrets.*`) survive per INV-004.
 _canonical_arr=()
 while IFS= read -r pat; do
-  [ -n "$pat" ] && _canonical_arr+=( "$(canonicalize_path "$pat")" )
+  [ -n "$pat" ] && canonicalize_path "$pat"; _canonical_arr+=( "$_CANONICAL_RESULT" )
 done <<< "$ALL_PATTERNS"
 _IFS_save="${IFS-}"; IFS=$'\n'
 CANONICAL_PATTERNS="${_canonical_arr[*]}"

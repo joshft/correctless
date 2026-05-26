@@ -137,8 +137,10 @@ for skill_dir in skills/*/; do
   fi
   sync_file "skills/$skill/SKILL.md" "correctless/skills/$skill/SKILL.md"
 done
+if [ "$CHECK_ONLY" = false ]; then
 skill_count=$(find skills -mindepth 1 -maxdepth 1 -type d ! -name '_shared' | wc -l | tr -d ' ')
 [ "$CHECK_ONLY" = false ] && info "All skills ($skill_count) → correctless/"
+fi
 
 # --- test-features templates (harness-fingerprint baseline) ---
 if [ "$CHECK_ONLY" = false ]; then
