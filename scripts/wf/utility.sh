@@ -126,19 +126,42 @@ cmd_reset() {
 cmd_gc() {
   local removed=0
   local kept=0
+  local skipped=0
   for sf in "$ARTIFACTS_DIR"/workflow-state-*.json; do
     [ -f "$sf" ] || continue
     local branch
     branch="$(jq -r '.branch // empty' "$sf" 2>/dev/null)"
-    [ -n "$branch" ] || continue
+    if [ -z "$branch" ]; then
+      info "Skipped $(basename "$sf"): no branch field (remove manually if unneeded)"
+      skipped=$((skipped + 1))
+      continue
+    fi
     if ! git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+      local gc_slug
+      gc_slug="$(branch_slug "$branch" 2>/dev/null)" || gc_slug=""
+      if [ -n "$gc_slug" ]; then
+        rm -f "$ARTIFACTS_DIR/audit-trail-${gc_slug}.jsonl" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/adherence-state-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/token-log-${gc_slug}.jsonl" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/review-decisions-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/antipattern-findings-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/pipeline-manifest-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/escalation-${gc_slug}."* 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/autonomous-decisions-${gc_slug}.jsonl" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/cost-cache-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/coverage-baseline-${gc_slug}.out" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/checkpoint-ctdd-"*.json "$ARTIFACTS_DIR/checkpoint-crefactor-"*.json \
+              "$ARTIFACTS_DIR/checkpoint-creview-spec-"*.json "$ARTIFACTS_DIR/checkpoint-caudit-"*.json 2>/dev/null
+        rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null
+        rm -f "${sf}."*.tmp "${sf}."[0-9]* 2>/dev/null
+      fi
       rm -f "$sf"
       removed=$((removed + 1))
     else
       kept=$((kept + 1))
     fi
   done
-  info "Garbage collected: $removed orphaned state files removed, $kept active kept"
+  info "Garbage collected: $removed orphaned state files removed, $kept active kept$( [ $skipped -gt 0 ] && echo ", $skipped skipped (no branch field)" )"
 }
 cmd_override() {
   local reason="${1:?Usage: workflow-advance.sh override \"reason\"}"
