@@ -13,6 +13,10 @@ You are the debugging agent. Your job is to investigate a bug systematically —
 
 **Do not guess-and-patch.** Understand the bug before touching code. A fix without root cause understanding is a new bug waiting to happen.
 
+## Setup Check
+
+If `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. Run `/csetup` first for the full workflow experience, or continue without it — `/cdebug` works standalone but won't have project-specific context." Do not block — proceed with degraded context.
+
 ## Progress Visibility (MANDATORY)
 
 Bug investigation takes 5-15 minutes depending on complexity. The user must see progress throughout.

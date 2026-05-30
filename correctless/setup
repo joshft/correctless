@@ -283,6 +283,13 @@ install_hooks() {
     info "Migrated scripts/lib.sh and scripts/antipattern-scan.sh to .correctless/scripts/. If scripts/ contains only Correctless files, you can safely delete it."
   fi
 
+  # UX-004: Capture old SFG pattern count BEFORE overwriting
+  local _old_sfg_count=0
+  local _sfg_hook="$hook_dest/sensitive-file-guard".sh
+  if [ -f "$_sfg_hook" ]; then
+    _old_sfg_count=$(awk '/^DEFAULTS=/{f=1;next} f && /^"/{exit} f && NF{c++} END{print c+0}' "$_sfg_hook" 2>/dev/null)
+  fi
+
   # Auto-discover hooks via glob — adding a new .sh file to hooks/ requires no code change
   for hook in "$SCRIPT_DIR"/hooks/*.sh; do
     [ -f "$hook" ] || continue
@@ -292,6 +299,27 @@ install_hooks() {
     # The [ ! -f ] guard prevented updates, causing stale hook drift.
     cp "$hook" "$hook_dest/$basename_hook"
     chmod +x "$hook_dest/$basename_hook" 2>/dev/null || true
+  done
+  # UX-004: Warn if sensitive-file-guard DEFAULTS changed during upgrade
+  if [ "$_old_sfg_count" -gt 0 ] 2>/dev/null; then
+    local _new_sfg_count
+    _new_sfg_count=$(awk '/^DEFAULTS=/{f=1;next} f && /^"/{exit} f && NF{c++} END{print c+0}' "$_sfg_hook" 2>/dev/null)
+    if [ "$_new_sfg_count" -gt "$_old_sfg_count" ] 2>/dev/null; then
+      warn "sensitive-file-guard now protects $((_new_sfg_count - _old_sfg_count)) additional file patterns. Some previously-permitted agent edits may be blocked. Check DEFAULTS in $_sfg_hook if you see unexpected BLOCKED errors."
+    fi
+  fi
+  # Remove stale hooks no longer in the distribution
+  for installed_hook in "$hook_dest"/*.sh; do
+    [ -f "$installed_hook" ] || continue
+    local _ih_base
+    _ih_base="$(basename "$installed_hook")"
+    if [ ! -f "$SCRIPT_DIR/hooks/$_ih_base" ]; then
+      # Only remove hooks that look like Correctless hooks (contain our header)
+      if grep -q 'HOOK_TYPE:\|Correctless' "$installed_hook" 2>/dev/null; then
+        rm -f "$installed_hook"
+        info "Removed stale hook: $_ih_base"
+      fi
+    fi
   done
   ok "Installed hooks to .correctless/hooks/"
 
@@ -1125,6 +1153,10 @@ mkdir -p "$REPO_ROOT/.correctless/config" \
          "$REPO_ROOT/.correctless/hooks" \
          "$REPO_ROOT/.correctless/artifacts" \
          "$REPO_ROOT/.correctless/artifacts/research" \
+         "$REPO_ROOT/.correctless/artifacts/pr-reviews" \
+         "$REPO_ROOT/.correctless/artifacts/reviews" \
+         "$REPO_ROOT/.correctless/artifacts/devadv" \
+         "$REPO_ROOT/.correctless/artifacts/redteam" \
          "$REPO_ROOT/.correctless/specs" \
          "$REPO_ROOT/.correctless/decisions" \
          "$REPO_ROOT/.correctless/verification" \
@@ -1135,6 +1167,11 @@ ok "Created .correctless/ directory structure"
 CONFIG_DEST="$REPO_ROOT/.correctless/config/workflow-config.json"
 HAS_INTENSITY="false"
 if [ -f "$CONFIG_DEST" ]; then
+  # UX-014: Validate schema_version for future migration support
+  _cfg_version="$(jq -r '.schema_version // 0' "$CONFIG_DEST" 2>/dev/null)"
+  if [ -z "$_cfg_version" ] || [ "$_cfg_version" -lt 1 ] 2>/dev/null; then
+    warn "workflow-config.json has no schema_version — may be from an older Correctless version"
+  fi
   skip "workflow-config.json (already exists)"
   if jq -e '.workflow.intensity' "$CONFIG_DEST" >/dev/null 2>&1; then
     HAS_INTENSITY="true"
@@ -1235,7 +1272,7 @@ else
 This project uses Correctless for structured development.
 Read .correctless/AGENT_CONTEXT.md before starting any work.
 Do NOT Read AGENT_CONTEXT.md from the project root — it may be stale or absent.
-Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect, /cmodelupgrade
+Available commands: /csetup, /cspec, /creview, /cmodel, /creview-spec, /ctdd, /cverify, /caudit, /cupdate-arch, /cdocs, /cpostmortem, /cdevadv, /credteam, /crefactor, /cpr-review, /ccontribute, /cmaintain, /cstatus, /csummary, /cmetrics, /cdebug, /chelp, /cwtf, /cquick, /crelease, /cexplain, /cauto, /carchitect, /cmodelupgrade, /cdashboard, /ctriage, /cprune
 CMDEOF
   ok "Updated CLAUDE.md"
 fi

@@ -108,6 +108,15 @@ cmd_reset() {
     rm -f "$ARTIFACTS_DIR/token-log-${slug_hash}.jsonl" 2>/dev/null
     rm -f "$ARTIFACTS_DIR/review-decisions-${slug_hash}.json" 2>/dev/null
     rm -f "$ARTIFACTS_DIR/antipattern-findings-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/pipeline-manifest-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/escalation-${slug_hash}."* 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/autonomous-decisions-${slug_hash}.jsonl" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/cost-cache-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/lens-recommendations-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/probe-results-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/wtf-report-${slug_hash}.md" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/cprune-lock-${slug_hash}" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/harness-notified-"*.flag 2>/dev/null
     # Clean lock dirs and temp files from locking operations
     rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null
     rm -f "${sf}."*.tmp "${sf}."[0-9]* 2>/dev/null
@@ -117,6 +126,55 @@ cmd_reset() {
   fi
 }
 
+
+cmd_gc() {
+  local removed=0
+  local kept=0
+  local skipped=0
+  for sf in "$ARTIFACTS_DIR"/workflow-state-*.json; do
+    [ -f "$sf" ] || continue
+    local branch
+    branch="$(jq -r '.branch // empty' "$sf" 2>/dev/null)"
+    if [ -z "$branch" ]; then
+      info "Skipped $(basename "$sf"): no branch field (remove manually if unneeded)"
+      skipped=$((skipped + 1))
+      continue
+    fi
+    if ! git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+      local gc_slug
+      gc_slug="$(branch_slug "$branch" 2>/dev/null)" || gc_slug=""
+      if [ -n "$gc_slug" ]; then
+        rm -f "$ARTIFACTS_DIR/audit-trail-${gc_slug}.jsonl" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/adherence-state-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/token-log-${gc_slug}.jsonl" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/review-decisions-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/antipattern-findings-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/pipeline-manifest-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/escalation-${gc_slug}."* 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/autonomous-decisions-${gc_slug}.jsonl" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/cost-cache-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/lens-recommendations-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/probe-results-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/wtf-report-${gc_slug}.md" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/cprune-lock-${gc_slug}" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/tdd-test-edits.log" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/.pkg-cache-"*.json 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/coverage-baseline-${gc_slug}.out" 2>/dev/null
+        # Checkpoints use spec-slug naming, not branch-slug -- skip global
+        # wildcard deletion here. Checkpoints self-invalidate via 72h staleness
+        # and branch-match checks in each skill.
+        :
+        rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null
+        rm -f "${sf}."*.tmp "${sf}."[0-9]* 2>/dev/null
+      fi
+      rm -f "$sf"
+      removed=$((removed + 1))
+    else
+      kept=$((kept + 1))
+    fi
+  done
+  info "Garbage collected: $removed orphaned state files removed, $kept active kept$( [ $skipped -gt 0 ] && echo ", $skipped skipped (no branch field)" )"
+}
 cmd_override() {
   local reason="${1:?Usage: workflow-advance.sh override \"reason\"}"
   local sf

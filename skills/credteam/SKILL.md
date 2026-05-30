@@ -259,7 +259,7 @@ cat red-team-report.md
 
 ## Write Report
 
-Write the report to `.correctless/artifacts/redteam/report-{date}.md`.
+**Persist before presenting (AP-029).** Before displaying results to the user, write the full report to `.correctless/artifacts/redteam/report-{date}.md`. For overnight runs, this is the only recovery path — conversation output does not persist across sessions.
 
 ## After the Assessment
 

@@ -92,14 +92,14 @@ The RED phase (test writing) and GREEN phase (implementation) MUST be executed b
 
 After reading the workflow state (step 6 below), check for `.correctless/artifacts/checkpoint-ctdd-{slug}.json` (derive slug from the workflow state file's spec_file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
-- **If found and <24 hours old**: Read `completed_phases`. Before skipping, verify the current phase:
+- **If found and <72 hours old**: Read `completed_phases`. Before skipping, verify the current phase:
   - After `red`: test files exist and fail when run
   - After `test-audit`: test files exist (audit feedback already applied)
   - After `green`: run test suite — tests must pass
   - After `simplify`: run test suite — tests must still pass
   - After `qa`: `.correctless/artifacts/qa-findings-{slug}.json` exists
-  If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}." Skip completed phases. If verification fails: restart from the phase that failed verification.
-- **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
+  If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}." Skip completed phases. Restore `green_attempts` and `calm_reset_fired` from the checkpoint to preserve escalation state across sessions. If verification fails: restart from the phase that failed verification.
+- **If found but >72 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
 - **If not found**: Start from the beginning as normal.
 
 After each major phase (`red`, `test-audit`, `green`, `simplify`, `qa`) completes, write/update the checkpoint:
@@ -110,19 +110,21 @@ After each major phase (`red`, `test-audit`, `green`, `simplify`, `qa`) complete
   "branch": "{current-branch}",
   "completed_phases": ["red", "test-audit"],
   "current_phase": "green",
+  "green_attempts": 0,
+  "calm_reset_fired": false,
   "timestamp": "ISO"
 }
 ```
 Clean up the checkpoint file when the skill completes successfully.
 
-1. Read `.correctless/AGENT_CONTEXT.md` for project context.
-2. Read the approved spec (path from workflow state).
-3. Read `.correctless/config/workflow-config.json` for test commands and patterns.
-4. **Verify required config fields exist**:
+1. Check current phase: `.correctless/hooks/workflow-advance.sh status`. Read the `Spec:` line to get the spec file path.
+2. Read `.correctless/AGENT_CONTEXT.md` for project context.
+3. Read the approved spec at the path from the status output `Spec:` line.
+4. Read `.correctless/config/workflow-config.json` for test commands and patterns.
+5. **Verify required config fields exist**:
    - If `commands.test` is null, absent, or empty: "No test command is configured in `.correctless/config/workflow-config.json`. Add a `commands.test` field (e.g., `\"npm test\"`) or re-run `/csetup` to detect your test runner." Do not proceed.
    - If `patterns.test_file` is null, absent, or empty: "No test file pattern is configured in `.correctless/config/workflow-config.json`. Add a `patterns.test_file` field (e.g., `\"*.test.ts\"`) or re-run `/csetup` to detect your test patterns." Do not proceed. This pattern is used by the workflow gate to distinguish test files from source files during phase enforcement.
-5. **Verify the test runner works**: Run `commands.test` from the config. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.correctless/config/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
-6. Check current phase: `.correctless/hooks/workflow-advance.sh status`
+6. **Verify the test runner works**: Run `commands.test` from the config. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.correctless/config/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
 
 ## Pre-Execution: Task Graph (for features with 5+ rules)
 
@@ -507,6 +509,10 @@ Update the finding's status in the qa-findings JSON based on the disposition: `f
 
   The fix round implements BOTH instance and class fixes. Then re-run QA. After each fix round, the orchestrator must verify the findings JSON: any finding whose instance_fix was applied but still shows `"status": "open"` should be updated to `"fixed"` by you (the orchestrator). This catches cases where the fix agent forgot to update the status.
 
+- **If no BLOCKING findings**:
+  - **At standard intensity**: `workflow-advance.sh audit-mini` — skip probe round, advance directly to mini-audit
+  - **At high+ intensity**: Run the **Adversarial Probe Round** (below), then `workflow-advance.sh audit-mini`
+
 ### Fix Round Calm Reset Prompt (R-011)
 
 The orchestrator tracks the fix agent's consecutive failure count separately from the GREEN phase count. When the fix phase reaches 3 consecutive failures within a single fix round, the orchestrator appends this fix reset prompt to the fix agent's next prompt:
@@ -548,10 +554,7 @@ When the failure involves an unclear root cause (hard-to-understand bug), includ
 
 ### Attempt Tracking (R-009)
 
-The orchestrator tracks attempt counts for all calm reset triggers in its own conversation context (working memory), not in persisted state. Attempt counts live entirely in orchestrator memory and clear when a new phase begins. No additional files, state fields, or checkpoint entries are needed — the orchestrator simply observes its own conversation history to determine how many attempts have been made.
-- **If no BLOCKING findings**:
-  - **At standard intensity**: `workflow-advance.sh audit-mini` — skip probe round, advance directly to mini-audit
-  - **At high+ intensity**: Run the **Adversarial Probe Round** (below), then `workflow-advance.sh audit-mini`
+The orchestrator tracks attempt counts for all calm reset triggers in its own conversation context (working memory) during a session. Across sessions, `green_attempts` and `calm_reset_fired` are persisted in the checkpoint file and restored on resume (see Checkpoint Resume section above). Attempt counts clear when a new phase begins.
 
 ## Adversarial Probe Round (high+ intensity only)
 

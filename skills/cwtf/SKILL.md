@@ -1,7 +1,7 @@
 ---
 name: cwtf
 description: Audit the workflow itself. Use when you suspect agents shortcut or after a bug escapes despite the workflow running. Checks phase execution, rule coverage, and agent thoroughness.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(jq*), Bash(find*), Bash(grep*)
+allowed-tools: Read, Grep, Glob, Write(.correctless/artifacts/wtf-*), Bash(git*), Bash(jq*), Bash(find*), Bash(grep*)
 interaction_mode: autonomous
 ---
 
@@ -38,7 +38,7 @@ Accountability analysis takes 5-10 minutes. The user must see progress throughou
 
 Derive the branch slug and hash using the same formula as other hooks (`sed + md5sum/md5`). Determine the repo root with `git rev-parse --show-toplevel` — prepend this to all relative paths for the Read tool.
 
-Derive the task-slug from the workflow state's `.task` field: lowercase, non-alphanumeric characters replaced with `-`, consecutive dashes collapsed, leading/trailing dashes removed. This differs from the branch slug.
+Derive the task-slug from the workflow state's `.spec_file` field: extract the basename and strip the `.md` extension. For example, if `spec_file` is `.correctless/specs/statusline-live-cost.md`, the task-slug is `statusline-live-cost`. This is the canonical slug used by all artifact filenames.
 
 Read these data sources (skip any that don't exist):
 
@@ -154,6 +154,8 @@ Assess the overall workflow quality:
 The verdict is a judgment call within those constraints. Explain the reasoning. Users can disagree.
 
 ## Output Format
+
+**Persist before presenting (AP-029).** Before displaying the report to the user, write it to `.correctless/artifacts/wtf-report-{branch-slug}.md` where branch-slug is derived from `branch_slug()`. This is the recovery path if the terminal display is interrupted or context is compacted.
 
 ```markdown
 ## Workflow Accountability Report

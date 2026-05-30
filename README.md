@@ -412,17 +412,29 @@ Optional (high+/critical):
 
 ### Uninstall
 
-To fully remove Correctless from a project:
+To fully remove Correctless from a project, follow these steps **in order** (the order matters — removing `.correctless/` before cleaning settings.json will lock you out of Claude Code because the fail-closed hooks point to scripts inside `.correctless/`):
 
 ```bash
-# Remove the plugin
+# 1. Remove the plugin registration
 /plugin uninstall correctless
 
-# Clean up project files
-rm -rf .correctless/
+# 2. Clean .claude/settings.json FIRST — remove all hook entries that reference
+#    .correctless/hooks/ or hooks/ (workflow-gate, sensitive-file-guard,
+#    audit-trail, auto-format, statusline, token-tracking, workflow-advance).
+#    Edit manually with a text editor, or delete .claude/settings.json entirely
+#    if you have no other Claude Code hooks.
 
-# Remove hook entries from .claude/settings.json (edit manually or delete the file)
-# Remove the "## Correctless" section from CLAUDE.md if present
+# 3. Remove the "## Correctless" and "## Correctless Learnings" sections from CLAUDE.md
+
+# 4. Remove Correctless-added entries from .mcp.json (serena, context7) if present
+#    — keep the file if you have other MCP servers configured
+
+# 5. Remove .serena.yml if it exists (created by /csetup Serena integration)
+
+# 6. Remove Correctless .gitignore entries (.correctless/artifacts/*, .serena/, etc.)
+
+# 7. NOW remove the project files
+rm -rf .correctless/
 ```
 
 ## Glossary

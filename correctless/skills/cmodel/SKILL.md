@@ -48,7 +48,7 @@ Mark each task complete as it finishes.
 
 Check current phase: `.correctless/hooks/workflow-advance.sh status`. You should be in the `model` phase. If not, tell the human to run `/cspec` first to enter the correct phase. Do not advance state from the wrong phase.
 
-1. Read the spec artifact (invariants, prohibitions, trust boundaries, STRIDE analysis).
+1. Read the spec artifact at the path shown in the `Spec:` line of the status output. Derive `{task-slug}` from the spec file basename (strip the `.md` extension).
 2. Read `.correctless/ARCHITECTURE.md` for existing trust boundaries and abstractions.
 3. Read `.correctless/config/workflow-config.json` for the Alloy JAR path.
 

@@ -1,7 +1,7 @@
 ---
 name: cpr-review
 description: Review an incoming PR. Use when someone opens a PR against your project. Checks architecture, security, tests, and antipatterns.
-allowed-tools: Read, Grep, Glob, Bash(gh*), Bash(glab*), Bash(git*), Bash(*test*), Bash(*lint*), Bash(*audit*), Bash(govulncheck*), Task(correctless:architecture-compliance-reviewer)
+allowed-tools: Read, Grep, Glob, Write(.correctless/artifacts/pr-reviews/*), Bash(gh*), Bash(glab*), Bash(git*), Bash(*test*), Bash(*lint*), Bash(*audit*), Bash(govulncheck*), Task(correctless:architecture-compliance-reviewer)
 interaction_mode: hybrid
 ---
 
@@ -279,6 +279,8 @@ Compute the effective intensity using the same method as other pipeline skills: 
 - Dependency size impact (bundle size for frontend, binary size for backend)
 
 ## Present Findings
+
+**Persist before presenting (AP-029).** Before displaying findings to the user, write the full review to `.correctless/artifacts/pr-reviews/pr-review-{pr-number}.md`. This is the recovery path if the terminal display is interrupted, context is compacted, or the session ends. Derive the PR number from the `gh pr view` output or the user's input.
 
 Group findings by severity:
 

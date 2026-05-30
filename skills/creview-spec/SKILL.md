@@ -59,9 +59,9 @@ Mark each task complete as agents return results.
 
 After reading the spec artifact (step 2 below), check for `.correctless/artifacts/checkpoint-creview-spec-{slug}.json` (derive slug from the spec file basename). Also check that the checkpoint branch matches the current branch — ignore checkpoints from other branches.
 
-- **If found and <24 hours old**: Read `completed_phases`. Phases: `self-assessment`, `red-team`, `assumptions`, `testability`, `design-contract`, `upgrade-compatibility`, `ux`. For parallel agents, checkpoint only after ALL 6 complete, not individually — partial agent results are not useful without synthesis. Verification is weak here (agent output lives in conversation context, not artifacts), so if the checkpoint says agents completed but you cannot access their findings: "Checkpoint found but agent outputs are not recoverable. Restarting agent team." Re-spawning is safer than skipping.
+- **If found and <72 hours old**: Read `completed_phases`. Phases: `self-assessment`, `red-team`, `assumptions`, `testability`, `design-contract`, `upgrade-compatibility`, `ux`. For parallel agents, checkpoint only after ALL 6 complete, not individually — partial agent results are not useful without synthesis. Verification is weak here (agent output lives in conversation context, not artifacts), so if the checkpoint says agents completed but you cannot access their findings: "Checkpoint found but agent outputs are not recoverable. Restarting agent team." Re-spawning is safer than skipping.
   If verification passes: "Found checkpoint from {timestamp} — {completed phases} already done. Resuming from {next phase}."
-- **If found but >24 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
+- **If found but >72 hours old**: "Stale checkpoint found (from {date}). Starting fresh."
 - **If not found**: Start from the beginning as normal.
 
 After each major phase completes, write/update the checkpoint:

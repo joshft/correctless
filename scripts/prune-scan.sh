@@ -443,7 +443,7 @@ scan_artifacts() {
 
   # Check each artifact file
   local candidates=()
-  local artifact_patterns="workflow-state-*.json token-log-*.jsonl qa-findings-*.json audit-trail-*.jsonl pipeline-manifest-*.json autonomous-decisions-*.jsonl escalation-*.json adherence-*.json"
+  local artifact_patterns="workflow-state-*.json token-log-*.jsonl audit-trail-*.jsonl pipeline-manifest-*.json autonomous-decisions-*.jsonl escalation-*.json adherence-*.json antipattern-findings-*.json cost-cache-*.json review-decisions-*.json harness-notified-*.flag lens-recommendations-*.json probe-results-*.json wtf-report-*.md cprune-lock-* coverage-baseline-*.out"
 
   for artifact in "$artifacts_dir"/*; do
     [ -f "$artifact" ] || continue

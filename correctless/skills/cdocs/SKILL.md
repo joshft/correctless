@@ -47,12 +47,14 @@ Documentation updates take about 5 minutes. The user must see progress throughou
 
 **First-run check**: If `.correctless/ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, or if `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't fully set up yet. I can do a quick scan of your codebase right now to populate .correctless/ARCHITECTURE.md and .correctless/AGENT_CONTEXT.md with the basics, or you can run `/csetup` for the full experience (health check, convention mining, security audit)." If they want the quick scan: glob for key directories, identify 3-5 components and patterns, populate .correctless/ARCHITECTURE.md with real entries, then continue. This takes 30 seconds and dramatically improves output quality.
 
-**Step 0: Check prerequisites.** Read the workflow state file. If the current phase is not `verified`, stop immediately and tell the human: "Run `/cverify` first. The workflow order is: done → /cverify → verified → /cdocs → documented." Check that `.correctless/verification/{task-slug}-verification.md` exists. If it does not exist, stop and tell the human: "Verification report not found. Run /cverify before /cdocs." Do NOT proceed with documentation work until both checks pass.
+**Step 0: Check prerequisites.** Run `.correctless/hooks/workflow-advance.sh status` to get the current workflow state. Read the `Spec:` line from the status output to get the spec file path. Derive `{task-slug}` from the spec file basename (strip the `.md` extension). Use this task-slug for all artifact path construction below.
+
+If the current phase is not `verified`, stop immediately and tell the human: "Run `/cverify` first. The workflow order is: done → /cverify → verified → /cdocs → documented." Check that `.correctless/verification/{task-slug}-verification.md` exists. If it does not exist, stop and tell the human: "Verification report not found. Run /cverify before /cdocs." Do NOT proceed with documentation work until both checks pass.
 
 1. Run `git log --oneline -20` to see recent changes.
 2. Run `git diff main...HEAD --stat` to see what changed on this branch.
 3. Read existing `README.md`, `.correctless/ARCHITECTURE.md`, `.correctless/AGENT_CONTEXT.md`.
-4. Read the spec artifact for the feature being merged (check `.correctless/specs/`).
+4. Read the spec artifact at the path from the status output `Spec:` line.
 5. Read `.correctless/config/workflow-config.json` for project commands.
 6. Read the verification report from `.correctless/verification/{task-slug}-verification.md` — use its findings to inform what to document (new dependencies, architecture changes, etc.).
 

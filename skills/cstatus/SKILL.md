@@ -152,6 +152,19 @@ Available commands:
   /cexplain       Guided codebase exploration
   /cauto          Semi-auto pipeline — orchestrates ctdd through PR
   /cmodelupgrade  Harness regression report (after model upgrade or version_bumped advisory)
+  /carchitect     Architecture definition — reverse-engineer or greenfield
+  /cdashboard     HTML project dashboard — metrics + artifact browser
+  /ctriage        Bulk triage deferred findings backlog
+  /cprune         Documentation and artifact pruning
+  /cpostmortem    Post-merge bug analysis
+  /cdevadv        Devil's advocate — challenge assumptions
+
+Intensity-gated (shown at high+ unless noted):
+  /creview-spec   Adversarial 6-agent spec review                    [high+]
+  /cmodel         Formal Alloy modeling                              [critical+]
+  /caudit         Olympics audit (QA/Hacker/Performance/UX)           [high+]
+  /cupdate-arch   Update .correctless/ARCHITECTURE.md                [high+]
+  /credteam       Live red team assessment                           [critical+]
 
 State management:
   .correctless/hooks/workflow-advance.sh status      Current phase
@@ -160,7 +173,7 @@ State management:
   .correctless/hooks/workflow-advance.sh override "reason"  Temporarily bypass gate
 ```
 
-Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is set to high+ or above, also highlight intensity-gated commands: `/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`
+Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is below `high`, omit the "Intensity-gated" section from the output — those commands are not available at standard intensity.
 
 ### 5. Install Freshness
 
