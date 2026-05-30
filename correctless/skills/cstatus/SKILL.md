@@ -156,14 +156,14 @@ Available commands:
   /cdashboard     HTML project dashboard — metrics + artifact browser
   /ctriage        Bulk triage deferred findings backlog
   /cprune         Documentation and artifact pruning
+  /cpostmortem    Post-merge bug analysis
+  /cdevadv        Devil's advocate — challenge assumptions
 
 Intensity-gated (shown at high+ unless noted):
   /creview-spec   Adversarial 6-agent spec review                    [high+]
   /cmodel         Formal Alloy modeling                              [critical+]
   /caudit         Olympics audit (QA/Hacker/Performance/UX)           [high+]
   /cupdate-arch   Update .correctless/ARCHITECTURE.md                [high+]
-  /cpostmortem    Post-merge bug analysis                            [high+]
-  /cdevadv        Devil's advocate — challenge assumptions           [high+]
   /credteam       Live red team assessment                           [critical+]
 
 State management:

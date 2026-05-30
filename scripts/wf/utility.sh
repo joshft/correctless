@@ -112,6 +112,10 @@ cmd_reset() {
     rm -f "$ARTIFACTS_DIR/escalation-${slug_hash}."* 2>/dev/null
     rm -f "$ARTIFACTS_DIR/autonomous-decisions-${slug_hash}.jsonl" 2>/dev/null
     rm -f "$ARTIFACTS_DIR/cost-cache-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/lens-recommendations-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/probe-results-${slug_hash}.json" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/wtf-report-${slug_hash}.md" 2>/dev/null
+    rm -f "$ARTIFACTS_DIR/cprune-lock-${slug_hash}" 2>/dev/null
     rm -f "$ARTIFACTS_DIR/harness-notified-"*.flag 2>/dev/null
     # Clean lock dirs and temp files from locking operations
     rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null

@@ -509,6 +509,10 @@ Update the finding's status in the qa-findings JSON based on the disposition: `f
 
   The fix round implements BOTH instance and class fixes. Then re-run QA. After each fix round, the orchestrator must verify the findings JSON: any finding whose instance_fix was applied but still shows `"status": "open"` should be updated to `"fixed"` by you (the orchestrator). This catches cases where the fix agent forgot to update the status.
 
+- **If no BLOCKING findings**:
+  - **At standard intensity**: `workflow-advance.sh audit-mini` — skip probe round, advance directly to mini-audit
+  - **At high+ intensity**: Run the **Adversarial Probe Round** (below), then `workflow-advance.sh audit-mini`
+
 ### Fix Round Calm Reset Prompt (R-011)
 
 The orchestrator tracks the fix agent's consecutive failure count separately from the GREEN phase count. When the fix phase reaches 3 consecutive failures within a single fix round, the orchestrator appends this fix reset prompt to the fix agent's next prompt:
@@ -551,9 +555,6 @@ When the failure involves an unclear root cause (hard-to-understand bug), includ
 ### Attempt Tracking (R-009)
 
 The orchestrator tracks attempt counts for all calm reset triggers in its own conversation context (working memory) during a session. Across sessions, `green_attempts` and `calm_reset_fired` are persisted in the checkpoint file and restored on resume (see Checkpoint Resume section above). Attempt counts clear when a new phase begins.
-- **If no BLOCKING findings**:
-  - **At standard intensity**: `workflow-advance.sh audit-mini` — skip probe round, advance directly to mini-audit
-  - **At high+ intensity**: Run the **Adversarial Probe Round** (below), then `workflow-advance.sh audit-mini`
 
 ## Adversarial Probe Round (high+ intensity only)
 
