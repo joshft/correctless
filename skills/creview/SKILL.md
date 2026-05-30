@@ -72,7 +72,7 @@ This review takes 5-10 minutes. The user must see progress throughout.
 **First-run check**: If `.correctless/config/workflow-config.json` does not exist, tell the user: "Correctless isn't set up yet. Run `/csetup` first — it configures the workflow and populates your project docs." If the config exists but `.correctless/ARCHITECTURE.md` contains `{PROJECT_NAME}` or `{PLACEHOLDER}` markers, offer: ".correctless/ARCHITECTURE.md is still the template. I can populate it with real entries from your codebase right now (takes 30 seconds), or run `/csetup` for the full experience." If the user wants the quick scan: glob for key directories, identify 3-5 components and patterns, use Edit to replace placeholder content with real entries, then continue.
 
 1. Read `.correctless/AGENT_CONTEXT.md` for project context.
-2. Read the spec artifact (path from workflow state).
+2. Run `.correctless/hooks/workflow-advance.sh status`. Read the spec artifact at the path shown in the `Spec:` line of the status output.
 3. Read `.correctless/ARCHITECTURE.md` for design patterns.
 4. Read `.correctless/antipatterns.md` for known bug classes.
 5. Read `.correctless/meta/workflow-effectiveness.json` (if it exists) — check which phases have historically missed bugs. If QA has missed concurrency bugs 3 times, push harder for concurrency rules in this spec.

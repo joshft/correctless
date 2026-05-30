@@ -117,14 +117,14 @@ After each major phase (`red`, `test-audit`, `green`, `simplify`, `qa`) complete
 ```
 Clean up the checkpoint file when the skill completes successfully.
 
-1. Read `.correctless/AGENT_CONTEXT.md` for project context.
-2. Read the approved spec (path from workflow state).
-3. Read `.correctless/config/workflow-config.json` for test commands and patterns.
-4. **Verify required config fields exist**:
+1. Check current phase: `.correctless/hooks/workflow-advance.sh status`. Read the `Spec:` line to get the spec file path.
+2. Read `.correctless/AGENT_CONTEXT.md` for project context.
+3. Read the approved spec at the path from the status output `Spec:` line.
+4. Read `.correctless/config/workflow-config.json` for test commands and patterns.
+5. **Verify required config fields exist**:
    - If `commands.test` is null, absent, or empty: "No test command is configured in `.correctless/config/workflow-config.json`. Add a `commands.test` field (e.g., `\"npm test\"`) or re-run `/csetup` to detect your test runner." Do not proceed.
    - If `patterns.test_file` is null, absent, or empty: "No test file pattern is configured in `.correctless/config/workflow-config.json`. Add a `patterns.test_file` field (e.g., `\"*.test.ts\"`) or re-run `/csetup` to detect your test patterns." Do not proceed. This pattern is used by the workflow gate to distinguish test files from source files during phase enforcement.
-5. **Verify the test runner works**: Run `commands.test` from the config. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.correctless/config/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
-6. Check current phase: `.correctless/hooks/workflow-advance.sh status`
+6. **Verify the test runner works**: Run `commands.test` from the config. If it fails with "command not found" or exits immediately: "Test command `{cmd}` is not available. Check `.correctless/config/workflow-config.json` and make sure your test runner is installed." Do not proceed until the test command is functional.
 
 ## Pre-Execution: Task Graph (for features with 5+ rules)
 
@@ -550,7 +550,7 @@ When the failure involves an unclear root cause (hard-to-understand bug), includ
 
 ### Attempt Tracking (R-009)
 
-The orchestrator tracks attempt counts for all calm reset triggers in its own conversation context (working memory), not in persisted state. Attempt counts live entirely in orchestrator memory and clear when a new phase begins. No additional files, state fields, or checkpoint entries are needed — the orchestrator simply observes its own conversation history to determine how many attempts have been made.
+The orchestrator tracks attempt counts for all calm reset triggers in its own conversation context (working memory) during a session. Across sessions, `green_attempts` and `calm_reset_fired` are persisted in the checkpoint file and restored on resume (see Checkpoint Resume section above). Attempt counts clear when a new phase begins.
 - **If no BLOCKING findings**:
   - **At standard intensity**: `workflow-advance.sh audit-mini` — skip probe round, advance directly to mini-audit
   - **At high+ intensity**: Run the **Adversarial Probe Round** (below), then `workflow-advance.sh audit-mini`

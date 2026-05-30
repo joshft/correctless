@@ -183,7 +183,7 @@ Only for findings from passes 1-3 that need code-level evidence. Load the specif
 
 ## The Devil's Advocate Report
 
-Write to `.correctless/artifacts/devadv/report-{date}.md`.
+**Persist before presenting (AP-029).** Before displaying findings to the user, write the full report to `.correctless/artifacts/devadv/report-{date}.md`. This is the recovery path if the terminal display is interrupted or context is compacted.
 
 For each finding:
 

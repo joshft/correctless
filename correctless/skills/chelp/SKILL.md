@@ -123,6 +123,8 @@ Quick reference:
   Review as maintainer → /cmaintain
   Project health     → /cmetrics
   Audit the workflow → /cwtf
+  Quick fix (no spec) → /cquick
+  Auto-pilot pipeline → /cauto
 ```
 
 ## Autonomous Defaults

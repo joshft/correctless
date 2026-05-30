@@ -149,9 +149,17 @@ cmd_gc() {
         rm -f "$ARTIFACTS_DIR/escalation-${gc_slug}."* 2>/dev/null
         rm -f "$ARTIFACTS_DIR/autonomous-decisions-${gc_slug}.jsonl" 2>/dev/null
         rm -f "$ARTIFACTS_DIR/cost-cache-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/lens-recommendations-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/probe-results-${gc_slug}.json" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/wtf-report-${gc_slug}.md" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/cprune-lock-${gc_slug}" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/tdd-test-edits.log" 2>/dev/null
+        rm -f "$ARTIFACTS_DIR/.pkg-cache-"*.json 2>/dev/null
         rm -f "$ARTIFACTS_DIR/coverage-baseline-${gc_slug}.out" 2>/dev/null
-        rm -f "$ARTIFACTS_DIR/checkpoint-ctdd-"*.json "$ARTIFACTS_DIR/checkpoint-crefactor-"*.json \
-              "$ARTIFACTS_DIR/checkpoint-creview-spec-"*.json "$ARTIFACTS_DIR/checkpoint-caudit-"*.json 2>/dev/null
+        # Checkpoints use spec-slug naming, not branch-slug -- skip global
+        # wildcard deletion here. Checkpoints self-invalidate via 72h staleness
+        # and branch-match checks in each skill.
+        :
         rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null
         rm -f "${sf}."*.tmp "${sf}."[0-9]* 2>/dev/null
       fi

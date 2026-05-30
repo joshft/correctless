@@ -157,6 +157,15 @@ Available commands:
   /ctriage        Bulk triage deferred findings backlog
   /cprune         Documentation and artifact pruning
 
+Intensity-gated (shown at high+ unless noted):
+  /creview-spec   Adversarial 6-agent spec review                    [high+]
+  /cmodel         Formal Alloy modeling                              [critical+]
+  /caudit         Olympics audit (QA/Hacker/Performance/UX)           [high+]
+  /cupdate-arch   Update .correctless/ARCHITECTURE.md                [high+]
+  /cpostmortem    Post-merge bug analysis                            [high+]
+  /cdevadv        Devil's advocate — challenge assumptions           [high+]
+  /credteam       Live red team assessment                           [critical+]
+
 State management:
   .correctless/hooks/workflow-advance.sh status      Current phase
   .correctless/hooks/workflow-advance.sh status-all   All active workflows
@@ -164,7 +173,7 @@ State management:
   .correctless/hooks/workflow-advance.sh override "reason"  Temporarily bypass gate
 ```
 
-Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is set to high+ or above, also highlight intensity-gated commands: `/cmodel`, `/creview-spec`, `/caudit`, `/cupdate-arch`, `/cpostmortem`, `/cdevadv`, `/credteam`
+Read `.correctless/config/workflow-config.json`. If `workflow.intensity` is below `high`, omit the "Intensity-gated" section from the output — those commands are not available at standard intensity.
 
 ### 5. Install Freshness
 
