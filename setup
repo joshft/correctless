@@ -285,8 +285,9 @@ install_hooks() {
 
   # UX-004: Capture old SFG pattern count BEFORE overwriting
   local _old_sfg_count=0
-  if [ -f "$hook_dest/sensitive-file-guard.sh" ]; then
-    _old_sfg_count=$(awk '/^DEFAULTS=/{f=1;next} f && /^"/{exit} f && NF{c++} END{print c+0}' "$hook_dest/sensitive-file-guard.sh" 2>/dev/null)
+  local _sfg_hook="$hook_dest/sensitive-file-guard".sh
+  if [ -f "$_sfg_hook" ]; then
+    _old_sfg_count=$(awk '/^DEFAULTS=/{f=1;next} f && /^"/{exit} f && NF{c++} END{print c+0}' "$_sfg_hook" 2>/dev/null)
   fi
 
   # Auto-discover hooks via glob — adding a new .sh file to hooks/ requires no code change
@@ -302,9 +303,9 @@ install_hooks() {
   # UX-004: Warn if sensitive-file-guard DEFAULTS changed during upgrade
   if [ "$_old_sfg_count" -gt 0 ] 2>/dev/null; then
     local _new_sfg_count
-    _new_sfg_count=$(awk '/^DEFAULTS=/{f=1;next} f && /^"/{exit} f && NF{c++} END{print c+0}' "$hook_dest/sensitive-file-guard.sh" 2>/dev/null)
+    _new_sfg_count=$(awk '/^DEFAULTS=/{f=1;next} f && /^"/{exit} f && NF{c++} END{print c+0}' "$_sfg_hook" 2>/dev/null)
     if [ "$_new_sfg_count" -gt "$_old_sfg_count" ] 2>/dev/null; then
-      warn "sensitive-file-guard now protects $((_new_sfg_count - _old_sfg_count)) additional file patterns. Some previously-permitted agent edits may be blocked. Check DEFAULTS in .correctless/hooks/sensitive-file-guard.sh if you see unexpected BLOCKED errors."
+      warn "sensitive-file-guard now protects $((_new_sfg_count - _old_sfg_count)) additional file patterns. Some previously-permitted agent edits may be blocked. Check DEFAULTS in $_sfg_hook if you see unexpected BLOCKED errors."
     fi
   fi
   # Remove stale hooks no longer in the distribution
