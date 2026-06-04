@@ -2,6 +2,7 @@
 name: cdashboard
 description: Generate a self-contained HTML dashboard with metrics and artifact browser. Opens via file:// protocol.
 allowed-tools: Bash(bash*scripts/build-dashboard.sh*), Read, Glob
+disallowed-tools: Edit, Write, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: autonomous
 ---
 

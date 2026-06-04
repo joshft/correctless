@@ -2,6 +2,7 @@
 name: cmaintain
 description: Maintainer review for incoming PRs. Use when you need to decide whether to merge a contribution. Checks scope, conventions, and maintenance burden.
 allowed-tools: Read, Grep, Glob, Write(.correctless/artifacts/pr-reviews/*), Bash(*)
+disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: hybrid
 ---
 

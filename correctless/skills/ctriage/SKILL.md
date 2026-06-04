@@ -2,6 +2,7 @@
 name: ctriage
 description: Bulk triage deferred findings backlog. Presents findings one at a time with disposition options.
 allowed-tools: Read(.correctless/meta/deferred-findings.json), Write(.correctless/meta/deferred-findings.json), Read, Grep, Glob, Bash(jq*)
+disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: interactive
 ---
 

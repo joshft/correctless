@@ -2,6 +2,7 @@
 name: cpr-review
 description: Review an incoming PR. Use when someone opens a PR against your project. Checks architecture, security, tests, and antipatterns.
 allowed-tools: Read, Grep, Glob, Write(.correctless/artifacts/pr-reviews/*), Bash(gh*), Bash(glab*), Bash(git*), Bash(*test*), Bash(*lint*), Bash(*audit*), Bash(govulncheck*), Task(correctless:architecture-compliance-reviewer)
+disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: hybrid
 ---
 

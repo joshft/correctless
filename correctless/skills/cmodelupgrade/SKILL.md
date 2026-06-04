@@ -2,6 +2,7 @@
 name: cmodelupgrade
 description: Compare current model+HARNESS_VERSION pipeline metrics against stored baselines and produce a per-feature regression report. Use after Anthropic ships a model upgrade or when /cspec/cstatus surfaces a harness version_bumped advisory. Read-only on the fingerprint store; writes only the baseline file.
 allowed-tools: Read, Grep, Glob, Bash(jq*), Bash(*workflow-advance.sh*), Bash(*harness-fingerprint*), Bash(git*), Write(.correctless/meta/model-baselines.json), Write(.correctless/artifacts/cmodelupgrade-*)
+disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: hybrid
 ---
 

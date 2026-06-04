@@ -2,6 +2,7 @@
 name: cstatus
 description: Show current Correctless workflow state, available commands, and suggested next steps. Run anytime to see where you are.
 allowed-tools: Bash, Read, Grep, Glob
+disallowed-tools: Edit, Write, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: autonomous
 ---
 
