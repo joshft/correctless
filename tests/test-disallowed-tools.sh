@@ -29,8 +29,14 @@ GROUP_A_DISALLOWED="Edit, Write, MultiEdit, NotebookEdit, CreateFile"
 GROUP_B_SKILLS="cexplain cwtf cmetrics csummary cpr-review cmaintain cmodel cmodelupgrade ctriage"
 GROUP_B_DISALLOWED="Edit, MultiEdit, NotebookEdit, CreateFile"
 
+# Skills that legitimately use Edit/Write and should NOT have disallowed-tools
+EXEMPT_SKILLS="carchitect caudit cauto ccontribute cdebug cdevadv cdocs cpostmortem cprune cquick credteam crefactor crelease creview-spec creview csetup cspec ctdd cupdate-arch cverify"
+
+# _shared is a directory but not a skill
+SKIP_DIRS="_shared"
+
 # ============================================================================
-# Helper: extract disallowed-tools from YAML frontmatter
+# Helpers
 # ============================================================================
 
 get_disallowed_tools() {
@@ -38,11 +44,46 @@ get_disallowed_tools() {
   get_frontmatter_field "$file" "disallowed-tools"
 }
 
-# Helper: extract tool basename by stripping sub-pattern scoping
+# Extract tool basename by stripping sub-pattern scoping
 # e.g., "Write(.correctless/artifacts/wtf-*)" -> "Write"
 strip_tool_scope() {
   local tool="$1"
   echo "$tool" | sed 's/([^)]*)//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+# Check whether a skill name is in a space-separated list
+is_in_list() {
+  local name="$1" list="$2"
+  local item
+  for item in $list; do
+    [ "$item" = "$name" ] && return 0
+  done
+  return 1
+}
+
+# Verify a group of skills has the expected disallowed-tools value
+check_group_disallowed() {
+  local rule_prefix="$1" group_name="$2" expected="$3"
+  shift 3
+  local skills="$*"
+  local skill skill_file actual
+
+  for skill in $skills; do
+    skill_file="$SKILLS_DIR/$skill/SKILL.md"
+    if [ ! -f "$skill_file" ]; then
+      fail "${rule_prefix}-$skill-exists" "$skill SKILL.md does not exist"
+      continue
+    fi
+
+    actual="$(get_disallowed_tools "$skill_file")"
+    if [ -z "$actual" ]; then
+      fail "${rule_prefix}-$skill" "$skill missing disallowed-tools frontmatter"
+    elif [ "$actual" = "$expected" ]; then
+      pass "${rule_prefix}-$skill" "$skill has correct disallowed-tools for $group_name"
+    else
+      fail "${rule_prefix}-$skill" "$skill disallowed-tools is '$actual', expected '$expected'"
+    fi
+  done
 }
 
 # ============================================================================
@@ -50,46 +91,14 @@ strip_tool_scope() {
 # ============================================================================
 
 section "R-001: Group A disallowed-tools"
-
-for skill in $GROUP_A_SKILLS; do
-  skill_file="$SKILLS_DIR/$skill/SKILL.md"
-  if [ ! -f "$skill_file" ]; then
-    fail "R001-$skill-exists" "$skill SKILL.md does not exist"
-    continue
-  fi
-
-  actual="$(get_disallowed_tools "$skill_file")"
-  if [ -z "$actual" ]; then
-    fail "R001-$skill" "$skill missing disallowed-tools frontmatter"
-  elif [ "$actual" = "$GROUP_A_DISALLOWED" ]; then
-    pass "R001-$skill" "$skill has correct disallowed-tools for Group A"
-  else
-    fail "R001-$skill" "$skill disallowed-tools is '$actual', expected '$GROUP_A_DISALLOWED'"
-  fi
-done
+check_group_disallowed "R001" "Group A" "$GROUP_A_DISALLOWED" $GROUP_A_SKILLS
 
 # ============================================================================
 # R-002: Group B skills have correct disallowed-tools
 # ============================================================================
 
 section "R-002: Group B disallowed-tools"
-
-for skill in $GROUP_B_SKILLS; do
-  skill_file="$SKILLS_DIR/$skill/SKILL.md"
-  if [ ! -f "$skill_file" ]; then
-    fail "R002-$skill-exists" "$skill SKILL.md does not exist"
-    continue
-  fi
-
-  actual="$(get_disallowed_tools "$skill_file")"
-  if [ -z "$actual" ]; then
-    fail "R002-$skill" "$skill missing disallowed-tools frontmatter"
-  elif [ "$actual" = "$GROUP_B_DISALLOWED" ]; then
-    pass "R002-$skill" "$skill has correct disallowed-tools for Group B"
-  else
-    fail "R002-$skill" "$skill disallowed-tools is '$actual', expected '$GROUP_B_DISALLOWED'"
-  fi
-done
+check_group_disallowed "R002" "Group B" "$GROUP_B_DISALLOWED" $GROUP_B_SKILLS
 
 # ============================================================================
 # R-003: disallowed-tools appears in YAML frontmatter block, not body
@@ -168,18 +177,15 @@ for skill in $ALL_DISALLOWED_SKILLS; do
     continue
   fi
 
-  # Extract basenames from allowed-tools
+  # Check each disallowed tool does not appear in allowed-tools (by basename)
   overlap=""
   IFS=',' read -ra disallowed_arr <<< "$disallowed_raw"
+  IFS=',' read -ra allowed_arr <<< "$allowed_raw"
   for dtool in "${disallowed_arr[@]}"; do
     dtool_clean="$(echo "$dtool" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     [ -z "$dtool_clean" ] && continue
-
-    # Check if this tool basename appears in allowed-tools (strip scope from allowed)
-    IFS=',' read -ra allowed_arr <<< "$allowed_raw"
     for atool in "${allowed_arr[@]}"; do
-      atool_base="$(strip_tool_scope "$atool")"
-      if [ "$atool_base" = "$dtool_clean" ]; then
+      if [ "$(strip_tool_scope "$atool")" = "$dtool_clean" ]; then
         overlap="${overlap}${dtool_clean} "
       fi
     done
@@ -192,7 +198,7 @@ for skill in $ALL_DISALLOWED_SKILLS; do
   fi
 done
 
-# R-005 specific: Group B must NOT disallow Write
+# R-005 addendum: Group B must NOT disallow Write (they need it for artifacts)
 section "R-005: Group B does not disallow Write"
 
 for skill in $GROUP_B_SKILLS; do
@@ -205,17 +211,7 @@ for skill in $GROUP_B_SKILLS; do
     continue
   fi
 
-  # Check Write is NOT in the disallowed list
-  IFS=',' read -ra darr <<< "$disallowed_raw"
-  found_write=false
-  for dtool in "${darr[@]}"; do
-    dtool_clean="$(echo "$dtool" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    if [ "$dtool_clean" = "Write" ]; then
-      found_write=true
-    fi
-  done
-
-  if [ "$found_write" = true ]; then
+  if echo ", $disallowed_raw," | grep -q ", Write,"; then
     fail "R005-$skill-nowrite" "$skill (Group B) disallows Write — Group B needs Write for artifacts"
   else
     pass "R005-$skill-nowrite" "$skill (Group B) correctly does not disallow Write"
@@ -264,40 +260,16 @@ declare -A expected_group
 for s in $GROUP_A_SKILLS; do expected_group[$s]="A"; done
 for s in $GROUP_B_SKILLS; do expected_group[$s]="B"; done
 
-# Skills that legitimately use Edit/Write and should NOT have disallowed-tools
-# DECISION: Derived from spec "Won't Do" — skills that use Edit/Write for legitimate purposes
-# This list must be kept in sync with the spec. Any new skill must be added here
-# or it's a test failure (unclassified).
-EXEMPT_SKILLS="carchitect caudit cauto ccontribute cdebug cdevadv cdocs cpostmortem cprune cquick credteam crefactor crelease creview-spec creview csetup cspec ctdd cupdate-arch cverify"
-# NOTE: cpr-review is in Group B (artifact-only — Write but not Edit).
-# cprune uses Edit+Write for legitimate purposes (editing architecture docs).
-
-# _shared is a directory but not a skill
-SKIP_DIRS="_shared"
-
-unclassified=""
-misclassified=""
-
 for skill_dir in "$SKILLS_DIR"/*/; do
   [ -d "$skill_dir" ] || continue
   skill="$(basename "$skill_dir")"
   skill_file="$skill_dir/SKILL.md"
 
-  # Skip non-skill directories
-  skip_it=false
-  for skip in $SKIP_DIRS; do
-    if [ "$skill" = "$skip" ]; then
-      skip_it=true
-      break
-    fi
-  done
-  $skip_it && continue
-
+  is_in_list "$skill" "$SKIP_DIRS" && continue
   [ -f "$skill_file" ] || continue
 
-  # Check classification
   if [ -n "${expected_group[$skill]+x}" ]; then
-    # This skill is in Group A or B — verify it has disallowed-tools
+    # Skill is in Group A or B — verify it has the correct disallowed-tools
     actual_disallowed="$(get_disallowed_tools "$skill_file" 2>/dev/null || true)"
     group="${expected_group[$skill]}"
     if [ "$group" = "A" ]; then
@@ -309,37 +281,22 @@ for skill_dir in "$SKILLS_DIR"/*/; do
     if [ "$actual_disallowed" = "$expected" ]; then
       pass "R007-$skill-classified" "$skill correctly classified as Group $group"
     else
-      misclassified="${misclassified}${skill} "
       fail "R007-$skill-classified" "$skill classified as Group $group but disallowed-tools wrong: '$actual_disallowed'"
     fi
-  else
-    # Not in Group A or B — should be in exempt list
-    is_exempt=false
-    for ex in $EXEMPT_SKILLS; do
-      if [ "$skill" = "$ex" ]; then
-        is_exempt=true
-        break
-      fi
-    done
-
-    if $is_exempt; then
-      # Exempt skills should NOT have disallowed-tools (they need Edit/Write)
-      actual_disallowed="$(get_disallowed_tools "$skill_file" 2>/dev/null || true)"
-      if [ -n "$actual_disallowed" ]; then
-        fail "R007-$skill-exempt" "$skill is exempt but has disallowed-tools: '$actual_disallowed'"
-      else
-        pass "R007-$skill-exempt" "$skill correctly exempt (no disallowed-tools)"
-      fi
+  elif is_in_list "$skill" "$EXEMPT_SKILLS"; then
+    # Exempt skills should NOT have disallowed-tools (they need Edit/Write)
+    actual_disallowed="$(get_disallowed_tools "$skill_file" 2>/dev/null || true)"
+    if [ -n "$actual_disallowed" ]; then
+      fail "R007-$skill-exempt" "$skill is exempt but has disallowed-tools: '$actual_disallowed'"
     else
-      # Unclassified — test failure
-      unclassified="${unclassified}${skill} "
-      fail "R007-$skill-unclassified" "$skill is not in Group A, Group B, or exempt list"
+      pass "R007-$skill-exempt" "$skill correctly exempt (no disallowed-tools)"
     fi
+  else
+    fail "R007-$skill-unclassified" "$skill is not in Group A, Group B, or exempt list"
   fi
 done
 
-# R-007 part (b): skills whose allowed-tools doesn't include Edit should have disallowed-tools
-# OR be in the exempt list with a documented reason
+# R-007b: skills whose allowed-tools lacks Edit should have disallowed-tools or be exempt
 section "R-007b: Skills without Edit in allowed-tools must have disallowed-tools or be excluded"
 
 for skill_dir in "$SKILLS_DIR"/*/; do
@@ -347,16 +304,7 @@ for skill_dir in "$SKILLS_DIR"/*/; do
   skill="$(basename "$skill_dir")"
   skill_file="$skill_dir/SKILL.md"
 
-  # Skip non-skill directories
-  skip_it=false
-  for skip in $SKIP_DIRS; do
-    if [ "$skill" = "$skip" ]; then
-      skip_it=true
-      break
-    fi
-  done
-  $skip_it && continue
-
+  is_in_list "$skill" "$SKIP_DIRS" && continue
   [ -f "$skill_file" ] || continue
 
   allowed_raw="$(get_frontmatter_field "$skill_file" "allowed-tools" 2>/dev/null || true)"
@@ -366,73 +314,21 @@ for skill_dir in "$SKILLS_DIR"/*/; do
   has_edit=false
   IFS=',' read -ra atarr <<< "$allowed_raw"
   for atool in "${atarr[@]}"; do
-    base="$(strip_tool_scope "$atool")"
-    if [ "$base" = "Edit" ]; then
+    if [ "$(strip_tool_scope "$atool")" = "Edit" ]; then
       has_edit=true
       break
     fi
   done
+  $has_edit && continue
 
-  if ! $has_edit; then
-    # No Edit in allowed-tools — should have disallowed-tools or be explicitly excluded
-    actual_disallowed="$(get_disallowed_tools "$skill_file" 2>/dev/null || true)"
-    if [ -n "$actual_disallowed" ]; then
-      pass "R007b-$skill" "$skill lacks Edit in allowed-tools and has disallowed-tools"
-    else
-      # Check if it's in the exempt list
-      is_exempt=false
-      for ex in $EXEMPT_SKILLS; do
-        if [ "$skill" = "$ex" ]; then
-          is_exempt=true
-          break
-        fi
-      done
-      if $is_exempt; then
-        pass "R007b-$skill" "$skill lacks Edit in allowed-tools, exempt (documented)"
-      else
-        fail "R007b-$skill" "$skill lacks Edit in allowed-tools but has no disallowed-tools and is not exempt"
-      fi
-    fi
-  fi
-done
-
-# ============================================================================
-# Edge cases: tool count and ordering
-# ============================================================================
-
-section "Edge cases: disallowed-tools completeness"
-
-# Group A must have exactly 5 tools
-for skill in $GROUP_A_SKILLS; do
-  skill_file="$SKILLS_DIR/$skill/SKILL.md"
-  [ -f "$skill_file" ] || continue
-  disallowed_raw="$(get_disallowed_tools "$skill_file" 2>/dev/null || true)"
-  if [ -z "$disallowed_raw" ]; then
-    fail "EC-$skill-count" "$skill has no disallowed-tools"
-    continue
-  fi
-  count=$(echo "$disallowed_raw" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -c '.')
-  if [ "$count" -eq 5 ]; then
-    pass "EC-$skill-count" "$skill Group A has exactly 5 disallowed tools"
+  # No Edit in allowed-tools — should have disallowed-tools or be exempt
+  actual_disallowed="$(get_disallowed_tools "$skill_file" 2>/dev/null || true)"
+  if [ -n "$actual_disallowed" ]; then
+    pass "R007b-$skill" "$skill lacks Edit in allowed-tools and has disallowed-tools"
+  elif is_in_list "$skill" "$EXEMPT_SKILLS"; then
+    pass "R007b-$skill" "$skill lacks Edit in allowed-tools, exempt (documented)"
   else
-    fail "EC-$skill-count" "$skill Group A has $count disallowed tools, expected 5"
-  fi
-done
-
-# Group B must have exactly 4 tools
-for skill in $GROUP_B_SKILLS; do
-  skill_file="$SKILLS_DIR/$skill/SKILL.md"
-  [ -f "$skill_file" ] || continue
-  disallowed_raw="$(get_disallowed_tools "$skill_file" 2>/dev/null || true)"
-  if [ -z "$disallowed_raw" ]; then
-    fail "EC-$skill-count" "$skill has no disallowed-tools"
-    continue
-  fi
-  count=$(echo "$disallowed_raw" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -c '.')
-  if [ "$count" -eq 4 ]; then
-    pass "EC-$skill-count" "$skill Group B has exactly 4 disallowed tools"
-  else
-    fail "EC-$skill-count" "$skill Group B has $count disallowed tools, expected 4"
+    fail "R007b-$skill" "$skill lacks Edit in allowed-tools but has no disallowed-tools and is not exempt"
   fi
 done
 
