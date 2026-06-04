@@ -2,6 +2,7 @@
 name: cmetrics
 description: Project health and ROI dashboard. Use monthly or when evaluating workflow effectiveness. Shows bugs caught, token cost, and trends.
 allowed-tools: Read, Grep, Glob, Bash(git*), Bash(wc*), Bash(find*), Bash(cat*), Bash(jq*), Write(.correctless/artifacts/metrics-*)
+disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: autonomous
 ---
 

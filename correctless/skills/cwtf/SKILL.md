@@ -2,6 +2,7 @@
 name: cwtf
 description: Audit the workflow itself. Use when you suspect agents shortcut or after a bug escapes despite the workflow running. Checks phase execution, rule coverage, and agent thoroughness.
 allowed-tools: Read, Grep, Glob, Write(.correctless/artifacts/wtf-*), Bash(git*), Bash(jq*), Bash(find*), Bash(grep*)
+disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: autonomous
 ---
 

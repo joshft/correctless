@@ -2,6 +2,7 @@
 name: csummary
 description: Feature summary. Use after /cdocs to see what the workflow caught, or mid-feature to check progress.
 allowed-tools: Read, Grep, Glob, Bash(git*), Write(.correctless/artifacts/summary-*)
+disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: autonomous
 ---
 

@@ -2,6 +2,7 @@
 name: cexplain
 description: Guided codebase exploration with mermaid diagrams and prose walkthroughs.
 allowed-tools: Read, Grep, Glob, Bash(*)
+disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: hybrid
 ---
 

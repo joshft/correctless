@@ -2,6 +2,7 @@
 name: chelp
 description: Quick help — shows the workflow pipeline, available commands, and current status.
 allowed-tools: Read, Bash(*)
+disallowed-tools: Edit, Write, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: autonomous
 ---
 

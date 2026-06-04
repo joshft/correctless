@@ -2,6 +2,7 @@
 name: cmodel
 description: Generate an Alloy formal model of security-relevant behavior and run the Alloy Analyzer. Use after /cspec for features with state machines, protocol handling, or trust boundaries.
 allowed-tools: Read, Grep, Glob, Bash(java*), Bash(alloy*), Bash(git*), Bash(*workflow-advance.sh*), Write(docs/models/*), Write(.correctless/artifacts/token-log-*)
+disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: hybrid
 ---
 
