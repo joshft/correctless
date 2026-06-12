@@ -56,11 +56,11 @@ else
     fail "R-001(a)" "cspec Step 3 block missing AP-031 reference"
   fi
 
-  # Tests R-001 [unit]: Step 3 block contains "format" (for format-pinning directive)
-  if grep -qi "format" <<< "$step3_block"; then
-    pass "R-001(b)" "cspec Step 3 block contains 'format'"
+  # Tests R-001 [unit]: Step 3 block contains format-pinning language (exact/pin/parsed/heading regex)
+  if grep -qiE "(pin.*format|format.*pin|exact format|format.*(being )?parsed|heading regex|JSON schema)" <<< "$step3_block"; then
+    pass "R-001(b)" "cspec Step 3 block contains format-pinning language"
   else
-    fail "R-001(b)" "cspec Step 3 block missing 'format'"
+    fail "R-001(b)" "cspec Step 3 block missing format-pinning language (pin.*format/exact format/heading regex/JSON schema)"
   fi
 
   # Tests R-001 [unit]: Step 3 block contains "producer" (cite producer file path)
@@ -73,10 +73,12 @@ else
   # Tests R-001 [unit]: Step 3 block contains detection heuristic keywords.
   # Spec requires trigger conditions: reads/extracts/pattern-matches against
   # files produced by another skill/script, including jq field access.
-  if grep -qiE "(reads|extracts|pattern.match|heading.*regex|jq|regex.*against|artifact.*content)" <<< "$step3_block"; then
+  # Bare 'reads' and 'extracts' are excluded — require specific anchors to
+  # avoid false positives from unrelated prose.
+  if grep -qiE "(heading (regex|format)|pattern.match|jq|regex.*against|artifact.*content|reads.*artifact|extracts.*from)" <<< "$step3_block"; then
     pass "R-001(d)" "cspec Step 3 block contains detection heuristic keywords"
   else
-    fail "R-001(d)" "cspec Step 3 block missing detection heuristics (reads/extracts/pattern-match/jq/regex)"
+    fail "R-001(d)" "cspec Step 3 block missing detection heuristics (heading regex/pattern-match/jq/reads.*artifact/extracts.*from)"
   fi
 
   # Tests R-001 [unit]: Step 3 block contains concrete example.
@@ -95,6 +97,22 @@ else
     pass "R-001(f)" "cspec Step 3 block cross-references a SKILL.md template path"
   else
     fail "R-001(f)" "cspec Step 3 block missing SKILL.md cross-reference in example"
+  fi
+
+  # Tests R-001 [unit]: Step 3 block contains the negative-trigger exclusion clause.
+  # Spec: "does NOT trigger for file existence checks or path-only operations"
+  if grep -qiE "(does not trigger|does NOT trigger|file.exist|path.only)" <<< "$step3_block"; then
+    pass "R-001(g)" "cspec Step 3 block contains negative-trigger exclusion clause"
+  else
+    fail "R-001(g)" "cspec Step 3 block missing negative-trigger exclusion clause (does not trigger/file exist/path-only)"
+  fi
+
+  # Tests R-001 [unit]: Step 3 block includes the "Not:" contrast in the concrete example.
+  # Spec: "Not: 'The script reads review findings.'"
+  if grep -qE "Not:" <<< "$step3_block"; then
+    pass "R-001(h)" "cspec Step 3 block contains 'Not:' contrast in concrete example"
+  else
+    fail "R-001(h)" "cspec Step 3 block missing 'Not:' contrast in concrete example"
   fi
 fi
 
@@ -126,13 +144,36 @@ else
     found{print}
   ' "$CTDD_RED_AGENT")"
 
+  _in_fallback=0
   if [ -z "$real_fixture_block" ]; then
+    _in_fallback=1
     # No dedicated heading found — fall back to ## Process section.
     real_fixture_block="$(awk '
       /^## Process/{found=1}
       found && !/^## Process/ && /^## /{exit}
       found{print}
     ' "$CTDD_RED_AGENT")"
+  fi
+
+  # TA-007: Fallback scope is wide; require anchor keywords to co-locate within
+  # a 25-line window to prevent scattered keyword matches passing vacuously.
+  # Only applies when using the ## Process fallback (not dedicated heading scope).
+  if [ "$_in_fallback" -eq 1 ] && [ -n "$real_fixture_block" ]; then
+    _line_real="$(grep -ni "real artifact" <<< "$real_fixture_block" | head -1 | cut -d: -f1)"
+    _line_source="$(grep -nF "# Source:" <<< "$real_fixture_block" | head -1 | cut -d: -f1)"
+    _line_dormant="$(grep -ni "dormant" <<< "$real_fixture_block" | head -1 | cut -d: -f1)"
+    if [ -n "$_line_real" ] && [ -n "$_line_source" ] && [ -n "$_line_dormant" ]; then
+      _max=$(( _line_real > _line_source ? _line_real : _line_source ))
+      _max=$(( _max > _line_dormant ? _max : _line_dormant ))
+      _min=$(( _line_real < _line_source ? _line_real : _line_source ))
+      _min=$(( _min < _line_dormant ? _min : _line_dormant ))
+      _window=$(( _max - _min ))
+      if [ "$_window" -le 25 ]; then
+        pass "R-002(g)" "fallback scope: anchor keywords co-locate within 25-line window ($_window lines)"
+      else
+        fail "R-002(g)" "fallback scope: anchor keywords span $_window lines (>25); directive may be scattered"
+      fi
+    fi
   fi
 
   # Tests R-002 [unit]: "real artifact" — core phrase specifying fixture source
@@ -212,6 +253,7 @@ else
   check11_block="$(awk '
     /^>[[:space:]]*11\./{found=1}
     found && /^>[[:space:]]*12\./{exit}
+    found && /^[[:space:]]*$/{next}
     found && !/^>/{exit}
     found{print}
   ' "$CTDD_SKILL")"
@@ -255,6 +297,15 @@ else
     fail "R-003(e)" "ctdd check 11 block missing producer-to-artifact mapping (e.g. review-spec-findings-)"
   fi
 
+  # Tests R-003 [unit]: check 11 follows fixture file paths referenced by modified tests.
+  # Spec: "The audit should also follow fixture file paths referenced by modified tests
+  # (e.g., tests/fixtures/*.md), not just examine the test files themselves."
+  if grep -qiE "(tests/fixtures|fixture file|follow.*fixture|referenced.*fixture)" <<< "$check11_block"; then
+    pass "R-003(h)" "ctdd check 11 block references following fixture file paths (tests/fixtures)"
+  else
+    fail "R-003(h)" "ctdd check 11 block missing fixture file path following (tests/fixtures or fixture file)"
+  fi
+
   # ---- Orchestrator section: git commands passed to test audit agent ----
   # BLOCK-SCOPED (R-004): extract ## Between RED and GREEN: Test Audit section
   # (from its heading to ## Phase: GREEN).
@@ -267,19 +318,33 @@ else
     found{print}
   ' "$CTDD_SKILL")"
 
-  # Tests R-003 [unit]: orchestrator section contains git diff for modified test files
-  if grep -qE "git diff" <<< "$test_audit_orch_block"; then
-    pass "R-003(f)" "ctdd test audit orchestrator section contains 'git diff'"
+  # TA-003 fix: exclude "> " blockquote lines so audit-agent blockquote instructions
+  # cannot satisfy the orchestrator's git-command contract. The audit agent is
+  # read-only and must not run git; only orchestrator prose should contain these.
+  non_blockquote="$(grep -v '^>' <<< "$test_audit_orch_block")"
+
+  # Tests R-003 [unit]: orchestrator (non-blockquote) contains git diff for modified test files
+  if grep -qE "git diff" <<< "$non_blockquote"; then
+    pass "R-003(f)" "ctdd test audit orchestrator (non-blockquote) contains 'git diff'"
   else
-    fail "R-003(f)" "ctdd test audit orchestrator section missing 'git diff' (modified file list)"
+    fail "R-003(f)" "ctdd test audit orchestrator (non-blockquote) missing 'git diff' (modified file list)"
   fi
 
-  # Tests R-003 [unit]: orchestrator section contains git status --porcelain for
+  # Tests R-003 [unit]: orchestrator (non-blockquote) contains git status --porcelain for
   # untracked files (new RED-phase test files are untracked, not just modified).
-  if grep -qE "git status.*--porcelain|--porcelain" <<< "$test_audit_orch_block"; then
-    pass "R-003(g)" "ctdd test audit orchestrator section contains 'git status --porcelain'"
+  if grep -qE "git status.*--porcelain|--porcelain" <<< "$non_blockquote"; then
+    pass "R-003(g)" "ctdd test audit orchestrator (non-blockquote) contains 'git status --porcelain'"
   else
-    fail "R-003(g)" "ctdd test audit orchestrator section missing 'git status --porcelain' (untracked file list)"
+    fail "R-003(g)" "ctdd test audit orchestrator (non-blockquote) missing 'git status --porcelain' (untracked file list)"
+  fi
+
+  # Tests R-003 [unit]: orchestrator prose documents passing both lists to the audit agent.
+  # Spec: "passes both lists to the test audit agent as input — the audit agent itself
+  # has read-only tools (Read, Grep, Glob) and cannot run git commands"
+  if grep -qiE "(passes both lists|pass(es)?.*lists?.*(audit|agent)|both.*lists?.*(audit|agent))" <<< "$non_blockquote"; then
+    pass "R-003(i)" "ctdd test audit orchestrator documents passing both lists to audit agent"
+  else
+    fail "R-003(i)" "ctdd test audit orchestrator missing 'passes both lists' or equivalent in non-blockquote prose"
   fi
 fi
 
@@ -390,18 +455,29 @@ else
     fail "R-006(b)" "AGENT_CONTEXT.md missing real-fixture/real-artifact in agents row or Design Patterns"
   fi
 
-  # Tests R-006 [unit]: test count documented in AGENT_CONTEXT.md reflects actual
-  # test file count (must be >= actual to detect stale count).
-  # Spec: "AGENT_CONTEXT.md test count is updated."
+  # Tests R-006 [unit]: test count documented in AGENT_CONTEXT.md is up-to-date.
+  # TA-008: (a) count must be >= actual AND <= actual + 2 (prevents inflated counts).
+  # (b) extraction is phrasing-tolerant and case-insensitive (test files/scripts).
+  # Distinguishes "extraction failed" (no recognizable phrase) from "count is stale".
   # In RED phase: adding test-ap031-fixture-divergence.sh increments actual count
-  # past the documented count → this assertion fails (expected RED state).
+  # past the documented count → fails with "stale" message (expected RED state).
   actual_test_count="$(find "$REPO_DIR/tests" -maxdepth 1 -name "test*.sh" | wc -l | tr -d ' ')"
-  documented_count="$(grep -oE "[0-9]+ test file" "$AGENT_CONTEXT" | grep -oE "^[0-9]+" | head -1 || true)"
+  documented_count_raw="$(grep -oiE "[0-9]+ (test files?|test scripts?)" "$AGENT_CONTEXT" | head -1 || true)"
+  documented_count="$(grep -oE "^[0-9]+" <<< "$documented_count_raw" || true)"
 
-  if [ -n "$documented_count" ] && [ "$documented_count" -ge "$actual_test_count" ]; then
-    pass "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) >= actual test files ($actual_test_count)"
+  if [ -z "$documented_count" ]; then
+    fail "R-006(c)" "AGENT_CONTEXT.md test count extraction failed — no recognizable test-count phrase (e.g., 'N test files')"
+  elif [ "$documented_count" -lt "$actual_test_count" ]; then
+    fail "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) is stale — actual is $actual_test_count; GREEN must update to $actual_test_count"
+  # +2 tolerance: GREEN may add helper test cases alongside the main AP-031 test,
+  # bumping the actual count before the AGENT_CONTEXT.md docs update lands in the
+  # same commit. Prevents a spurious fail when tests and docs are updated together.
+  elif [ "$documented_count" -gt $(( actual_test_count + 2 )) ]; then
+    fail "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) is inflated — actual is $actual_test_count, max allowed $((actual_test_count + 2))"
+  elif [ "$documented_count" -eq "$actual_test_count" ]; then
+    pass "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) exactly matches actual ($actual_test_count)"
   else
-    fail "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) < actual test files ($actual_test_count); GREEN must update to $actual_test_count"
+    pass "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) within +2 tolerance — actual is $actual_test_count"
   fi
 fi
 
