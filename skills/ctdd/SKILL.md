@@ -262,7 +262,7 @@ After the test agent completes and tests exist, run the **test audit** before ad
 >     | `/caudit` | `.correctless/artifacts/findings/audit-*-round-*.json` |
 >     | `/cverify` | `.correctless/meta/intensity-calibration.json` |
 >     | `/ctdd` | `.correctless/artifacts/qa-findings-*.json` |
->     | `/cdocs` | `.correctless/artifacts/cost-*.json` |
+>     | `/cdocs` | `.correctless/artifacts/cost-*.json` excluding `cost-cache-*` (statusline cache, not /cdocs output) |
 >
 >     If no artifact matching the producer's pattern exists in the repo, the requirement is dormant for this feature (new producer + consumer in same PR — no prior artifact). The spec's format-pinning (AP-031 Layer 1) is the sole guard in dormant state. Citation form for real-fixture tests: `# Source:` prefix followed by the artifact path (e.g., `# Source: .correctless/artifacts/review-spec-findings-disallowed-tools.md`).
 >
