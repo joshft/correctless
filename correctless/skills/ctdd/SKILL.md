@@ -737,7 +737,7 @@ Each mini-audit round spawns the 6 default specialist agents as forked subagents
 
    For each issue, report it as a finding with the MA- prefix and LENS: ux-review. If the UX agent fails to spawn, returns an error, times out, or returns malformed or incomplete output, the round proceeds without UX findings and notes the absence — the UX lens is advisory and never gates progression."
 
-6. **Integration depth agent**: "You are verifying that `[integration]` tests actually exercise real integration — not just import the entrypoint while stubbing everything behind it. Your job is to catch tests that pass the mechanical test audit (checks 5, 6, 9, 10) but are still unit-tests-in-disguise.
+6. **Integration depth agent**: "You are verifying that `[integration]` tests actually exercise real integration — not just import the entrypoint while stubbing everything behind it. Your job is to catch tests that pass the mechanical test audit (checks 5, 6, 9, 10, 11) but are still unit-tests-in-disguise.
 
    **Scope**: You operate ONLY on `[integration]` rules that have Entry/Through/Exit contracts in the spec. For `[integration]` rules without contracts, emit one LOW per rule: 'R-xxx is [integration] without Entry/Through/Exit — integration depth not auditable. Consider adding a contract via /cspec.' Do NOT attempt semantic analysis of uncontracted tests. If no `[integration]` rules have contracts, complete with zero findings and note: 'No integration contracts found — integration depth lens has nothing to audit.'
 
