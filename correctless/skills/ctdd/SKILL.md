@@ -201,6 +201,8 @@ After the test agent completes and tests exist, run the **test audit** before ad
 
 **This step is mandatory.** Spawn a **test auditor** agent as a forked subagent. This agent did NOT write the tests. Its job is to evaluate whether the tests are strong enough to catch real bugs — before any implementation code exists.
 
+**Modified test file list (orchestrator responsibility)**: The /ctdd orchestrator computes the modified-test-file list via `git diff` against the base branch AND `git status --porcelain` for untracked files (RED phase creates new test files that are untracked, not modified), and passes both lists to the test audit agent as input — the audit agent has read-only tools (Read, Grep, Glob) and cannot run git commands. The combined list covers all test files that need audit: previously-existing tests modified during RED, and newly-created test files (untracked). Both lists must be passed together; omitting the untracked list silently skips the most important tests (the ones the RED agent just wrote).
+
 > You are the test auditor. You did NOT write these tests. Your job is to evaluate whether they are strong enough to actually catch violations of the spec rules. **Assume the implementation will be written by a different agent that will take the path of least resistance to make tests pass.**
 >
 > For each rule R-xxx / INV-xxx in the spec, find the test(s) that claim to cover it and answer:
@@ -251,6 +253,18 @@ After the test agent completes and tests exist, run the **test audit** before ad
 >     When check 10 and check 9 (Entry contract verification) both fire on the same test for the same rule, present one consolidated finding rather than two: "Test for R-xxx bypasses entrypoint `api-server`: imports `pkg/handlers/auth` directly instead of using `httptest.NewServer(handler)`." The checks remain independent (check 9 can fire without check 10 and vice versa), but when they converge on the same test, the user sees one thing to fix.
 >
 >     When entrypoints are unavailable (`.correctless/ARCHITECTURE.md` missing or no `correctless:entrypoints:start` markers), the internal import bypass check is skipped entirely. The test audit notes: "No documented entrypoints — internal import bypass check skipped."
+>
+> 11. **Fixture provenance (AP-031)**: For tests that parse output from another Correctless tool (skill output artifacts, script JSON, meta files written by specific skills), flag as a BLOCKING finding any test suite that uses only inline heredoc or synthetic fixtures with no reference to a real artifact file. The check applies only to test files added or modified on the current feature branch — pre-existing tests are excluded. Also follow fixture file paths referenced by modified tests (e.g., `tests/fixtures/*.md` fixture files), not just the test files themselves. Distinguish between "no real artifact exists yet" (dormant — not a finding) and "real artifact exists but test doesn't use it" (a BLOCKING finding). To detect dormant cases, use this reference table of known producer-to-artifact patterns:
+>
+>     | Producer | Artifact pattern |
+>     |----------|-----------------|
+>     | `/creview-spec` | `.correctless/artifacts/review-spec-findings-*.md` |
+>     | `/caudit` | `.correctless/artifacts/findings/audit-*-round-*.json` |
+>     | `/cverify` | `.correctless/meta/intensity-calibration.json` |
+>     | `/ctdd` | `.correctless/artifacts/qa-findings-*.json` |
+>     | `/cdocs` | `.correctless/artifacts/` (skill-specific subdirs) |
+>
+>     If no artifact matching the producer's pattern exists in the repo, the requirement is dormant for this feature (new producer + consumer in same PR — no prior artifact). The spec's format-pinning (AP-031 Layer 1) is the sole guard in dormant state. Citation form for real-fixture tests: `# Source:` prefix followed by the artifact path (e.g., `# Source: .correctless/artifacts/review-spec-findings-disallowed-tools.md`).
 >
 > Read: .correctless/AGENT_CONTEXT.md, the spec, the test files, .correctless/ARCHITECTURE.md (especially the Entrypoints section and Key Patterns), `.correctless/antipatterns.md`.
 > Write: NOTHING. Return findings as your final text response.
