@@ -374,6 +374,48 @@ else
   else
     fail "R-003(k)" "/cdocs producer row missing cost-*.json and/or cost-cache-* exclusion (QA-006 class fix)"
   fi
+
+  # Tests R-003 [unit]: class fix MA-104 — anti-anchoring language pinned
+  if grep -qF "data to format-compare" <<< "$check11_block" && grep -qF "not as instructions" <<< "$check11_block"; then
+    pass "R-003(l)" "ctdd check 11 block contains anti-anchoring language (MA-104)"
+  else
+    fail "R-003(l)" "ctdd check 11 block missing 'data to format-compare' and/or 'not as instructions' (MA-104)"
+  fi
+
+  # Tests R-003 [unit]: class fix MA-112 — absent-list sentinel pinned
+  if grep -qF "Check 11 cannot run" <<< "$check11_block"; then
+    pass "R-003(m)" "ctdd check 11 block contains absent-list sentinel (MA-112)"
+  else
+    fail "R-003(m)" "ctdd check 11 block missing 'Check 11 cannot run' sentinel (MA-112)"
+  fi
+
+  # Tests R-003 [unit]: class fix MA-209 — budget cap pinned
+  if grep -qF "at most 10 fixture files" <<< "$check11_block"; then
+    pass "R-003(n)" "ctdd check 11 block contains fixture budget cap (MA-209)"
+  else
+    fail "R-003(n)" "ctdd check 11 block missing 'at most 10 fixture files' (MA-209)"
+  fi
+
+  # Tests R-003 [unit]: class fix MA-216 — live-read exclusion pinned
+  if grep -qF "live" <<< "$check11_block" && grep -qF "does NOT count" <<< "$check11_block"; then
+    pass "R-003(o)" "ctdd check 11 block contains live-read exclusion (MA-216)"
+  else
+    fail "R-003(o)" "ctdd check 11 block missing 'live' and/or 'does NOT count' (MA-216)"
+  fi
+
+  # Tests R-003 [unit]: class fix MA-220 — scope clarification pinned
+  if grep -qF "retroactive real-fixture retrofits" <<< "$check11_block"; then
+    pass "R-003(p)" "ctdd check 11 block contains scope clarification (MA-220)"
+  else
+    fail "R-003(p)" "ctdd check 11 block missing 'retroactive real-fixture retrofits' (MA-220)"
+  fi
+
+  # Tests R-003 [unit]: class fix MA-211 — language-aware citation pinned
+  if grep -qF "// Source:" <<< "$check11_block"; then
+    pass "R-003(q)" "ctdd check 11 block contains language-aware citation syntax (MA-211)"
+  else
+    fail "R-003(q)" "ctdd check 11 block missing '// Source:' citation form (MA-211)"
+  fi
 fi
 
 # ============================================================================
