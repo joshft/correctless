@@ -370,7 +370,7 @@ If `workflow.compliance_checks` in `workflow-config.json` has entries with `phas
 
 ### Format-Pinning Directive (AP-031)
 
-**When a feature involves parsing output produced by another Correctless skill or script**, the spec must include a format-pinning invariant. This guards against AP-031 (test fixtures diverging from real producer output — two back-to-back PMBs caused by fixture-format mismatch).
+**When a feature involves parsing output produced by another Correctless skill or script**, the spec must include a format-pinning rule or invariant (`R-xxx` at standard intensity, `INV-xxx` at high+). This guards against AP-031 (test fixtures diverging from real producer output — two back-to-back PMBs caused by fixture-format mismatch).
 
 **Trigger detection**: This applies when the feature reads from, extracts from, or pattern-matches against files produced by another skill or script — including markdown heading parsing, jq JSON field access, and regex matching against artifact content. It does NOT trigger for file existence checks or path-only operations.
 

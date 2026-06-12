@@ -346,6 +346,26 @@ else
   else
     fail "R-003(i)" "ctdd test audit orchestrator missing 'passes both lists' or equivalent in non-blockquote prose"
   fi
+
+  # Tests R-003 [unit]: class fix QA-004 — no bare-directory globs in producer table
+  _bare_dir_found=0
+  while IFS= read -r _row; do
+    [ -z "$_row" ] && continue
+    _artifact_cell="$(echo "$_row" | awk -F'|' '{print $3}')"
+    _artifact_path="$(echo "$_artifact_cell" | grep -o '`[^`]*`' | tr -d '`' | head -1)"
+    [ -z "$_artifact_path" ] && continue
+    _final="${_artifact_path##*/}"
+    if [ -z "$_final" ]; then
+      _bare_dir_found=1
+    fi
+  done < <(grep '| `/' <<< "$check11_block" || true)
+  if [ "$_bare_dir_found" -eq 0 ] && [ -n "$check11_block" ]; then
+    pass "R-003(j)" "no bare-directory globs in producer-to-artifact table (QA-004 class fix)"
+  elif [ -z "$check11_block" ]; then
+    fail "R-003(j)" "check 11 block not found — cannot validate producer table"
+  else
+    fail "R-003(j)" "producer-to-artifact table contains a bare-directory glob (ends in '/' with no file component)"
+  fi
 fi
 
 # ============================================================================
