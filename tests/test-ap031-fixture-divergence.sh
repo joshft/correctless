@@ -132,6 +132,9 @@ if [ ! -f "$CTDD_RED_AGENT" ]; then
   fail "R-002(d)" "agents/ctdd-red.md not found"
   fail "R-002(e)" "agents/ctdd-red.md not found"
   fail "R-002(f)" "agents/ctdd-red.md not found"
+  fail "R-002(h)" "agents/ctdd-red.md not found"
+  fail "R-002(i)" "agents/ctdd-red.md not found"
+  fail "R-002(j)" "agents/ctdd-red.md not found"
 else
   # BLOCK-SCOPED (R-004): first try to extract a dedicated "real-fixture" or
   # "real artifact" heading section (preferred — most specific scope).
@@ -223,6 +226,46 @@ else
     pass "R-002(f)" "ctdd-red directive block documents alternative live-file form and limitation"
   else
     fail "R-002(f)" "ctdd-red directive block missing alternative form / gitignored limitation"
+  fi
+
+  # Tests R-002 [unit]: post-review amended clauses pin (sprint/r004-amended-clause-pins).
+  # The MA-117 trigger-detection block and MA-211 language-aware citation forms were
+  # added to agents/ctdd-red.md after the original R-002 keyword contract was set, so
+  # R-004's keyword set didn't pin them. Without these checks, an edit to ctdd-red.md
+  # could silently remove the clauses and the test would still pass.
+
+  # R-002(h): MA-117 trigger-detection block — both halves must be present (the
+  # positive directive AND the negative-trigger exclusion). Mirrors R-001's
+  # detection-heuristics structure in skills/cspec/SKILL.md Step 3.
+  if grep -qF "Trigger detection" <<< "$real_fixture_block" && \
+     grep -qF "does NOT trigger" <<< "$real_fixture_block"; then
+    pass "R-002(h)" "ctdd-red directive block contains MA-117 trigger-detection (positive + negative)"
+  else
+    fail "R-002(h)" "ctdd-red directive block missing MA-117 trigger-detection block (need 'Trigger detection' AND 'does NOT trigger')"
+  fi
+
+  # R-002(i): producer-to-artifact reference table mirrors check 11's table.
+  # Requires both table headers AND at least one concrete producer mapping —
+  # headers alone could be a placeholder, but a real mapping anchors the contract.
+  if grep -qF "Producer" <<< "$real_fixture_block" && \
+     grep -qF "Artifact pattern" <<< "$real_fixture_block" && \
+     grep -qF "review-spec-findings-" <<< "$real_fixture_block"; then
+    pass "R-002(i)" "ctdd-red directive block contains producer-to-artifact table with concrete mapping"
+  else
+    fail "R-002(i)" "ctdd-red directive block missing producer table headers or concrete producer mapping"
+  fi
+
+  # R-002(j): MA-211 language-aware Source: citation forms. The original R-002(b)
+  # only pins '# Source:' (shell/Python). Non-shell projects need '// Source:'
+  # (Go/TS/Java) and '-- Source:' (SQL). All three must be present so a writer
+  # using any of these languages has a documented citation form.
+  # Note: '--' separator is required before '-- Source:' because grep parses
+  # a literal starting with '-' as an option flag otherwise.
+  if grep -qF -- "// Source:" <<< "$real_fixture_block" && \
+     grep -qF -- "-- Source:" <<< "$real_fixture_block"; then
+    pass "R-002(j)" "ctdd-red directive block contains MA-211 language-aware citation forms (// Source:, -- Source:)"
+  else
+    fail "R-002(j)" "ctdd-red directive block missing language-aware citation forms (need '// Source:' AND '-- Source:')"
   fi
 fi
 
