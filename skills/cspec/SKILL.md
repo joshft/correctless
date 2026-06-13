@@ -368,6 +368,20 @@ If `workflow.compliance_checks` in `workflow-config.json` has entries with `phas
 - At high intensity: use `templates/spec-full.md`, 12 sections including invariants. Research agent always runs for security-relevant topics. STRIDE analysis required for features touching trust boundaries.
 - At critical intensity: all templates loaded, exhaustive question depth (refuse vague answers). Research agent always runs regardless of topic.
 
+### Format-Pinning Directive (AP-031)
+
+**When a feature involves parsing output produced by another Correctless skill or script**, the spec must include a format-pinning rule or invariant (`R-xxx` at standard intensity, `INV-xxx` at high+). This guards against AP-031 (test fixtures diverging from real producer output — two back-to-back PMBs caused by fixture-format mismatch).
+
+**Trigger detection**: This applies when the feature reads from, extracts from, or pattern-matches against files produced by another skill or script — including markdown heading parsing, jq JSON field access, and regex matching against artifact content. It does NOT trigger for file existence checks or path-only operations.
+
+**Required spec content when triggered**:
+- (a) Pin the exact format being parsed — the heading regex, JSON schema, or field names the feature reads
+- (b) Cite the producer file path (SKILL.md template section or script path) as the authoritative format source
+
+Example: 'Heading format: `## Finding RS-{NNN}: {title}` per skills/creview-spec/SKILL.md Step 3.5 template.' Not: 'The script reads review findings.'
+
+Reference: AP-031
+
 ### Step 3a: Pattern Detection and Composition Check
 
 **Pattern detection substep (at all intensities).** After drafting the spec rules in Step 3, extract all PAT-xxx entries from `.correctless/ARCHITECTURE.md` by scanning for `### PAT-\d{3}:` heading patterns. For each spec rule, check whether it introduces a convention not covered by an existing PAT-xxx entry. A "convention" is a repeated structural pattern — how files are organized, how hooks compose, how state flows between skills, how artifacts are named.

@@ -36,6 +36,26 @@ For each rule R-xxx / INV-xxx / PRH-xxx / BND-xxx in the spec, write at least on
 
 Walk through the spec **in document order**, not in dependency order. Dependency-driven ordering is the test audit's job. Your job is coverage.
 
+### Real-fixture requirement (AP-031)
+
+When tests parse output from another Correctless tool (skill output artifacts, script JSON, meta files written by specific skills), at least one test fixture must be sourced from a real artifact in the repo. The preferred form is a verbatim excerpt included in the test file (or a tracked fixture file under `tests/fixtures/`) with a comment citing the source path — this form is hermetic and works in CI and fresh clones.
+
+**Trigger detection**: This applies when you are writing tests that exercise code reading, extracting from, or pattern-matching against files produced by another Correctless skill or script — including tests parsing markdown artifact headings, jq-processing JSON artifacts, or regex-matching artifact content. It does NOT trigger for tests that only check file existence or path availability. To find real artifacts, use this reference table of known producer-to-artifact patterns:
+
+| Producer | Artifact pattern |
+|----------|-----------------|
+| `/creview-spec` | `.correctless/artifacts/review-spec-findings-*.md` |
+| `/caudit` | `.correctless/artifacts/findings/audit-*-round-*.json` |
+| `/cverify` | `.correctless/meta/intensity-calibration.json` |
+| `/ctdd` | `.correctless/artifacts/qa-findings-*.json` |
+| `/cdocs` | `.correctless/artifacts/cost-*.json` excluding `cost-cache-*` (statusline cache, not /cdocs output) |
+
+Citation MUST use the `Source:` token inside the test language's line-comment syntax — `# Source:` in shell/Python, `// Source:` in Go/TypeScript/Java, `-- Source:` in SQL — followed by the artifact path (e.g., `# Source: .correctless/artifacts/review-spec-findings-disallowed-tools.md`). A verbatim excerpt from the real artifact pinned to this comment satisfies the requirement.
+
+The alternative form — reading the real artifact from its file path at test time — provides live coverage but must not be the sole form, since `.correctless/artifacts/` is gitignored and absent in CI or fresh clones. A test that only reads a live file will silently pass in CI with no fixture at all.
+
+**Dormant behavior**: When no real artifact exists in the repo (new producer + consumer in the same PR), this requirement is dormant — the spec's format-pinning (AP-031 Layer 1) is the sole guard. The real-fixture requirement activates after the producer has run at least once and produced an artifact that can be committed or excerpted.
+
 ### Test level for each rule
 
 - Rules about data transformation, validation, or pure logic → **unit tests** are fine
