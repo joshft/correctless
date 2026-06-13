@@ -40,7 +40,17 @@ Walk through the spec **in document order**, not in dependency order. Dependency
 
 When tests parse output from another Correctless tool (skill output artifacts, script JSON, meta files written by specific skills), at least one test fixture must be sourced from a real artifact in the repo. The preferred form is a verbatim excerpt included in the test file (or a tracked fixture file under `tests/fixtures/`) with a comment citing the source path — this form is hermetic and works in CI and fresh clones.
 
-Citation MUST use the prefix `# Source:` followed by the artifact path (e.g., `# Source: .correctless/artifacts/review-spec-findings-disallowed-tools.md`). A verbatim excerpt from the real artifact pinned to this comment satisfies the requirement.
+**Trigger detection**: This applies when you are writing tests that exercise code reading, extracting from, or pattern-matching against files produced by another Correctless skill or script — including tests parsing markdown artifact headings, jq-processing JSON artifacts, or regex-matching artifact content. It does NOT trigger for tests that only check file existence or path availability. To find real artifacts, use this reference table of known producer-to-artifact patterns:
+
+| Producer | Artifact pattern |
+|----------|-----------------|
+| `/creview-spec` | `.correctless/artifacts/review-spec-findings-*.md` |
+| `/caudit` | `.correctless/artifacts/findings/audit-*-round-*.json` |
+| `/cverify` | `.correctless/meta/intensity-calibration.json` |
+| `/ctdd` | `.correctless/artifacts/qa-findings-*.json` |
+| `/cdocs` | `.correctless/artifacts/cost-*.json` excluding `cost-cache-*` (statusline cache, not /cdocs output) |
+
+Citation MUST use the `Source:` token inside the test language's line-comment syntax — `# Source:` in shell/Python, `// Source:` in Go/TypeScript/Java, `-- Source:` in SQL — followed by the artifact path (e.g., `# Source: .correctless/artifacts/review-spec-findings-disallowed-tools.md`). A verbatim excerpt from the real artifact pinned to this comment satisfies the requirement.
 
 The alternative form — reading the real artifact from its file path at test time — provides live coverage but must not be the sole form, since `.correctless/artifacts/` is gitignored and absent in CI or fresh clones. A test that only reads a live file will silently pass in CI with no fixture at all.
 
