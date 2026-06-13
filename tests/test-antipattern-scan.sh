@@ -2934,8 +2934,14 @@ test_se_r009_drift_test() {
   local ctdd_skill="$REPO_DIR/skills/ctdd/SKILL.md"
 
   # (1) ctdd audit blockquote has a numbered check with anchor phrase "production call chain"
+  # Pipe-into-grep-q is SIGPIPE-prone under `set -uo pipefail` (this file): the
+  # first grep emits multiple lines; grep -qi exits on first match and SIGPIPEs
+  # the first grep; pipeline exits 141; && silently doesn't fire. Use herestring
+  # to avoid the pipe entirely. (AP-031 deferred follow-up #3 / PR #151.)
   local has_prod_chain="no"
-  grep -E '^> [0-9]+\.' "$ctdd_skill" 2>/dev/null | grep -qi 'production call chain' && has_prod_chain="yes"
+  local numbered_blockquote_lines
+  numbered_blockquote_lines="$(grep -E '^> [0-9]+\.' "$ctdd_skill" 2>/dev/null || true)"
+  grep -qi 'production call chain' <<< "$numbered_blockquote_lines" && has_prod_chain="yes"
   assert_eq "SE-R-009(1): audit check with 'production call chain' exists" "yes" "$has_prod_chain"
 
   # (2) PATTERN_META contains key dead-security-fn
