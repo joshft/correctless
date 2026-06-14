@@ -53,6 +53,7 @@ declare -A PATTERN_META=(
     ["gnu-grep-ext"]="medium|GNU grep extension in grep pattern — not POSIX ERE (AP-001)|portability"
     ["gnu-grep-ext-low"]="low|GNU grep word-boundary extension in grep pattern — more portable but not POSIX (AP-001)|portability"
     ["dead-security-fn"]="high|Function in security script has zero production callers — structurally inert (AP-022)|security-enforcement"
+    ["prune-scan-substring-match"]="high|prune-scan.sh uses substring slug matching — false positives cause autonomous data-loss (AP-032 / INV-005 / PRH-002)|data-integrity"
 )
 
 # ============================================
@@ -496,6 +497,21 @@ check_shell() {
       fi
     fi
   done < <(grep -nF '\' "$file" 2>/dev/null | grep -E '[\\][swdb]' || true)
+
+  # (g) AP-032: prune-scan-substring-match — slug matching via substring primitives
+  # Only checked on the scanner file itself. Detects:
+  #   grep -F "$slug" ...           — substring match
+  #   [[ $f =~ $slug ]]             — unquoted regex (treats slug as pattern)
+  #   case "$f" in *"$slug"*)       — substring case match
+  # Per INV-005 / PRH-002, slug matching must be delimited-token, not substring.
+  case "$file" in
+    */prune-scan.sh)
+      while IFS=: read -r line_num _; do
+        [ -n "$line_num" ] || continue
+        add_finding "prune-scan-substring-match" "$file" "$line_num"
+      done < <(grep -nE 'grep[[:space:]]+-F[[:space:]]+"\$slug"|\[\[[[:space:]]*\$f[[:space:]]*=~[[:space:]]*\$slug[[:space:]]*\]\]|case[[:space:]]+"\$f"[[:space:]]+in[[:space:]]+\*"\$slug"\*' "$file" 2>/dev/null || true)
+      ;;
+  esac
 }
 
 # --- Rust checks (R-008) ---

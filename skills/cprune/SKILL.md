@@ -2,7 +2,7 @@
 name: cprune
 description: Documentation and artifact pruning skill. Detects stale entries and orphaned artifacts, archives documentation (never deletes), cleans ephemeral artifacts. Two modes — autonomous for /cauto pipeline, interactive for direct invocation.
 interaction_mode: hybrid
-allowed-tools: Read, Grep, Glob, Bash(scripts/prune-scan.sh*), Bash(git*), Bash(sed*), Bash(mkdir*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/antipatterns.md), Write(.correctless/AGENT_CONTEXT.md), Write(.correctless/ARCHITECTURE_DEPRECATED.md), Write(.correctless/antipatterns-archived.md), Write(.correctless/CLAUDE_LEARNINGS_ARCHIVED.md), Write(.correctless/meta/drift-debt.json), Write(.correctless/specs/archived/*), Write(.correctless/artifacts/prune-report-*.md), Edit(.correctless/ARCHITECTURE.md), Edit(.correctless/antipatterns.md), Edit(.correctless/AGENT_CONTEXT.md), Edit(CLAUDE.md)
+allowed-tools: Read, Grep, Glob, Bash(scripts/prune-scan.sh*), Bash(git*), Bash(sed*), Bash(mkdir*), Bash(jq*), Write(.correctless/ARCHITECTURE.md), Write(.correctless/antipatterns.md), Write(.correctless/AGENT_CONTEXT.md), Write(.correctless/ARCHITECTURE_DEPRECATED.md), Write(.correctless/antipatterns-archived.md), Write(.correctless/CLAUDE_LEARNINGS_ARCHIVED.md), Write(.correctless/meta/drift-debt.json), Write(.correctless/specs/archived/*), Write(.correctless/artifacts/prune-report-*.md), Edit(.correctless/ARCHITECTURE.md), Edit(.correctless/antipatterns.md), Edit(.correctless/AGENT_CONTEXT.md), Edit(CLAUDE.md)
 ---
 
 # /cprune — Documentation and Artifact Pruning
@@ -24,7 +24,7 @@ Before starting, check for `.correctless/artifacts/cprune-lock-{slug}` (where sl
 
 ## Scanner
 
-The scanner script at `scripts/prune-scan.sh` (or `.correctless/scripts/prune-scan.sh` on installed projects) is the sole detection mechanism. It accepts `--category` and `--base` flags and outputs a JSON array of candidates.
+The scanner script at `scripts/prune-scan.sh` (or `.correctless/scripts/prune-scan.sh` on installed projects) is the sole detection mechanism. It accepts `--category` and `--base` flags and outputs JSON to stdout.
 
 Run the scanner for each category:
 ```bash
@@ -32,6 +32,48 @@ bash scripts/prune-scan.sh --category <category> --base .
 ```
 
 Categories (9 total): `architecture`, `antipatterns`, `claude-md`, `artifacts`, `deferred`, `counts`, `crossrefs`, `specs`, `driftdebt`
+
+### Scanner output schema (BND-001)
+
+For the `artifacts` category, the scanner emits a **wrapped object** (NOT a bare array). All other categories still emit a bare array. The skill must read `.candidates` from the wrapped object:
+
+```bash
+# Correct:
+bash scripts/prune-scan.sh --category artifacts --base . | jq -r '.candidates[]'
+
+# Wrong — would read the wrapper object as a candidate:
+bash scripts/prune-scan.sh --category artifacts --base . | jq -r '.[]'
+```
+
+Wrapped-object schema (`artifacts` only):
+```json
+{
+  "candidates": [...],
+  "skipped_unclassified": [{"pattern": "...", "count": N}],
+  "protection_set": {
+    "live_branches": [...],
+    "live_branch_slugs": [...],
+    "live_task_slugs": [...],
+    "live_session_ids": [...],
+    "source_workflow_state_files": [...]
+  },
+  "protection_status": {
+    "task_slug": "ok|fail-closed",
+    "reason": "no-workflow-state|incomplete-spec_file|parse-failure|null"
+  }
+}
+```
+
+Render the **Protection Set** section in the prune report from `.protection_set` (INV-017). When `protection_status.task_slug` is `fail-closed`, the report must include the reason and explain that no task-slug-named files were considered for pruning in this scan. Render skipped patterns from `.skipped_unclassified` (INV-007 — surfaces unclassified-pattern safety belt activations).
+
+**Baseline-update flag is interactive-only** (INV-011):
+The baseline manifest at `.correctless/meta/prune-pattern-baseline.json` is
+updated only by interactive mode after the human confirms newly-emitted
+`medium`-risk candidates have been reviewed. The autonomous code path below
+must never pass the baseline-update flag to `scripts/prune-scan.sh` regardless
+of the candidate set; the flag (its literal name redacted here so structural
+tests can assert the autonomous block does not invoke it) is reserved for the
+human-confirmed interactive flow.
 
 ## Archive Contract (ABS-038)
 

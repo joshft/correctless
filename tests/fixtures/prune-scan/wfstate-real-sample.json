@@ -1,0 +1,17 @@
+{
+  "_comment_source": "Derived from .correctless/artifacts/workflow-state-feature-prune-scan-slug-aware-matching-b64929.json at commit 82de3a5bb990e1b4b5d235ae29d860b47e1427ab. This is the AP-031 real-fixture for INV-004 task-slug derivation tests. Renamed away from workflow-state-*.json to avoid the workflow-gate.sh PreToolUse hook intercepting test fixture writes. Tests copy this file to a workflow-state-*.json filename inside a tmpdir before running the scanner. DO NOT edit without re-deriving from a real local workflow-state-feature-*.json artifact produced by scripts/wf/utility.sh.",
+  "phase": "tdd-tests",
+  "task": "prune-scan-slug-aware-matching",
+  "spec_file": ".correctless/specs/prune-scan-slug-aware.md",
+  "started_at": "2026-06-13T18:44:52Z",
+  "phase_entered_at": "2026-06-13T22:45:16Z",
+  "branch": "feature/prune-scan-slug-aware-matching",
+  "qa_rounds": 0,
+  "feature_intensity": "high",
+  "override": {
+    "active": false,
+    "remaining_calls": 0
+  },
+  "spec_hash": "584f6882519e962e9785cadea4778a56149184f03b5bc3311ee3b3df865e4562",
+  "spec_line_count": 390
+}
