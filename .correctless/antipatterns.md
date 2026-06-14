@@ -116,9 +116,15 @@ When a bug is found (pre-merge by QA, or post-merge by /cpostmortem):
 - **Frequency**: 1 finding in 1 feature (qa-audit-2026-04-12 R1)
 
 ### AP-020: Paired-array processing without cardinality assertion
-- **What went wrong**: `enforce_prh003` iterated over `[range($resp | length)]` instead of `[range($findings | length)]`. When the supervisor returned fewer decisions than findings, trailing security findings were silently dropped from output — no enforcement, no error.
+- **What went wrong**:
+  - **Instance 1 (qa-audit-2026-04-12 R1)**: `enforce_prh003` iterated over `[range($resp | length)]` instead of `[range($findings | length)]`. When the supervisor returned fewer decisions than findings, trailing security findings were silently dropped from output — no enforcement, no error.
+  - **Instance 2 (prune-scan-slug-aware, PMB-013, 2026-06-14)**: `scripts/prune-scan.sh` maintained two parallel arrays — `stale_workflow_state_files` and `stale_task_slugs` — that should stay in lockstep. The populate path at L866-867 pushed both together; three error-paths at L825/L833/L842 (fail-closed branches for no-workflow-state, parse-failure, incomplete-spec_file) reset only `stale_task_slugs=()`, leaving `stale_workflow_state_files` populated from prior loop iterations. The INV-018 atomic-group enforcement loop at L1143-1149 then indexed past end of `stale_task_slugs` with `set -u` triggering unbound-variable abort at runtime. The fixes were spread across F-001, F-002, and INV-004a rounds — no single diff scope covered all six related code sites simultaneously.
 - **How to catch it**: Any function that zips two arrays by index must validate they have the same length first. Iterate over the longer array and handle missing elements explicitly (hard_stop for security, accept for non-security). Spec rule: "Paired-array processing must assert equal lengths. Mismatched lengths are fail-closed for security elements."
-- **Frequency**: 1 finding in 1 feature (qa-audit-2026-04-12 R1)
+- **Class fix (2026-06-14, post-PMB-013)**: Two-part structural enforcement, mirroring AP-033's resolution model.
+  1. **Scanner rule** in `scripts/antipattern-scan.sh check_shell()`: detect any function declaring 2+ `local -a` arrays whose names share a prefix or suffix root AND are appended to in the same function AND are reset (`name=()`) in different code paths. Finding ID: `paired-array-no-cardinality`. Remediation: assert `${#a[@]} -eq ${#b[@]}` at consumer time, or refactor to a single associative array.
+  2. **/creview-spec Design Contract Checker** flags specs whose invariants describe "parallel arrays", "paired arrays", "lockstep", or "atomic group" semantics over array-of-X + array-of-Y without an enforcement clause for cardinality invariance.
+  3. Preferred refactor (when feasible): replace parallel arrays with a single associative array (`declare -A stale_pairs; stale_pairs[$filename]=$slug`). Single source of truth makes the bug class structurally impossible at that site.
+- **Frequency**: 2 findings in 2 features (qa-audit-2026-04-12 R1, prune-scan-slug-aware-matching 2026-06-14 PMB-013). 3rd instance → promote to PAT-xxx structural rule.
 
 ### AP-021: Lock mechanism creates coupled artifacts without consistent cleanup
 - **What went wrong**: cauto-lock.sh's R1 fix introduced a `.d` directory alongside the legacy lockfile for atomic locking, but `lock_check_stale` only cleaned the flat file, not the directory. Stale lock recovery was permanently broken — users had to manually delete the `.d` directory.
