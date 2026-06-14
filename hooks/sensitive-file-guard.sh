@@ -247,6 +247,9 @@ audit-record.sh
 scripts/autonomous-decision-writer.sh
 .correctless/scripts/autonomous-decision-writer.sh
 autonomous-decision-writer.sh
+scripts/prune-scan.sh
+.correctless/scripts/prune-scan.sh
+prune-scan.sh
 .correctless/ARCHITECTURE_DEPRECATED.md
 .correctless/antipatterns-archived.md
 .correctless/CLAUDE_LEARNINGS_ARCHIVED.md
