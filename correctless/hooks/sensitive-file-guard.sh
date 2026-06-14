@@ -236,6 +236,7 @@ id_ed25519.*
 .correctless/artifacts/autonomous-decisions-*.jsonl
 .correctless/meta/harness-fingerprint.json
 .correctless/meta/model-baselines.json
+.correctless/meta/prune-pattern-baseline.json
 scripts/harness-fingerprint.sh
 .correctless/scripts/harness-fingerprint.sh
 harness-fingerprint.sh

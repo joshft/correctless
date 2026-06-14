@@ -47,7 +47,7 @@ assert_json_valid() {
 assert_json_array_length() {
   local id="$1" desc="$2" expected="$3" json_str="$4"
   local actual
-  actual="$(echo "$json_str" | jq 'length' 2>/dev/null || echo "-1")"
+  actual="$(echo "$json_str" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null || echo "-1")"
   if [ "$expected" = "$actual" ]; then
     pass "$id" "$desc"
   else
@@ -58,7 +58,7 @@ assert_json_array_length() {
 assert_json_field_eq() {
   local id="$1" desc="$2" field="$3" expected="$4" json_str="$5"
   local actual
-  actual="$(echo "$json_str" | jq -r "$field" 2>/dev/null)"
+  actual="$(echo "$json_str" | jq -r "(if type == \"object\" and has(\"candidates\") then .candidates else . end) | $field" 2>/dev/null)"
   if [ "$expected" = "$actual" ]; then
     pass "$id" "$desc"
   else
@@ -68,7 +68,7 @@ assert_json_field_eq() {
 
 assert_json_field_exists() {
   local id="$1" desc="$2" field="$3" json_str="$4"
-  if echo "$json_str" | jq -e "$field" >/dev/null 2>&1; then
+  if echo "$json_str" | jq -e "(if type == \"object\" and has(\"candidates\") then .candidates else . end) | $field" >/dev/null 2>&1; then
     pass "$id" "$desc"
   else
     fail "$id" "$desc (field '$field' not found)"
@@ -136,7 +136,7 @@ cat > "$TMPDIR_002f/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 - **Test**: `tests/test-nonexistent.sh`
 ARCH_EOF
 result_002f="$(bash "$SCANNER" --category architecture --base "$TMPDIR_002f" 2>/dev/null)" || true
-if [ "$(echo "$result_002f" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_002f" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   # Check required fields on the first candidate
   assert_json_field_exists "INV-002-f1" "Candidate has 'id' field" '.[0].id' "$result_002f"
   assert_json_field_exists "INV-002-f2" "Candidate has 'category' field" '.[0].category' "$result_002f"
@@ -196,7 +196,7 @@ cat > "$TMPDIR_003/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 - **Test**: `tests/test-deleted.sh`
 ARCH_EOF
 result_003a="$(bash "$SCANNER" --category architecture --base "$TMPDIR_003" 2>/dev/null)" || true
-if [ "$(echo "$result_003a" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_003a" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   assert_json_field_eq "INV-003-a" "Dead entry is flagged with correct id" '.[0].id' "ABS-050" "$result_003a"
 else
   fail "INV-003-a" "Entry with all dead refs should be flagged as stale"
@@ -251,7 +251,7 @@ cat > "$TMPDIR_003d/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 - **Invariant**: Something
 ARCH_EOF
 result_003d="$(bash "$SCANNER" --category architecture --base "$TMPDIR_003d" 2>/dev/null)" || true
-if [ "$(echo "$result_003d" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_003d" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   pass "INV-003-d" "Backtick-quoted file paths are extracted and detected as dead"
 else
   fail "INV-003-d" "Scanner should extract backtick-quoted file paths"
@@ -272,9 +272,9 @@ cat > "$TMPDIR_003e/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 - **Violated when**: something
 ARCH_EOF
 result_003e="$(bash "$SCANNER" --category architecture --base "$TMPDIR_003e" 2>/dev/null)" || true
-if [ "$(echo "$result_003e" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_003e" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   # Verify dead_refs contains both files
-  local_dead="$(echo "$result_003e" | jq -r '.[0].dead_refs | length' 2>/dev/null)"
+  local_dead="$(echo "$result_003e" | jq -r '(if type == "object" and has("candidates") then .candidates else . end) | .[0].dead_refs | length' 2>/dev/null)"
   if [ "$local_dead" -ge 2 ]; then
     pass "INV-003-e" "Enforced at comma-separated paths are extracted"
   else
@@ -296,7 +296,7 @@ cat > "$TMPDIR_003f/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 See `path/to/nonexistent-rule.md`.
 ARCH_EOF
 result_003f="$(bash "$SCANNER" --category architecture --base "$TMPDIR_003f" 2>/dev/null)" || true
-if [ "$(echo "$result_003f" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_003f" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   pass "INV-003-f" "See-link paths in index-only entries are extracted"
 else
   fail "INV-003-f" "Scanner should detect dead See-link paths"
@@ -316,7 +316,7 @@ cat > "$TMPDIR_003g/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 - **Test**: `tests/test-nonexistent.sh`
 ARCH_EOF
 result_003g="$(bash "$SCANNER" --category architecture --base "$TMPDIR_003g" 2>/dev/null)" || true
-if [ "$(echo "$result_003g" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_003g" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   pass "INV-003-g" "Test field paths are extracted"
 else
   fail "INV-003-g" "Scanner should extract Test field paths"
@@ -392,7 +392,7 @@ cat > "$TMPDIR_003types/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 - **What**: References only deleted files at `scripts/nonexistent-env.sh`
 ARCH_EOF
 result_003types="$(bash "$SCANNER" --category architecture --base "$TMPDIR_003types" 2>/dev/null)" || true
-count_003types="$(echo "$result_003types" | jq 'length' 2>/dev/null || echo "0")"
+count_003types="$(echo "$result_003types" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null || echo "0")"
 if [ "$count_003types" -ge 3 ]; then
   pass "INV-003-types" "PAT, TB, ENV entry types are all detected"
 else
@@ -435,9 +435,9 @@ main_slug="$(cd "$TMPDIR_005" && source "$TMPDIR_005/scripts/lib.sh" && branch_s
 touch "$TMPDIR_005/.correctless/artifacts/workflow-state-${main_slug}.json"
 
 result_005="$(bash "$SCANNER" --category artifacts --base "$TMPDIR_005" 2>/dev/null)" || true
-if [ "$(echo "$result_005" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_005" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   # The orphaned artifact should be flagged
-  first_id="$(echo "$result_005" | jq -r '.[0].id' 2>/dev/null)"
+  first_id="$(echo "$result_005" | jq -r '(if type == "object" and has("candidates") then .candidates else . end) | .[0].id' 2>/dev/null)"
   if echo "$first_id" | grep -q "deleted-branch"; then
     pass "INV-005-a" "Artifact for deleted branch is flagged"
   else
@@ -448,7 +448,7 @@ else
 fi
 
 # The main artifact should NOT be flagged
-flagged_main="$(echo "$result_005" | jq -r '.[] | select(.id | test("main"))' 2>/dev/null)"
+flagged_main="$(echo "$result_005" | jq -r '(if type == "object" and has("candidates") then .candidates else . end) | .[] | select(.id | test("main"))' 2>/dev/null)"
 if [ -z "$flagged_main" ]; then
   pass "INV-005-b" "Artifact for existing branch (main) is NOT flagged"
 else
@@ -474,8 +474,11 @@ TMPDIR_005d="$(setup_fixture_dir)"
 git -C "$TMPDIR_005d" commit --allow-empty -m "init" -q 2>/dev/null
 touch "$TMPDIR_005d/.correctless/artifacts/workflow-state-feature-gone-bbbbbb.json"
 echo "main" > "$TMPDIR_005d/branches.txt"
+# Seed baseline file so scanner doesn't trigger first-run-after-upgrade gate (INV-011)
+mkdir -p "$TMPDIR_005d/.correctless/meta"
+echo '{"patterns": ["workflow-state-*.json"]}' > "$TMPDIR_005d/.correctless/meta/prune-pattern-baseline.json"
 result_005d="$(bash "$SCANNER" --category artifacts --base "$TMPDIR_005d" --branches-file "$TMPDIR_005d/branches.txt" 2>/dev/null)" || true
-if [ "$(echo "$result_005d" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_005d" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   assert_json_field_eq "INV-005-d" "Orphaned artifact is risk: low" '.[0].risk' "low" "$result_005d"
 else
   fail "INV-005-d" "Should flag orphaned artifact"
@@ -508,7 +511,7 @@ mkdir -p "$TMPDIR_006/skills/csetup"
 mkdir -p "$TMPDIR_006/skills/cspec"
 touch "$TMPDIR_006/agents/red.md"
 result_006="$(bash "$SCANNER" --category counts --base "$TMPDIR_006" 2>/dev/null)" || true
-count_006="$(echo "$result_006" | jq 'length' 2>/dev/null || echo "0")"
+count_006="$(echo "$result_006" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null || echo "0")"
 if [ "$count_006" -gt 0 ]; then
   pass "INV-006-a" "Mismatched counts are detected"
   assert_json_field_eq "INV-006-a2" "Count mismatch is risk: low" '.[0].risk' "low" "$result_006"
@@ -560,7 +563,7 @@ touch "$TMPDIR_006c/agents/red.md"
 touch "$TMPDIR_006c/agents/green.md"
 result_006c="$(bash "$SCANNER" --category counts --base "$TMPDIR_006c" 2>/dev/null)" || true
 # There should be mismatches detected (5 vs 3 tests, 5 vs 3 scripts, 5 vs 3 skills, 5 vs 2 agents)
-count_006c="$(echo "$result_006c" | jq 'length' 2>/dev/null || echo "0")"
+count_006c="$(echo "$result_006c" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null || echo "0")"
 if [ "$count_006c" -gt 0 ]; then
   pass "INV-006-c" "Detects mismatches even when count value appears multiple times in file"
 else
@@ -591,7 +594,7 @@ cat > "$TMPDIR_007/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 ARCH_EOF
 touch "$TMPDIR_007/tests/test-lib.sh"
 result_007="$(bash "$SCANNER" --category crossrefs --base "$TMPDIR_007" 2>/dev/null)" || true
-if [ "$(echo "$result_007" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_007" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   # Should be risk: medium (cross-ref update needed, not archiving)
   assert_json_field_eq "INV-007-a" "Stale cross-ref is risk: medium" '.[0].risk' "medium" "$result_007"
   pass "INV-007-a2" "Stale cross-references are detected"
@@ -635,7 +638,7 @@ cat > "$TMPDIR_008/CLAUDE.md" << 'CLAUDE_EOF'
 - Source: /cdocs after feature/deleted-feature
 CLAUDE_EOF
 result_008="$(bash "$SCANNER" --category claude-md --base "$TMPDIR_008" 2>/dev/null)" || true
-if [ "$(echo "$result_008" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_008" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   pass "INV-008-a" "Learning with all dead file refs is flagged"
   assert_json_field_eq "INV-008-a2" "CLAUDE.md learning is risk: high" '.[0].risk' "high" "$result_008"
 else
@@ -707,7 +710,7 @@ cat > "$TMPDIR_008f/CLAUDE.md" << 'CLAUDE_EOF'
 - Source: /cdocs
 CLAUDE_EOF
 result_008f="$(bash "$SCANNER" --category claude-md --base "$TMPDIR_008f" 2>/dev/null)" || true
-if [ "$(echo "$result_008f" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_008f" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   pass "INV-008-f" "Body text 'always'/'never' does NOT make entry class-level"
 else
   fail "INV-008-f" "Instance-level entry with 'always'/'All' in body should still be flagged"
@@ -735,7 +738,7 @@ GIT_COMMITTER_DATE="2026-03-01T00:00:00Z" git -C "$TMPDIR_009" commit --allow-em
 # feature/old-feature is NOT in the branches file (merged and deleted)
 echo "main" > "$TMPDIR_009/branches.txt"
 result_009="$(bash "$SCANNER" --category specs --base "$TMPDIR_009" --branches-file "$TMPDIR_009/branches.txt" 2>/dev/null)" || true
-if [ "$(echo "$result_009" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_009" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   pass "INV-009-a" "Spec for merged branch 30+ days ago is flagged"
 else
   fail "INV-009-a" "Spec with merged branch 30+ days ago should be a candidate"
@@ -797,7 +800,7 @@ DEF_EOF
 # Create the existing source file for DF-002
 touch "$TMPDIR_010/.correctless/artifacts/review-spec-findings-existing.md"
 result_010="$(bash "$SCANNER" --category deferred --base "$TMPDIR_010" 2>/dev/null)" || true
-if [ "$(echo "$result_010" | jq 'length' 2>/dev/null)" -eq 1 ]; then
+if [ "$(echo "$result_010" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -eq 1 ]; then
   assert_json_field_eq "INV-010-a" "Dead source_file finding is flagged" '.[0].id' "DF-001" "$result_010"
   pass "INV-010-a2" "Only findings with dead source_file are flagged"
 else
@@ -835,7 +838,7 @@ cat > "$TMPDIR_010c/.correctless/meta/deferred-findings.json" << 'DEF_EOF'
 ]}
 DEF_EOF
 result_010c="$(bash "$SCANNER" --category deferred --base "$TMPDIR_010c" 2>/dev/null)" || true
-if [ "$(echo "$result_010c" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_010c" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   assert_json_field_eq "INV-010-c" "Deferred finding is risk: medium" '.[0].risk' "medium" "$result_010c"
 else
   fail "INV-010-c" "Should flag stale deferred finding"
@@ -859,7 +862,7 @@ cat > "$TMPDIR_011/.correctless/antipatterns.md" << 'AP_EOF'
 - **Frequency**: 1 finding in deleted-feature
 AP_EOF
 result_011="$(bash "$SCANNER" --category antipatterns --base "$TMPDIR_011" 2>/dev/null)" || true
-if [ "$(echo "$result_011" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_011" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   pass "INV-011-a" "Instance-level AP with all dead refs is flagged"
 else
   fail "INV-011-a" "Instance-level AP with all dead refs should be flagged"
@@ -906,7 +909,7 @@ cat > "$TMPDIR_011c/.correctless/antipatterns.md" << 'AP_EOF'
 - **Frequency**: 1
 AP_EOF
 result_011c="$(bash "$SCANNER" --category antipatterns --base "$TMPDIR_011c" 2>/dev/null)" || true
-if [ "$(echo "$result_011c" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_011c" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   pass "INV-011-c" "Body text 'All' does NOT prevent flagging of instance-level AP"
 else
   fail "INV-011-c" "Instance-level AP with 'All' in body should still be flagged when refs are dead"
@@ -1005,7 +1008,7 @@ cat > "$TMPDIR_014/.correctless/meta/drift-debt.json" << 'DRIFT_EOF'
 ]}
 DRIFT_EOF
 result_014="$(bash "$SCANNER" --category driftdebt --base "$TMPDIR_014" 2>/dev/null)" || true
-if [ "$(echo "$result_014" | jq 'length' 2>/dev/null)" -eq 1 ]; then
+if [ "$(echo "$result_014" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -eq 1 ]; then
   assert_json_field_eq "INV-014-a" "Resolved drift debt >90 days is flagged" '.[0].id' "DD-001" "$result_014"
   pass "INV-014-a2" "Open drift debt is NOT flagged"
 else
@@ -1028,7 +1031,7 @@ cat > "$TMPDIR_014b/.correctless/meta/drift-debt.json" << 'DRIFT_EOF'
 ]}
 DRIFT_EOF
 result_014b="$(bash "$SCANNER" --category driftdebt --base "$TMPDIR_014b" 2>/dev/null)" || true
-if [ "$(echo "$result_014b" | jq 'length' 2>/dev/null)" -gt 0 ]; then
+if [ "$(echo "$result_014b" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
   pass "INV-014-b" "wont-fix drift debt >90 days is flagged"
 else
   fail "INV-014-b" "wont-fix drift debt >90 days should be flagged"
@@ -1310,8 +1313,8 @@ cat > "$TMPDIR_BND002/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 - **Enforced at**: `scripts/deleted3.sh`
 ARCH_EOF
 result_bnd002="$(bash "$SCANNER" --category architecture --base "$TMPDIR_BND002" 2>/dev/null)" || true
-if [ "$(echo "$result_bnd002" | jq 'length' 2>/dev/null)" -gt 0 ]; then
-  bulk_val="$(echo "$result_bnd002" | jq -r '.[0].bulk_warning' 2>/dev/null)"
+if [ "$(echo "$result_bnd002" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
+  bulk_val="$(echo "$result_bnd002" | jq -r '(if type == "object" and has("candidates") then .candidates else . end) | .[0].bulk_warning' 2>/dev/null)"
   if [ "$bulk_val" = "true" ]; then
     pass "BND-002-a" "bulk_warning is true when >50% of entries are candidates"
   else
@@ -1349,8 +1352,8 @@ cat > "$TMPDIR_BND002b/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
 - **Enforced at**: `scripts/deleted.sh`
 ARCH_EOF
 result_bnd002b="$(bash "$SCANNER" --category architecture --base "$TMPDIR_BND002b" 2>/dev/null)" || true
-if [ "$(echo "$result_bnd002b" | jq 'length' 2>/dev/null)" -gt 0 ]; then
-  bulk_val_b="$(echo "$result_bnd002b" | jq -r '.[0].bulk_warning' 2>/dev/null)"
+if [ "$(echo "$result_bnd002b" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
+  bulk_val_b="$(echo "$result_bnd002b" | jq -r '(if type == "object" and has("candidates") then .candidates else . end) | .[0].bulk_warning' 2>/dev/null)"
   if [ "$bulk_val_b" = "false" ]; then
     pass "BND-002-b" "bulk_warning is false when <50% of entries are candidates"
   else
