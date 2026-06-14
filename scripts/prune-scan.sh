@@ -1143,7 +1143,11 @@ scan_artifacts() {
     local _i _j _n=${#stale_workflow_state_files[@]}
     for ((_i=0; _i<_n; _i++)); do
       local _stale_ws="${stale_workflow_state_files[$_i]}"
-      local _stale_ts="${stale_task_slugs[$_i]}"
+      # Arrays may diverge when workflow-state files lack .spec_file (older schema):
+      # stale_workflow_state_files has the file, stale_task_slugs has no entry.
+      # Skip atomic-group enforcement for files without derivable task slugs.
+      local _stale_ts="${stale_task_slugs[$_i]:-}"
+      [ -z "$_stale_ts" ] && continue
 
       # ws-candidate present? Match by exact id equality on the branch-slug entry.
       local _ws_present=false
