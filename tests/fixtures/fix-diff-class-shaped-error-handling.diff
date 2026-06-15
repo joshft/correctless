@@ -1,0 +1,40 @@
+# Provenance: synthetic fixture for INV-013 prompt-composition layer
+# Class shape: single-site error handling addition (2>/dev/null) at one of several sibling
+#              error sites. Classic scope-narrowed instance fix — one rm gets the redirect, four
+#              sibling rm/cp/mv calls in the same script do not.
+# Adversarial marker test cases (for INV-016 marker-validity contract):
+#   - Round-added marker in +line at the end.
+#   - Pre-existing marker in context line.
+#   - Malformed marker (missing rationale prose after the separator).
+#   - Marker-in-string-literal via printf "...SIBLING-DEFERRED: ...".
+
+diff --git a/scripts/cleaner.sh b/scripts/cleaner.sh
+index 3333333..4444444 100644
+--- a/scripts/cleaner.sh
++++ b/scripts/cleaner.sh
+@@ -5,15 +5,15 @@
+ cleanup() {
+   # Pre-existing marker (in a context line, NOT a + line) — must FULLY suppress
+   # SIBLING-DEFERRED: scripts/cleaner.sh:42 — final rm path is part of the legacy cleanup flow tracked in #789 with rollback plan attached
+-  rm /tmp/foo
++  rm /tmp/foo 2>/dev/null
+   rm /tmp/bar
+   cp /tmp/baz /backup/baz
+   mv /tmp/qux /archive/qux
+   rm /tmp/spam
+ }
+
+-# A malformed marker missing the rationale (must be rejected for the malformed shape):
+-# SIBLING-DEFERRED: scripts/cleaner.sh:9 —
++# A malformed marker missing the rationale (must be rejected for the malformed shape):
++# SIBLING-DEFERRED: scripts/cleaner.sh:9 — TODO
+
+ # Marker laundered into a string literal (must be rejected by INV-016a):
+ announce() { printf "SIBLING-DEFERRED: scripts/cleaner.sh:42 — string-literal bypass attempt"; }
+@@ -28,3 +28,6 @@ rollback() {
+   mv /var/lib/old /var/lib/archive
+ }
+
++# Round-added marker in this commit (must downgrade to MEDIUM per INV-016c):
++# SIBLING-DEFERRED: scripts/cleaner.sh:7 — broader audit pass to add error redirects across all paths scheduled in follow-up #1234 with rollback documentation
++

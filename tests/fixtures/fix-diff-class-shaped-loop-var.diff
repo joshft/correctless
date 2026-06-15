@@ -1,0 +1,38 @@
+# Provenance: synthetic fixture for INV-013 prompt-composition layer
+# Class shape: loop-variable capture in Go closures (https://go.dev/doc/faq#closures_and_goroutines)
+#              — single-site fix at one for-loop, leaves multiple sibling loops in same file with
+#              identical defect. The class-shaped lens MUST recognize this as a scope-narrowed
+#              instance fix and flag unaddressed siblings.
+# Adversarial marker test cases (for INV-016 marker-validity contract):
+#   - Round-added marker (in +line): present at the END of this fixture as a "+# SIBLING-DEFERRED:" line
+#     to exercise the INV-016c round-added downgrade rule (severity → MEDIUM, finding still emitted).
+#   - Pre-existing marker: present in a context line (no leading + or -) to exercise the
+#     full-suppression case for siblings the marker covers.
+#   - Malformed marker: a "SIBLING-DEFERRED " line without the required colon — must be REJECTED.
+#   - Marker-in-string-literal: a fmt.Sprintf("SIBLING-DEFERRED: lib.go:5 — bypass") line —
+#     this is a string literal inside printf, NOT a syntactic comment — must be REJECTED.
+
+diff --git a/scripts/looper.go b/scripts/looper.go
+index 1111111..2222222 100644
+--- a/scripts/looper.go
++++ b/scripts/looper.go
+@@ -10,7 +10,9 @@ func processAll(items []string) {
+ 	// Pre-existing marker for tasks[0..2] only:
+ 	// SIBLING-DEFERRED: scripts/looper.go:42 — broader migration to range-with-value lands in PR #999 with team sign-off after staging soak
+ 	for i, t := range tasks {
+-		go func() { handle(t) }()
++		t := t
++		go func() { handle(t) }()
+ 	}
+
+ 	for i, item := range items {
+@@ -27,3 +29,9 @@ func processAll(items []string) {
+ 		go func() { worker(item) }()
+ 	}
+ }
++
++// Note: a malformed marker (no colon, must be rejected): SIBLING-DEFERRED scripts/looper.go:99 — see notes
++// A marker hidden in a string literal (must be rejected as a carve-out signal):
++func bypass() { fmt.Sprintf("SIBLING-DEFERRED: scripts/looper.go:99 — laundered through string literal") }
++
++// SIBLING-DEFERRED: scripts/looper.go:33 — round-added marker added in the same commit as the scope-narrowed fix; the broader migration to range-with-value lands separately (autonomous downgrade applies)

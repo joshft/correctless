@@ -261,6 +261,80 @@ the enumeration yields zero rule bodies and the fix-diff reviewer receives
 just the fenced diff — this is expected graceful degradation, not a failure
 (BND-005). No matching rule for a diff is a valid outcome.
 
+**Step 4b — Emit the per-round finding-description fence (class-shaped lens refinement input).**
+
+After the rules fences and BEFORE the diff fence, emit a new fenced
+section `<UNTRUSTED_FINDING_DESCRIPTION source="round-N-findings">`
+carrying the round's specialist-finding list in canonical JSON-array
+form. The reviewer agent's class-shaped bug detection lens uses this as
+its **refinement signal**; the diff content is the primary signal and
+the lens degrades gracefully when this fence is absent (PAT-019).
+
+Source of truth: the round's audit-findings artifact at
+`.correctless/artifacts/findings/{preset}/audit-{preset}-{started_at}-round-{N}.json`
+(ABS-029 sole-writer contract). The orchestrator MAY use an in-memory
+binding as the primary source when /caudit Step 1 already bound the
+list at Step 6a invocation time — the on-disk read at the ABS-029 path
+is the deterministic fallback. If neither is available, OMIT the
+fence entirely; do not emit an empty fence.
+
+Payload schema — each entry has exactly two fields:
+
+```
+<UNTRUSTED_FINDING_DESCRIPTION source="round-1-findings">
+[
+  {"id":"HACK-003","description":"<finding description text>"},
+  {"id":"QA-R1-007","description":"<finding description text>"}
+]
+</UNTRUSTED_FINDING_DESCRIPTION>
+```
+
+The `id` field is the upstream specialist-finding ID (whatever the
+producing preset assigns — `HACK-`, `QA-R1-`, `PERF-`, `AUDIT-`, etc.).
+The reviewer's OWN output uses the `FD-NNN` prefix per the existing
+JSON output contract — input fence and output array are different ID
+spaces. Do not conflate.
+
+**Ordering.** Findings are ordered by ascending `id` using a
+deterministic byte-order comparator (lexicographic on the UTF-8 `id`
+string). Mixed prefixes sort by their byte sequences.
+
+**Filtering and omission.**
+
+- Findings with null, empty, or whitespace-only `description` are
+  OMITTED from the array.
+- Duplicate `id` values are deduplicated keeping the first occurrence.
+- When the array would be empty after filtering, the ENTIRE fence is
+  omitted (no empty fence emission).
+
+**Size caps — single emitted-bytes measurement model.** Cap is
+enforced on the bytes actually emitted into the prompt text, including
+JSON escaping, object syntax, commas, brackets, and any truncation
+markers. There is ONE measurement surface; do not measure the raw
+description separately and escape after.
+
+- **Per-entry cap: 4096 emitted bytes.** Build the candidate emitted
+  object, measure UTF-8 byte length of the emitted form. If ≤ 4096,
+  keep. If > 4096, drop one codepoint from the END of the description
+  (do not split multi-byte UTF-8 sequences; do not leave a partial
+  JSON escape sequence), append `[truncated: N more bytes]` where N is
+  the count of dropped raw-description bytes, re-escape, re-format,
+  re-measure. Loop until ≤ 4096. The loop terminates because each
+  iteration strictly reduces description length.
+- **Aggregate cap: 16384 emitted bytes.** Build the emitted array.
+  Measure UTF-8 bytes. If > 16384, compute per-entry proportional
+  shares based on current emitted byte length, re-truncate each
+  entry's description to fit its share using the per-entry algorithm,
+  rebuild the array, re-measure. Repeat at most 3 passes. If still
+  over after 3 passes (adversarial escape-byte distribution), drop the
+  smallest-emitted-bytes entry from the array and retry the loop. The
+  fence is NEVER omitted just for being large — only when the array
+  would be empty per the omission rule above.
+
+The model in one sentence: build the emitted text, measure UTF-8
+bytes, truncate until the measurement is at or under cap. The cap
+applies to the emitted text only.
+
 Then the diff itself is wrapped in an `<UNTRUSTED_DIFF>` fence:
 
 ```

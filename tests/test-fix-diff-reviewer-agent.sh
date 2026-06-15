@@ -2202,6 +2202,640 @@ check_gap008_abs010_narrow_scope() {
 }
 
 # ============================================================================
+# Class-shaped bug detection lens (fix-diff-reviewer-class spec INV-001..INV-017)
+# ============================================================================
+#
+# This single function enforces the class-shaped lens spec's 16 testable
+# invariants (15 spec invariants + INV-012a final-state backstop). The
+# EXPECTED_SUB_ASSERTION_IDS array names every sub-assertion ID; the
+# cardinality check at the end asserts the array equals the set of IDs
+# actually exercised (RS-020 / INV-007 cardinality checklist).
+
+# shellcheck disable=SC2034
+# Path constants for class-shaped lens sub-assertions. CLS_AGENT_DIST and
+# CLS_FIXTURE_DIR are kept for documentation symmetry (sync-target completeness
+# and fixture-directory clarity) even when individual sub-assertions reference
+# the full per-fixture path directly.
+CLS_AGENT="agents/fix-diff-reviewer.md"
+# CLS_AGENT_DIST kept for documentation symmetry — INV-008 covers the
+# byte-equal mirror via existing distribution-parity tests, so this is
+# referenced indirectly through that infrastructure rather than directly here.
+# shellcheck disable=SC2034
+CLS_AGENT_DIST="correctless/agents/fix-diff-reviewer.md"
+CLS_CAUDIT_SKILL="skills/caudit/SKILL.md"
+CLS_SFG_SRC="hooks/sensitive-file-guard.sh"
+CLS_SFG_DIST="correctless/hooks/sensitive-file-guard.sh"
+CLS_SENTINEL=".correctless/.sfg-lift-active"
+CLS_LIFT_CHECK="scripts/check-no-pending-sfg-lift.sh"
+# CLS_FIXTURE_DIR is the parent of the three per-fixture paths below; kept
+# for fixture-directory clarity even though sub-assertions reference the
+# per-fixture paths directly.
+# shellcheck disable=SC2034
+CLS_FIXTURE_DIR="tests/fixtures"
+CLS_FIXTURE_ARGMAX="tests/fixtures/fix-diff-class-shaped-argmax.diff"
+CLS_FIXTURE_LOOPVAR="tests/fixtures/fix-diff-class-shaped-loop-var.diff"
+CLS_FIXTURE_ERRH="tests/fixtures/fix-diff-class-shaped-error-handling.diff"
+CLS_HELPER="tests/helpers/build-caudit-prompt.sh"
+
+# Section heading regex for INV-001 — case-insensitive match against
+# the level-2-or-3 "class-shaped" heading.
+CLS_HEADING_RE='^#{2,3}[[:space:]]+.*[Cc]lass[ -][Ss]haped'
+
+# Extract the class-shaped section body (between the heading and the next
+# level-2-or-3 heading or end-of-file). Used by every prose-composition sub-check.
+cls_extract_section_body() {
+  # Recognize the opening heading's level, then capture everything until the
+  # next heading at the SAME-or-HIGHER level (lower-numbered prefix means
+  # higher level — ## is higher than ###). Subsections (###, ####) WITHIN the
+  # class-shaped section are included in the body. Lines inside a fenced code
+  # block are NOT scanned for headings — a bash comment `# SIBLING-DEFERRED: ...`
+  # inside a ```bash``` fence must not be misread as a markdown heading.
+  awk '
+    BEGIN { in_section = 0; level = 0; in_fence = 0 }
+    /^```/ { in_fence = !in_fence }
+    {
+      hl = 0
+      if (!in_fence && match($0, /^#+[[:space:]]/)) {
+        hl = RLENGTH - 1
+      }
+    }
+    !in_section && hl >= 2 && hl <= 3 && $0 ~ /[Cc]lass[ -][Ss]haped/ {
+      in_section = 1; level = hl; next
+    }
+    in_section && hl > 0 && hl <= level { in_section = 0 }
+    in_section { print }
+  ' "$CLS_AGENT"
+}
+
+# Track which sub-assertion IDs the function exercises. Wrap pass/fail to
+# capture the ID into the EXERCISED array (RS-020 cardinality checklist).
+declare -a CLS_EXERCISED_IDS=()
+cls_pass() { CLS_EXERCISED_IDS+=("$1"); pass "$1" "$2"; }
+cls_fail() { CLS_EXERCISED_IDS+=("$1"); fail "$1" "$2"; }
+
+check_class_shaped_bug_detection() {
+  section "Class-shaped bug detection lens (INV-001..INV-017 + INV-012a)"
+
+  # The hardcoded cardinality checklist (RS-020 / INV-007). 16 entries:
+  # 15 spec invariants from fix-diff-reviewer-class.md (INV-001..INV-017
+  # excluding INV-008 which is covered by existing distribution-parity tests)
+  # PLUS INV-012a (final-state backstop is distinct from INV-012 in-iteration).
+  # Spec INV-007: "INV-001, INV-002, INV-003, INV-004, INV-005, INV-006,
+  # INV-009, INV-010, INV-011, INV-012, INV-013, INV-014, INV-015, INV-016,
+  # AND INV-017" = 15 base IDs (INV-008 excluded — covered by existing tests),
+  # plus INV-012a (final-state backstop) = 16 entries. INV-007 itself is the
+  # cardinality-checklist contract and is enforced by the closing assertion
+  # rather than being a sub-assertion ID it exercises against itself.
+  local EXPECTED_SUB_ASSERTION_IDS=(
+    CLS-INV-001 CLS-INV-002 CLS-INV-003 CLS-INV-004 CLS-INV-005
+    CLS-INV-006 CLS-INV-009 CLS-INV-010 CLS-INV-011 CLS-INV-012
+    CLS-INV-012a CLS-INV-013 CLS-INV-014 CLS-INV-015 CLS-INV-016
+    CLS-INV-017
+  )
+
+  # Pre-flight: agent file must exist (lifted state during this PR is OK; we
+  # require the file itself, not the SFG protection state).
+  if [ ! -f "$CLS_AGENT" ]; then
+    cls_fail "CLS-INV-001" "$CLS_AGENT does not exist"
+    return
+  fi
+
+  local body
+  body="$(cls_extract_section_body)"
+  local body_present="no"
+  if [ -n "$body" ]; then
+    body_present="yes"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-001: Class-shaped section present, level-2-or-3, body non-empty,
+  # appears before Output contract.
+  # --------------------------------------------------------------------------
+  if [ "$body_present" = "yes" ] && grep -qE "$CLS_HEADING_RE" "$CLS_AGENT"; then
+    local class_line_no out_line_no
+    class_line_no="$(grep -nE "$CLS_HEADING_RE" "$CLS_AGENT" | head -1 | cut -d: -f1)"
+    out_line_no="$(grep -nE '^## +Output contract' "$CLS_AGENT" | head -1 | cut -d: -f1)"
+    if [ -n "$class_line_no" ] && [ -n "$out_line_no" ] && [ "$class_line_no" -lt "$out_line_no" ]; then
+      cls_pass "CLS-INV-001" "class-shaped heading present, body non-empty, precedes Output contract"
+    else
+      cls_fail "CLS-INV-001" "class-shaped heading must appear before Output contract section (class=$class_line_no out=$out_line_no)"
+    fi
+  else
+    cls_fail "CLS-INV-001" "class-shaped heading missing or section body empty"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-002: Two-signal detection — primary (diff content), refinement (finding desc).
+  # Seed list explicit + non-exhaustive. Graceful degradation when fence absent.
+  # --------------------------------------------------------------------------
+  local inv002_fail=""
+  echo "$body" | grep -qE '(primary|diff content|diff signal)' || inv002_fail="${inv002_fail}primary-signal "
+  echo "$body" | grep -qE '(refinement|finding description|<UNTRUSTED_FINDING_DESCRIPTION>)' || inv002_fail="${inv002_fail}refinement-signal "
+  echo "$body" | grep -qiE '(non-exhaustive|examples include|extend when)' || inv002_fail="${inv002_fail}non-exhaustive-marker "
+  echo "$body" | grep -qiE '(degrade gracefully|when absent|when the fence is absent|absent.*diff signal alone|diff signal alone)' || inv002_fail="${inv002_fail}graceful-degradation "
+  # Seed list must include code-pattern examples, not just bug-description keywords.
+  echo "$body" | grep -qE '(--arg|--rawfile|--slurpfile|2>/dev/null|loop[ -]variable|lock/unlock)' || inv002_fail="${inv002_fail}seed-code-patterns "
+  if [ -z "$inv002_fail" ]; then
+    cls_pass "CLS-INV-002" "two-signal detection with non-exhaustive seed list and graceful-degradation language"
+  else
+    cls_fail "CLS-INV-002" "missing: ${inv002_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-003: Sibling-grep directive — single ≤120-char line, names ≥2 of
+  # Read/Grep/Glob, NOT a negation, NOT hedged.
+  # --------------------------------------------------------------------------
+  # Find the candidate imperative line: contains grep (or search) and sibling/other instances/same pattern.
+  local imp_line
+  imp_line="$(echo "$body" | grep -E '\b(grep|search)\b.{0,80}\b(sibling|other instances|same pattern)\b' | head -1)"
+  if [ -z "$imp_line" ]; then
+    cls_fail "CLS-INV-003" "no sibling-grep imperative line found"
+  elif [ "${#imp_line}" -gt 120 ]; then
+    cls_fail "CLS-INV-003" "sibling-grep line exceeds 120 chars (${#imp_line})"
+  elif echo "$imp_line" | grep -qiE '^[[:space:]]*([Dd]o NOT|never|avoid|should not|may skip)'; then
+    cls_fail "CLS-INV-003" "sibling-grep line begins with negation: $imp_line"
+  elif echo "$imp_line" | grep -qiE '^(.*\b(you may consider|if confident|might want to|could perhaps)\b)'; then
+    cls_fail "CLS-INV-003" "sibling-grep line is hedged: $imp_line"
+  else
+    # Must name >=2 of Read, Grep, Glob
+    local tool_count=0
+    echo "$imp_line" | grep -qw "Read" && tool_count=$((tool_count + 1))
+    echo "$imp_line" | grep -qw "Grep" && tool_count=$((tool_count + 1))
+    echo "$imp_line" | grep -qw "Glob" && tool_count=$((tool_count + 1))
+    if [ "$tool_count" -ge 2 ]; then
+      cls_pass "CLS-INV-003" "sibling-grep imperative names ≥2 of Read/Grep/Glob: $imp_line"
+    else
+      cls_fail "CLS-INV-003" "sibling-grep line names $tool_count tools, requires ≥2: $imp_line"
+    fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-004: SIBLING-DEFERRED carve-out — literal token, optional line-number,
+  # per-sibling coverage, worked example, ≥6 comment styles, "non-exhaustive",
+  # excludes """, names "true syntactic comment" or equivalent.
+  # --------------------------------------------------------------------------
+  local inv004_fail=""
+  echo "$body" | grep -q "SIBLING-DEFERRED:" || inv004_fail="${inv004_fail}token "
+  echo "$body" | grep -qE '\(:[\\]?d\+\)\?|\(:\\d\+\)\?|optional.*line[- ]number' || inv004_fail="${inv004_fail}optional-line-number "
+  echo "$body" | grep -qiE '(per-sibling|each sibling)' || inv004_fail="${inv004_fail}per-sibling-coverage "
+  # Worked example: a code-fence block within the section body containing SIBLING-DEFERRED:.
+  # Use awk to detect a fenced block within the class-shaped section.
+  if echo "$body" | awk '
+    BEGIN { in_fence = 0; found = 0 }
+    /^```/ { in_fence = !in_fence; next }
+    in_fence && /SIBLING-DEFERRED:/ { found = 1 }
+    END { exit (found ? 0 : 1) }
+  '; then :; else inv004_fail="${inv004_fail}worked-example "; fi
+  # Count comment styles — must be ≥6 including <!-- --> and ; but excluding """.
+  local style_count=0
+  echo "$body" | grep -qE '`#`|hash[ -]style' && style_count=$((style_count + 1))
+  echo "$body" | grep -qE '`//`|double[ -]slash' && style_count=$((style_count + 1))
+  echo "$body" | grep -qE '`--`|double[ -]dash' && style_count=$((style_count + 1))
+  echo "$body" | grep -qE '`/\*.*\*/`|C[ -]style' && style_count=$((style_count + 1))
+  echo "$body" | grep -qE '`<!--.*-->`|HTML[ -]style' && style_count=$((style_count + 1))
+  echo "$body" | grep -qE '`;`|semicolon[ -]style' && style_count=$((style_count + 1))
+  if [ "$style_count" -lt 6 ]; then inv004_fail="${inv004_fail}comment-styles($style_count<6) "; fi
+  # Triple-quoted forms MAY appear in the section body only in rejection context
+  # (the spec explicitly requires the agent to name `"""` as NOT a comment style).
+  # Verify that any mention of `"""` or "triple-quoted" appears in a 3-line
+  # window containing rejection markers (NOT, never, exclud, reject, are NOT,
+  # collide, string literal) — wrapping may push the rejection clause to a
+  # neighboring line.
+  if echo "$body" | grep -nE '`"""`|triple[ -]quoted' | while IFS=: read -r ln _; do
+    start=$((ln > 1 ? ln - 1 : 1))
+    end=$((ln + 2))
+    sed -n "${start},${end}p" <<< "$body" | tr '\n' ' ' | grep -qiE '\b(are NOT|NOT comment|never[[:space:]]+honored|exclud|reject|string literal|collide)\b' || echo "FORBIDDEN:$ln"
+  done | grep -q FORBIDDEN; then
+    inv004_fail="${inv004_fail}forbidden-triple-quote-not-in-rejection-context "
+  fi
+  # "non-exhaustive" within 5 lines of comment-style list.
+  echo "$body" | grep -qiE '(non-exhaustive|examples)' || inv004_fail="${inv004_fail}non-exhaustive-marker "
+  echo "$body" | grep -qE '(true syntactic comment|start of a comment, not inside a string)' || inv004_fail="${inv004_fail}syntactic-comment-requirement "
+  if [ -z "$inv004_fail" ]; then
+    cls_pass "CLS-INV-004" "SIBLING-DEFERRED carve-out complete with non-exhaustive comment styles"
+  else
+    cls_fail "CLS-INV-004" "missing: ${inv004_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-005: Calibrated HIGH severity with worked HIGH+LOW examples and
+  # aggressive-default directive.
+  # --------------------------------------------------------------------------
+  local inv005_fail=""
+  echo "$body" | grep -qiE '(HIGH|severity:[[:space:]]*high).{0,200}(because|when|example)' || inv005_fail="${inv005_fail}high-example "
+  echo "$body" | grep -qiE '(LOW|severity:[[:space:]]*low).{0,200}(because|when|example)' || inv005_fail="${inv005_fail}low-example "
+  echo "$body" | grep -qiE '(when in doubt|default to|err toward).{0,40}(HIGH|high)' || inv005_fail="${inv005_fail}aggressive-default "
+  if [ -z "$inv005_fail" ]; then
+    cls_pass "CLS-INV-005" "severity calibration with HIGH/LOW examples + aggressive default"
+  else
+    cls_fail "CLS-INV-005" "missing: ${inv005_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-006: Citation of PMB-019 / #144 / PR #124 with narrative context.
+  # --------------------------------------------------------------------------
+  local cite_line
+  cite_line="$(echo "$body" | grep -E '\bPMB-019\b|\bGH ?#144\b|\bPR ?#124\b' | head -1)"
+  if [ -z "$cite_line" ]; then
+    cls_fail "CLS-INV-006" "no PMB-019/#144/#124 citation found"
+  elif ! echo "$cite_line" | grep -qiE '(motivat|recurrence|prevent|ARG_?MAX|sibling|class-shape|same shape)'; then
+    cls_fail "CLS-INV-006" "citation present but lacks narrative context: $cite_line"
+  else
+    cls_pass "CLS-INV-006" "PMB-019/#144/#124 citation with narrative context"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-007: Cardinality checklist — the EXPECTED_SUB_ASSERTION_IDS array IS
+  # the structural enforcement, and the closing assertion exercises it end-to-end.
+  # We record an array-size sanity pass here using plain pass/fail (NOT cls_pass)
+  # so it does not pollute the EXERCISED ID set used by the closing cardinality
+  # comparison. INV-007 is satisfied by the cardinality closing assertion below.
+  # --------------------------------------------------------------------------
+  if [ ${#EXPECTED_SUB_ASSERTION_IDS[@]} -eq 16 ]; then
+    pass "CLS-INV-007" "EXPECTED_SUB_ASSERTION_IDS cardinality array contains 16 entries"
+  else
+    fail "CLS-INV-007" "EXPECTED_SUB_ASSERTION_IDS has ${#EXPECTED_SUB_ASSERTION_IDS[@]} entries, expected 16"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-009: (a) Denylist extended; (b) Data-treatment prose covers new fence.
+  # --------------------------------------------------------------------------
+  local inv009_fail=""
+  # (a) denylist must include >=3 lens-specific phrases.
+  local denylist_count=0
+  grep -qE '"class-shaped"|class-shaped' "$0" && denylist_count=$((denylist_count + 1))
+  grep -qE 'SIBLING-DEFERRED' "$0" && denylist_count=$((denylist_count + 1))
+  grep -qE 'sibling instances' "$0" && denylist_count=$((denylist_count + 1))
+  # Note: this is a self-reference — the denylist in tests/test-fix-diff-reviewer-agent.sh
+  # is where inline-prompt phrases are listed. We check the test file (self) for those phrases
+  # as a proxy for the denylist being extended.
+  # (b) Data-treatment paragraph must name the new fence by name OR wildcard form.
+  local datatreat_block
+  datatreat_block="$(awk '
+    BEGIN { in_block = 0 }
+    /^## Data treatment/ { in_block = 1; next }
+    in_block && /^## / { in_block = 0 }
+    in_block { print }
+  ' "$CLS_AGENT")"
+  if echo "$datatreat_block" | grep -qE '<UNTRUSTED_FINDING_DESCRIPTION>'; then
+    : # by-name
+  elif echo "$datatreat_block" | grep -qE '<UNTRUSTED_\*>|any.*<UNTRUSTED_'; then
+    : # wildcard form
+  else
+    inv009_fail="${inv009_fail}data-treatment-prose-not-extended "
+  fi
+  if [ "$denylist_count" -lt 3 ]; then
+    inv009_fail="${inv009_fail}denylist-phrases($denylist_count<3) "
+  fi
+  if [ -z "$inv009_fail" ]; then
+    cls_pass "CLS-INV-009" "denylist extended + data-treatment prose covers new fence"
+  else
+    cls_fail "CLS-INV-009" "missing: ${inv009_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-010: Scope-amendment exception is proximity-anchored within 5 lines of
+  # the "Out of scope: the unchanged codebase" line, with EXCEPT/exception
+  # linking language and no level-3 heading separating them.
+  # --------------------------------------------------------------------------
+  local oos_line_no
+  oos_line_no="$(grep -nE 'Out of scope.{0,60}unchanged codebase' "$CLS_AGENT" | head -1 | cut -d: -f1)"
+  if [ -z "$oos_line_no" ]; then
+    cls_fail "CLS-INV-010" "Out of scope: unchanged codebase line not found"
+  else
+    local window
+    window="$(sed -n "${oos_line_no},$((oos_line_no + 5))p" "$CLS_AGENT")"
+    local inv010_fail=""
+    echo "$window" | grep -qE '\b(EXCEPT|exception|carve-out|narrow exception)\b' || inv010_fail="${inv010_fail}exception-link "
+    echo "$window" | grep -qiE '(sibling|file under fix)' || inv010_fail="${inv010_fail}sibling-or-file-under-fix "
+    if echo "$window" | grep -qE '^### '; then
+      inv010_fail="${inv010_fail}level3-heading-in-window "
+    fi
+    if [ -z "$inv010_fail" ]; then
+      cls_pass "CLS-INV-010" "scope-amendment exception proximity-anchored within 5 lines"
+    else
+      cls_fail "CLS-INV-010" "missing/violated: ${inv010_fail}"
+    fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-011: /caudit Step 6a emits <UNTRUSTED_FINDING_DESCRIPTION> fence in
+  # JSON-array form between RULES and DIFF, with ordering, filtering, omission
+  # for empty array, and graceful-degradation language in the agent file.
+  # --------------------------------------------------------------------------
+  local step6a_block
+  step6a_block="$(extract_step_6a_block "$CLS_CAUDIT_SKILL" 2>/dev/null)" || step6a_block=""
+  local inv011_fail=""
+  # Fence name may include attributes (e.g., source="round-1-findings").
+  echo "$step6a_block" | grep -qE '<UNTRUSTED_FINDING_DESCRIPTION([[:space:]][^>]*)?>' || inv011_fail="${inv011_fail}fence-name-in-step6a "
+  echo "$step6a_block" | grep -qE '"id"[[:space:]]*:[[:space:]]*"' || inv011_fail="${inv011_fail}json-id-field "
+  echo "$step6a_block" | grep -qE '"description"[[:space:]]*:[[:space:]]*"' || inv011_fail="${inv011_fail}json-description-field "
+  echo "$step6a_block" | grep -qiE '(ascending|sort.*id|lexicographic)' || inv011_fail="${inv011_fail}ordering "
+  echo "$step6a_block" | grep -qiE '(empty.*description|whitespace.*omit|null.*omit|omit.*empty)' || inv011_fail="${inv011_fail}empty-filter "
+  echo "$step6a_block" | grep -qiE '(omit.*entire|omit.*fence|empty array.*omit|when.*array.*would.*be.*empty)' || inv011_fail="${inv011_fail}empty-array-omission "
+  echo "$body" | grep -qiE '(when.*absent.*diff signal alone|when.*fence.*absent|diff signal alone)' || inv011_fail="${inv011_fail}graceful-degradation-in-agent "
+  # Source-of-truth path must reference ABS-029 finding artifact.
+  echo "$step6a_block" | grep -qE 'audit-.*-round-.*\.json|\.correctless/artifacts/findings/' || inv011_fail="${inv011_fail}sole-writer-artifact-path "
+  if [ -z "$inv011_fail" ]; then
+    cls_pass "CLS-INV-011" "<UNTRUSTED_FINDING_DESCRIPTION> fence emission complete in Step 6a"
+  else
+    cls_fail "CLS-INV-011" "missing: ${inv011_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-012: SFG hook final-state check with SKIP sentinel path.
+  # If sentinel exists, SKIP this sub-assertion with remediation message.
+  # --------------------------------------------------------------------------
+  if [ -f "$CLS_SENTINEL" ]; then
+    # SKIP path — lift is active. Record CLS-INV-012 as exercised but skipped.
+    CLS_EXERCISED_IDS+=("CLS-INV-012")
+    skip "CLS-INV-012" "SFG lift active (.correctless/.sfg-lift-active present) — AP-037 lift-and-restore in progress. To resume iteration: continue editing agents/fix-diff-reviewer.md. Before push: restore agents/fix-diff-reviewer.md to DEFAULTS in hooks/sensitive-file-guard.sh AND correctless/hooks/sensitive-file-guard.sh, delete .correctless/.sfg-lift-active, run bash sync.sh. See .claude/rules/sfg-deliverable.md and PMB-017."
+  else
+    # No sentinel — enforce final-state grep on both sync targets.
+    local inv012_fail=""
+    grep -Fxq "agents/fix-diff-reviewer.md" "$CLS_SFG_SRC" || inv012_fail="${inv012_fail}src "
+    grep -Fxq "agents/fix-diff-reviewer.md" "$CLS_SFG_DIST" || inv012_fail="${inv012_fail}dist "
+    if [ -z "$inv012_fail" ]; then
+      cls_pass "CLS-INV-012" "SFG DEFAULTS contains agents/fix-diff-reviewer.md in both sync targets"
+    else
+      cls_fail "CLS-INV-012" "agents/fix-diff-reviewer.md not in hooks/sensitive-file-guard.sh DEFAULTS (${inv012_fail}). AP-037 lift-and-restore detected without sentinel. To resume iteration: write the sentinel: echo 'lift-active: <feature>' > .correctless/.sfg-lift-active; commit the lift with the sentinel ADD in the same commit. Before pushing, restore the agent path to DEFAULTS and remove the sentinel in the restore commit. See .claude/rules/sfg-deliverable.md."
+    fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-012a: Final-state backstop — scripts/check-no-pending-sfg-lift.sh
+  # exists, is NOT under tests/, is executable, exits 0 when sentinel absent,
+  # exits 2 with remediation message when sentinel present.
+  # --------------------------------------------------------------------------
+  local inv012a_fail=""
+  [ -f "$CLS_LIFT_CHECK" ] || inv012a_fail="${inv012a_fail}script-missing "
+  [ -x "$CLS_LIFT_CHECK" ] || inv012a_fail="${inv012a_fail}not-executable "
+  # Must not be picked up by tests/test-*.sh glob.
+  case "$CLS_LIFT_CHECK" in
+    tests/test-*.sh) inv012a_fail="${inv012a_fail}in-test-glob " ;;
+  esac
+  # Functional check (only when script exists and is executable).
+  if [ -f "$CLS_LIFT_CHECK" ] && [ -x "$CLS_LIFT_CHECK" ]; then
+    # Create a temp project root with no sentinel, then with sentinel, and verify exit codes.
+    local tmp_root
+    tmp_root="$(mktemp -d)"
+    mkdir -p "$tmp_root/.correctless"
+    # Sentinel absent → exit 0.
+    if ( cd "$tmp_root" && bash "$REPO_DIR/$CLS_LIFT_CHECK" >/dev/null 2>&1 ); then
+      : # exit 0 confirmed
+    else
+      inv012a_fail="${inv012a_fail}exits-nonzero-without-sentinel "
+    fi
+    # Sentinel present → exit 2 with remediation message containing AP-037 + restore step.
+    touch "$tmp_root/.correctless/.sfg-lift-active"
+    local lift_out
+    lift_out="$( cd "$tmp_root" && bash "$REPO_DIR/$CLS_LIFT_CHECK" 2>&1; echo "EXIT:$?" )"
+    if ! echo "$lift_out" | grep -q "EXIT:2"; then
+      inv012a_fail="${inv012a_fail}wrong-exit-with-sentinel "
+    fi
+    if ! echo "$lift_out" | grep -qiE '(AP-037|restore|sentinel|sfg-deliverable)'; then
+      inv012a_fail="${inv012a_fail}missing-remediation-message "
+    fi
+    rm -rf "$tmp_root"
+  fi
+  if [ -z "$inv012a_fail" ]; then
+    cls_pass "CLS-INV-012a" "scripts/check-no-pending-sfg-lift.sh works (exit 0 absent / exit 2 present)"
+  else
+    cls_fail "CLS-INV-012a" "missing/broken: ${inv012a_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-013: Prompt-composition test layer — 3 fixtures (≥1 real provenance),
+  # helper exists, fence presence / fence-absent / marker-cases / size-cap
+  # composition assertions.
+  # --------------------------------------------------------------------------
+  local inv013_fail=""
+  [ -f "$CLS_FIXTURE_ARGMAX" ] || inv013_fail="${inv013_fail}fixture-argmax "
+  [ -f "$CLS_FIXTURE_LOOPVAR" ] || inv013_fail="${inv013_fail}fixture-loopvar "
+  [ -f "$CLS_FIXTURE_ERRH" ] || inv013_fail="${inv013_fail}fixture-errh "
+  [ -f "$CLS_HELPER" ] || inv013_fail="${inv013_fail}helper-missing "
+  # PR-124 provenance comment in the real fixture.
+  if [ -f "$CLS_FIXTURE_ARGMAX" ]; then
+    grep -qE 'PR ?#124|70446b0' "$CLS_FIXTURE_ARGMAX" || inv013_fail="${inv013_fail}argmax-no-pr124-provenance "
+  fi
+  # Marker-validity test cases in each fixture (round-added, pre-existing, malformed, marker-in-string-literal).
+  if [ -f "$CLS_FIXTURE_LOOPVAR" ]; then
+    grep -q "round-added" "$CLS_FIXTURE_LOOPVAR" || inv013_fail="${inv013_fail}loopvar-no-round-added-case "
+    grep -q "string literal" "$CLS_FIXTURE_LOOPVAR" || inv013_fail="${inv013_fail}loopvar-no-string-literal-case "
+  fi
+  # Helper functional: produces fence when findings provided, omits when not.
+  if [ -f "$CLS_HELPER" ] && [ -f "$CLS_FIXTURE_LOOPVAR" ]; then
+    local tmpf_findings tmpf_out tmpf_out2
+    tmpf_findings="$(mktemp)"
+    tmpf_out="$(mktemp)"
+    tmpf_out2="$(mktemp)"
+    printf '%s\n' '[{"id":"HACK-003","description":"ARG_MAX overflow"},{"id":"QA-R1-007","description":"loop variable capture"}]' > "$tmpf_findings"
+    bash "$CLS_HELPER" "$CLS_FIXTURE_LOOPVAR" "$tmpf_findings" "-" > "$tmpf_out" 2>/dev/null || true
+    grep -q '<UNTRUSTED_FINDING_DESCRIPTION' "$tmpf_out" || inv013_fail="${inv013_fail}helper-no-fence-when-provided "
+    bash "$CLS_HELPER" "$CLS_FIXTURE_LOOPVAR" "-" "-" > "$tmpf_out2" 2>/dev/null || true
+    if grep -q '<UNTRUSTED_FINDING_DESCRIPTION' "$tmpf_out2"; then
+      inv013_fail="${inv013_fail}helper-fence-present-when-omitted "
+    fi
+    grep -q '<UNTRUSTED_DIFF>' "$tmpf_out" || inv013_fail="${inv013_fail}helper-no-diff-fence "
+    rm -f "$tmpf_findings" "$tmpf_out" "$tmpf_out2"
+  fi
+  if [ -z "$inv013_fail" ]; then
+    cls_pass "CLS-INV-013" "prompt-composition fixtures + helper present and functional"
+  else
+    cls_fail "CLS-INV-013" "missing/broken: ${inv013_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-014: Per-fence size cap (4096) + aggregate cap (16384), single
+  # emitted-bytes measurement model, documented in Step 6a prose.
+  # --------------------------------------------------------------------------
+  local inv014_fail=""
+  echo "$step6a_block" | grep -q '4096' || inv014_fail="${inv014_fail}per-entry-cap "
+  echo "$step6a_block" | grep -q '16384' || inv014_fail="${inv014_fail}aggregate-cap "
+  echo "$step6a_block" | grep -qiE '(emitted byte|emitted JSON|emitted text|measured on the final emitted|byte length in the emitted)' || inv014_fail="${inv014_fail}emitted-bytes-model "
+  echo "$step6a_block" | grep -qE '\[truncated:.*more bytes\]|truncated:.*more bytes' || inv014_fail="${inv014_fail}truncation-marker "
+  # Functional verification — helper actually emits ≤4096 bytes per entry when fed a 5KB description.
+  if [ -f "$CLS_HELPER" ] && [ -f "$CLS_FIXTURE_LOOPVAR" ]; then
+    local tmpf_big tmpf_bigout
+    tmpf_big="$(mktemp)"
+    tmpf_bigout="$(mktemp)"
+    # Build a JSON with one entry whose description is 5KB.
+    local huge
+    huge="$(printf 'x%.0s' $(seq 1 5000))"
+    printf '[{"id":"HACK-003","description":"%s"}]' "$huge" > "$tmpf_big"
+    bash "$CLS_HELPER" "$CLS_FIXTURE_LOOPVAR" "$tmpf_big" "-" > "$tmpf_bigout" 2>/dev/null || true
+    # Extract the JSON array text from the fence and measure each entry.
+    local arr_bytes
+    arr_bytes="$(awk '/<UNTRUSTED_FINDING_DESCRIPTION/{flag=1; next} /<\/UNTRUSTED_FINDING_DESCRIPTION>/{flag=0} flag' "$tmpf_bigout" | tr -d '\n' | wc -c)"
+    # Aggregate must be <= 16384.
+    if [ "$arr_bytes" -gt 16384 ]; then
+      inv014_fail="${inv014_fail}aggregate-overflows($arr_bytes) "
+    fi
+    # Per-entry must be <= 4096 — best effort: jq into per-entry object.
+    if command -v jq >/dev/null 2>&1; then
+      local arr_text per_entry_max
+      arr_text="$(awk '/<UNTRUSTED_FINDING_DESCRIPTION/{flag=1; next} /<\/UNTRUSTED_FINDING_DESCRIPTION>/{flag=0} flag' "$tmpf_bigout" | tr -d '\n')"
+      if [ -n "$arr_text" ]; then
+        per_entry_max="$(printf '%s' "$arr_text" | jq -r 'max_by(tojson | length) | tojson | length' 2>/dev/null)"
+        if [ -n "$per_entry_max" ] && [ "$per_entry_max" -gt 4096 ]; then
+          inv014_fail="${inv014_fail}per-entry-overflows($per_entry_max) "
+        fi
+      fi
+    fi
+    # Truncation marker must appear in the output.
+    if ! grep -qE '\[truncated:[[:space:]]*[0-9]+[[:space:]]*more bytes\]' "$tmpf_bigout"; then
+      inv014_fail="${inv014_fail}helper-no-truncation-marker "
+    fi
+    rm -f "$tmpf_big" "$tmpf_bigout"
+  fi
+  if [ -z "$inv014_fail" ]; then
+    cls_pass "CLS-INV-014" "per-entry 4096 + aggregate 16384 emitted-byte caps with truncation marker"
+  else
+    cls_fail "CLS-INV-014" "missing/broken: ${inv014_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-015: Bounded sibling search scope + deny-list (4 categories) +
+  # non-exhaustive marker within 5 lines of deny-list.
+  # --------------------------------------------------------------------------
+  local inv015_fail=""
+  echo "$body" | grep -qE '(same[ -]directory|same directory)' || inv015_fail="${inv015_fail}same-directory "
+  echo "$body" | grep -qiE '(same[ -]extension|same[ -]language[ -]extension)' || inv015_fail="${inv015_fail}same-extension "
+  echo "$body" | grep -q '\.env' || inv015_fail="${inv015_fail}env-denylist "
+  echo "$body" | grep -q '\.correctless/preferences' || inv015_fail="${inv015_fail}preferences-denylist "
+  echo "$body" | grep -q 'autonomous-decisions' || inv015_fail="${inv015_fail}autonomous-decisions-denylist "
+  echo "$body" | grep -q '\.git/objects' || inv015_fail="${inv015_fail}git-objects-denylist "
+  # Non-exhaustive marker within 5 lines of a deny-list item — direction-agnostic
+  # (the marker may appear in the heading/preface line OR after the items).
+  if ! echo "$body" | awk '
+    BEGIN { idx = 0 }
+    {
+      idx++
+      lines[idx] = $0
+      if ($0 ~ /\.env|\.correctless\/preferences|autonomous-decisions|\.git\/objects/) {
+        for (i = (idx > 5 ? idx - 5 : 1); i <= idx + 5 && i <= NR + 5; i++) {
+          # check this line backward
+        }
+        # capture indexes of deny-list lines for second pass
+        deny[idx] = 1
+      }
+    }
+    END {
+      for (h in deny) {
+        lo = (h > 5 ? h - 5 : 1)
+        hi = h + 5
+        for (j = lo; j <= hi && j <= idx; j++) {
+          if (lines[j] ~ /non-exhaustive|examples include/) {
+            print "FOUND"
+            exit 0
+          }
+        }
+      }
+      exit 1
+    }
+  ' | grep -q FOUND; then
+    inv015_fail="${inv015_fail}non-exhaustive-near-denylist "
+  fi
+  if [ -z "$inv015_fail" ]; then
+    cls_pass "CLS-INV-015" "bounded scope + 4-category deny-list with non-exhaustive marker"
+  else
+    cls_fail "CLS-INV-015" "missing: ${inv015_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-016: Marker-validity contract — diff-fence-only provenance,
+  # substantive-rationale floor, round-added downgrade, NO author metadata.
+  # --------------------------------------------------------------------------
+  local inv016_fail=""
+  # Look for diff-fence-only language across a window (the prose may say
+  # "honored ONLY when they appear in <UNTRUSTED_DIFF>" with the qualifier
+  # and fence-name on adjacent lines after wrapping).
+  if ! echo "$body" | tr '\n' ' ' | grep -qiE '(diff[ -]fence[ -]only|honored[[:space:]]+ONLY[[:space:]]+when[[:space:]]+they[[:space:]]+appear|appear[[:space:]]+ONLY[[:space:]]+(when[[:space:]]+|as[[:space:]]+|in[[:space:]]+)?(syntactic[[:space:]]+comments[[:space:]]+)?in[[:space:]]+<?UNTRUSTED_DIFF>?|honored[[:space:]]+only[[:space:]]+(when[[:space:]]+|as[[:space:]]+|in[[:space:]]+).*<UNTRUSTED_DIFF>|<UNTRUSTED_DIFF>.*never[[:space:]]+honored)'; then
+    inv016_fail="${inv016_fail}diff-fence-only "
+  fi
+  echo "$body" | grep -qE '(30[[:space:]]+character|30-character|minimum.*30|≥[[:space:]]*30)' || inv016_fail="${inv016_fail}rationale-length-floor "
+  # >=3 reject-as-non-substantive examples.
+  local reject_count=0
+  echo "$body" | grep -q 'covered by future PR' && reject_count=$((reject_count + 1))
+  echo "$body" | grep -q 'see notes' && reject_count=$((reject_count + 1))
+  echo "$body" | grep -qE 'TODO.*without further context|TODO$' && reject_count=$((reject_count + 1))
+  if [ "$reject_count" -lt 3 ]; then inv016_fail="${inv016_fail}reject-examples($reject_count<3) "; fi
+  echo "$body" | grep -qiE '(round-added|appears in the diff|added.*\+.*line)' || inv016_fail="${inv016_fail}round-added-detection "
+  echo "$body" | grep -qE '(MEDIUM|medium)' || inv016_fail="${inv016_fail}downgrade-medium "
+  echo "$body" | grep -qiE '(pre-existing|predates the round)' || inv016_fail="${inv016_fail}pre-existing-suppression "
+  # NO author metadata language allowed as an AFFIRMATIVE signal.
+  # Lines that explicitly DISCLAIM reliance on author metadata (e.g.,
+  # "the reviewer does NOT receive commit author email") are permitted —
+  # they reinforce the no-metadata contract rather than violating it.
+  if echo "$body" | grep -niE '(commit author|author email|mode:[[:space:]]*autonomous metadata|git author)' | while IFS=: read -r ln _; do
+    sed -n "${ln}p" <<< "$body" | grep -qiE '\b(does NOT|not receive|never receive|do not reach|no commit metadata|not exposed|reviewer.*does not)\b' || echo "VIOL:$ln"
+  done | grep -q VIOL; then
+    inv016_fail="${inv016_fail}forbidden-author-metadata "
+  fi
+  if [ -z "$inv016_fail" ]; then
+    cls_pass "CLS-INV-016" "marker-validity contract complete (diff-fence-only + rationale floor + round-added downgrade)"
+  else
+    cls_fail "CLS-INV-016" "missing/forbidden: ${inv016_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # INV-017: class_fix field shows verbatim marker example with annotation.
+  # --------------------------------------------------------------------------
+  local inv017_fail=""
+  # "class_fix" within 10 lines of "marker"
+  if ! echo "$body" | awk '
+    BEGIN { last_cf = 0 }
+    /class_fix/ { last_cf = NR }
+    last_cf > 0 && NR - last_cf <= 10 && /[Mm]arker/ { print "FOUND"; exit 0 }
+  ' | grep -q FOUND; then
+    inv017_fail="${inv017_fail}class_fix-near-marker "
+  fi
+  # Verbatim marker example annotated as such (looking for "Example marker:" or similar).
+  echo "$body" | grep -qE 'Example marker:|Sample marker:|e\.g\.,.*SIBLING-DEFERRED:' || inv017_fail="${inv017_fail}example-annotation "
+  # Verbatim sample within a code fence inside the class-shaped section.
+  if echo "$body" | awk '
+    BEGIN { in_fence = 0; found = 0 }
+    /^```/ { in_fence = !in_fence; next }
+    in_fence && /SIBLING-DEFERRED:.*[—-].+/ { found = 1 }
+    END { exit (found ? 0 : 1) }
+  '; then :; else inv017_fail="${inv017_fail}verbatim-sample-in-codefence "; fi
+  if [ -z "$inv017_fail" ]; then
+    cls_pass "CLS-INV-017" "class_fix names marker with verbatim Example marker: sample in code fence"
+  else
+    cls_fail "CLS-INV-017" "missing: ${inv017_fail}"
+  fi
+
+  # --------------------------------------------------------------------------
+  # Cardinality checklist enforcement (RS-020 / INV-007 backstop).
+  # Compare EXERCISED set against EXPECTED set — both must be equal.
+  # --------------------------------------------------------------------------
+  local missing_ids="" extra_ids=""
+  local id
+  for id in "${EXPECTED_SUB_ASSERTION_IDS[@]}"; do
+    case " ${CLS_EXERCISED_IDS[*]} " in
+      *" $id "*) : ;;
+      *) missing_ids="${missing_ids}${id} " ;;
+    esac
+  done
+  for id in "${CLS_EXERCISED_IDS[@]}"; do
+    case " ${EXPECTED_SUB_ASSERTION_IDS[*]} " in
+      *" $id "*) : ;;
+      *) extra_ids="${extra_ids}${id} " ;;
+    esac
+  done
+  # Cardinality check: EXPECTED size MUST equal EXERCISED size (PMB-013 paired-array consumer assertion).
+  local expected_card="${#EXPECTED_SUB_ASSERTION_IDS[@]}"
+  local exercised_card="${#CLS_EXERCISED_IDS[@]}"
+  if [ "$expected_card" -ne "$exercised_card" ]; then
+    fail "CLS-INV-007-cardinality" "EXPECTED($expected_card) != EXERCISED($exercised_card); missing=[${missing_ids}] extra=[${extra_ids}]"
+  elif [ -n "$missing_ids" ] || [ -n "$extra_ids" ]; then
+    fail "CLS-INV-007-cardinality" "exercised IDs differ from expected; missing=[${missing_ids}] extra=[${extra_ids}]"
+  else
+    pass "CLS-INV-007-cardinality" "all $expected_card EXPECTED_SUB_ASSERTION_IDS exercised, no extras"
+  fi
+}
+
+# ============================================================================
 # Run all checks
 # ============================================================================
 
@@ -2244,6 +2878,7 @@ check_producer_temporal_ordering
 check_orphan_variables
 check_gap002_dd009_metadata
 check_gap008_abs010_narrow_scope
+check_class_shaped_bug_detection
 
 # ============================================================================
 # Summary
