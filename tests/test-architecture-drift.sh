@@ -1543,7 +1543,7 @@ check_inv025() {
   block="$(awk -v h="$header" '
     index($0, h) > 0 { in_block = 1 }
     in_block { print }
-    in_block && /^Source:/ { exit }
+    in_block && /^[[:space:]]*-?[[:space:]]*Source:/ { exit }
   ' "$CLAUDE_MD")"
   # (b) PAT-001 migrated to .claude/rules/hooks-pretooluse.md
   if echo "$block" | grep -qF "PAT-001" \
