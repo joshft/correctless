@@ -85,6 +85,14 @@ are intended to load into editing context whenever an agent opens
 ## Tests
 
 - `tests/test-canonicalize-path.sh` — fuzz corpus + property-based + structural.
+  The fuzz tests (INV-001/INV-001a/INV-002) call `canonicalize_path` **in-process**
+  (sourced once at file top), never via a per-input `timeout … bash -c "source
+  lib.sh; …"`. Re-sourcing `lib.sh` per input across ~1000 inputs × 3 tests was
+  ~3000 forks and made the suite exceed bounded time, blocking the
+  full-`tests/test-*.sh` done-gate (DEP-001). Do **not** reintroduce a per-input
+  subprocess: the function is proven total and fork-free/bounded (INV-012), so a
+  per-input hang cannot occur by construction; a regression hang surfaces as a
+  suite-level timeout. Keep the in-process call.
 - `tests/test-sensitive-file-guard.sh` — INV-005 (canonical-only-at-matcher),
   INV-008 (canonical-on-both-sides), INV-005a (version probe before use).
 - `tests/test-architecture-drift.sh` — PAT-017 (rule-file presence + paths

@@ -68,12 +68,14 @@ test_inv001_totality() {
   local input out rc lines
   while IFS= read -r -d '' input; do
     total_run=$((total_run + 1))
-    # Per-invocation 2s timeout
-    out="$(timeout 2 bash -c "
-      # shellcheck disable=SC1090
-      source '$LIB'
-      canonicalize_path \"\$1\"
-    " _ "$input" 2>/dev/null)"
+    # canonicalize_path is sourced once (top of file) and called in-process — no
+    # per-input subprocess/re-source. DEP-001 perf: the old `timeout 2 bash -c
+    # "source lib.sh; ..."` re-parsed lib.sh on every one of ~1000 inputs across
+    # three fuzz tests (~3000 forks); the function is proven total and
+    # fork-free/bounded (INV-012), so a per-input hang cannot occur by
+    # construction and a regression hang surfaces as a suite-level timeout. Every
+    # INV-001 assertion (single-line stdout, exit 0, no multi-line) is preserved.
+    out="$(canonicalize_path "$input" 2>/dev/null)"
     rc=$?
     if [ "$rc" -ne 0 ]; then
       total_failures=$((total_failures + 1))
@@ -112,10 +114,8 @@ test_inv001a_no_empty_output_on_nonempty_input() {
     # Strip whitespace for the "non-empty after trim" check
     trimmed="$(printf '%s' "$input" | tr -d ' \t\n')"
     [ -z "$trimmed" ] && continue
-    out="$(timeout 2 bash -c "
-      source '$LIB'
-      canonicalize_path \"\$1\"
-    " _ "$input" 2>/dev/null)"
+    # In-process call (DEP-001) — function sourced once at top of file.
+    out="$(canonicalize_path "$input" 2>/dev/null)"
     if [ -z "$out" ]; then
       violations=$((violations + 1))
       [ "$violations" -le 3 ] && echo "  INV-001a empty output on non-empty input: $(printf '%s' "$input" | xxd | head -1)" >&2
@@ -139,7 +139,8 @@ test_inv002_output_shape() {
   [ -f "$CORPUS_FILE" ] || generate_fuzz_corpus
   local violations=0 input out
   while IFS= read -r -d '' input; do
-    out="$(timeout 2 bash -c "source '$LIB'; canonicalize_path \"\$1\"" _ "$input" 2>/dev/null)"
+    # In-process call (DEP-001) — function sourced once at top of file.
+    out="$(canonicalize_path "$input" 2>/dev/null)"
     [ -z "$out" ] && continue
     # No `//`
     if printf '%s' "$out" | grep -q '//' ; then
