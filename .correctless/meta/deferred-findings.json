@@ -338,6 +338,29 @@
       "deferred_at": "2026-05-17T02:45:00Z",
       "resolved_at": "2026-05-31T04:49:19Z",
       "resolution": "Old config key never documented for end users. Silent compatibility is correct."
+    },
+    {
+      "id": "DF-027",
+      "finding_id": "RS-018",
+      "source_file": ".correctless/artifacts/review-spec-findings-fix-diff-reviewer-class.md",
+      "severity": "MEDIUM",
+      "title": "Add config kill switch for class-shaped lens",
+      "description": "The class-shaped lens fires unconditionally on diff signal. If a project hits a noise spiral (lens repeatedly false-positives), there is no escape except editing SFG-protected agent prose. Deferred — v1 ships with the SIBLING-DEFERRED carve-out as the primary false-positive mitigation. Revisit if a real project hits a noise spiral that the carve-out cannot resolve.",
+      "status": "open",
+      "deferred_at": "2026-06-14T00:00:00Z",
+      "category": "ux-offboarding"
+    },
+    {
+      "id": "DF-028",
+      "finding_id": "RS-019",
+      "source_file": ".correctless/artifacts/review-spec-findings-fix-diff-reviewer-class.md",
+      "severity": "MEDIUM",
+      "title": "Add ABS entry for <UNTRUSTED_*> fence catalog",
+      "description": "The project has 5 producer/consumer instances of the <UNTRUSTED_*> fence convention (DIFF, RULES, RESEARCH_BRIEF, RECOMMENDATION, FINDING_DESCRIPTION). No ABS-xxx entry documents the convention contract — producer set, consumer set, wildcard data-treatment, per-fence size budget, prompt-injection mitigation. Deferred — v1 of fix-diff-reviewer-class fixes the immediate inheritance gap (RS-003) locally; the architecture-level abstraction is a separate /carchitect cycle. Promote when a 6th instance lands or the catalog drifts.",
+      "status": "open",
+      "deferred_at": "2026-06-14T00:00:00Z",
+      "category": "architecture-missing-abstraction",
+      "github_issue": "https://github.com/joshft/correctless/issues/178"
     }
   ]
 }
