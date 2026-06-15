@@ -60,16 +60,32 @@ jobs:
           bash sync.sh
           git diff --exit-code || (echo "sync.sh produced changes — run sync.sh and commit" && exit 1)
 
+  sfg-lift-check:
+    name: SFG lift-and-restore final-state backstop
+    runs-on: ubuntu-latest
+    # CS-018a / AP-037: unconditional, dedicated job (no matrix, not inside the
+    # tests/test-*.sh loop). Fails if a .correctless/.sfg-lift-active sentinel is
+    # still committed (lift commit landed without its restore commit).
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Check no pending SFG lift sentinel
+        run: bash scripts/check-no-pending-sfg-lift.sh
+
   test-suite:
     name: Test Suite
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, sfg-lift-check]
     if: always()
     steps:
       - name: Check matrix results
         run: |
           if [ "${{ needs.test.result }}" != "success" ]; then
             echo "Test matrix failed: ${{ needs.test.result }}"
+            exit 1
+          fi
+          if [ "${{ needs.sfg-lift-check.result }}" != "success" ]; then
+            echo "SFG lift-check failed: ${{ needs.sfg-lift-check.result }}"
             exit 1
           fi
 

@@ -261,6 +261,93 @@ the enumeration yields zero rule bodies and the fix-diff reviewer receives
 just the fenced diff — this is expected graceful degradation, not a failure
 (BND-005). No matching rule for a diff is a valid outcome.
 
+### Round-level finding descriptions (CS-011 — `<UNTRUSTED_FINDING_DESCRIPTION>` fence)
+
+After the `<UNTRUSTED_RULES>` enumeration and **before** the `<UNTRUSTED_DIFF>`
+fence, the prompt-assembly sub-step emits a new `<UNTRUSTED_FINDING_DESCRIPTION>`
+fence carrying the round-level finding list. This is the refinement signal for
+the fix-diff reviewer's class-shaped bug detection lens (the reviewer is invoked
+**once per round**, not per finding).
+
+**Source of truth (read path, RS-002).** The orchestrator reads the round-level
+finding list from the audit-findings artifact written per ABS-029. The path is
+the **flat** form `.correctless/artifacts/findings/audit-${preset}-${date}-round-${round}.json`
+— NO `{preset}/` subdirectory, and `${date}` is the **date portion** of
+`started_at` (date-only, e.g. `2026-06-15`, NOT the full ISO timestamp). This
+string-matches the `dst` construction in the audit findings recorder verbatim
+(`dst_dir=".correctless/artifacts/findings"`,
+`dst="${dst_dir}/audit-${preset}-${date}-round-${round}.json"`). The flat
+`.correctless/artifacts/findings/audit-` prefix is load-bearing — do NOT
+reintroduce a per-preset subdirectory between `findings/` and the `audit-`
+basename, and do NOT use the full `started_at` timestamp in the basename.
+
+**Payload schema (JSON array).** The fence body is a single JSON array of objects,
+each with exactly `id` and `description`. The `id` is the upstream specialist
+finding ID (e.g. `HACK-003`, `QA-R1-007`), NOT a fix-diff-reviewer `FD-NNN` id:
+
+```
+<UNTRUSTED_FINDING_DESCRIPTION source="round-{N}-findings">
+[{"id":"HACK-003","description":"<finding description text>"},
+ {"id":"QA-R1-007","description":"<finding description text>"}]
+</UNTRUSTED_FINDING_DESCRIPTION>
+```
+
+**Ordering, dedup, filtering.**
+- **Ordering:** findings are emitted in **ascending `id`** order (lexicographic
+  byte order on the `id` string) — reproducible across replays.
+- **Dedup:** duplicate `id` values are **de-duplicated**, keeping the first
+  occurrence.
+- **Filtering:** findings whose `description` is **null, empty, or whitespace-only**
+  are OMITTED from the array (whitespace-only descriptions are treated identically
+  to no description). Findings already resolved by a prior round's fix are omitted.
+
+**Empty vs corrupt (both omit, distinct cases).**
+- When the array would be **empty** (no qualifying findings), the entire fence is
+  OMITTED — never emit an empty `<UNTRUSTED_FINDING_DESCRIPTION>[]</...>` fence.
+- When the artifact is **absent** (synthetic invocation, resumed checkpoint), the
+  fence is OMITTED.
+- When the artifact is present but **corrupt / unparsable (malformed/invalid JSON)**,
+  it is treated **identically to absent** — the fence is OMITTED, never emitted as
+  a malformed fence. The corrupt case is distinct from the empty case but resolves
+  to the same omit outcome.
+
+**Degradation advisory (RS-031).** Whenever the fence is omitted (empty, absent, or
+corrupt artifact), Step 6a emits a one-line observable advisory so an integrator can
+distinguish intended degradation from a wiring bug:
+`finding-description fence omitted: round artifact absent/unparsable/empty; lens runs on diff signal only`.
+The reviewer's lens degrades gracefully — when the fence is absent it fires on the
+**diff signal only**.
+
+**Production producer (RS-014).** Prose-presence of the fence name is NOT sufficient.
+The deterministic prompt builder `tests/helpers/build-caudit-prompt.sh`
+(`build_caudit_prompt`) is the canonical prompt producer that assembles
+`<UNTRUSTED_RULES>` + `<UNTRUSTED_FINDING_DESCRIPTION>` + `<UNTRUSTED_DIFF>` with
+the ordering/dedup/filter/omit rules above; Step 6a's assembly points at this
+deterministic prompt-builder. As a forensic backstop, the orchestrator asserts the
+emitted (transcript-logged) prompt contains the fence whenever a non-empty finding
+list existed for the round.
+
+**Per-fence size bound (CS-014, emitted-bytes model).** The finding-description
+fence is size-capped using an **emitted-bytes** model — bytes actually emitted into
+the prompt AFTER JSON escaping, measured with a byte-counting primitive
+(`jq utf8bytelength`, or piping the emitted form through a byte counter — NOT
+shell parameter-length expansion and NOT jq `length`, which count codepoints not
+bytes):
+- **Per-description cap: 4096 emitted bytes.** A description whose emitted form
+  exceeds 4096 bytes is truncated and a `[truncated: N more bytes]` marker is
+  appended; the emitted object stays ≤ 4096 bytes.
+- **Aggregate cap: 16384 emitted bytes**, carved from /caudit's 102400-byte
+  prompt ceiling AFTER `<UNTRUSTED_DIFF>` + `<UNTRUSTED_RULES>` are measured. When
+  the array would exceed the carved budget, individual descriptions are truncated
+  proportionally — preserving a truncation marker entry per finding — before any
+  entry is dropped.
+
+**Pre-PR-base marker fence (CS-016c).** Step 6a separately supplies an
+orchestrator-computed pre-PR-base marker fence enumerating the `SIBLING-DEFERRED:`
+markers present at the PR base / merge-base (the reviewer cannot run git). A marker
+present in this pre-PR-base fence fully suppresses the finding for the covered
+sibling; a marker appearing only in the current diff downgrades severity to MEDIUM.
+
 Then the diff itself is wrapped in an `<UNTRUSTED_DIFF>` fence:
 
 ```

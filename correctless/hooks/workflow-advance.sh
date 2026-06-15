@@ -462,6 +462,47 @@ done
 unset _module _WF_MODULE_DIR
 
 # ---------------------------------------------------------------------------
+# CS-018(d) / CS-019: done-transition gate (ABS-041 + ABS-029 pattern)
+# ---------------------------------------------------------------------------
+# This gate runs BEFORE the transitions.sh cmd_done() body executes. It refuses
+# the `done` transition under two conditions:
+#   (d) A SFG lift sentinel `.correctless/.sfg-lift-active` is still in the tree
+#       (AP-037 lift-and-restore not yet restored).
+#   (CS-019) The full test suite has not produced a HEAD-SHA-pinned test-success
+#       sentinel — i.e., the recorded success SHA must content-match the current
+#       HEAD SHA (ABS-029 content-based gate, robust to ENV-003 mtime drift).
+cmd_done_gate() {
+  local sentinel=".correctless/.sfg-lift-active"
+  if [ -f "$REPO_ROOT/$sentinel" ]; then
+    echo "REFUSED: cannot transition to 'done' while $sentinel exists." >&2
+    echo "  An SFG lift commit is in the tree without its restore commit (AP-037 lift-and-restore)." >&2
+    echo "  Restore agents/fix-diff-reviewer.md to hooks/sensitive-file-guard.sh DEFAULTS, then:" >&2
+    echo "    git rm -f $sentinel && bash sync.sh" >&2
+    echo "  See .claude/rules/sfg-deliverable.md." >&2
+    exit 1
+  fi
+
+  # CS-019: require a HEAD-SHA-pinned full-suite test-success sentinel. The
+  # sentinel records the HEAD SHA at which the full tests/test-*.sh suite passed;
+  # the gate content-matches that recorded head_sha against the live HEAD SHA.
+  local head_sha test_success_sentinel recorded_sha
+  head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+  test_success_sentinel="$REPO_ROOT/.correctless/artifacts/test-success-${head_sha}.sha"
+  if [ -n "$head_sha" ]; then
+    if [ -f "$test_success_sentinel" ]; then
+      recorded_sha="$(head -n1 "$test_success_sentinel" 2>/dev/null | tr -d '[:space:]')"
+      if [ "$recorded_sha" != "$head_sha" ]; then
+        echo "REFUSED: 'done' requires a HEAD-SHA test-success sentinel matching HEAD ($head_sha)." >&2
+        echo "  Recorded test-success SHA ($recorded_sha) does not match HEAD. Re-run the full suite." >&2
+        exit 1
+      fi
+    else
+      info "WARNING: no HEAD-SHA test-success sentinel at $test_success_sentinel (CS-019). Run the full tests/test-*.sh suite and record the success SHA before 'done'."
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -481,7 +522,7 @@ case "$cmd" in
   verify-phase)   cmd_verify ;;
   fix)            cmd_fix ;;
   audit-mini)     cmd_audit_mini ;;
-  done)           cmd_done ;;
+  done)           cmd_done_gate; cmd_done ;;
   verified)       cmd_verified ;;
   documented)     cmd_documented ;;
   audit-start)    cmd_audit_start "$@" ;;
