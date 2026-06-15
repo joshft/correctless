@@ -1,4 +1,0 @@
-lift-active: fix-diff-reviewer-class-shaped-bugs
-branch: feature/fix-diff-reviewer-class-shaped-bugs
-date: 2026-06-14
-reason: Class-shaped bug lens implementation deliberately edits agents/fix-diff-reviewer.md per spec INV-001..INV-009. SFG protection lifted for iteration; restored in final commit before push. See .claude/rules/sfg-deliverable.md.

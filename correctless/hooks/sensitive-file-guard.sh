@@ -271,6 +271,7 @@ scripts/intent-hash.sh
 .correctless/scripts/intent-hash.sh
 .correctless/meta/intensity-calibration.json
 .correctless/meta/pat001-measurement-due.json
+agents/fix-diff-reviewer.md
 agents/supervisor.md
 agents/decision-agent.md
 agents/ctdd-red.md
