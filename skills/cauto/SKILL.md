@@ -323,6 +323,16 @@ bash .correctless/scripts/check-no-pending-sfg-lift.sh || { echo "ABORT: SFG lif
 ```
 This blocks push when a lift commit is in the tree without its restore commit. The script NO-OPs when the deliverable is no longer SFG-protected (RS-028 self-deactivation).
 
+**Step 8.3b: Record full-suite-green sentinel (CS-019 / QA-002).** The consolidation
+gate ran the FULL `tests/test-*.sh` suite (`commands.test`) before reaching this point.
+Write the HEAD-SHA-pinned test-success sentinel so the `done`-transition gate
+(`_done_phase_gate`) has a live, current sentinel to content-match against (absence is
+silent; a stale SHA refuses). `.correctless/artifacts/` is gitignored, so this stays local:
+```bash
+HEAD_SHA="$(git rev-parse HEAD)"
+printf '%s\n' "$HEAD_SHA" > ".correctless/artifacts/test-success-${HEAD_SHA}.sha"
+```
+
 **Step 8.4: Push.** Derive remote name from `git config --get branch.$(git branch --show-current).remote` for tracked branches. If unset (fresh branch), use the first remote from `git remote | head -1` with `--set-upstream`. If `git remote` returns nothing, abort with: **"No git remote configured. Push manually or add a remote."**
 
 R-003 must not push to branches matching `main`, `master`, `develop`, or `release/*` — abort with an error if the current branch matches any of these.

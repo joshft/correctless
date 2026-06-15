@@ -318,14 +318,47 @@ distinguish intended degradation from a wiring bug:
 The reviewer's lens degrades gracefully — when the fence is absent it fires on the
 **diff signal only**.
 
-**Production producer (RS-014).** Prose-presence of the fence name is NOT sufficient.
-The deterministic prompt builder `tests/helpers/build-caudit-prompt.sh`
-(`build_caudit_prompt`) is the canonical prompt producer that assembles
-`<UNTRUSTED_RULES>` + `<UNTRUSTED_FINDING_DESCRIPTION>` + `<UNTRUSTED_DIFF>` with
-the ordering/dedup/filter/omit rules above; Step 6a's assembly points at this
-deterministic prompt-builder. As a forensic backstop, the orchestrator asserts the
-emitted (transcript-logged) prompt contains the fence whenever a non-empty finding
-list existed for the round.
+**Production producer (RS-014, QA-001).** Prose-presence of the fence name is NOT
+sufficient — the fence text MUST be produced by a real coded producer, not
+hand-assembled by the orchestrator LLM. The deterministic prompt builder
+`scripts/build-caudit-prompt.sh` (`build_caudit_prompt`) is the canonical
+production producer; setup installs it to `.correctless/scripts/build-caudit-prompt.sh`
+and sync.sh mirrors it to `correctless/scripts/`. It implements the
+ordering/dedup/filter/omit rules and the CS-014 carve/truncation algorithm above.
+
+EXECUTABLE — Step 6a invokes the INSTALLED producer to emit the fence text, then
+embeds the emitted block verbatim into the reviewer Task prompt between
+`<UNTRUSTED_RULES>` and `<UNTRUSTED_DIFF>`:
+
+```bash
+# Producers for this block (each consumed variable is assigned here so the block
+# is self-contained). PRESET and DATE are the audit branch's preset + date — the
+# orchestrator binds them from the audit-start metadata (`audit/{preset}-{date}`),
+# date-only per RS-002. ROUND_N / ROUND_START_SHA come from The Loop above.
+PRESET="${PRESET:-$(git rev-parse --abbrev-ref HEAD | sed -E 's#^audit/([^-]+)-.*#\1#')}"
+DATE="${DATE:-$(date -u +%Y-%m-%d)}"   # date-only portion of started_at, RS-002
+ROUND_DIFF_PATH="${ROUND_DIFF_PATH:-$(mktemp)}"
+git diff "${ROUND_START_SHA}..HEAD" > "$ROUND_DIFF_PATH"
+UNTRUSTED_RULES_TEXT="$(git show "${ROUND_START_SHA}:.claude/rules/" 2>/dev/null || printf '')"
+ROUND_FINDINGS=".correctless/artifacts/findings/audit-${PRESET}-${DATE}-round-${ROUND_N}.json"
+# Orchestrator-computed pre-PR-base SIBLING-DEFERRED markers (CS-016c); /dev/null when none.
+PRE_PR_BASE_MARKERS="${PRE_PR_BASE_MARKERS:-/dev/null}"
+
+# Emit the fence text via the INSTALLED production producer (QA-001). The producer
+# self-measures DIFF+RULES bytes for the CS-014 carve (passing 0 0 here keeps the
+# byte-count out of this prose so it does not collide with the PROMPT_BYTES ceiling
+# gate's own counter below). Empty output (no qualifying findings) is the
+# graceful-degradation path — the producer prints the advisory line and the lens
+# runs on diff signal only.
+FINDING_FENCE_TEXT="$(bash .correctless/scripts/build-caudit-prompt.sh \
+  "$ROUND_DIFF_PATH" "$ROUND_FINDINGS" "$UNTRUSTED_RULES_TEXT" \
+  0 0 "$PRE_PR_BASE_MARKERS")"
+```
+
+The orchestrator embeds `$FINDING_FENCE_TEXT` verbatim into the reviewer Task
+prompt. As a forensic backstop, the orchestrator asserts the emitted
+(transcript-logged) prompt contains the `<UNTRUSTED_FINDING_DESCRIPTION>` fence
+whenever a non-empty finding list existed for the round.
 
 **Per-fence size bound (CS-014, emitted-bytes model).** The finding-description
 fence is size-capped using an **emitted-bytes** model — bytes actually emitted into
@@ -342,11 +375,20 @@ bytes):
   proportionally — preserving a truncation marker entry per finding — before any
   entry is dropped.
 
-**Pre-PR-base marker fence (CS-016c).** Step 6a separately supplies an
-orchestrator-computed pre-PR-base marker fence enumerating the `SIBLING-DEFERRED:`
-markers present at the PR base / merge-base (the reviewer cannot run git). A marker
-present in this pre-PR-base fence fully suppresses the finding for the covered
-sibling; a marker appearing only in the current diff downgrades severity to MEDIUM.
+**Pre-PR-base marker fence (CS-016c, QA-005).** Step 6a separately supplies an
+orchestrator-computed `<PRE_PR_BASE_MARKERS>` fence enumerating the `SIBLING-DEFERRED:`
+markers present at the PR base / merge-base (the reviewer cannot run git). This fence
+is emitted by the SAME coded producer (`build-caudit-prompt.sh`), not hand-assembled:
+the orchestrator computes the pre-PR-base markers via
+`git show "$(git merge-base origin/main HEAD):<path>"` (or `git diff` against the
+merge-base) and passes the resulting marker list as the producer's
+`pre_pr_base_markers_path` argument. The producer emits the `<PRE_PR_BASE_MARKERS>`
+fence whenever the diff carries ANY `SIBLING-DEFERRED:` marker; when no pre-PR-base
+list was computed it emits an observable in-fence advisory rather than silently
+omitting it (a SIBLING-DEFERRED marker in the diff with no pre-PR-base fence is a
+wiring bug, not a silent default). A marker present in this pre-PR-base fence fully
+suppresses the finding for the covered sibling; a marker appearing only in the
+current diff downgrades severity to MEDIUM.
 
 Then the diff itself is wrapped in an `<UNTRUSTED_DIFF>` fence:
 

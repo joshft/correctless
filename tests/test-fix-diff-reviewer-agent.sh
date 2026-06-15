@@ -2227,7 +2227,7 @@ CS_CHECK_SCRIPT="scripts/check-no-pending-sfg-lift.sh"
 CS_FIX_ARGMAX="tests/fixtures/fix-diff-class-shaped-argmax.diff"
 CS_FIX_LOOPVAR="tests/fixtures/fix-diff-class-shaped-loop-var.diff"
 CS_FIX_ERRH="tests/fixtures/fix-diff-class-shaped-error-handling.diff"
-CS_PROMPT_HELPER="tests/helpers/build-caudit-prompt.sh"
+CS_PROMPT_HELPER="scripts/build-caudit-prompt.sh"
 CS_PR124_SHA="70446b0"
 
 # Cardinality checklist (RS-015, RS-020): EXACTLY these 20 literal IDs.
@@ -2557,16 +2557,39 @@ check_class_shaped_bug_detection() {
   # ----- CS-018: backstop invoked by CI job + /cauto Step 8 + rule + cmd_done -----
   cs_check_018
 
-  # ----- CS-019: cmd_done HEAD-SHA test-success sentinel gate -----
+  # ----- CS-019: done-gate test-success sentinel — READER + WRITER both exist -----
+  # QA-002: the gate (reader) was structurally present but practically dead —
+  # nothing WROTE the test-success-<HEAD>.sha sentinel, so the SHA-mismatch
+  # branch never fired. CS-019 now asserts BOTH: (1) the dispatcher gate READS a
+  # HEAD-SHA-pinned test-success sentinel, AND (2) at least one PRODUCER writes
+  # it after the full suite passes. Zero writers MUST FAIL (2026-04-30
+  # sole-writer-ships-with-gate convention).
   local ok19=1 why19=""
+  # --- Reader: the done-gate in the dispatcher reads the HEAD-SHA sentinel. ---
   if [ -f "$CS_WFADV" ]; then
-    grep -qE 'cmd_done' "$CS_WFADV" || { ok19=0; why19="${why19}no cmd_done; "; }
-    grep -qiE 'test-success|HEAD.?SHA|head_sha|test.?sentinel' "$CS_WFADV" || { ok19=0; why19="${why19}no HEAD-SHA test-success sentinel gate; "; }
+    grep -qE 'cmd_done|_done_phase_gate' "$CS_WFADV" || { ok19=0; why19="${why19}no cmd_done/_done_phase_gate; "; }
+    grep -qE 'test-success-' "$CS_WFADV" || { ok19=0; why19="${why19}gate does not READ a test-success-<HEAD> sentinel; "; }
   else
-    ok19=0; why19="workflow-advance absent"
+    ok19=0; why19="${why19}workflow-advance absent; "
+  fi
+  # --- Writer: a producer writes the sentinel after the full suite passes. ---
+  # Search the transition module + the suite-running delivery skills. A WRITE is
+  # a redirect of a `test-success-...sha` path, NOT just a read/compare.
+  local writer_found=0
+  local CS_TRANS="scripts/wf/transitions.sh"
+  for wf in "$CS_TRANS" "$CS_CAUTO" "skills/cverify/SKILL.md"; do
+    [ -f "$wf" ] || continue
+    if grep -qE '>[[:space:]]*"?\$?\{?[^"]*test-success-' "$wf" \
+       || grep -qE 'test-success-\$\{?head_sha\}?\.sha"?[[:space:]]*$' "$wf" \
+       || grep -qE 'printf.*test-success-.*>' "$wf"; then
+      writer_found=1
+    fi
+  done
+  if [ "$writer_found" -eq 0 ]; then
+    ok19=0; why19="${why19}NO WRITER for test-success-<HEAD>.sha — gate reads a sentinel nothing writes (dead gate, AP-022/QA-002); "
   fi
   if [ "$ok19" -eq 1 ]; then
-    cs_pass "CS-019" "cmd_done gate-checks a HEAD-SHA-pinned test-success sentinel"
+    cs_pass "CS-019" "done-gate reads HEAD-SHA test-success sentinel AND a producer writes it (reader+writer, QA-002)"
   else
     cs_fail "CS-019" "done-gate full-suite sentinel incomplete: ${why19}"
   fi
@@ -2677,19 +2700,35 @@ cs_check_011() {
   grep -qF "$rec_dir/audit-" "$CS_CAUDIT" \
     || { ok11=0; why11="${why11}read-path does not string-match audit-record.sh dst_dir '$rec_dir'; "; }
 
-  # --- B4: production-producer (RS-014). Prose-presence of the fence name is
-  #     NOT sufficient. THIS PR must satisfy ONE of:
-  #       (i)  Step 6a invokes / points at the deterministic builder
-  #            tests/helpers/build-caudit-prompt.sh (or an equivalent producer), OR
-  #       (ii) a /caudit-side forensic check that the emitted prompt contains the
-  #            fence whenever a finding list existed for the round. ---
-  local producer_ok=0
-  grep -qF 'build-caudit-prompt' "$CS_CAUDIT" && producer_ok=1
-  grep -qiE 'build_caudit_prompt|prompt[- ]?builder|deterministic (prompt )?producer' "$CS_CAUDIT" && producer_ok=1
-  grep -qiE 'forensic|transcript-logged|emitted prompt contains.*fence|assert.*emitted.*fence' "$CS_CAUDIT" && producer_ok=1
-  if [ "$producer_ok" -eq 0 ]; then
-    ok11=0; why11="${why11}no production-producer/forensic mechanism — prose-presence alone (RS-014); "
+  # --- B4: production-producer (RS-014, QA-001). Prose-presence of the fence
+  #     name or a stray mention of the builder is NOT sufficient — the prior
+  #     gap was exactly that (prose "points at the builder" while no code ran).
+  #     THIS PR MUST have Step 6a invoke the builder inside an EXECUTABLE fenced
+  #     code block (```bash / ```sh). A mention of `build-caudit-prompt.sh`
+  #     OUTSIDE any executable fence (prose only) MUST FAIL.
+  #
+  #     Extract the contents of every ```bash / ```sh fenced region, then assert
+  #     `build-caudit-prompt.sh` appears INSIDE one of them. Separately assert
+  #     the producer is the INSTALLED path (.correctless/scripts/...) per the
+  #     setup/sync contract (CS-020), and that a forensic backstop is named.
+  local exec_fence_blocks producer_exec=0
+  exec_fence_blocks="$(awk '
+    /^```[[:space:]]*(bash|sh)[[:space:]]*$/ { infence=1; next }
+    /^```[[:space:]]*$/ { infence=0; next }
+    infence { print }
+  ' "$CS_CAUDIT")"
+  printf '%s' "$exec_fence_blocks" | grep -qF 'build-caudit-prompt.sh' && producer_exec=1
+  if [ "$producer_exec" -eq 0 ]; then
+    ok11=0; why11="${why11}Step 6a has no EXECUTABLE (\`\`\`bash) invocation of build-caudit-prompt.sh — prose mention alone fails B4 (RS-014/QA-001); "
   fi
+  # The executable invocation must call the INSTALLED producer path so real
+  # /caudit rounds run the script that setup installed (not a repo-relative path
+  # that is absent in installed projects).
+  printf '%s' "$exec_fence_blocks" | grep -qF '.correctless/scripts/build-caudit-prompt.sh' \
+    || { ok11=0; why11="${why11}executable invocation does not use the INSTALLED .correctless/scripts/build-caudit-prompt.sh path (CS-020); "; }
+  # Forensic backstop must still be named (defense-in-depth alongside the producer).
+  grep -qiE 'forensic|transcript-logged|emitted prompt contains.*fence|assert.*emitted.*fence' "$CS_CAUDIT" \
+    || { ok11=0; why11="${why11}no forensic backstop named alongside the producer; "; }
 
   # --- B5: discrete sub-asserts. Each NAMED behavior must appear in Step 6a prose. ---
   # corrupt-artifact -> omit, DISTINCT from empty -> omit. A SKILL that documents
@@ -2734,9 +2773,23 @@ cs_check_013() {
     [ -f "$f" ] || { ok13=0; why13="${why13}${f} missing; "; }
   done
 
-  # Provenance (RS-019): the argmax fixture's hunk is a literal substring of
-  # `git show <PR-124-squash-sha>`. A comment alone is insufficient.
-  if [ -f "$CS_FIX_ARGMAX" ] && command -v git >/dev/null 2>&1; then
+  # Provenance (RS-019, QA-004): the argmax fixture's hunk is a literal substring
+  # of `git show <PR-124-squash-sha>`. The SHA is a LIVE git object that can be
+  # unreachable in a shallow clone, after this branch squash-merges, or when git
+  # is absent. In those cases the provenance check SKIPs (observable) rather than
+  # FAILs — the substring assertion is the always-on check ONLY when the SHA is
+  # actually reachable. A missing FIXTURE still fails (caught by the file-exists
+  # loop above); only the git-reachability of the reference commit is SKIP-able.
+  if [ ! -f "$CS_FIX_ARGMAX" ]; then
+    ok13=0; why13="${why13}argmax fixture missing; "
+  elif ! command -v git >/dev/null 2>&1; then
+    cs_record "CS-013"
+    skip "CS-013(provenance)" "git unavailable — cannot verify PR #124 provenance (SKIP, not FAIL; QA-004)"
+  elif ! git cat-file -e "${CS_PR124_SHA}^{commit}" 2>/dev/null \
+       && ! git cat-file -e "${CS_PR124_SHA}" 2>/dev/null; then
+    cs_record "CS-013"
+    skip "CS-013(provenance)" "PR #124 squash SHA $CS_PR124_SHA unreachable (shallow clone / GC'd / post-squash) — SKIP, not FAIL (QA-004)"
+  else
     local commit hunk
     commit="$(git show "$CS_PR124_SHA" 2>/dev/null || true)"
     # The un-augmented hunk: the @@..@@ block from the fixture (skip diff header).
@@ -2745,10 +2798,8 @@ cs_check_013() {
       cs_record "CS-013"
       pass "CS-013(provenance)" "argmax fixture hunk is a literal substring of git show $CS_PR124_SHA"
     else
-      ok13=0; why13="${why13}argmax hunk not a substring of git show $CS_PR124_SHA; "
+      ok13=0; why13="${why13}argmax hunk not a substring of git show $CS_PR124_SHA (SHA reachable but content mismatch); "
     fi
-  else
-    ok13=0; why13="${why13}cannot verify provenance (fixture or git missing); "
   fi
 
   if [ "$ok13" -ne 1 ] || [ ! -f "$CS_PROMPT_HELPER" ]; then
@@ -2910,6 +2961,36 @@ cs_check_013() {
     fi
   else
     skip "CS-013(d-multibyte)" "multibyte fixture unbuildable (no python3 and printf UTF-8 fallback produced empty) — observable skip, not a silent no-op"
+  fi
+
+  # (d-carve) QA-003: the aggregate cap is a CARVE — min(16384, 100KB - DIFF -
+  #   RULES - overhead) — not a static 16384. Supply measured DIFF+RULES byte
+  #   counts large enough that the carve drops BELOW 16384, plus a findings array
+  #   whose total emitted size would exceed the carve, and assert the emitted
+  #   fence is truncated to the (sub-16384) carve. A static-16384 implementation
+  #   FAILS this: it would let the array stay larger than the carve.
+  #   Choose DIFF+RULES = 90000 bytes -> carve = 102400-90000-8192 = 4208 bytes.
+  local carve_diff_bytes=60000 carve_rules_bytes=30000
+  # Two findings each ~3KB so the raw array (~6KB) exceeds the ~4208 carve.
+  local cfill
+  cfill="$(head -c 3000 /dev/zero | tr '\0' 'y')"
+  printf '%s' "$(jq -cn --arg d "$cfill" '[{id:"CARVE-1",description:$d},{id:"CARVE-2",description:$d}]')" > "$tmp/carve.json"
+  local prompt_carve carve_array_bytes
+  prompt_carve="$(build_caudit_prompt "$CS_FIX_ARGMAX" "$tmp/carve.json" "rule text" "$carve_diff_bytes" "$carve_rules_bytes")"
+  # Extract just the emitted JSON array inside the FINDING_DESCRIPTION fence.
+  carve_array_bytes="$(printf '%s\n' "$prompt_carve" \
+    | grep -oE '<UNTRUSTED_FINDING_DESCRIPTION[^>]*>\[.*\]</UNTRUSTED_FINDING_DESCRIPTION>' \
+    | sed -E 's/<UNTRUSTED_FINDING_DESCRIPTION[^>]*>(\[.*\])<\/UNTRUSTED_FINDING_DESCRIPTION>/\1/' \
+    | head -1 | wc -c | tr -d ' ')"
+  # The carve here is 102400-60000-30000-8192 = 4208. The emitted array must be
+  # <= that carve (and crucially BELOW the static 16384), AND truncation markers
+  # must be present (the descriptions were forced over budget).
+  if [ -n "$carve_array_bytes" ] && [ "$carve_array_bytes" -gt 0 ] \
+     && [ "$carve_array_bytes" -le 4208 ] \
+     && printf '%s' "$prompt_carve" | grep -qF '[truncated:'; then
+    pass "CS-013(d-carve)" "aggregate cap carved to sub-16384 (DIFF+RULES=90KB -> carve=4208); emitted array <=carve ($carve_array_bytes) with truncation"
+  else
+    ok13=0; why13="${why13}(d-carve) aggregate not carved below 16384 to the dynamic budget (array=$carve_array_bytes, expected <=4208 w/ truncation); "
   fi
 
   # (e) Suppression-claim fixture: description argues against grepping; the prompt

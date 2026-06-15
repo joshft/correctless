@@ -9,6 +9,27 @@
 
 # shellcheck disable=SC2254
 
+# ---------------------------------------------------------------------------
+# CS-019 / QA-002: test-success sentinel WRITER
+# ---------------------------------------------------------------------------
+# Writes .correctless/artifacts/test-success-<HEAD-SHA>.sha after the FULL
+# tests/test-*.sh suite (commands.test) passed via tests_pass. The done-gate
+# (_done_phase_gate in the dispatcher) READS this sentinel and refuses the
+# `done` transition on a SHA MISMATCH (stale sentinel). Without this writer the
+# sentinel never exists and the gate's mismatch branch is dead code (AP-022).
+# .correctless/artifacts/ is gitignored, so the sentinel stays local.
+#
+# Content is the bare HEAD SHA. No-op (silent) when git or HEAD is unavailable
+# (e.g. the spec-mutation-alerts temp project that never runs the full suite),
+# keeping _done_phase_gate's absent-is-silent contract intact.
+_write_test_success_sentinel() {
+  local head_sha
+  head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+  [ -n "$head_sha" ] || return 0
+  mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || return 0
+  printf '%s\n' "$head_sha" > "$ARTIFACTS_DIR/test-success-${head_sha}.sha" 2>/dev/null || return 0
+}
+
 cmd_review() {
   check_branch_match
   if is_full_mode; then
@@ -101,6 +122,8 @@ cmd_qa() {
   require_phase "tdd-impl"
   info "Checking that tests pass (GREEN gate)..."
   tests_pass
+  # CS-019/QA-002: record full-suite-green for HEAD so the done-gate sentinel is live.
+  _write_test_success_sentinel
 
   # Capture coverage baseline if coverage command exists
   local cov_cmd
@@ -142,6 +165,8 @@ cmd_verify() {
 
   info "Checking that tests pass..."
   tests_pass
+  # CS-019/QA-002: record full-suite-green for HEAD so the done-gate sentinel is live.
+  _write_test_success_sentinel
 
   update_phase "tdd-verify"
   info "Next: final verification (all edits blocked)"
@@ -155,6 +180,8 @@ cmd_audit_mini() {
 
   info "Checking that tests pass..."
   tests_pass
+  # CS-019/QA-002: record full-suite-green for HEAD so the done-gate sentinel is live.
+  _write_test_success_sentinel
 
   update_phase "tdd-audit"
   info "Phase: tdd-audit"
@@ -170,6 +197,8 @@ cmd_done() {
 
   info "Checking that tests still pass..."
   tests_pass
+  # CS-019/QA-002: record full-suite-green for HEAD (idempotent on re-run).
+  _write_test_success_sentinel
 
   # R-002/R-004: Check spec integrity before completing (single state read)
   local state spec_path stored_hash
