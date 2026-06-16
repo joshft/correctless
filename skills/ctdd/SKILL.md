@@ -647,6 +647,15 @@ Test generation gets **one attempt** — no convergence loop. If generation fail
 
 Test-generation commits are **deferred to tdd-audit phase** — they are committed during the mini-audit phase when the workflow gate permits test writes. Do not attempt test-gen commits during tdd-qa phase.
 
+**Refresh the test-success sentinel after committing probe-gen tests (MA-C1, CS-019).** Committing a generated test advances `HEAD` past the SHA recorded in `.correctless/artifacts/test-success.sha` (written at the QA/audit-mini transition when the full suite last passed). Because no `workflow-advance.sh` transition runs between the probe commit and `workflow-advance.sh done`, a stale sentinel would make the done-gate refuse a legitimately-green transition (`recorded SHA != live HEAD`). After committing the generated test(s) — and after confirming the full suite still passes at the new HEAD — re-write the sentinel to the new HEAD **before** invoking `workflow-advance.sh done`:
+
+```bash
+# After the probe-gen test commit(s) land and the full suite passes at HEAD:
+git rev-parse HEAD > .correctless/artifacts/test-success.sha
+```
+
+This keeps the sentinel content-matched to live HEAD so the done-gate allows the transition. The done-gate also re-validates structurally (it re-runs the full suite at HEAD on a stale-sentinel mismatch and refreshes the sentinel itself), so this skill-level step is the cheap fast-path, not the sole guarantee — the invariant is that `done` never refuses when the full suite passes at live HEAD.
+
 ### Probe Results Artifact
 
 Write results **incrementally** to `.correctless/artifacts/probe-results-{branch-slug}.json` as each probe completes. Schema:

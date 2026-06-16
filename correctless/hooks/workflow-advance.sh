@@ -462,6 +462,85 @@ done
 unset _module _WF_MODULE_DIR
 
 # ---------------------------------------------------------------------------
+# CS-018(d) / CS-019: done-transition gate (ABS-041 + ABS-029 pattern)
+# ---------------------------------------------------------------------------
+# This gate runs BEFORE the transitions.sh cmd_done() body executes. It refuses
+# the `done` transition under two conditions:
+#   (d) A SFG lift sentinel `.correctless/.sfg-lift-active` is still in the tree
+#       (AP-037 lift-and-restore not yet restored).
+#   (CS-019) The full test suite has not produced a fixed-name test-success
+#       sentinel whose recorded SHA content-matches the current HEAD SHA
+#       (ABS-029 content-based gate, robust to ENV-003 mtime drift).
+_done_phase_gate() {
+  local sentinel=".correctless/.sfg-lift-active"
+  if [ -f "$REPO_ROOT/$sentinel" ]; then
+    echo "REFUSED: cannot transition to 'done' while $sentinel exists." >&2
+    echo "  An SFG lift commit is in the tree without its restore commit (AP-037 lift-and-restore)." >&2
+    echo "  Restore agents/fix-diff-reviewer.md to hooks/sensitive-file-guard.sh DEFAULTS, then:" >&2
+    echo "    git rm -f $sentinel && bash sync.sh" >&2
+    echo "  See .claude/rules/sfg-deliverable.md." >&2
+    exit 1
+  fi
+
+  # CS-019 / QA2-001: require a fixed-name full-suite test-success sentinel whose
+  # CONTENT (the recorded SHA) matches the live HEAD SHA. The sentinel is the
+  # FIXED file .correctless/artifacts/test-success.sha — NOT keyed on HEAD in the
+  # filename. Its content is the HEAD SHA at which the full tests/test-*.sh suite
+  # last passed. The gate reads that recorded SHA and compares against live HEAD:
+  #   - present, content == HEAD  -> allow (suite is green at this exact tree)
+  #   - present, content != HEAD  -> REFUSE (HEAD advanced past the last green
+  #                                  suite; the sentinel is stale)
+  #   - absent                    -> allow, SILENTLY (the process gate is the
+  #                                  backstop; the sentinel is written by the
+  #                                  full-suite / CI gate per CS-019, not on
+  #                                  every run). Do NOT fail-closed on absent —
+  #                                  that breaks test-spec-mutation-alerts, whose
+  #                                  temp project's qa passes with a stubbed test
+  #                                  command and writes no sentinel.
+  local head_sha test_success_sentinel recorded_sha
+  head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+  test_success_sentinel="$REPO_ROOT/.correctless/artifacts/test-success.sha"
+  if [ -n "$head_sha" ] && [ -f "$test_success_sentinel" ]; then
+    recorded_sha="$(head -n1 "$test_success_sentinel" 2>/dev/null | tr -d '[:space:]')"
+    if [ -n "$recorded_sha" ] && [ "$recorded_sha" != "$head_sha" ]; then
+      # MA-C1: the sentinel is STALE relative to live HEAD. This happens
+      # legitimately when the high+ probe round commits generated tests during
+      # tdd-audit (HEAD advances) without rewriting the sentinel. A stale
+      # sentinel must NOT spuriously refuse a legitimately-green transition —
+      # the invariant is "done MUST NOT refuse when the full suite passes at
+      # live HEAD, but MUST refuse when the suite has not validated live HEAD".
+      #
+      # So on a mismatch we RE-VALIDATE at live HEAD: run the full suite
+      # (tests_pass, which `die`s on failure). If it passes, refresh the sentinel
+      # to live HEAD and allow `done`. If tests_pass is unavailable (e.g. a
+      # narrowly-sourced gate-only context) it returns non-zero and we refuse —
+      # preserving the stale-without-revalidation refusal.
+      if command -v tests_pass >/dev/null 2>&1 && declare -F tests_pass >/dev/null 2>&1; then
+        echo "test-success sentinel is stale (recorded $recorded_sha != HEAD $head_sha) — re-validating the full suite at HEAD before 'done'..." >&2
+        # tests_pass dies on failure; if it returns, the suite is green at HEAD.
+        tests_pass
+        # Refresh the sentinel to live HEAD so subsequent gates see a fresh sentinel.
+        mkdir -p "$REPO_ROOT/.correctless/artifacts" 2>/dev/null || true
+        printf '%s\n' "$head_sha" > "$test_success_sentinel" 2>/dev/null || true
+        # MA2-C1: the gate just proved the full suite green at THIS exact HEAD and
+        # refreshed the sentinel. cmd_done runs tests_pass AGAIN by default (~the
+        # full suite, hundreds of seconds). Export a same-transition revalidation
+        # token keyed on the SHA we just validated so cmd_done can skip the second
+        # run. cmd_done MUST verify the token's SHA equals live HEAD before
+        # trusting it, so a stale env var (different HEAD) can never skip a needed
+        # run. The token is scoped to this single `done` transition only.
+        export _DONE_GATE_REVALIDATED="$head_sha"
+        return 0
+      fi
+      echo "REFUSED: 'done' requires a test-success sentinel matching HEAD ($head_sha)." >&2
+      echo "  Recorded test-success SHA ($recorded_sha) does not match HEAD — the full suite" >&2
+      echo "  last passed at an earlier commit. Re-run the full suite at HEAD before completing." >&2
+      exit 1
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -481,7 +560,7 @@ case "$cmd" in
   verify-phase)   cmd_verify ;;
   fix)            cmd_fix ;;
   audit-mini)     cmd_audit_mini ;;
-  done)           cmd_done ;;
+  done)           _done_phase_gate; cmd_done ;;
   verified)       cmd_verified ;;
   documented)     cmd_documented ;;
   audit-start)    cmd_audit_start "$@" ;;

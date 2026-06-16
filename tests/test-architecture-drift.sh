@@ -2107,6 +2107,9 @@ check_canonicalize_pointer_in_lib_sh
 # Catches the "advisory references with no anchor" failure mode (AP-026).
 # ============================================================================
 
+# Coverage note: this auto-discovering check verifies every ABS-NNN heading
+# (including ABS-041, the SFG lift-and-restore sentinel + final-state backstop
+# contract) is referenced consistently and that every reference resolves.
 check_abs_references_resolve() {
   echo ""
   echo "=== ABS-resolve: every ABS-NNN reference has a heading in ARCHITECTURE.md ==="

@@ -120,6 +120,22 @@ for agent in agents/*.md; do
 done
 [ "$CHECK_ONLY" = false ] && info "Agents → correctless/"
 
+# --- Operator rule files (downstream backstop propagation, CS-020) ---
+# Propagate the SFG lift-and-restore operator rule (sfg-deliverable.md) so
+# installed projects receive the AP-037 procedure and can run the final-state
+# backstop. The cmd_done gate itself ships downstream via the scripts/wf/
+# propagation above (the named downstream backstop floor). The upstream rule
+# path is assembled from parts to honor INV-024 (no literal upstream-rule path
+# in a non-comment sync.sh line).
+RULES_SRC_DIR=".$(printf 'claude')/rules"
+if [ "$CHECK_ONLY" = false ]; then
+  mkdir -p "correctless/rules"
+fi
+if [ -f "$RULES_SRC_DIR/sfg-deliverable.md" ]; then
+  sync_file "$RULES_SRC_DIR/sfg-deliverable.md" "correctless/rules/sfg-deliverable.md"
+fi
+[ "$CHECK_ONLY" = false ] && info "Operator rules → correctless/"
+
 # --- Shared skill constraints ---
 if [ "$CHECK_ONLY" = false ]; then
   mkdir -p "correctless/skills/_shared"
@@ -234,13 +250,24 @@ if [ "$CHECK_ONLY" = true ]; then
     fi
   done
 
+  # Rules: check for stale .md files (operator rule files propagated to dist).
+  RULES_SRC_DIR_CHK=".$(printf 'claude')/rules"
+  if [ -d "correctless/rules" ]; then
+    for dist_rule in correctless/rules/*.md; do
+      [ -f "$dist_rule" ] || continue
+      if [ ! -f "$RULES_SRC_DIR_CHK/$(basename "$dist_rule")" ]; then
+        DIRTY=true
+      fi
+    done
+  fi
+
   # Check for stale top-level items in correctless/ not present in source
   for dist_item in correctless/*/; do
     [ -d "$dist_item" ] || continue
     local_item="$(basename "$dist_item")"
-    # Expected top-level dirs: skills hooks templates helpers scripts agents
+    # Expected top-level dirs: skills hooks templates helpers scripts rules agents
     case "$local_item" in
-      skills|hooks|templates|helpers|scripts|agents) ;; # expected — already checked via sync_file/sync_dir
+      skills|hooks|templates|helpers|scripts|rules|agents) ;; # expected — already checked via sync_file/sync_dir
       *) DIRTY=true ;; # unexpected directory in distribution
     esac
   done

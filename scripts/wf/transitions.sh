@@ -9,6 +9,34 @@
 
 # shellcheck disable=SC2254
 
+# ---------------------------------------------------------------------------
+# CS-019 / QA-002 / QA2-001: test-success sentinel WRITER
+# ---------------------------------------------------------------------------
+# Writes the FIXED-NAME file .correctless/artifacts/test-success.sha after the
+# FULL tests/test-*.sh suite (commands.test) passed via tests_pass. The file
+# CONTENT is the current HEAD SHA — i.e. the sentinel records "the SHA at which
+# the full suite last passed". The done-gate (_done_phase_gate in the
+# dispatcher) READS this fixed-name file and refuses the `done` transition when
+# the recorded SHA != live HEAD (the suite is stale — HEAD advanced past the
+# last green suite). A HEAD-keyed FILENAME (the prior scheme) made the mismatch
+# branch unreachable, because filename==content==SHA: an advanced HEAD changed
+# the filename (absent → pass) and an unchanged HEAD content-matched (pass).
+# Fixed filename + SHA-as-content makes the mismatch branch reachable (QA2-001).
+# .correctless/artifacts/ is gitignored, so the sentinel stays local.
+#
+# No-op (silent) only when git/HEAD is genuinely unavailable (no .git, detached
+# bare context). The spec-mutation-alerts temp project stubs commands.test to
+# pass, so tests_pass succeeds and the writer runs there harmlessly — its HEAD
+# is available, the sentinel is written content-matching HEAD, and the done-gate
+# allows. The absent-is-silent contract in _done_phase_gate is the backstop.
+_write_test_success_sentinel() {
+  local head_sha
+  head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+  [ -n "$head_sha" ] || return 0
+  mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || return 0
+  printf '%s\n' "$head_sha" > "$ARTIFACTS_DIR/test-success.sha" 2>/dev/null || return 0
+}
+
 cmd_review() {
   check_branch_match
   if is_full_mode; then
@@ -101,6 +129,8 @@ cmd_qa() {
   require_phase "tdd-impl"
   info "Checking that tests pass (GREEN gate)..."
   tests_pass
+  # CS-019/QA-002: record full-suite-green for HEAD so the done-gate sentinel is live.
+  _write_test_success_sentinel
 
   # Capture coverage baseline if coverage command exists
   local cov_cmd
@@ -142,6 +172,8 @@ cmd_verify() {
 
   info "Checking that tests pass..."
   tests_pass
+  # CS-019/QA-002: record full-suite-green for HEAD so the done-gate sentinel is live.
+  _write_test_success_sentinel
 
   update_phase "tdd-verify"
   info "Next: final verification (all edits blocked)"
@@ -155,6 +187,8 @@ cmd_audit_mini() {
 
   info "Checking that tests pass..."
   tests_pass
+  # CS-019/QA-002: record full-suite-green for HEAD so the done-gate sentinel is live.
+  _write_test_success_sentinel
 
   update_phase "tdd-audit"
   info "Phase: tdd-audit"
@@ -168,8 +202,33 @@ cmd_done() {
   require_phase_oneof "tdd-qa" "tdd-verify" "tdd-audit"
   _require_min_qa_rounds
 
-  info "Checking that tests still pass..."
-  tests_pass
+  # MA2-L2 BACKSTOP — DO NOT make this tests_pass conditional on the prose/gate
+  # sentinel fast-path. It is the STRUCTURAL backstop that guarantees `done`
+  # never completes on a red suite: the test-success.sha sentinel is advisory
+  # (absent => silent-allow in _done_phase_gate), so if this call were gated on
+  # the sentinel a missing/forged sentinel would create a red-suite escape. The
+  # ONLY permitted skip is the MA2-C1 same-transition revalidation guard below,
+  # which runs ONLY when _done_phase_gate already executed the full suite at THIS
+  # exact HEAD in the same `done` invocation (token SHA == live HEAD).
+  local _head_sha
+  _head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+  if [ -n "${_DONE_GATE_REVALIDATED:-}" ] && [ -n "$_head_sha" ] \
+     && [ "${_DONE_GATE_REVALIDATED}" = "$_head_sha" ]; then
+    # MA2-C1: _done_phase_gate just ran the full suite at this exact HEAD (stale-
+    # sentinel revalidation path) and refreshed the sentinel. Skip the redundant
+    # second full-suite run (~hundreds of seconds) — it would re-validate the
+    # identical tree. The token is SHA-pinned, so a stale env var from an earlier
+    # HEAD can never satisfy this and skip a needed run.
+    info "Tests already revalidated at HEAD by the done-gate this transition — skipping redundant re-run (MA2-C1)."
+  else
+    info "Checking that tests still pass..."
+    tests_pass
+    # CS-019/QA-002: record full-suite-green for HEAD (idempotent on re-run).
+    _write_test_success_sentinel
+  fi
+  # MA2-C1: consume the one-shot token so it can never leak into a later,
+  # different transition (defense against a stale exported env var).
+  unset _DONE_GATE_REVALIDATED
 
   # R-002/R-004: Check spec integrity before completing (single state read)
   local state spec_path stored_hash

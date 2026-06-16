@@ -261,6 +261,151 @@ the enumeration yields zero rule bodies and the fix-diff reviewer receives
 just the fenced diff — this is expected graceful degradation, not a failure
 (BND-005). No matching rule for a diff is a valid outcome.
 
+### Round-level finding descriptions (CS-011 — `<UNTRUSTED_FINDING_DESCRIPTION>` fence)
+
+After the `<UNTRUSTED_RULES>` enumeration and **before** the `<UNTRUSTED_DIFF>`
+fence, the prompt-assembly sub-step emits a new `<UNTRUSTED_FINDING_DESCRIPTION>`
+fence carrying the round-level finding list. This is the refinement signal for
+the fix-diff reviewer's class-shaped bug detection lens (the reviewer is invoked
+**once per round**, not per finding).
+
+**Source of truth (read path, RS-002).** The orchestrator reads the round-level
+finding list from the audit-findings artifact written per ABS-029. The path is
+the **flat** form `.correctless/artifacts/findings/audit-${preset}-${date}-round-${round}.json`
+— NO `{preset}/` subdirectory, and `${date}` is the **date portion** of
+`started_at` (date-only, e.g. `2026-06-15`, NOT the full ISO timestamp). This
+string-matches the `dst` construction in the audit findings recorder verbatim
+(`dst_dir=".correctless/artifacts/findings"`,
+`dst="${dst_dir}/audit-${preset}-${date}-round-${round}.json"`). The flat
+`.correctless/artifacts/findings/audit-` prefix is load-bearing — do NOT
+reintroduce a per-preset subdirectory between `findings/` and the `audit-`
+basename, and do NOT use the full `started_at` timestamp in the basename.
+
+**Payload schema (JSON array).** The fence body is a single JSON array of objects,
+each with exactly `id` and `description`. The `id` is the upstream specialist
+finding ID (e.g. `HACK-003`, `QA-R1-007`), NOT a fix-diff-reviewer `FD-NNN` id:
+
+```
+<UNTRUSTED_FINDING_DESCRIPTION source="round-{N}-findings">
+[{"id":"HACK-003","description":"<finding description text>"},
+ {"id":"QA-R1-007","description":"<finding description text>"}]
+</UNTRUSTED_FINDING_DESCRIPTION>
+```
+
+**Ordering, dedup, filtering.**
+- **Ordering:** findings are emitted in **ascending `id`** order (lexicographic
+  byte order on the `id` string) — reproducible across replays.
+- **Dedup:** duplicate `id` values are **de-duplicated**, keeping the first
+  occurrence.
+- **Filtering:** findings whose `description` is **null, empty, or whitespace-only**
+  are OMITTED from the array (whitespace-only descriptions are treated identically
+  to no description). Findings already resolved by a prior round's fix are omitted.
+
+**Empty vs corrupt (both omit, distinct cases).**
+- When the array would be **empty** (no qualifying findings), the entire fence is
+  OMITTED — never emit an empty `<UNTRUSTED_FINDING_DESCRIPTION>[]</...>` fence.
+- When the artifact is **absent** (synthetic invocation, resumed checkpoint), the
+  fence is OMITTED.
+- When the artifact is present but **corrupt / unparsable (malformed/invalid JSON)**,
+  it is treated **identically to absent** — the fence is OMITTED, never emitted as
+  a malformed fence. The corrupt case is distinct from the empty case but resolves
+  to the same omit outcome.
+
+**Degradation advisory (RS-031).** Whenever the fence is omitted (empty, absent, or
+corrupt artifact), Step 6a emits a one-line observable advisory so an integrator can
+distinguish intended degradation from a wiring bug:
+`finding-description fence omitted: round artifact absent/unparsable/empty; lens runs on diff signal only`.
+The reviewer's lens degrades gracefully — when the fence is absent it fires on the
+**diff signal only**.
+
+**Production producer (RS-014, QA-001).** Prose-presence of the fence name is NOT
+sufficient — the fence text MUST be produced by a real coded producer, not
+hand-assembled by the orchestrator LLM. The deterministic prompt builder
+`scripts/build-caudit-prompt.sh` (`build_caudit_prompt`) is the canonical
+production producer; setup installs it to `.correctless/scripts/build-caudit-prompt.sh`
+and sync.sh mirrors it to `correctless/scripts/`. It implements the
+ordering/dedup/filter/omit rules and the CS-014 carve/truncation algorithm above.
+
+EXECUTABLE — Step 6a invokes the INSTALLED producer to emit the fence text, then
+embeds the emitted block verbatim into the reviewer Task prompt between
+`<UNTRUSTED_RULES>` and `<UNTRUSTED_DIFF>`:
+
+```bash
+# Producers for this block (each consumed variable is assigned here so the block
+# is self-contained). PRESET is the audit branch's preset. DATE is the date-only
+# portion of the workflow state's `started_at` — the SAME field audit-record.sh
+# keys its write path on (`date="${started_at%%T*}"`). It MUST NOT be wall-clock
+# (`date -u`): a `date -u` here drifts from the producer's write path the moment
+# the run crosses midnight UTC, so the read path looks up a file that was written
+# under yesterday's date (RS-002 / QA2-002, AP-031/AP-032). ROUND_N /
+# ROUND_START_SHA come from The Loop above; BRANCH_SLUG / STATE_FILE from the
+# Producer block in Step 5.5.
+PRESET="${PRESET:-$(git rev-parse --abbrev-ref HEAD | sed -E 's#^audit/([^-]+)-.*#\1#')}"
+# Read DATE from workflow-state started_at (date-only), NEVER from wall-clock,
+# so the read path string-matches audit-record.sh's started_at-keyed write path.
+STATE_FILE="${STATE_FILE:-.correctless/artifacts/workflow-state-${BRANCH_SLUG}.json}"
+STARTED_AT="$(jq -r '.started_at // empty' "$STATE_FILE" 2>/dev/null)"
+DATE="${DATE:-${STARTED_AT%%T*}}"   # date-only portion of started_at, RS-002
+ROUND_DIFF_PATH="${ROUND_DIFF_PATH:-$(mktemp)}"
+git diff "${ROUND_START_SHA}..HEAD" > "$ROUND_DIFF_PATH"
+UNTRUSTED_RULES_TEXT="$(git show "${ROUND_START_SHA}:.claude/rules/" 2>/dev/null || printf '')"
+ROUND_FINDINGS=".correctless/artifacts/findings/audit-${PRESET}-${DATE}-round-${ROUND_N}.json"
+# Orchestrator-computed pre-PR-base SIBLING-DEFERRED markers (CS-016c, MA-M1).
+# CODED producer — NOT a bare LLM-bound variable. build-pre-pr-base-markers.sh
+# runs `git merge-base origin/main HEAD` + `git grep` against the merge-base to
+# extract SIBLING-DEFERRED markers present at the PR base, writes them to a file,
+# and prints the path. This keeps the SUPPRESS path live (a pre-PR-base marker
+# fully suppresses; a current-PR-only marker only downgrades to MEDIUM). An empty
+# output file means "no pre-PR-base markers" — the consumer emits the in-fence
+# degradation advisory (observable, never a silent /dev/null default).
+PRE_PR_BASE_MARKERS="${PRE_PR_BASE_MARKERS:-$(bash .correctless/scripts/build-pre-pr-base-markers.sh)}"
+
+# Emit the fence text via the INSTALLED production producer (QA-001). The producer
+# self-measures DIFF+RULES bytes for the CS-014 carve (passing 0 0 here keeps the
+# byte-count out of this prose so it does not collide with the PROMPT_BYTES ceiling
+# gate's own counter below). Empty output (no qualifying findings) is the
+# graceful-degradation path — the producer prints the advisory line and the lens
+# runs on diff signal only.
+FINDING_FENCE_TEXT="$(bash .correctless/scripts/build-caudit-prompt.sh \
+  "$ROUND_DIFF_PATH" "$ROUND_FINDINGS" "$UNTRUSTED_RULES_TEXT" \
+  0 0 "$PRE_PR_BASE_MARKERS")"
+```
+
+The orchestrator embeds `$FINDING_FENCE_TEXT` verbatim into the reviewer Task
+prompt. As a forensic backstop, the orchestrator asserts the emitted
+(transcript-logged) prompt contains the `<UNTRUSTED_FINDING_DESCRIPTION>` fence
+whenever a non-empty finding list existed for the round.
+
+**Per-fence size bound (CS-014, emitted-bytes model).** The finding-description
+fence is size-capped using an **emitted-bytes** model — bytes actually emitted into
+the prompt AFTER JSON escaping, measured with a byte-counting primitive
+(`jq utf8bytelength`, or piping the emitted form through a byte counter — NOT
+shell parameter-length expansion and NOT jq `length`, which count codepoints not
+bytes):
+- **Per-description cap: 4096 emitted bytes.** A description whose emitted form
+  exceeds 4096 bytes is truncated and a `[truncated: N more bytes]` marker is
+  appended; the emitted object stays ≤ 4096 bytes.
+- **Aggregate cap: 16384 emitted bytes**, carved from /caudit's 102400-byte
+  prompt ceiling AFTER `<UNTRUSTED_DIFF>` + `<UNTRUSTED_RULES>` are measured. When
+  the array would exceed the carved budget, individual descriptions are truncated
+  proportionally — preserving a truncation marker entry per finding — before any
+  entry is dropped.
+
+**Pre-PR-base marker fence (CS-016c, QA-005).** Step 6a separately supplies an
+orchestrator-computed `<PRE_PR_BASE_MARKERS>` fence enumerating the `SIBLING-DEFERRED:`
+markers present at the PR base / merge-base (the reviewer cannot run git). This fence
+is emitted by the SAME coded producer (`build-caudit-prompt.sh`), not hand-assembled:
+the orchestrator computes the pre-PR-base markers via
+`git show "$(git merge-base origin/main HEAD):<path>"` (or `git diff` against the
+merge-base) and passes the resulting marker list as the producer's
+`pre_pr_base_markers_path` argument. The producer emits the `<PRE_PR_BASE_MARKERS>`
+fence whenever the diff carries ANY `SIBLING-DEFERRED:` marker; when no pre-PR-base
+list was computed it emits an observable in-fence advisory rather than silently
+omitting it (a SIBLING-DEFERRED marker in the diff with no pre-PR-base fence is a
+wiring bug, not a silent default). A marker present in this pre-PR-base fence fully
+suppresses the finding for the covered sibling; a marker appearing only in the
+current diff downgrades severity to MEDIUM.
+
 Then the diff itself is wrapped in an `<UNTRUSTED_DIFF>` fence:
 
 ```

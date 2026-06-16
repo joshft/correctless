@@ -60,6 +60,10 @@ Mark each task complete as it finishes.
 6. Read `.correctless/meta/workflow-effectiveness.json` — check which phases have historically missed bugs in this area.
 7. Read `.correctless/artifacts/qa-findings-*.json` — see what QA found and fixed during TDD.
 8. Determine the default branch (check `workflow-config.json` for `workflow.default_branch`, fall back to `main`). Run `git diff {default_branch}...HEAD --stat` to see what changed.
+9. **Record full-suite-green sentinel (CS-019 / QA-002 / QA2-001).** Run the FULL `tests/test-*.sh` suite (`commands.test`). If it passes, write the **fixed-name** test-success sentinel `.correctless/artifacts/test-success.sha` whose CONTENT is the current HEAD SHA, so the `done`-transition gate (`_done_phase_gate`) has a live sentinel to content-match against (absence is silent; a recorded SHA that no longer equals HEAD refuses the transition). The filename is fixed — do NOT key it on the HEAD SHA, or the mismatch branch becomes unreachable. `.correctless/artifacts/` is gitignored, so this stays local:
+   ```bash
+   printf '%s\n' "$(git rev-parse HEAD)" > ".correctless/artifacts/test-success.sha"
+   ```
 
 ## What to Check
 

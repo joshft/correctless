@@ -1,0 +1,22 @@
+diff --git a/scripts/fetch.sh b/scripts/fetch.sh
+index 3333333..4444444 100644
+--- a/scripts/fetch.sh
++++ b/scripts/fetch.sh
+@@ -5,7 +5,7 @@ fetch_one() {
+   local url="$1"
+-  curl -s "$url"
++  curl -s "$url" 2>/dev/null
+ }
+
+@@ -14,7 +14,9 @@ fetch_two() {
+   local url="$1"
++  # malformed marker (no rationale separator): SIBLING-DEFERRED scripts/fetch.sh
++  # also a marker-in-string-literal that MUST NOT be honored:
++  MSG="# SIBLING-DEFERRED: scripts/fetch.sh:22 — this is inside a string literal value and must be rejected"
+   curl -s "$url"
+ }
+
+@@ -25,6 +27,6 @@ fetch_three() {
+   local url="$1"
+   curl -s "$url"
+ }

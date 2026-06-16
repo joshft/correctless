@@ -255,6 +255,12 @@ Check the state of the cross-feature intelligence brief and its data sources. Th
 
 **Dormant when the script itself (`scripts/cross-feature-intel.sh` or `.correctless/scripts/cross-feature-intel.sh`) does not exist** — pre-upgrade projects should see no intelligence health output (PAT-019). When the script does not exist, omit this section entirely.
 
+### 6d. Stranded SFG lift sentinel (RS-024 / AP-037)
+
+Detect a committed-but-not-restored SFG lift sentinel. When `.correctless/.sfg-lift-active` exists in the working tree, display a WARNING: "Stranded SFG lift sentinel detected (.correctless/.sfg-lift-active). An AP-037 lift-and-restore is mid-flight — a lift commit removed a deliverable from sensitive-file-guard.sh DEFAULTS but the restore commit has not landed. Before pushing: restore `agents/fix-diff-reviewer.md` to the DEFAULTS list, run `bash sync.sh`, then `git rm -f .correctless/.sfg-lift-active`. The final-state backstop is `bash scripts/check-no-pending-sfg-lift.sh` (source) / `bash .correctless/scripts/check-no-pending-sfg-lift.sh` (installed). See .claude/rules/sfg-deliverable.md."
+
+When the sentinel is absent, omit this section entirely.
+
 ### 7. Health Check (if requested)
 
 If the human asks "is everything set up correctly?" or similar, validate:

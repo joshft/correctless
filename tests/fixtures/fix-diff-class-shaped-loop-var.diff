@@ -1,0 +1,21 @@
+diff --git a/scripts/iterate.sh b/scripts/iterate.sh
+index 1111111..2222222 100644
+--- a/scripts/iterate.sh
++++ b/scripts/iterate.sh
+@@ -10,7 +10,9 @@ process_first() {
+   local -a items
+   for item in "${list_a[@]}"; do
+-    handler "$item"
++    # SIBLING-DEFERRED: scripts/iterate.sh:31 — second loop over list_b uses the same closure-capture shape; widening fix tracked in a follow-up scope-widening PR per the loop-variable audit
++    local copy="$item"
++    handler "$copy"
+   done
+ }
+
+@@ -28,6 +30,6 @@ process_second() {
+   local -a more
+   for item in "${list_b[@]}"; do
+     # the description argues this is "isolated; no siblings" but the diff shape says otherwise
+     handler "$item"
+   done
+ }

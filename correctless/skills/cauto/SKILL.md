@@ -300,11 +300,14 @@ The explicit pipeline output path list is a constant — future additions to pip
 .correctless/antipatterns-archived.md
 .correctless/CLAUDE_LEARNINGS_ARCHIVED.md
 .correctless/artifacts/probe-results-{branch-slug}.json
+.correctless/.sfg-lift-active
 README.md
 CONTRIBUTING.md
 docs/workflow-history.md
 docs/features/*.md
 ```
+
+The `.correctless/.sfg-lift-active` entry is in the staging allowlist so that, if a lift commit is mid-flight, its restore (sentinel removal) is staged and committed during consolidation rather than silently left in the working tree (RS-020 / AP-037).
 
 **Step 8.2: Belt-and-suspenders artifact guard.** Verify nothing under `.correctless/artifacts/` was staged — if anything was, unstage it, **except** probe-results files (TB-004c allowlist exception for committed probe data):
 ```bash
@@ -313,6 +316,23 @@ git diff --cached --name-only | grep '^\.correctless/artifacts/' | grep -v 'prob
 ```
 
 **Step 8.3: Commit.** If there are uncommitted changes after steps 8.1–8.2, commit with message: `"Add pipeline artifacts for {task-slug}"`. If there are no uncommitted changes after steps 8.1–8.2, skip steps 8.3–8.4 (no-op).
+
+**Step 8.3a: SFG lift-and-restore final-state backstop (CS-018b / AP-037).** Before pushing, run the installed final-state backstop and abort on a non-zero exit:
+```bash
+bash .correctless/scripts/check-no-pending-sfg-lift.sh || { echo "ABORT: SFG lift sentinel still present — restore agents/fix-diff-reviewer.md to DEFAULTS and remove .correctless/.sfg-lift-active. See .claude/rules/sfg-deliverable.md"; exit 1; }
+```
+This blocks push when a lift commit is in the tree without its restore commit. The script NO-OPs when the deliverable is no longer SFG-protected (RS-028 self-deactivation).
+
+**Step 8.3b: Record full-suite-green sentinel (CS-019 / QA-002 / QA2-001).** The
+consolidation gate ran the FULL `tests/test-*.sh` suite (`commands.test`) before reaching
+this point. Write the **fixed-name** test-success sentinel `.correctless/artifacts/test-success.sha`
+whose CONTENT is the current HEAD SHA so the `done`-transition gate (`_done_phase_gate`)
+has a live sentinel to content-match against (absence is silent; a recorded SHA that no
+longer equals HEAD refuses). The filename is fixed — do NOT key it on the HEAD SHA, or the
+mismatch branch becomes unreachable. `.correctless/artifacts/` is gitignored, so this stays local:
+```bash
+printf '%s\n' "$(git rev-parse HEAD)" > ".correctless/artifacts/test-success.sha"
+```
 
 **Step 8.4: Push.** Derive remote name from `git config --get branch.$(git branch --show-current).remote` for tracked branches. If unset (fresh branch), use the first remote from `git remote | head -1` with `--set-upstream`. If `git remote` returns nothing, abort with: **"No git remote configured. Push manually or add a remote."**
 
