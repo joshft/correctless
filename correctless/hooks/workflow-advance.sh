@@ -503,6 +503,27 @@ _done_phase_gate() {
   if [ -n "$head_sha" ] && [ -f "$test_success_sentinel" ]; then
     recorded_sha="$(head -n1 "$test_success_sentinel" 2>/dev/null | tr -d '[:space:]')"
     if [ -n "$recorded_sha" ] && [ "$recorded_sha" != "$head_sha" ]; then
+      # MA-C1: the sentinel is STALE relative to live HEAD. This happens
+      # legitimately when the high+ probe round commits generated tests during
+      # tdd-audit (HEAD advances) without rewriting the sentinel. A stale
+      # sentinel must NOT spuriously refuse a legitimately-green transition —
+      # the invariant is "done MUST NOT refuse when the full suite passes at
+      # live HEAD, but MUST refuse when the suite has not validated live HEAD".
+      #
+      # So on a mismatch we RE-VALIDATE at live HEAD: run the full suite
+      # (tests_pass, which `die`s on failure). If it passes, refresh the sentinel
+      # to live HEAD and allow `done`. If tests_pass is unavailable (e.g. a
+      # narrowly-sourced gate-only context) it returns non-zero and we refuse —
+      # preserving the stale-without-revalidation refusal.
+      if command -v tests_pass >/dev/null 2>&1 && declare -F tests_pass >/dev/null 2>&1; then
+        echo "test-success sentinel is stale (recorded $recorded_sha != HEAD $head_sha) — re-validating the full suite at HEAD before 'done'..." >&2
+        # tests_pass dies on failure; if it returns, the suite is green at HEAD.
+        tests_pass
+        # Refresh the sentinel to live HEAD so subsequent gates see a fresh sentinel.
+        mkdir -p "$REPO_ROOT/.correctless/artifacts" 2>/dev/null || true
+        printf '%s\n' "$head_sha" > "$test_success_sentinel" 2>/dev/null || true
+        return 0
+      fi
       echo "REFUSED: 'done' requires a test-success sentinel matching HEAD ($head_sha)." >&2
       echo "  Recorded test-success SHA ($recorded_sha) does not match HEAD — the full suite" >&2
       echo "  last passed at an earlier commit. Re-run the full suite at HEAD before completing." >&2

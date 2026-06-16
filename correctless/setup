@@ -352,6 +352,22 @@ install_hooks() {
     done
   fi
 
+  # Install path-scoped operator rule files (MA-C2, CS-020a). sync.sh propagates
+  # .claude/rules/*.md to the dist staging dir correctless/rules/; setup is the
+  # downstream consumer that installs them to the project's .correctless/rules/.
+  # PMB-003 / AP-024: glob all .md files — never a hardcoded list. Without this
+  # loop the rule files dead-end at correctless/rules/ and never reach installed
+  # projects (the operator-affordance ceiling for AP-037 lift-and-restore, etc.).
+  if [ -d "$SCRIPT_DIR/correctless/rules" ]; then
+    local rules_dest="$REPO_ROOT/.correctless/rules"
+    mkdir -p "$rules_dest"
+    for rule_file in "$SCRIPT_DIR"/correctless/rules/*.md; do
+      [ -f "$rule_file" ] || continue
+      cp "$rule_file" "$rules_dest/$(basename "$rule_file")"
+    done
+    ok "Installed operator rules to .correctless/rules/"
+  fi
+
   # ============================================
   # Write install manifest with SHA-256 checksums
   # Sources the source-tree copy of lib.sh for sha256_hash_file.

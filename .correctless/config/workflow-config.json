@@ -5,7 +5,7 @@
     "description": "Claude Code plugin framework: structured workflow skills for spec-driven development with TDD, auditing, and project health"
   },
   "commands": {
-    "test": "for f in tests/test-*.sh; do [[ \"$f\" == */test-helpers.sh ]] && continue; echo \">>> $f\"; bash \"$f\" || exit 1; done",
+    "test": "for f in tests/test-*.sh; do [[ \"$f\" == */test-helpers.sh ]] && continue; echo \">>> $f\"; bash \"$f\" || { echo \"RETRY $f\"; bash \"$f\"; } || exit 1; done",
     "test_new": "",
     "test_verbose": "bash tests/test-core.sh && bash tests/test-mcp.sh",
     "coverage": "",

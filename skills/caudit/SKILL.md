@@ -350,8 +350,15 @@ ROUND_DIFF_PATH="${ROUND_DIFF_PATH:-$(mktemp)}"
 git diff "${ROUND_START_SHA}..HEAD" > "$ROUND_DIFF_PATH"
 UNTRUSTED_RULES_TEXT="$(git show "${ROUND_START_SHA}:.claude/rules/" 2>/dev/null || printf '')"
 ROUND_FINDINGS=".correctless/artifacts/findings/audit-${PRESET}-${DATE}-round-${ROUND_N}.json"
-# Orchestrator-computed pre-PR-base SIBLING-DEFERRED markers (CS-016c); /dev/null when none.
-PRE_PR_BASE_MARKERS="${PRE_PR_BASE_MARKERS:-/dev/null}"
+# Orchestrator-computed pre-PR-base SIBLING-DEFERRED markers (CS-016c, MA-M1).
+# CODED producer — NOT a bare LLM-bound variable. build-pre-pr-base-markers.sh
+# runs `git merge-base origin/main HEAD` + `git grep` against the merge-base to
+# extract SIBLING-DEFERRED markers present at the PR base, writes them to a file,
+# and prints the path. This keeps the SUPPRESS path live (a pre-PR-base marker
+# fully suppresses; a current-PR-only marker only downgrades to MEDIUM). An empty
+# output file means "no pre-PR-base markers" — the consumer emits the in-fence
+# degradation advisory (observable, never a silent /dev/null default).
+PRE_PR_BASE_MARKERS="${PRE_PR_BASE_MARKERS:-$(bash .correctless/scripts/build-pre-pr-base-markers.sh)}"
 
 # Emit the fence text via the INSTALLED production producer (QA-001). The producer
 # self-measures DIFF+RULES bytes for the CS-014 carve (passing 0 0 here keeps the
