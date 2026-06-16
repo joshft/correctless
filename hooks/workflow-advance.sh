@@ -522,6 +522,14 @@ _done_phase_gate() {
         # Refresh the sentinel to live HEAD so subsequent gates see a fresh sentinel.
         mkdir -p "$REPO_ROOT/.correctless/artifacts" 2>/dev/null || true
         printf '%s\n' "$head_sha" > "$test_success_sentinel" 2>/dev/null || true
+        # MA2-C1: the gate just proved the full suite green at THIS exact HEAD and
+        # refreshed the sentinel. cmd_done runs tests_pass AGAIN by default (~the
+        # full suite, hundreds of seconds). Export a same-transition revalidation
+        # token keyed on the SHA we just validated so cmd_done can skip the second
+        # run. cmd_done MUST verify the token's SHA equals live HEAD before
+        # trusting it, so a stale env var (different HEAD) can never skip a needed
+        # run. The token is scoped to this single `done` transition only.
+        export _DONE_GATE_REVALIDATED="$head_sha"
         return 0
       fi
       echo "REFUSED: 'done' requires a test-success sentinel matching HEAD ($head_sha)." >&2

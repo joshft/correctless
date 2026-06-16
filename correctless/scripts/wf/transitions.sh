@@ -202,10 +202,33 @@ cmd_done() {
   require_phase_oneof "tdd-qa" "tdd-verify" "tdd-audit"
   _require_min_qa_rounds
 
-  info "Checking that tests still pass..."
-  tests_pass
-  # CS-019/QA-002: record full-suite-green for HEAD (idempotent on re-run).
-  _write_test_success_sentinel
+  # MA2-L2 BACKSTOP — DO NOT make this tests_pass conditional on the prose/gate
+  # sentinel fast-path. It is the STRUCTURAL backstop that guarantees `done`
+  # never completes on a red suite: the test-success.sha sentinel is advisory
+  # (absent => silent-allow in _done_phase_gate), so if this call were gated on
+  # the sentinel a missing/forged sentinel would create a red-suite escape. The
+  # ONLY permitted skip is the MA2-C1 same-transition revalidation guard below,
+  # which runs ONLY when _done_phase_gate already executed the full suite at THIS
+  # exact HEAD in the same `done` invocation (token SHA == live HEAD).
+  local _head_sha
+  _head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+  if [ -n "${_DONE_GATE_REVALIDATED:-}" ] && [ -n "$_head_sha" ] \
+     && [ "${_DONE_GATE_REVALIDATED}" = "$_head_sha" ]; then
+    # MA2-C1: _done_phase_gate just ran the full suite at this exact HEAD (stale-
+    # sentinel revalidation path) and refreshed the sentinel. Skip the redundant
+    # second full-suite run (~hundreds of seconds) — it would re-validate the
+    # identical tree. The token is SHA-pinned, so a stale env var from an earlier
+    # HEAD can never satisfy this and skip a needed run.
+    info "Tests already revalidated at HEAD by the done-gate this transition — skipping redundant re-run (MA2-C1)."
+  else
+    info "Checking that tests still pass..."
+    tests_pass
+    # CS-019/QA-002: record full-suite-green for HEAD (idempotent on re-run).
+    _write_test_success_sentinel
+  fi
+  # MA2-C1: consume the one-shot token so it can never leak into a later,
+  # different transition (defense against a stale exported env var).
+  unset _DONE_GATE_REVALIDATED
 
   # R-002/R-004: Check spec integrity before completing (single state read)
   local state spec_path stored_hash
