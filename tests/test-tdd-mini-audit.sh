@@ -48,8 +48,11 @@ else
 fi
 
 # R-001c: audit-mini accepts tdd-qa as a source phase
-# DA-002: cmd_audit_mini may be in a module file
-if cat $WF_ALL_FILES 2>/dev/null | awk '/cmd_audit_mini/,/^cmd_|^}$/' | grep -q 'tdd-qa'; then
+# DA-002: cmd_audit_mini may be in a module file. Anchor on the function
+# DEFINITION (not the dispatch line) so the awk range is the body — the
+# unanchored form started at the dispatch and was awk-version-sensitive to
+# intervening `}`/`cmd_` lines (matches the anchored sibling checks below).
+if cat $WF_ALL_FILES 2>/dev/null | awk '/^cmd_audit_mini\(\)/,/^}$/' | grep -q 'tdd-qa'; then
   pass "R-001c" "audit-mini accepts tdd-qa as source phase"
 else
   fail "R-001c" "audit-mini does not accept tdd-qa as source phase"
