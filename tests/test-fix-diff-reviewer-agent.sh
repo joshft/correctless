@@ -2557,39 +2557,99 @@ check_class_shaped_bug_detection() {
   # ----- CS-018: backstop invoked by CI job + /cauto Step 8 + rule + cmd_done -----
   cs_check_018
 
-  # ----- CS-019: done-gate test-success sentinel — READER + WRITER both exist -----
-  # QA-002: the gate (reader) was structurally present but practically dead —
-  # nothing WROTE the test-success-<HEAD>.sha sentinel, so the SHA-mismatch
-  # branch never fired. CS-019 now asserts BOTH: (1) the dispatcher gate READS a
-  # HEAD-SHA-pinned test-success sentinel, AND (2) at least one PRODUCER writes
-  # it after the full suite passes. Zero writers MUST FAIL (2026-04-30
-  # sole-writer-ships-with-gate convention).
+  # ----- CS-019: done-gate test-success sentinel — READER + WRITER + REACHABLE
+  #               REFUSAL (QA2-001). -----
+  # QA-002 / QA2-001: the gate (reader) was structurally present but practically
+  # dead. The prior scheme keyed the sentinel FILENAME on the HEAD SHA whose
+  # CONTENT was the same SHA, so the mismatch-refusal branch was UNREACHABLE
+  # (HEAD advanced -> different filename -> absent -> silent pass; HEAD same ->
+  # content matches -> pass). The fixed scheme writes a FIXED-NAME file
+  # `.correctless/artifacts/test-success.sha` whose CONTENT is the HEAD SHA at
+  # which the full suite last passed; the gate refuses `done` when recorded SHA
+  # != live HEAD. CS-019 now asserts THREE things: (1) the dispatcher gate READS
+  # the fixed-name sentinel, (2) at least one PRODUCER writes the fixed-name
+  # sentinel after the full suite passes, AND (3) the mismatch-refusal branch is
+  # actually REACHABLE — exercised behaviorally in a temp repo (AP-022: a gate
+  # whose refusal branch never fires is dead code).
   local ok19=1 why19=""
-  # --- Reader: the done-gate in the dispatcher reads the HEAD-SHA sentinel. ---
+  # --- Reader: the done-gate reads the FIXED-NAME sentinel (not HEAD-keyed). ---
   if [ -f "$CS_WFADV" ]; then
     grep -qE 'cmd_done|_done_phase_gate' "$CS_WFADV" || { ok19=0; why19="${why19}no cmd_done/_done_phase_gate; "; }
-    grep -qE 'test-success-' "$CS_WFADV" || { ok19=0; why19="${why19}gate does not READ a test-success-<HEAD> sentinel; "; }
+    grep -qF 'test-success.sha' "$CS_WFADV" || { ok19=0; why19="${why19}gate does not READ the fixed-name test-success.sha sentinel; "; }
+    # The old HEAD-keyed filename form (test-success-<SHA>.sha) MUST be gone from
+    # the reader — its presence means the unreachable scheme survived.
+    grep -qE 'test-success-\$?\{?[A-Za-z_]*head' "$CS_WFADV" \
+      && { ok19=0; why19="${why19}reader still uses HEAD-keyed filename (unreachable scheme, QA2-001); "; }
   else
     ok19=0; why19="${why19}workflow-advance absent; "
   fi
-  # --- Writer: a producer writes the sentinel after the full suite passes. ---
-  # Search the transition module + the suite-running delivery skills. A WRITE is
-  # a redirect of a `test-success-...sha` path, NOT just a read/compare.
-  local writer_found=0
+  # --- Writer: a producer writes the FIXED-NAME sentinel after the suite passes.
+  # A WRITE is a redirect to the literal `test-success.sha` path, NOT a HEAD-keyed
+  # filename and NOT just a read/compare. ---
+  local writer_found=0 writer_headkeyed=0
   local CS_TRANS="scripts/wf/transitions.sh"
   for wf in "$CS_TRANS" "$CS_CAUTO" "skills/cverify/SKILL.md"; do
     [ -f "$wf" ] || continue
-    if grep -qE '>[[:space:]]*"?\$?\{?[^"]*test-success-' "$wf" \
-       || grep -qE 'test-success-\$\{?head_sha\}?\.sha"?[[:space:]]*$' "$wf" \
-       || grep -qE 'printf.*test-success-.*>' "$wf"; then
-      writer_found=1
-    fi
+    grep -qE '>[[:space:]]*"?[^"]*test-success\.sha' "$wf" && writer_found=1
+    grep -qE 'test-success-\$?\{?[A-Za-z_]*head' "$wf" && writer_headkeyed=1
   done
   if [ "$writer_found" -eq 0 ]; then
-    ok19=0; why19="${why19}NO WRITER for test-success-<HEAD>.sha — gate reads a sentinel nothing writes (dead gate, AP-022/QA-002); "
+    ok19=0; why19="${why19}NO WRITER for fixed-name test-success.sha — gate reads a sentinel nothing writes (dead gate, AP-022/QA-002); "
   fi
+  if [ "$writer_headkeyed" -eq 1 ]; then
+    ok19=0; why19="${why19}a writer still uses the HEAD-keyed filename form (unreachable scheme survived, QA2-001); "
+  fi
+
+  # --- (3) BEHAVIORAL: exercise the mismatch-refusal branch end-to-end. QA2-001.
+  # Build a throwaway git repo, source the dispatcher's transition module + gate,
+  # and drive _done_phase_gate with three sentinel states:
+  #   wrong SHA  -> refusal (non-zero)
+  #   HEAD SHA   -> allow   (zero)
+  #   absent     -> allow   (zero, silent)
+  # _done_phase_gate calls `exit` on refusal, so each invocation runs in a
+  # subshell to capture the status without killing the test process.
+  if command -v git >/dev/null 2>&1; then
+    local btmp
+    btmp="$(mktemp -d)"
+    (
+      cd "$btmp" || exit 99
+      git init -q . 2>/dev/null
+      git config user.email t@t.t; git config user.name t
+      mkdir -p .correctless/artifacts
+      printf 'x\n' > f; git add f; git commit -qm init 2>/dev/null
+      # Minimal gate replica is NOT used — we source the real dispatcher gate.
+    ) >/dev/null 2>&1
+    # Source the REAL gate function from the dispatcher into this shell. The
+    # dispatcher sources modules + runs `case` at the bottom; we only want the
+    # function, so extract _done_phase_gate's body via awk and eval it.
+    local gate_src
+    gate_src="$(awk '/^_done_phase_gate\(\) \{/{c=1} c{print} /^\}/{if(c){c=0; exit}}' "$CS_WFADV")"
+    if [ -n "$gate_src" ]; then
+      eval "$gate_src"
+      local head_sha b_wrong=0 b_match=0 b_absent=0
+      head_sha="$(git -C "$btmp" rev-parse HEAD 2>/dev/null)"
+      # State A: wrong SHA -> MUST refuse (non-zero).
+      printf '%s\n' '0000000000000000000000000000000000000000' > "$btmp/.correctless/artifacts/test-success.sha"
+      ( REPO_ROOT="$btmp" _done_phase_gate ) >/dev/null 2>&1 && b_wrong=0 || b_wrong=1
+      # State B: matching HEAD SHA -> MUST allow (zero).
+      printf '%s\n' "$head_sha" > "$btmp/.correctless/artifacts/test-success.sha"
+      ( REPO_ROOT="$btmp" _done_phase_gate ) >/dev/null 2>&1 && b_match=1 || b_match=0
+      # State C: absent -> MUST allow (zero), silently.
+      rm -f "$btmp/.correctless/artifacts/test-success.sha"
+      ( REPO_ROOT="$btmp" _done_phase_gate ) >/dev/null 2>&1 && b_absent=1 || b_absent=0
+      [ "$b_wrong" -eq 1 ] || { ok19=0; why19="${why19}REFUSAL UNREACHABLE: wrong-SHA sentinel did NOT refuse 'done' (QA2-001/AP-022); "; }
+      [ "$b_match" -eq 1 ] || { ok19=0; why19="${why19}matching-SHA sentinel did NOT allow 'done'; "; }
+      [ "$b_absent" -eq 1 ] || { ok19=0; why19="${why19}absent sentinel did NOT allow 'done' (must be silent-allow); "; }
+    else
+      ok19=0; why19="${why19}could not extract _done_phase_gate body for behavioral exercise; "
+    fi
+    rm -rf "$btmp" 2>/dev/null || true
+  else
+    skip "CS-019(behavioral)" "git unavailable — cannot exercise the refusal branch (SKIP, not FAIL)"
+  fi
+
   if [ "$ok19" -eq 1 ]; then
-    cs_pass "CS-019" "done-gate reads HEAD-SHA test-success sentinel AND a producer writes it (reader+writer, QA-002)"
+    cs_pass "CS-019" "done-gate reads fixed-name test-success.sha, a producer writes it, AND the SHA-mismatch refusal is behaviorally reachable (reader+writer+refusal, QA-002/QA2-001)"
   else
     cs_fail "CS-019" "done-gate full-suite sentinel incomplete: ${why19}"
   fi
@@ -2757,8 +2817,35 @@ cs_check_011() {
   grep -qiE 'fence omitted|degrad|diff signal only' "$CS_CAUDIT" \
     || { ok11=0; why11="${why11}no degradation advisory; "; }
 
+  # --- QA2-002: Step 6a DATE must be derived from the workflow-state
+  #     `started_at` field (the SAME field audit-record.sh keys its write path
+  #     on), NOT from wall-clock `date -u`. A `date -u` DATE drifts from the
+  #     producer's write path across a UTC midnight boundary, so the read path
+  #     looks up a file written under a different date (AP-031/AP-032 — consumer
+  #     path drifting from producer path). Scope the check to the Step 6a block.
+  local block11
+  block11="$(extract_step_6a_block "$CS_CAUDIT" 2>/dev/null || true)"
+  # The DATE assignment line inside step 6a.
+  local date_line
+  date_line="$(printf '%s\n' "$block11" | grep -E '^[[:space:]]*DATE=' | head -1)"
+  if [ -z "$date_line" ]; then
+    ok11=0; why11="${why11}no DATE= assignment in step 6a; "
+  else
+    # Must reference started_at (directly or via a STARTED_AT var fed from it).
+    if printf '%s\n' "$block11" | grep -qE 'DATE=.*started_at|STARTED_AT=.*started_at|DATE=.*STARTED_AT' ; then
+      :
+    else
+      ok11=0; why11="${why11}step 6a DATE does not derive from started_at (RS-002/QA2-002 drift); "
+    fi
+    # Must NOT derive DATE from wall-clock. Reject `date -u` (or `date +`) on the
+    # DATE assignment line itself.
+    if printf '%s' "$date_line" | grep -qE 'date[[:space:]]+-u|date[[:space:]]+\+'; then
+      ok11=0; why11="${why11}step 6a DATE uses wall-clock 'date -u'/'date +' (must be started_at-keyed, QA2-002); "
+    fi
+  fi
+
   if [ "$ok11" -eq 1 ]; then
-    cs_pass "CS-011" "Step 6a fence: JSON-array, FLAT==audit-record.sh dst, producer/forensic, corrupt!=empty, asc-id, dedup, ws-filter, degrade"
+    cs_pass "CS-011" "Step 6a fence: JSON-array, FLAT==audit-record.sh dst, producer/forensic, corrupt!=empty, asc-id, dedup, ws-filter, started_at-date, degrade"
   else
     cs_fail "CS-011" "Step 6a fence emission incomplete: ${why11}"
   fi
@@ -2909,7 +2996,9 @@ cs_check_013() {
   prompt_d="$(build_caudit_prompt "$CS_FIX_ARGMAX" "$tmp/big.json" "rule text")"
   if printf '%s' "$prompt_d" | grep -qF '[truncated:'; then
     # measure the emitted object's bytes
-    entry_bytes="$(printf '%s' "$prompt_d" | grep -oE '\{"id":"PERF-12"[^}]*\}' | head -1 | wc -c | tr -d ' ')"
+    # Strip the trailing newline grep -o appends before measuring — otherwise wc
+    # -c reports object_bytes+1, masking an exactly-at-cap (4096) emit as 4097.
+    entry_bytes="$(printf '%s' "$prompt_d" | grep -oE '\{"id":"PERF-12"[^}]*\}' | head -1 | tr -d '\n' | wc -c | tr -d ' ')"
     if [ -n "$entry_bytes" ] && [ "$entry_bytes" -le 4096 ]; then
       pass "CS-013(d-perentry)" "5KB description truncated; emitted entry <=4096 bytes ($entry_bytes)"
     else
@@ -2924,7 +3013,7 @@ cs_check_013() {
   printf '%s' "$(jq -cn --arg d "$quotes" '[{id:"ESC-1",description:$d}]')" > "$tmp/esc.json"
   local prompt_esc esc_bytes
   prompt_esc="$(build_caudit_prompt "$CS_FIX_ARGMAX" "$tmp/esc.json" "rule text")"
-  esc_bytes="$(printf '%s' "$prompt_esc" | grep -oE '\{"id":"ESC-1"[^}]*\}' | head -1 | wc -c | tr -d ' ')"
+  esc_bytes="$(printf '%s' "$prompt_esc" | grep -oE '\{"id":"ESC-1"[^}]*\}' | head -1 | tr -d '\n' | wc -c | tr -d ' ')"
   if [ -n "$esc_bytes" ] && [ "$esc_bytes" -le 4096 ]; then
     pass "CS-013(d-escape)" "escape-byte fixture: emitted (post-escape) bytes <=4096 ($esc_bytes)"
   else
@@ -2953,7 +3042,7 @@ cs_check_013() {
     printf '%s' "$(jq -cn --arg d "$mb" '[{id:"MB-1",description:$d}]')" > "$tmp/mb.json"
     local prompt_mb mb_bytes
     prompt_mb="$(build_caudit_prompt "$CS_FIX_ARGMAX" "$tmp/mb.json" "rule text")"
-    mb_bytes="$(printf '%s' "$prompt_mb" | grep -oE '\{"id":"MB-1"[^}]*\}' | head -1 | wc -c | tr -d ' ')"
+    mb_bytes="$(printf '%s' "$prompt_mb" | grep -oE '\{"id":"MB-1"[^}]*\}' | head -1 | tr -d '\n' | wc -c | tr -d ' ')"
     if [ -n "$mb_bytes" ] && [ "$mb_bytes" -le 4096 ]; then
       pass "CS-013(d-multibyte)" "multibyte description truncated by BYTE measure <=4096 ($mb_bytes)"
     else
@@ -2991,6 +3080,31 @@ cs_check_013() {
     pass "CS-013(d-carve)" "aggregate cap carved to sub-16384 (DIFF+RULES=90KB -> carve=4208); emitted array <=carve ($carve_array_bytes) with truncation"
   else
     ok13=0; why13="${why13}(d-carve) aggregate not carved below 16384 to the dynamic budget (array=$carve_array_bytes, expected <=4208 w/ truncation); "
+  fi
+
+  # (d-floor) QA2-003: HARD carve enforcement at the 256-byte floor. Supply
+  #   DIFF+RULES large enough that the carve floors to 256 (e.g. DIFF+RULES near
+  #   100KB), plus n>=8 findings whose raw array vastly exceeds 256. The emitted
+  #   array MUST be <= the carve BY CONSTRUCTION — a best-effort (3-pass-only)
+  #   implementation leaves the array far above 256 here and FAILS. Dropped
+  #   findings must leave a forensic truncation marker (no silent vanish).
+  local floor_diff_bytes=70000 floor_rules_bytes=30000   # carve = 102400-100000-8192 < 256 -> floors to 256
+  local ffill
+  ffill="$(head -c 400 /dev/zero | tr '\0' 'z')"
+  # 8 findings, each ~400-byte description.
+  printf '%s' "$(jq -cn --arg d "$ffill" '[range(0;8) | {id:("FL-"+(tostring)),description:$d}]')" > "$tmp/floor.json"
+  local prompt_floor floor_array_bytes
+  prompt_floor="$(build_caudit_prompt "$CS_FIX_ARGMAX" "$tmp/floor.json" "rule text" "$floor_diff_bytes" "$floor_rules_bytes")"
+  floor_array_bytes="$(printf '%s\n' "$prompt_floor" \
+    | grep -oE '<UNTRUSTED_FINDING_DESCRIPTION[^>]*>\[.*\]</UNTRUSTED_FINDING_DESCRIPTION>' \
+    | sed -E 's/<UNTRUSTED_FINDING_DESCRIPTION[^>]*>(\[.*\])<\/UNTRUSTED_FINDING_DESCRIPTION>/\1/' \
+    | head -1 | wc -c | tr -d ' ')"
+  if [ -n "$floor_array_bytes" ] && [ "$floor_array_bytes" -gt 0 ] \
+     && [ "$floor_array_bytes" -le 256 ] \
+     && printf '%s' "$prompt_floor" | grep -qF '[truncated:'; then
+    pass "CS-013(d-floor)" "n=8 findings @ ~100KB DIFF+RULES: carve floored to 256, emitted array <=256 by construction ($floor_array_bytes) with truncation markers"
+  else
+    ok13=0; why13="${why13}(d-floor) aggregate NOT hard-enforced to the 256 carve floor (array=$floor_array_bytes, expected <=256 w/ truncation; best-effort carve leaks over cap, QA2-003); "
   fi
 
   # (e) Suppression-claim fixture: description argues against grepping; the prompt

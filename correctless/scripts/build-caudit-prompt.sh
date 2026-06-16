@@ -74,37 +74,59 @@ _byte_len() {
   printf '%s' "$1" | wc -c | tr -d ' '
 }
 
+# Serialize {"id":..,"description":..} with the description truncated to the
+# first `keep` codepoints, appending the truncation marker when keep < full.
+# Never splits a multibyte sequence or a JSON escape (substring is codepoint-
+# indexed; jq re-escapes the result so the emitted form is always valid JSON).
+_emit_obj() {
+  local id="$1" full="$2" keep="$3" raw_bytes="$4"
+  if [ "$keep" -ge "${#full}" ]; then
+    jq -cn --arg id "$id" --arg d "$full" '{id:$id,description:$d}'
+    return 0
+  fi
+  local trunc="${full:0:$keep}"
+  local kept_bytes dropped
+  kept_bytes="$(_byte_len "$trunc")"
+  dropped=$((raw_bytes - kept_bytes))
+  jq -cn --arg id "$id" --arg d "${trunc}[truncated: ${dropped} more bytes]" '{id:$id,description:$d}'
+}
+
 # Build a single emitted JSON object {"id":..,"description":..}, truncating the
 # description (by codepoints, never splitting a multibyte sequence or a JSON
 # escape) until the EMITTED object is <= cap bytes. Appends [truncated: N more
 # bytes] marker when truncation occurs. Echoes the emitted JSON object text.
+#
+# QA2-004: the keep-length is found by BINARY SEARCH on codepoint count
+# (O(log n) jq invocations) rather than a linear codepoint-drop loop (O(n)).
+# The emitted-byte length is monotonic non-decreasing in keep, so binary search
+# over [0, len] for the largest keep whose emitted object is <= cap is correct.
 _build_entry() {
   local id="$1" desc="$2" cap="${3:-$PER_ENTRY_CAP}"
   local obj
   obj="$(jq -cn --arg id "$id" --arg d "$desc" '{id:$id,description:$d}')"
-  local elen
-  # Byte length of the EMITTED (serialized) object — post-JSON-escape.
-  elen="$(_byte_len "$obj")"
-  if [ "$elen" -le "$cap" ]; then
+  # Fast path: untruncated object already fits.
+  if [ "$(_byte_len "$obj")" -le "$cap" ]; then
     printf '%s' "$obj"
     return 0
   fi
-  # Truncate the description by codepoints from the END until it fits.
-  local raw_bytes
+  local raw_bytes len
   raw_bytes="$(_byte_len "$desc")"
-  local trunc="$desc"
-  local dropped=0
-  while [ "$(_byte_len "$obj")" -gt "$cap" ] && [ -n "$trunc" ]; do
-    # Drop ~16 codepoints at a time for speed, then refine by 1.
-    local step=16
-    [ "${#trunc}" -lt 64 ] && step=1
-    trunc="${trunc%"${trunc: -$step}"}"
-    local kept_bytes
-    kept_bytes="$(_byte_len "$trunc")"
-    dropped=$((raw_bytes - kept_bytes))
-    obj="$(jq -cn --arg id "$id" --arg d "${trunc}[truncated: ${dropped} more bytes]" '{id:$id,description:$d}')"
+  len="${#desc}"
+  # Binary search for the largest keep in [0, len) whose EMITTED (post-escape,
+  # marker-appended) object is <= cap. lo is the best known-good keep so far.
+  local lo=0 hi="$len" best=0
+  while [ "$lo" -le "$hi" ]; do
+    local mid=$(( (lo + hi) / 2 ))
+    local cand
+    cand="$(_emit_obj "$id" "$desc" "$mid" "$raw_bytes")"
+    if [ "$(_byte_len "$cand")" -le "$cap" ]; then
+      best="$mid"
+      lo=$((mid + 1))
+    else
+      hi=$((mid - 1))
+    fi
   done
-  printf '%s' "$obj"
+  _emit_obj "$id" "$desc" "$best" "$raw_bytes"
 }
 
 build_caudit_prompt() {
@@ -179,6 +201,48 @@ build_caudit_prompt() {
         array_text="[${entries}]"
         pass=$((pass + 1))
       done
+
+      # QA2-003: HARD carve enforcement. After proportional re-truncation, the
+      # array may STILL exceed the carve when there are many entries (the JSON
+      # wrappers + per-entry minimums sum above the cap, or `share` hit its 64-
+      # byte floor). The invariant "emitted <= aggregate_cap" must hold BY
+      # CONSTRUCTION, not best-effort. Rebuild the array entry-by-entry, dropping
+      # WHOLE entries from the tail once the next entry would breach the cap.
+      # Each dropped entry is NOT silent — it is replaced by a minimal per-finding
+      # truncation marker object {"id":..,"description":"[truncated: dropped]"} so
+      # no finding vanishes without a trace, while still respecting the cap.
+      if [ "$(_byte_len "$array_text")" -gt "$aggregate_cap" ]; then
+        local rebuilt="" j=0
+        while [ "$j" -lt "$n" ]; do
+          local eid edesc entry marker candidate
+          eid="$(printf '%s' "$filtered" | jq -r ".[$j].id")"
+          edesc="$(printf '%s' "$filtered" | jq -r ".[$j].description")"
+          entry="$(_build_entry "$eid" "$edesc" "$PER_ENTRY_CAP")"
+          # Marker object stands in for a dropped finding (forensic, not silent).
+          marker="$(jq -cn --arg id "$eid" '{id:$id,description:"[truncated: finding dropped to honor aggregate cap]"}')"
+          # Would adding the FULL entry keep us within cap? If yes, add it; else
+          # try the marker; if even the marker breaches, stop (tail dropped).
+          if [ -z "$rebuilt" ]; then candidate="[${entry}]"; else candidate="[${rebuilt},${entry}]"; fi
+          if [ "$(_byte_len "$candidate")" -le "$aggregate_cap" ]; then
+            if [ -z "$rebuilt" ]; then rebuilt="$entry"; else rebuilt="${rebuilt},${entry}"; fi
+            j=$((j + 1)); continue
+          fi
+          if [ -z "$rebuilt" ]; then candidate="[${marker}]"; else candidate="[${rebuilt},${marker}]"; fi
+          if [ "$(_byte_len "$candidate")" -le "$aggregate_cap" ]; then
+            if [ -z "$rebuilt" ]; then rebuilt="$marker"; else rebuilt="${rebuilt},${marker}"; fi
+            j=$((j + 1)); continue
+          fi
+          # Even the marker would breach — the remaining tail cannot be carried.
+          break
+        done
+        # Guarantee a non-empty, in-cap array. If even the first marker did not
+        # fit (cap smaller than a single minimal object — only at the 256 floor
+        # with a long id), emit a single global truncation marker.
+        if [ -z "$rebuilt" ]; then
+          rebuilt="$(jq -cn '{id:"AGG",description:"[truncated: all findings dropped to honor aggregate cap]"}')"
+        fi
+        array_text="[${rebuilt}]"
+      fi
     fi
   fi
 

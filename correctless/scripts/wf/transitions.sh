@@ -10,24 +10,31 @@
 # shellcheck disable=SC2254
 
 # ---------------------------------------------------------------------------
-# CS-019 / QA-002: test-success sentinel WRITER
+# CS-019 / QA-002 / QA2-001: test-success sentinel WRITER
 # ---------------------------------------------------------------------------
-# Writes .correctless/artifacts/test-success-<HEAD-SHA>.sha after the FULL
-# tests/test-*.sh suite (commands.test) passed via tests_pass. The done-gate
-# (_done_phase_gate in the dispatcher) READS this sentinel and refuses the
-# `done` transition on a SHA MISMATCH (stale sentinel). Without this writer the
-# sentinel never exists and the gate's mismatch branch is dead code (AP-022).
+# Writes the FIXED-NAME file .correctless/artifacts/test-success.sha after the
+# FULL tests/test-*.sh suite (commands.test) passed via tests_pass. The file
+# CONTENT is the current HEAD SHA — i.e. the sentinel records "the SHA at which
+# the full suite last passed". The done-gate (_done_phase_gate in the
+# dispatcher) READS this fixed-name file and refuses the `done` transition when
+# the recorded SHA != live HEAD (the suite is stale — HEAD advanced past the
+# last green suite). A HEAD-keyed FILENAME (the prior scheme) made the mismatch
+# branch unreachable, because filename==content==SHA: an advanced HEAD changed
+# the filename (absent → pass) and an unchanged HEAD content-matched (pass).
+# Fixed filename + SHA-as-content makes the mismatch branch reachable (QA2-001).
 # .correctless/artifacts/ is gitignored, so the sentinel stays local.
 #
-# Content is the bare HEAD SHA. No-op (silent) when git or HEAD is unavailable
-# (e.g. the spec-mutation-alerts temp project that never runs the full suite),
-# keeping _done_phase_gate's absent-is-silent contract intact.
+# No-op (silent) only when git/HEAD is genuinely unavailable (no .git, detached
+# bare context). The spec-mutation-alerts temp project stubs commands.test to
+# pass, so tests_pass succeeds and the writer runs there harmlessly — its HEAD
+# is available, the sentinel is written content-matching HEAD, and the done-gate
+# allows. The absent-is-silent contract in _done_phase_gate is the backstop.
 _write_test_success_sentinel() {
   local head_sha
   head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
   [ -n "$head_sha" ] || return 0
   mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || return 0
-  printf '%s\n' "$head_sha" > "$ARTIFACTS_DIR/test-success-${head_sha}.sha" 2>/dev/null || return 0
+  printf '%s\n' "$head_sha" > "$ARTIFACTS_DIR/test-success.sha" 2>/dev/null || return 0
 }
 
 cmd_review() {

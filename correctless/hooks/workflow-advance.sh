@@ -468,9 +468,9 @@ unset _module _WF_MODULE_DIR
 # the `done` transition under two conditions:
 #   (d) A SFG lift sentinel `.correctless/.sfg-lift-active` is still in the tree
 #       (AP-037 lift-and-restore not yet restored).
-#   (CS-019) The full test suite has not produced a HEAD-SHA-pinned test-success
-#       sentinel — i.e., the recorded success SHA must content-match the current
-#       HEAD SHA (ABS-029 content-based gate, robust to ENV-003 mtime drift).
+#   (CS-019) The full test suite has not produced a fixed-name test-success
+#       sentinel whose recorded SHA content-matches the current HEAD SHA
+#       (ABS-029 content-based gate, robust to ENV-003 mtime drift).
 _done_phase_gate() {
   local sentinel=".correctless/.sfg-lift-active"
   if [ -f "$REPO_ROOT/$sentinel" ]; then
@@ -482,27 +482,32 @@ _done_phase_gate() {
     exit 1
   fi
 
-  # CS-019: require a HEAD-SHA-pinned full-suite test-success sentinel. The
-  # sentinel records the HEAD SHA at which the full tests/test-*.sh suite passed;
-  # the gate content-matches that recorded head_sha against the live HEAD SHA.
+  # CS-019 / QA2-001: require a fixed-name full-suite test-success sentinel whose
+  # CONTENT (the recorded SHA) matches the live HEAD SHA. The sentinel is the
+  # FIXED file .correctless/artifacts/test-success.sha — NOT keyed on HEAD in the
+  # filename. Its content is the HEAD SHA at which the full tests/test-*.sh suite
+  # last passed. The gate reads that recorded SHA and compares against live HEAD:
+  #   - present, content == HEAD  -> allow (suite is green at this exact tree)
+  #   - present, content != HEAD  -> REFUSE (HEAD advanced past the last green
+  #                                  suite; the sentinel is stale)
+  #   - absent                    -> allow, SILENTLY (the process gate is the
+  #                                  backstop; the sentinel is written by the
+  #                                  full-suite / CI gate per CS-019, not on
+  #                                  every run). Do NOT fail-closed on absent —
+  #                                  that breaks test-spec-mutation-alerts, whose
+  #                                  temp project's qa passes with a stubbed test
+  #                                  command and writes no sentinel.
   local head_sha test_success_sentinel recorded_sha
   head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
-  test_success_sentinel="$REPO_ROOT/.correctless/artifacts/test-success-${head_sha}.sha"
-  if [ -n "$head_sha" ]; then
-    if [ -f "$test_success_sentinel" ]; then
-      recorded_sha="$(head -n1 "$test_success_sentinel" 2>/dev/null | tr -d '[:space:]')"
-      if [ "$recorded_sha" != "$head_sha" ]; then
-        echo "REFUSED: 'done' requires a HEAD-SHA test-success sentinel matching HEAD ($head_sha)." >&2
-        echo "  Recorded test-success SHA ($recorded_sha) does not match HEAD. Re-run the full suite." >&2
-        exit 1
-      fi
+  test_success_sentinel="$REPO_ROOT/.correctless/artifacts/test-success.sha"
+  if [ -n "$head_sha" ] && [ -f "$test_success_sentinel" ]; then
+    recorded_sha="$(head -n1 "$test_success_sentinel" 2>/dev/null | tr -d '[:space:]')"
+    if [ -n "$recorded_sha" ] && [ "$recorded_sha" != "$head_sha" ]; then
+      echo "REFUSED: 'done' requires a test-success sentinel matching HEAD ($head_sha)." >&2
+      echo "  Recorded test-success SHA ($recorded_sha) does not match HEAD — the full suite" >&2
+      echo "  last passed at an earlier commit. Re-run the full suite at HEAD before completing." >&2
+      exit 1
     fi
-    # An absent test-success sentinel is intentionally NON-blocking and SILENT:
-    # normal `done` transitions proceed (the sentinel is written by the
-    # full-suite / CI gate per CS-019, not on every workflow run). Emitting a
-    # WARNING here fires on every `done` and pollutes downstream output — it
-    # matched WARNING.*spec via the temp path and broke test-spec-mutation-alerts
-    # R-002/R-003. The SHA-mismatch refusal above remains the real guard.
   fi
 }
 

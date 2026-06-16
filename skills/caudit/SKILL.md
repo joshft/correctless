@@ -332,11 +332,20 @@ embeds the emitted block verbatim into the reviewer Task prompt between
 
 ```bash
 # Producers for this block (each consumed variable is assigned here so the block
-# is self-contained). PRESET and DATE are the audit branch's preset + date — the
-# orchestrator binds them from the audit-start metadata (`audit/{preset}-{date}`),
-# date-only per RS-002. ROUND_N / ROUND_START_SHA come from The Loop above.
+# is self-contained). PRESET is the audit branch's preset. DATE is the date-only
+# portion of the workflow state's `started_at` — the SAME field audit-record.sh
+# keys its write path on (`date="${started_at%%T*}"`). It MUST NOT be wall-clock
+# (`date -u`): a `date -u` here drifts from the producer's write path the moment
+# the run crosses midnight UTC, so the read path looks up a file that was written
+# under yesterday's date (RS-002 / QA2-002, AP-031/AP-032). ROUND_N /
+# ROUND_START_SHA come from The Loop above; BRANCH_SLUG / STATE_FILE from the
+# Producer block in Step 5.5.
 PRESET="${PRESET:-$(git rev-parse --abbrev-ref HEAD | sed -E 's#^audit/([^-]+)-.*#\1#')}"
-DATE="${DATE:-$(date -u +%Y-%m-%d)}"   # date-only portion of started_at, RS-002
+# Read DATE from workflow-state started_at (date-only), NEVER from wall-clock,
+# so the read path string-matches audit-record.sh's started_at-keyed write path.
+STATE_FILE="${STATE_FILE:-.correctless/artifacts/workflow-state-${BRANCH_SLUG}.json}"
+STARTED_AT="$(jq -r '.started_at // empty' "$STATE_FILE" 2>/dev/null)"
+DATE="${DATE:-${STARTED_AT%%T*}}"   # date-only portion of started_at, RS-002
 ROUND_DIFF_PATH="${ROUND_DIFF_PATH:-$(mktemp)}"
 git diff "${ROUND_START_SHA}..HEAD" > "$ROUND_DIFF_PATH"
 UNTRUSTED_RULES_TEXT="$(git show "${ROUND_START_SHA}:.claude/rules/" 2>/dev/null || printf '')"
