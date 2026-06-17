@@ -249,6 +249,12 @@ autonomous-decision-writer.sh
 scripts/prune-scan.sh
 .correctless/scripts/prune-scan.sh
 prune-scan.sh
+scripts/external-review-run.sh
+.correctless/scripts/external-review-run.sh
+external-review-run.sh
+scripts/config-update.sh
+.correctless/scripts/config-update.sh
+config-update.sh
 .correctless/ARCHITECTURE_DEPRECATED.md
 .correctless/antipatterns-archived.md
 .correctless/CLAUDE_LEARNINGS_ARCHIVED.md

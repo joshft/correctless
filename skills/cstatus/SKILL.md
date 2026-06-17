@@ -261,6 +261,42 @@ Detect a committed-but-not-restored SFG lift sentinel. When `.correctless/.sfg-l
 
 When the sentinel is absent, omit this section entirely.
 
+### 6e. Cross-model review discoverability advisory (RS-010 / INV-023)
+
+If `codex` is on PATH (`command -v codex`) AND `.workflow.external_models` in
+`workflow-config.json` is empty or absent, emit a one-time advisory:
+
+```
+codex detected — run /csetup to enable cross-model spec review (codex reviews specs alongside Claude in /creview-spec).
+```
+
+This keeps the feature discoverable rather than invisibly dormant. If `codex` is not on
+PATH, or `external_models.codex` is already configured, omit this section entirely.
+
+### 6f. Un-adjudicated cross-model review runs (INV-008 / RS-027 / MA-005)
+
+INV-008/RS-027 promise the `pending` surface (completed codex runs whose findings
+have not yet been adjudicated) in BOTH `/creview-spec` AND `/cstatus`. Run the
+producer's `pending` subcommand and report any un-adjudicated runs so a user who
+deferred adjudication and never reopened `/creview-spec` still gets a signal
+(PMB-008 lost-findings class):
+
+```bash
+bash .correctless/scripts/external-review-run.sh pending
+```
+
+(Use `scripts/external-review-run.sh` from the source tree.) When the output is
+empty or "(no external-review history)", this section is **dormant** — emit
+nothing. When it lists one or more runs, surface:
+
+```
+Un-adjudicated cross-model review run(s): {run_id} — {N} finding(s) awaiting disposition.
+Reopen /creview-spec to adjudicate, or run: external-review-run.sh set-disposition <run_id> <finding_id> <accepted|rejected|modified|deferred|duplicate>.
+```
+
+If the producer script does not exist at either path, this section is dormant
+(PAT-019) — no error, no output.
+
 ### 7. Health Check (if requested)
 
 If the human asks "is everything set up correctly?" or similar, validate:

@@ -182,6 +182,44 @@ for skill_dir in "$skills_dir"/*/; do
 done
 
 # ============================================
+# cross-model-spec-review INV-013 / AP-008:
+#   creview-spec allowed-tools MUST contain Bash(*external-review-run.sh*)
+#   creview-spec allowed-tools MUST NOT contain Write(...external-review-history.json...)
+#     (the direct history Write grant is REMOVED so the producer is sole writer — RS-001)
+#   csetup allowed-tools MUST contain Bash(*config-update.sh*)  (RS-019)
+# ============================================
+
+echo ""
+echo "=== INV-013 (cross-model-spec-review): producer reachable; direct history Write removed ==="
+
+creview_spec="$REPO_DIR/skills/creview-spec/SKILL.md"
+csetup_skill="$REPO_DIR/skills/csetup/SKILL.md"
+
+creview_allowed="$(grep -m1 '^allowed-tools:' "$creview_spec" 2>/dev/null || true)"
+csetup_allowed="$(grep -m1 '^allowed-tools:' "$csetup_skill" 2>/dev/null || true)"
+
+# Presence: Bash grant for the producer.
+if echo "$creview_allowed" | grep -qF 'external-review-run.sh'; then
+  pass "INV-013-01" "creview-spec allowed-tools includes Bash(*external-review-run.sh*)"
+else
+  fail "INV-013-01" "creview-spec allowed-tools must include Bash(*external-review-run.sh*)"
+fi
+
+# Negative assertion: the direct history Write grant must be REMOVED (RS-001).
+if echo "$creview_allowed" | grep -qF 'external-review-history.json'; then
+  fail "INV-013-02" "creview-spec must NOT grant Write(...external-review-history.json...) — producer is sole writer (RS-001)"
+else
+  pass "INV-013-02" "creview-spec no longer grants direct Write to external-review-history.json"
+fi
+
+# csetup must grant Bash(*config-update.sh*) (RS-019).
+if echo "$csetup_allowed" | grep -qF 'config-update.sh'; then
+  pass "INV-013-03" "csetup allowed-tools includes Bash(*config-update.sh*)"
+else
+  fail "INV-013-03" "csetup allowed-tools must include Bash(*config-update.sh*) (RS-019)"
+fi
+
+# ============================================
 # Results
 # ============================================
 

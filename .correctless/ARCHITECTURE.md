@@ -84,6 +84,23 @@
 - **Acknowledged gap**: In `/cauto` autonomous mode, there is no human checkpoint between research brief and spec draft — the orchestrator may incorporate adversarial recommendations before human review. TB-002 (script-generated content → LLM context) overlaps in pattern.
 - **Test**: tests/test-cspec-research-agent.sh — INV-002 (write-free tool allowlist), INV-015 (data-treatment directive), INV-007 (skepticism override), INV-016 (network failure self-diagnostic)
 
+### TB-008: External model output → Claude review synthesis → spec
+- **Crosses**: codex (external LLM, own network + full read-only repo scope, cross-vendor/cross-process) → producer `scripts/external-review-run.sh` → Claude review synthesis (`/creview-spec`) → spec artifact.
+- **Identity assertion**: codex is config-selected via `.workflow.external_models.codex` (TB-001c). The reviewer binary, flags, and model are config inputs treated as untrusted-against-tampering (INV-017 closed allowlist, bin-realpath, flag arg-shape, model charset, clamped timeout).
+- **Data sensitivity change**: codex output is *shaped like review findings* — the exact form the orchestrator acts on — AND egresses the full repo (incl. secrets/.env/git history) to OpenAI. Stronger than TB-007 (web content via a write-free agent): the output looks actionable and the reviewer reads/exfiltrates the repo.
+- **Invariant**: nonce-fence + neutralization (INV-009, reusing `build-caudit-prompt.sh` verbatim — `<UNTRUSTED_EXTERNAL_REVIEW nonce="…">`), embedded schema + parse-gate + bounds (INV-001/002/019), advisory-only + Step 4 human disposition gate (PRH-003), sole-writer invocation-coupled record (INV-007/ABS-042). Read-only sandbox bounds WRITES only, not egress — the egress boundary is the INV-005 auto-off-when-absent gate + INV-014 disclosure + INV-022 per-run send-time notice, NOT the sandbox.
+- **Violated when**: a static (nonce-less) fence replaces the per-invocation nonce fence; the return path is unbounded; config tampering selects a non-codex binary or unsafe flags; a codex finding auto-incorporates into the spec without the human gate; the producer resolves `location` as a filesystem path or emits a codex id in Claude's `RS-` namespace.
+- **Acknowledged gap**: external review is `/creview-spec`-only; the TB-007 `/cauto` autonomous "no human checkpoint" gap does NOT apply here.
+- **Test**: tests/test-external-review.sh (INV-001/002/009/017/019, PRH-003/007), tests/test-sensitive-file-guard.sh (INV-010/020), tests/test-allowed-tools-check.sh (INV-013)
+
+### TB-001c: Structured external-tool config → argv (no eval)
+- **Crosses**: `.workflow.external_models.codex` config object → producer argv array → codex process (no shell).
+- **Identity assertion**: a third config→shell exception class beyond TB-001a/b (eval'd commands): a structured object selecting a binary + argv array, executed without a shell, gated by bin-realpath + closed flag-allowlist (INV-015/017). Honors TB-001a's must-flag convention.
+- **Data sensitivity change**: config is the first config input treated as untrusted-against-tampering rather than owner-trusted — bin/model/flag tampering is a privilege-escalation vector validated at runtime.
+- **Invariant**: the producer builds a `local -a` argv array and execs codex with no `eval`/`sh -c`/`bash -c`/backticks/string-interpolation of config values; the prompt is on stdin (INV-003), never argv; every config field is validated by the INV-017 closed allowlist before exec. TB-003 (findings→synthesis) places codex on the external-untrusted → structural-fence side.
+- **Violated when**: any config value is interpolated into a shell string or eval'd; an unknown flag passes the allowlist; the bin is accepted by basename without realpath; the model is split/concatenated onto argv.
+- **Test**: tests/test-external-review.sh (INV-015 argv-array, INV-017 closed allowlist, PRH-005)
+
 ## Abstractions
 
 ### ABS-001: Shared script library (scripts/lib.sh)
@@ -389,6 +406,15 @@
 - **Violated-when**: the backstop script is missing or stops self-deactivating; the `cmd_done` gate does not refuse on sentinel-present or omits the HEAD-SHA test-success sentinel; the CI `sfg-lift-check` job is cosmetic (falsy `if:`, `continue-on-error: true`, buried in the test-*.sh loop or a matrix) or absent from `test-suite`'s own `needs:`; the sentinel is not in SFG DEFAULTS; `/cauto` Step 8 does not invoke the installed backstop path or omits the sentinel from staging; a lift commit ships without its restore commit
 - **Test**: `tests/test-fix-diff-reviewer-agent.sh` (CS-012, CS-012a, CS-018(a/b/c/d/behavioral), CS-019); `tests/test-architecture-drift.sh` (ABS-041 coverage)
 - **Guards against**: AP-037 (protected asset is the deliverable — guard has no legitimate-edit affordance); AP-022 (dead-code-in-security-paths — the self-deactivation no-op prevents a permanently-passing backstop); silent ship of an un-restored lift state
+
+### ABS-042: Sole-writer external-review producer (scripts/external-review-run.sh)
+- **What**: `scripts/external-review-run.sh` is the sole writer of `.correctless/meta/external-review-history.json` and the run_id-keyed codex output file under `.correctless/artifacts/`. The producer invokes codex read-only against the whole spec (on stdin), validates the config-sourced invocation as a closed allowlist (INV-017), parse-gates + bounds + neutralizes the untrusted codex output (INV-002/009/019), and records the run (`record`) in the SAME execution as the codex call (invocation-coupling). It self-seeds `{"reviews":[]}` when the history file is absent (RS-009) and appends via the ABS-003 `locked_update_file` pattern (RS-012). `/creview-spec` never writes the history file — the direct `Write` grant was removed (INV-013). The lift-and-restore affordance for this SFG-protected deliverable is generalized to N deliverables (INV-020 / ABS-041).
+- **Invariant**: the producer is the single writer of the history file and the codex output file; the append is invocation-coupled (`record` in the same exec as the codex call), ABS-003-locked, self-seeding, and run_id-keyed (the `--output-last-message` path embeds the full run_id so concurrent runs never TOCTOU-collide). `external-review-run.sh` and `config-update.sh` are both present in the SFG DEFAULTS of `hooks/sensitive-file-guard.sh` and its synced mirror in all three path forms.
+- **Deviation note (RS-020)**: chooses invocation-coupling over the ABS-029 `cmd_*` phase-transition gate — justified because no phase transition depends on the history file; the `pending` subcommand is the surfacing mechanism. Documented explicitly per PAT-018, like ABS-033 documents its deviation.
+- **Enforced-at**: `scripts/external-review-run.sh` (producer), `hooks/sensitive-file-guard.sh` + mirror (three-form DEFAULTS for both writers), `skills/creview-spec/SKILL.md` (Step 3 invokes the producer; no direct history write), `tests/test-external-review.sh` (INV-007/008/019 behavioral), `tests/test-sensitive-file-guard.sh` (INV-010 three-form + live-guard)
+- **Violated-when**: a second writer touches the history file; the append is decoupled from the codex call; raw jq-to-file replaces `locked_update_file`; the codex output path omits the run_id; either privileged writer is missing from SFG DEFAULTS
+- **Test**: `tests/test-external-review.sh` (INV-007/INV-008/INV-019); `tests/test-sensitive-file-guard.sh` (INV-010/INV-020); `tests/test-architecture-drift.sh` (ABS-042 coverage)
+- **Guards against**: AP-026 (advisory-prose write contract), PMB-005 (sole-writer omission), AP-022 (dead-code-in-security-paths), AP-037 (protected deliverable)
 
 ## Patterns
 

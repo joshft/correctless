@@ -1,7 +1,7 @@
 ---
 name: csetup
 description: Initialize Correctless and run a project health check. Detects stack, configures workflow, bootstraps docs, checks security/quality/CI/testing hygiene, and offers to fix gaps. Adapts to project maturity — greenfield, early-stage, or mature.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
+allowed-tools: Bash, Bash(*config-update.sh*), Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 interaction_mode: interactive
 ---
 
@@ -302,6 +302,60 @@ fi
 ```
 
 Idempotency is mandatory — never overwrite an existing baseline.md the user may have customized.
+
+## Step 2.7: Cross-Model Spec Review (codex) Detection — optional
+
+Check for the `codex` CLI on PATH (`command -v codex`). codex (GPT-5.5) can act as a
+first-class cross-model adversarial reviewer in `/creview-spec`, reading the WHOLE spec
+alongside Claude's six agents.
+
+### Egress disclosure (INV-014 — present this once, verbatim categories)
+
+Before offering to enable cross-model review, disclose the egress boundary explicitly:
+
+> **Cross-model spec review sends data to OpenAI.** If enabled, `/creview-spec` invokes
+> codex read-only over the **entire repository**. The full repo context — **explicitly
+> including any secrets, `.env` files, and git history present in the working tree** — may
+> be sent to OpenAI. Read-only sandboxing bounds *writes*, not *egress*: codex has network
+> access and full repo read scope. The review auto-disables whenever `codex` is absent from
+> PATH, and you can turn it off any time by setting `require_external_review: false`.
+
+### Enabling (only via the sanctioned writer)
+
+If the user opts in, write the structured codex entry via the config updater — NEVER edit
+`workflow-config.json` directly (it is SFG-protected; direct Edit/redirect is blocked,
+BND-003):
+
+```bash
+bash .correctless/scripts/config-update.sh set-external-model codex \
+  bin "$(command -v codex)" \
+  model gpt-5.5-codex \
+  timeout_seconds 120 \
+  stdin true \
+  base_args '["exec","--ephemeral","--json"]'
+```
+
+`base_args` carries only OPTIONAL non-security flags. The security-mandatory
+`--sandbox read-only` is injected by the producer (`external-review-run.sh`)
+unconditionally and cannot be supplied, omitted, or overridden via config
+(MA-001) — so it is intentionally absent here.
+
+### Upgrade migration (INV-023)
+
+Existing projects carry an explicit `require_external_review: false` from the old template,
+which under the tri-state model means **force-off forever**. If you detect a pre-existing
+old-default `false`, present the INV-014 disclosure and offer to migrate it to absent/auto
+(numbered decision, recommended default = migrate). Migrate via the off-switch subcommand,
+which removes the key (absent ⇒ auto):
+
+```bash
+bash .correctless/scripts/config-update.sh set-require-external-review auto
+```
+
+`set-require-external-review true|false` are also the explicit on/off switches.
+
+If `codex` is not on PATH, skip this step silently — cross-model review stays dormant and
+auto-activates if codex is installed later (re-run `/csetup` to enable it).
 
 ## Step 3: Confirm Configuration
 

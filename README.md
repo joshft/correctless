@@ -256,7 +256,7 @@ graph LR
 | Skill | Min Intensity | What It Does |
 |-------|---------------|--------------|
 | [`/caudit`](docs/skills/caudit.md) | high | Olympics convergence audit (QA / Hacker / Performance / UX presets) |
-| [`/creview-spec`](docs/skills/creview-spec.md) | high | 6-agent adversarial spec review |
+| [`/creview-spec`](docs/skills/creview-spec.md) | high | 6-agent adversarial spec review (+ optional cross-model codex review) |
 | [`/cupdate-arch`](docs/skills/cupdate-arch.md) | high | Keep ARCHITECTURE.md current after features land |
 | [`/cmodel`](docs/skills/cmodel.md) | critical | Alloy formal modeling for state machines and protocols |
 | [`/credteam`](docs/skills/credteam.md) | critical | Live adversarial red team with source code access |
