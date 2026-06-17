@@ -399,4 +399,152 @@ else
 fi
 
 # ============================================
+# MA-S2 [integration]: whole-buffer (multiline-aware) redaction
+# A line-oriented engine (sed without -z) matches PER LINE, so a secret split
+# across a newline — and ANY inherently multi-line secret (a PEM private key
+# block is always multi-line) — would pass through unredacted to a public sink.
+# These fixtures assert the redactor processes the WHOLE buffer.
+# ============================================
+
+section "MA-S2: newline-split and multi-line secrets redact (whole-buffer)"
+
+# Tests MA-S2 [integration] (a): a secret SPLIT across a newline. The generic
+# assignment pattern allows [[:space:]] (which includes \n) between the operator
+# and the value, so `password=\n<value>` must still redact — a per-LINE sed
+# would never match `password=` on one line and the value on the next.
+if [ -x "$REDACTOR" ]; then
+  SPLIT_INPUT=$'config:\npassword=\nSuperSecretValue123456\ntrailing text'
+  SPLIT_SECRET='SuperSecretValue123456'
+  run_redactor "$SPLIT_INPUT"
+  if [ "$R_CODE" -ne 0 ]; then
+    fail "MAS2-NEWLINE-SPLIT" "redactor exited $R_CODE on a valid multi-line input"
+  elif grep -qF "$SPLIT_SECRET" <<<"$R_OUT"; then
+    fail "MAS2-NEWLINE-SPLIT" "FAILED: secret survived a newline split (per-line engine leak): '$R_OUT'"
+  elif grep -qF "$REDACTION_MARKER" <<<"$R_OUT"; then
+    pass "MAS2-NEWLINE-SPLIT" "newline-split secret redacted (whole-buffer processing)"
+  else
+    fail "MAS2-NEWLINE-SPLIT" "no $REDACTION_MARKER in output: '$R_OUT'"
+  fi
+else
+  fail "MAS2-NEWLINE-SPLIT" "scripts/redact-secrets.sh not found"
+fi
+
+# Tests MA-S2 [integration] (b): a FULL multi-line PEM private key block. The
+# ENTIRE span from BEGIN header through END footer must become <REDACTED>, not
+# just the header line — the key body (the actual secret material) lives BETWEEN
+# the header and footer across multiple lines.
+if [ -x "$REDACTOR" ]; then
+  PEM_BLOCK=$'-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEAabcdef0123456789ZZZZZZZZZZ\nQWERTYUIOPasdfghjklZXCVBNM1234567890+/==\n-----END RSA PRIVATE KEY-----'  # gitleaks:allow
+  PEM_BODY_LINE='MIIEpAIBAAKCAQEAabcdef0123456789ZZZZZZZZZZ'  # gitleaks:allow
+  run_redactor "$PEM_BLOCK"
+  if [ "$R_CODE" -ne 0 ]; then
+    fail "MAS2-PEM-BLOCK" "redactor exited $R_CODE on a valid PEM block"
+  elif grep -qF "$PEM_BODY_LINE" <<<"$R_OUT"; then
+    fail "MAS2-PEM-BLOCK" "FAILED: PEM key BODY survived (only the header was redacted): '$R_OUT'"
+  elif grep -qF 'PRIVATE KEY' <<<"$R_OUT"; then
+    fail "MAS2-PEM-BLOCK" "FAILED: PEM markers survived in output: '$R_OUT'"
+  elif grep -qF "$REDACTION_MARKER" <<<"$R_OUT"; then
+    pass "MAS2-PEM-BLOCK" "entire multi-line PEM block redacted to $REDACTION_MARKER"
+  else
+    fail "MAS2-PEM-BLOCK" "no $REDACTION_MARKER in output: '$R_OUT'"
+  fi
+else
+  fail "MAS2-PEM-BLOCK" "scripts/redact-secrets.sh not found"
+fi
+
+# ============================================
+# MA-S7 [integration]: PCRE-only pattern source FAILS CLOSED
+# gitleaks.toml patterns are PCRE (\d, (?i), lookarounds, lazy quantifiers).
+# Applying them through sed -E (POSIX-ERE) silently UNDER-redacts. The redactor
+# must REJECT such a pattern source (non-zero exit + empty stdout), never
+# silently skip or misapply it.
+# ============================================
+
+section "MA-S7: PCRE-only pattern source fails closed (no silent under-redaction)"
+
+# Tests MA-S7 [integration]: a pattern source containing a PCRE-only construct
+# (`(?i)\d{16}`-style) must abort the redactor — non-zero exit AND empty stdout.
+if [ -x "$REDACTOR" ]; then
+  PCRE_SRC="$(mktemp)"
+  # gitleaks:allow — fake PCRE-only pattern, not a real secret.
+  printf '(?i)\\d{16}\n' > "$PCRE_SRC"  # gitleaks:allow
+  tmp_out="$(mktemp)"; tmp_err="$(mktemp)"
+  printf '%s' "card 1234567812345678 here" \
+    | REDACT_PATTERN_SOURCE="$PCRE_SRC" bash "$REDACTOR" >"$tmp_out" 2>"$tmp_err"
+  pcre_code=$?
+  pcre_out="$(cat "$tmp_out")"
+  rm -f "$PCRE_SRC" "$tmp_out" "$tmp_err"
+  if [ "$pcre_code" -ne 0 ] && [ -z "$pcre_out" ]; then
+    pass "MAS7-PCRE-FAILCLOSED" "PCRE-only pattern source: non-zero exit AND empty stdout"
+  elif [ "$pcre_code" -eq 0 ]; then
+    fail "MAS7-PCRE-FAILCLOSED" "FAILED: exited 0 on a PCRE-only source (would silently under-redact)"
+  else
+    fail "MAS7-PCRE-FAILCLOSED" "non-zero exit but stdout NOT empty: '$pcre_out'"
+  fi
+else
+  fail "MAS7-PCRE-FAILCLOSED" "scripts/redact-secrets.sh not found"
+fi
+
+# Tests MA-S7 [integration]: a `\d` shorthand (PCRE) source also fails closed —
+# distinct from the inline-flag case, since `\d` compiles leniently under GNU
+# grep/sed as a literal 'd' (silent under-redaction) rather than a hard error.
+if [ -x "$REDACTOR" ]; then
+  PCRE_SRC2="$(mktemp)"
+  printf '\\d{16}\n' > "$PCRE_SRC2"  # gitleaks:allow
+  tmp_out2="$(mktemp)"
+  printf '%s' "card 1234567812345678" \
+    | REDACT_PATTERN_SOURCE="$PCRE_SRC2" bash "$REDACTOR" >"$tmp_out2" 2>/dev/null
+  pcre2_code=$?
+  pcre2_out="$(cat "$tmp_out2")"
+  rm -f "$PCRE_SRC2" "$tmp_out2"
+  if [ "$pcre2_code" -ne 0 ] && [ -z "$pcre2_out" ]; then
+    pass "MAS7-PCRE-SHORTHAND" "\\d shorthand source fails closed (no silent literal-'d' under-redaction)"
+  else
+    fail "MAS7-PCRE-SHORTHAND" "FAILED: \\d source did not fail closed (exit=$pcre2_code, out='$pcre2_out')"
+  fi
+else
+  fail "MAS7-PCRE-SHORTHAND" "scripts/redact-secrets.sh not found"
+fi
+
+# ============================================
+# MA-S3 [structural]: setup installs the bundled pattern set
+# On an installed project the redactor probes .correctless/config/secret-patterns.txt;
+# if setup never installs it, the redactor fails closed on every run and /cchores
+# aborts. Assert setup references the install path (the feature is dead-on-arrival
+# without it). This is a source-reference guard, not a full install simulation.
+# ============================================
+
+section "MA-S3: setup installs secret-patterns.txt to .correctless/config/"
+
+SETUP_FILE="$REPO_DIR/setup"
+if [ -f "$SETUP_FILE" ]; then
+  setup_src="$(cat "$SETUP_FILE")"
+  if grep -qF '.correctless/config/secret-patterns.txt' <<<"$setup_src" \
+     && grep -qF 'templates/secret-patterns.txt' <<<"$setup_src"; then
+    pass "MAS3-SETUP-INSTALL" "setup installs templates/secret-patterns.txt -> .correctless/config/secret-patterns.txt"
+  else
+    fail "MAS3-SETUP-INSTALL" "setup does NOT install secret-patterns.txt to .correctless/config/ (redactor dead-on-arrival)"
+  fi
+else
+  fail "MAS3-SETUP-INSTALL" "setup file not found at $SETUP_FILE"
+fi
+
+# Tests MA-S3 [structural]: setup does NOT wholesale-gitignore .correctless/ — the
+# project intentionally TRACKS .correctless/ (specs/config/architecture) and the
+# gitignore policy is the user's call (test-consolidation.sh R-002). Chore artifacts
+# stay out of commits via the scoped-staging + `git restore --staged` guard (INV-011),
+# not a setup-imposed ignore. This test pins that setup must NOT add a `.correctless/`
+# ignore entry (the redactor pattern-source install is covered by MAS3-SETUP-PATTERNS).
+if [ -f "$SETUP_FILE" ]; then
+  setup_src="$(grep -vE '^[[:space:]]*#' "$SETUP_FILE")"  # ignore comments
+  if grep -qE 'gitignore.*\.correctless/(artifacts|meta)|ensure_gitignore_entry[^(]*\.correctless' <<<"$setup_src"; then
+    fail "MAS3-SETUP-GITIGNORE" "setup wholesale-gitignores .correctless/ subdirs — conflicts with the tracked-.correctless decision (test-consolidation R-002)"
+  else
+    pass "MAS3-SETUP-GITIGNORE" "setup does NOT impose a .correctless/ gitignore (tracked-.correctless decision honored; artifacts protected by INV-011 staging guard)"
+  fi
+else
+  fail "MAS3-SETUP-GITIGNORE" "setup file not found at $SETUP_FILE"
+fi
+
+# ============================================
 summary "test-redact-secrets"

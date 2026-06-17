@@ -53,8 +53,15 @@ survives the Task hop — honor it.
 4. Run the repro test (via Bash, using the project's test command) and confirm it
    now passes. Run the existing test suite and confirm no regressions.
 
-## What you do NOT do
+## What you do NOT do / MUST NOT edit
 
+- **Never edit shared project docs.** You MUST NOT edit `.correctless/antipatterns.md`,
+  `.correctless/ARCHITECTURE.md`, `.correctless/AGENT_CONTEXT.md`, `CLAUDE.md`, `README.md`,
+  or any other shared project-wide documentation file. These are not part of any bug's
+  code path. Editing them is an INV-010 scope violation — a stray antipatterns.md/architecture
+  edit leaks into the chore PR diff. **Your edits are confined to the source files named in
+  the root-cause analysis's code path PLUS the repro test you implement against (read-only
+  for you — you do not edit it either).** Nothing else.
 - Edit the repro test or any other test file (agent separation — the test is the
   contract).
 - Spawn sub-agents (you have no `Task`).

@@ -1260,6 +1260,24 @@ if [ -f "$SCRIPT_DIR/templates/auto-policy.json" ]; then
   create_if_missing "$REPO_ROOT/.correctless/config/auto-policy.json" "$SCRIPT_DIR/templates/auto-policy.json" "auto-policy.json"
 fi
 
+# Install the bundled secret-redaction pattern set to .correctless/config/ so the
+# coded outbound redactor (scripts/redact-secrets.sh) has a pattern source on an
+# installed project (INV-013 / MA-S3). Without this the redactor fails closed on
+# every /cchores run because NONE of its probed sources exist on a fresh install.
+# Precedence in the redactor: a /csetup gitleaks.toml wins if present; this
+# installed file is the bundled POSIX-ERE fallback.
+if [ -f "$SCRIPT_DIR/templates/secret-patterns.txt" ]; then
+  create_if_missing "$REPO_ROOT/.correctless/config/secret-patterns.txt" "$SCRIPT_DIR/templates/secret-patterns.txt" "secret-patterns.txt (outbound redaction patterns)"
+fi
+
+# NOTE (MA-S3): setup deliberately does NOT auto-add `.correctless/artifacts/` or
+# `.correctless/meta/` to the project .gitignore. The project intentionally TRACKS
+# `.correctless/` (specs, config, architecture) and the gitignore policy is the
+# user's call (the /csetup gitignore decision). Chore artifacts are kept out of
+# commits by the scoped-staging + `git restore --staged .correctless/artifacts/
+# .correctless/meta/` belt-and-suspenders guard (INV-011), not by a setup-imposed
+# wholesale ignore — see tests/test-consolidation.sh R-002.
+
 # Record file state for the skill agent (template, existing, or missing→template)
 ARCH_STATE="$(detect_file_state "$REPO_ROOT/.correctless/ARCHITECTURE.md")"
 AGENT_STATE="$(detect_file_state "$REPO_ROOT/.correctless/AGENT_CONTEXT.md")"

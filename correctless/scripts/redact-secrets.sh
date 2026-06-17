@@ -122,24 +122,157 @@ if [ "${#PATTERNS[@]}" -eq 0 ]; then
 fi
 
 # ============================================
-# STEP 4: Read all of stdin, then apply each pattern's substitution in turn.
+# STEP 3b: Validate every pattern is genuinely POSIX-ERE (MA-S7).
+#   gitleaks.toml is an advertised pattern source, but its patterns are written
+#   in the PCRE dialect (`\d`, `\w`, `\s`, `(?i)`/`(?s)` inline flags,
+#   `(?=...)`/`(?!...)` lookarounds, non-greedy `*?`/`+?`). These are NOT POSIX
+#   ERE. Two failure modes must both be caught:
+#     1. HARD compile error — `sed -E`/`grep -E` rejects the pattern.
+#     2. SILENT misapplication — GNU grep/sed leniently ACCEPT `\d`/`(?i)` but
+#        interpret them as literals (`\d` => literal 'd'), so the pattern
+#        UNDER-redacts. A pure "does it compile?" check misses this class.
+#   To keep "advertised gitleaks.toml support" HONEST we fail closed on BOTH:
+#   any PCRE-only construct OR any pattern that does not compile as ERE.
+# ============================================
+# PCRE-only construct probe. ERE has no inline-flag/lookaround `(?...)` groups,
+# no `\d`/`\w`/`\s`/`\D`/`\W`/`\S` shorthands, and no lazy `*?`/`+?`/`??`/`{m,n}?`
+# quantifiers. Any of these means the pattern was authored for PCRE, not ERE.
+pcre_only_construct() {
+  local p="$1"
+  case "$p" in
+    *'(?'*) return 0 ;;            # inline flags / lookarounds / named groups
+    *'\d'*|*'\D'*) return 0 ;;
+    *'\w'*|*'\W'*) return 0 ;;
+    *'\s'*|*'\S'*) return 0 ;;
+  esac
+  # Lazy quantifiers: a quantifier immediately followed by '?'.
+  if printf '%s' "$p" | grep -Eq -e '[*+?}]\?'; then
+    return 0
+  fi
+  return 1
+}
+
+for pat in "${PATTERNS[@]}"; do
+  if pcre_only_construct "$pat"; then
+    echo "redact-secrets: pattern uses PCRE-only constructs unsupported by POSIX-ERE (\\d / \\w / \\s / (?...) / lazy quantifier): '$pat' — failing closed" >&2
+    exit 5
+  fi
+  # `printf '' | grep -E "$pat"` compiles the regex without needing a match.
+  # grep exits 1 (no match) on a valid pattern against empty input, and 2 on a
+  # regex COMPILE error. We only treat exit >=2 as a compile failure. The
+  # `|| grep_status=$?` form keeps `set -e` from aborting on the benign exit 1.
+  # `-e "$pat"` so a pattern beginning with `-` (e.g. the PEM header) is not
+  # mistaken for a grep option.
+  grep_status=0
+  printf '' | grep -E -e "$pat" >/dev/null 2>&1 || grep_status=$?
+  if [ "$grep_status" -ge 2 ]; then
+    echo "redact-secrets: pattern does not compile as POSIX-ERE: '$pat' — failing closed" >&2
+    exit 5
+  fi
+done
+
+# ============================================
+# STEP 4: Read all of stdin, then apply each pattern's substitution over the
+#   WHOLE buffer (MA-S2). A line-oriented engine (`sed` without -z) matches per
+#   line, so a secret split across a newline — and ANY inherently multi-line
+#   secret such as a PEM private key block — would pass through unredacted to a
+#   public sink. We process the entire buffer as a single string so the dotall /
+#   cross-newline match works.
+#
 #   Substitution delimiter: SOH (0x01) control byte — cannot appear in the
 #   patterns (POSIX-ERE source text) nor in realistic egress prose, so it never
 #   collides with the '/', '+', '=' characters present in the patterns.
+#
+#   Multiline mechanism precedence:
+#     1. perl -0777  — slurp whole input; `(?i)`+`(?s)` make `.` cross newlines.
+#                      Translate ERE patterns directly (perl regex is a PCRE
+#                      superset of ERE for the constructs we accept). Preferred.
+#     2. GNU sed -z  — null-separated => the whole buffer is one "line", so the
+#                      `I` (case-insensitive) flag plus a newline-aware pattern
+#                      span the buffer. Used when perl is unavailable.
+#     3. portable awk fallback — read the whole record (RS set to a byte that
+#                      cannot appear in text) and shell out per pattern is not
+#                      portable; instead the final fallback applies sed -E per
+#                      pattern over the buffer with explicit newline handling.
 # ============================================
+
+# Slurp stdin verbatim into a temp file (preserve embedded newlines exactly;
+# command-substitution would strip trailing newlines and cannot hold NULs).
+INPUT_FILE="$(mktemp)"
+trap 'rm -f "$INPUT_FILE"' EXIT
+cat > "$INPUT_FILE"
+
+# Build the PEM-block span pattern. A PEM private key is ALWAYS multi-line; we
+# redact the ENTIRE span from the BEGIN header through the END footer, not just
+# the header line (MA-S2). This augments (does not replace) any line-oriented
+# PEM-header pattern already present in the source.
+PEM_BEGIN='-----BEGIN [A-Z ]*PRIVATE KEY-----'
+PEM_END='-----END [A-Z ]*PRIVATE KEY-----'
+
+redact_with_perl() {
+  # Pass patterns as @ARGV after a sentinel; read text from the temp file via
+  # -0777 slurp. (?is) => case-insensitive + dotall so `.` crosses newlines.
+  perl -0777 -e '
+    my $marker = "<REDACTED>";
+    my $pem_begin = shift @ARGV;
+    my $pem_end   = shift @ARGV;
+    my $file      = shift @ARGV;
+    my @pats      = @ARGV;
+    local $/; open(my $fh, "<", $file) or exit 7;
+    my $text = <$fh>; close($fh);
+    # PEM multi-line span first: BEGIN ... END, non-greedy, dotall + case-insens.
+    # $pem_begin/$pem_end are themselves ERE; embed them as regex, not literal.
+    my $span = "(?is)$pem_begin.*?$pem_end";
+    $text =~ s/$span/$marker/g;
+    for my $p (@pats) {
+      $text =~ s/(?i)$p/$marker/g;
+    }
+    print $text;
+  ' -- "$PEM_BEGIN" "$PEM_END" "$INPUT_FILE" "${PATTERNS[@]}"
+}
+
+redact_with_sed_z() {
+  # GNU sed -z: the whole buffer is one NUL-terminated record, so a pattern can
+  # span newlines and the `I` flag applies case-insensitively across it.
+  local out
+  out="$(cat "$INPUT_FILE")"
+  # PEM span first. With -z the buffer is one record but `.` still does not match
+  # a newline, so we span with `(.|\n)*` to cross the multi-line key body. The
+  # match is greedy; in practice one PEM block per body, so greedy is fine.
+  out="$(printf '%s' "$out" \
+    | sed -zE "s${DELIM}${PEM_BEGIN}(.|\n)*${PEM_END}${DELIM}<REDACTED>${DELIM}gI" 2>/dev/null || printf '%s' "$out")"
+  for pat in "${PATTERNS[@]}"; do
+    out="$(printf '%s' "$out" \
+      | sed -zE "s${DELIM}${pat}${DELIM}<REDACTED>${DELIM}gI")"
+  done
+  printf '%s' "$out"
+}
+
 DELIM="$(printf '\001')"
 
-# Slurp stdin verbatim (preserve embedded newlines; command-substitution strips
-# only the trailing newline, which is acceptable for egress bodies).
-INPUT="$(cat)"
-
-OUTPUT="$INPUT"
-for pat in "${PATTERNS[@]}"; do
-  # `I` flag (GNU sed) makes the match case-insensitive so PASSWORD=, Token:,
-  # etc. all redact. `g` replaces every occurrence on every line.
-  OUTPUT="$(printf '%s' "$OUTPUT" \
-    | sed -E "s${DELIM}${pat}${DELIM}<REDACTED>${DELIM}gI")"
-done
+if command -v perl >/dev/null 2>&1; then
+  OUTPUT="$(redact_with_perl)"
+elif printf '' | sed -zE 's/x/y/' >/dev/null 2>&1; then
+  # GNU sed with -z support.
+  OUTPUT="$(redact_with_sed_z)"
+else
+  # Portable last-resort fallback: per-pattern sed over the buffer. This is
+  # line-oriented for single-line patterns; the PEM span is handled by a tr-join
+  # trick (collapse newlines to a sentinel, redact the span, restore). It is
+  # strictly a degraded path for environments lacking both perl and GNU sed -z.
+  OUTPUT="$(cat "$INPUT_FILE")"
+  # Join lines on a SUB (0x1a) sentinel so the PEM span pattern can match across
+  # original newlines, then restore the surviving newlines.
+  SENT="$(printf '\032')"
+  joined="$(printf '%s' "$OUTPUT" | tr '\n' "$SENT")"
+  joined="$(printf '%s' "$joined" \
+    | sed -E "s${DELIM}${PEM_BEGIN}[^${DELIM}]*${PEM_END}${DELIM}<REDACTED>${DELIM}gI" 2>/dev/null || printf '%s' "$joined")"
+  OUTPUT="$(printf '%s' "$joined" | tr "$SENT" '\n')"
+  for pat in "${PATTERNS[@]}"; do
+    OUTPUT="$(printf '%s' "$OUTPUT" \
+      | sed -E "s${DELIM}${pat}${DELIM}<REDACTED>${DELIM}gI")"
+  done
+fi
 
 printf '%s' "$OUTPUT"
 exit 0

@@ -241,6 +241,60 @@ else
   fail "R-006c" "cauto does not reference sole-writer or ABS-030 for autonomous-decisions JSONL"
 fi
 
+# R-006d-cchores [positive]: cchores is allowlisted (like cauto) NOT by a blanket
+# exemption but because it is verified to write only THROUGH
+# autonomous-decision-writer.sh. A blanket `continue` would let cchores hold a
+# direct-write to autonomous-decisions (its allowed-tools include
+# `Write(.correctless/artifacts/*)`) without detection — the AP-022 dead-exemption
+# shape. So before exempting it from the loop's negative check below, assert the
+# POSITIVE write-through contract here: cchores SKILL.md (a) REFERENCES
+# autonomous-decision-writer.sh, AND (b) contains NO direct-write pattern to an
+# autonomous-decisions artifact (no Write(...autonomous-decisions...), no
+# >>/>/tee redirect to autonomous-decisions-*). Mirrors cauto's R-006c/R-006e
+# positive contract. Assertions use here-strings (not printf|grep) per #186/AP-033.
+CCHORES_SKILL_FILE="$SKILLS_DIR/cchores/SKILL.md"
+if [ -f "$CCHORES_SKILL_FILE" ]; then
+  CCHORES_BODY="$(cat "$CCHORES_SKILL_FILE")"
+
+  # (a) must reference the sole-writer script
+  if grep -qF 'autonomous-decision-writer.sh' <<<"$CCHORES_BODY"; then
+    pass "R-006d-cchores-1" "cchores references autonomous-decision-writer.sh (writes THROUGH the sole writer)"
+  else
+    fail "R-006d-cchores-1" "cchores does NOT reference autonomous-decision-writer.sh (allowlist exemption unjustified)"
+  fi
+
+  # (b) must NOT contain any direct-write to autonomous-decisions: neither a
+  # Write(...autonomous-decisions...) tool reference, nor a >>/>/tee redirect to
+  # an autonomous-decisions-* file. The writer-script invocation
+  # (autonomous-decision-writer.sh) is the legitimate path and is excluded.
+  cchores_directwrite=""
+  # Tool-level direct write: Write(...autonomous-decisions...)
+  if grep -qiE 'Write\([^)]*autonomous-decisions' <<<"$CCHORES_BODY"; then
+    cchores_directwrite="${cchores_directwrite}Write(autonomous-decisions) "
+  fi
+  # Redirect/tee to an autonomous-decisions-* file (NOT the writer script).
+  # Exclude lines mentioning the writer script so the legitimate invocation
+  # (which may pipe into the script) is not misflagged.
+  while IFS= read -r _adline; do
+    [ -n "$_adline" ] || continue
+    case "$_adline" in
+      *autonomous-decision-writer*) continue ;;  # the legitimate writer path
+    esac
+    if grep -qiE '(>>|>|tee)[[:space:]]*[^|]*autonomous-decisions-' <<<"$_adline"; then
+      cchores_directwrite="${cchores_directwrite}redirect "
+    fi
+  done < <(grep -niE 'autonomous-decisions-' <<<"$CCHORES_BODY")
+
+  if [ -z "$cchores_directwrite" ]; then
+    pass "R-006d-cchores-2" "cchores has NO direct-write to autonomous-decisions (no Write(...), no >>/>/tee redirect — write-through only)"
+  else
+    fail "R-006d-cchores-2" "cchores contains a direct-write to autonomous-decisions: $cchores_directwrite(must write only THROUGH autonomous-decision-writer.sh)"
+  fi
+else
+  fail "R-006d-cchores-1" "skills/cchores/SKILL.md not found (cannot verify write-through contract)"
+  fail "R-006d-cchores-2" "skills/cchores/SKILL.md not found (cannot verify direct-write absence)"
+fi
+
 # R-006d: Skills must NOT write to autonomous-decisions JSONL directly
 r006_violators=""
 for skill_file in $SKILLS_DIR/*/SKILL.md; do
@@ -248,8 +302,11 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
   skill_name=$(basename "$(dirname "$skill_file")")
   [ "$skill_name" = "_shared" ] && continue
   [ "$skill_name" = "cauto" ] && continue
-  # cchores is an authorized invoker of autonomous-decision-writer.sh (ABS-030 revised,
-  # R-006d allowlist) — it writes only THROUGH the sole-writer script, never directly.
+  # cchores is an authorized invoker of autonomous-decision-writer.sh (ABS-030
+  # revised, R-006d allowlist). It is NOT blanket-exempted: the positive
+  # write-through contract is asserted in R-006d-cchores-1/2 ABOVE. The loop skip
+  # here only prevents the negative-check from double-flagging the same skill the
+  # positive block already verified.
   [ "$skill_name" = "cchores" ] && continue
 
   if grep -q 'autonomous-decisions-' "$skill_file" 2>/dev/null; then
@@ -261,7 +318,7 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
 done
 
 if [ -z "$r006_violators" ]; then
-  pass "R-006d" "No non-cauto skills write to autonomous-decisions JSONL"
+  pass "R-006d" "No non-cauto skills write to autonomous-decisions JSONL (cchores write-through verified separately)"
 else
   fail "R-006d" "Skills writing to autonomous-decisions JSONL: $r006_violators"
 fi

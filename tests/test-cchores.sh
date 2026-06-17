@@ -805,7 +805,7 @@ for g in "git status" "git fetch" "git switch" "git reset" "git restore" "git re
 done
 
 # INV-017c [structural]: tooling/scripts pinned.
-for t in "jq" "shellcheck" "bash sync.sh" "redact-secrets.sh" "cauto-lock.sh" "autonomous-decision-writer.sh" "check-no-pending-sfg-lift.sh" "timeout" "gtimeout"; do
+for t in "jq" "shellcheck" "bash sync.sh" "redact-secrets.sh" "cchores-fence-issue.sh" "cchores-emit.sh" "cauto-lock.sh" "autonomous-decision-writer.sh" "check-no-pending-sfg-lift.sh" "timeout" "gtimeout"; do
   id="INV-017-tool-$(echo "$t" | tr ' ./' '---')"
   assert_match "$id" "allowed-tools pins $t" "$t" "$SKILL_SRC"
 done
@@ -1087,6 +1087,81 @@ assert_match "BND-003b" "empty candidate set writes a run report (non-silent no-
   'no.?op.*report|report.*no.?op|clean.*no.?op' "$SKILL_SRC"
 assert_match "BND-003c" "no-op considers full pagination, not just --limit 100 (RS-028)" \
   '(full )?pagination|not just .*100' "$SKILL_SRC"
+
+# ============================================================================
+# CODED chokepoints (Wave 2): INGRESS fence + EGRESS redact/cap wired into SKILL
+# ============================================================================
+
+section "CODED chokepoints: ingress fence + egress emit wired into SKILL"
+
+# CHK-001 [structural]: allowed-tools pins BOTH new coded helpers (ingress + egress).
+assert_match "CHK-001a" "allowed-tools pins cchores-fence-issue.sh (INGRESS chokepoint)" \
+  'Bash\(bash \.correctless/scripts/cchores-fence-issue\.sh' "$SKILL_SRC"
+assert_match "CHK-001b" "allowed-tools pins cchores-emit.sh (EGRESS chokepoint)" \
+  'Bash\(bash \.correctless/scripts/cchores-emit\.sh' "$SKILL_SRC"
+
+# CHK-002 [structural]: INGRESS — issue text routed through the coded fence helper,
+# and the SKILL states ONLY the fenced output reaches the Task prompt (never raw).
+assert_match "CHK-002a" "SKILL references cchores-fence-issue.sh at ingress" \
+  'cchores-fence-issue\.sh' "$SKILL_SRC"
+assert_match "CHK-002b" "fenced output (not raw issue text) placed in the Task prompt" \
+  '(only).*(fenced|helper).*(output|fenced).*(prompt|Task)|never raw issue text|fenced output.*(prompt|Task)' \
+  "$SKILL_SRC"
+# CHK-002c: the fence is applied at BOTH dispatch points (classifier + /cdebug). The
+# coded helper appears at least twice in the body (the two dispatch sites + INV-009).
+if [ -n "$SKILL_BODY" ]; then
+  fence_hits="$(grep -coE 'cchores-fence-issue\.sh' <<<"$SKILL_BODY")"
+  fence_hits="${fence_hits:-0}"
+  if [ "$fence_hits" -ge 2 ]; then
+    pass "CHK-002c" "ingress fence helper referenced at >=2 sites (classifier + /cdebug dispatch), got $fence_hits"
+  else
+    fail "CHK-002c" "ingress fence helper referenced <2 times in body (got $fence_hits) — both dispatch points must fence"
+  fi
+else
+  fail "CHK-002c" "SKILL body empty — ingress dispatch-site coverage unverifiable"
+fi
+# CHK-002d: coded helper (not hand-rolled prose) does nonce + neutralization + cap.
+assert_match "CHK-002d" "coded helper (not hand-rolled) does nonce + neutralize + cap" \
+  '(coded).*(helper|chokepoint|fence-issue).*(nonce|neutraliz|cap)|not.*hand-rolled' "$SKILL_SRC"
+
+# CHK-003 [structural]: EGRESS — every outbound sink routed through cchores-emit.sh
+# (which itself pipes through redact-secrets.sh). PR title, PR body, comment, commit.
+assert_match "CHK-003a" "SKILL routes egress through cchores-emit.sh" \
+  'cchores-emit\.sh' "$SKILL_SRC"
+assert_match "CHK-003b" "egress emit names redact-secrets.sh as the redaction pass" \
+  'cchores-emit.*redact-secrets|redact-secrets.*cchores-emit|redact-secrets\.sh' "$SKILL_SRC"
+assert_match "CHK-003c" "PR title routed through cchores-emit --sink title" \
+  'cchores-emit\.sh --sink title' "$SKILL_SRC"
+assert_match "CHK-003d" "PR body routed through cchores-emit --sink pr-body" \
+  'cchores-emit\.sh --sink pr-body' "$SKILL_SRC"
+assert_match "CHK-003e" "issue comment routed through cchores-emit --sink comment" \
+  'cchores-emit\.sh --sink comment' "$SKILL_SRC"
+assert_match "CHK-003f" "commit message routed through cchores-emit --sink commit" \
+  'cchores-emit\.sh --sink commit' "$SKILL_SRC"
+# CHK-003g: cchores-emit.sh is named the SOLE egress path (cannot route around it).
+assert_match "CHK-003g" "cchores-emit.sh named as the SOLE egress path" \
+  '(SOLE|single) egress path|sole.*(redaction|egress)' "$SKILL_SRC"
+
+# CHK-004 [structural]: INV-010 abort covers antipatterns.md + shared project docs.
+assert_match "CHK-004a" "diff allowlist aborts on .correctless/antipatterns.md" \
+  'antipatterns\.md' "$SKILL_SRC"
+assert_match "CHK-004b" "diff allowlist aborts on shared project docs (ARCHITECTURE/AGENT_CONTEXT/CLAUDE/README)" \
+  '(ARCHITECTURE\.md.*AGENT_CONTEXT\.md|shared project doc).*(CLAUDE\.md|README\.md)|antipatterns\.md.*(ARCHITECTURE|shared project)' \
+  "$SKILL_SRC"
+
+# CHK-005 [structural]: EA-007 preflight verifies cdebug-fix.md resolves (not just classifier).
+assert_match "CHK-005a" "preflight EA-007 verifies cdebug-fix.md resolves via Task" \
+  'cdebug-fix\.md.*(resolve|Task)|(resolve|Task).*cdebug-fix\.md' "$SKILL_SRC"
+assert_match "CHK-005b" "preflight checks BOTH classifier AND cdebug-fix before selecting an issue" \
+  '(both|AND).*(classifier|cchores-issue-classifier).*cdebug-fix|cdebug-fix.*(classifier|before selecting)' \
+  "$SKILL_SRC"
+
+# CHK-006 [structural]: INV-015 lock — PID-liveness stale-recovery named PRIMARY release,
+# cooperative prose release named the fast-path.
+assert_match "CHK-006a" "PID-liveness stale-recovery is the PRIMARY release mechanism" \
+  '(PID.?liveness|stale.?recovery).*PRIMARY|PRIMARY release mechanism' "$SKILL_SRC"
+assert_match "CHK-006b" "prose 'release on every terminal path' is the cooperative fast-path" \
+  'cooperative fast-path|fast-path.*(release|cooperative)' "$SKILL_SRC"
 
 # ============================================================================
 summary "test-cchores.sh"

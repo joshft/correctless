@@ -474,6 +474,43 @@ else
 fi
 
 # ============================================================================
+# INV-010 (leaf write-scope): agents/cdebug-fix.md MUST carry an explicit
+# do-not-edit-shared-project-docs directive. The leaf fix agent has unscoped
+# Write/Edit; without this prompt-level directive it could edit
+# `.correctless/antipatterns.md` (a shared project doc NOT under
+# .correctless/artifacts|meta and NOT SFG-protected), leaking into the chore PR
+# diff (MA-S4 / INV-010 scope violation). The orchestrator's Phase-5 suppression
+# guards the orchestrator path; this guards the LEAF path that survives the Task
+# hop. Asserted via a here-string (not printf|grep) per #186/AP-033.
+# ============================================================================
+
+section "INV-010: cdebug-fix leaf agent has do-not-edit-shared-docs directive"
+
+if [ -f "$FIX_AGENT" ]; then
+  FIX_AGENT_BODY="$(cat "$FIX_AGENT")"
+  # The directive must (a) name antipatterns.md as a file NOT to edit, and
+  # (b) frame it as a do-not-edit / MUST NOT edit constraint on shared docs.
+  names_antipatterns=$(grep -qiF 'antipatterns.md' <<<"$FIX_AGENT_BODY" && echo 1 || echo 0)
+  has_donotedit=$(grep -qiE 'never edit|must not edit|do not edit|MUST NOT.*edit' <<<"$FIX_AGENT_BODY" && echo 1 || echo 0)
+  names_sharedclass=$(grep -qiE 'shared project doc|shared .*documentation|shared.*doc' <<<"$FIX_AGENT_BODY" && echo 1 || echo 0)
+  if [ "$names_antipatterns" = 1 ] && [ "$has_donotedit" = 1 ] && [ "$names_sharedclass" = 1 ]; then
+    pass "INV-010-1" "agents/cdebug-fix.md forbids editing antipatterns.md / shared project docs (do-not-edit directive)"
+  else
+    fail "INV-010-1" "agents/cdebug-fix.md missing do-not-edit-shared-docs directive (antipatterns=$names_antipatterns do-not-edit=$has_donotedit shared-class=$names_sharedclass)"
+  fi
+
+  # The directive must also tie the prohibition to the INV-010 scope/PR-leak rationale.
+  if grep -qiE 'INV-010|leak.*(chore )?PR|PR (diff|leak)|scope violation' <<<"$FIX_AGENT_BODY"; then
+    pass "INV-010-2" "do-not-edit directive cites INV-010 / chore-PR-leak rationale"
+  else
+    fail "INV-010-2" "do-not-edit directive does not cite the INV-010 / PR-leak rationale (why shared docs must not be edited)"
+  fi
+else
+  fail "INV-010-1" "agents/cdebug-fix.md not found (cannot check do-not-edit directive)"
+  fail "INV-010-2" "agents/cdebug-fix.md not found (cannot check INV-010 rationale)"
+fi
+
+# ============================================================================
 # INV-006(g): Write-path gating — generalizes INV-006(a) beyond human-prompt
 # phrases to ANY /cdebug phase that performs a non-artifact file write to a
 # tracked project doc (e.g. the Phase 5 class-fix write to
