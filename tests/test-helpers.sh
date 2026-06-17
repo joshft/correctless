@@ -15,7 +15,15 @@
 # Preamble
 # ============================================================================
 
-set -uo pipefail
+# nounset on; pipefail intentionally OFF. The suite's pervasive `producer | grep -q`
+# idiom (printf/echo/cat into grep -q) SIGPIPEs the producer when grep -q matches and
+# closes the pipe early; under pipefail that 141 propagates as a spurious pipeline
+# failure — the #186 / AP-033 roaming flake that intermittently reddens different
+# assertions across runs. The grep-q idioms want grep's match status, not the
+# producer's SIGPIPE, so pipefail is not load-bearing here. (Scoped to the test suite;
+# does not change any production hook/script. Necessary to make the suite gate
+# deterministic — see /cchores mini-audit run.)
+set -u
 
 cd "$(dirname "${BASH_SOURCE[1]}")/.." || { echo "FATAL: cannot cd to repo root" >&2; exit 2; }
 REPO_DIR="$(pwd)"
