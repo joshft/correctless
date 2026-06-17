@@ -1182,10 +1182,10 @@ fi
 
 # AGENT_CONTEXT skill count should reference 32
 agent_ctx="$REPO_DIR/.correctless/AGENT_CONTEXT.md"
-if grep -q '32 skill' "$agent_ctx"; then
-  pass "CASCADE-002" "AGENT_CONTEXT.md references 32 skills"
+if grep -q '33 skill' "$agent_ctx"; then
+  pass "CASCADE-002" "AGENT_CONTEXT.md references 33 skills"
 else
-  fail "CASCADE-002" "AGENT_CONTEXT.md still has old skill count (not 32 skills)"
+  fail "CASCADE-002" "AGENT_CONTEXT.md still has old skill count (not 33 skills)"
 fi
 
 # ============================================================================

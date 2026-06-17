@@ -248,6 +248,9 @@ for skill_file in $SKILLS_DIR/*/SKILL.md; do
   skill_name=$(basename "$(dirname "$skill_file")")
   [ "$skill_name" = "_shared" ] && continue
   [ "$skill_name" = "cauto" ] && continue
+  # cchores is an authorized invoker of autonomous-decision-writer.sh (ABS-030 revised,
+  # R-006d allowlist) — it writes only THROUGH the sole-writer script, never directly.
+  [ "$skill_name" = "cchores" ] && continue
 
   if grep -q 'autonomous-decisions-' "$skill_file" 2>/dev/null; then
     # Check if it's a write reference vs a read reference

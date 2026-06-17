@@ -102,6 +102,7 @@ Other:
   /cdashboard    HTML project dashboard — metrics + artifact browser
   /ctriage       Bulk triage deferred findings backlog
   /cprune        Documentation and artifact pruning
+  /cchores       Autonomous backlog grooming — fix one suitable issue, open one PR
 ```
 
 ### 4. Show Current Status

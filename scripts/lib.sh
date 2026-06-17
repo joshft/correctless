@@ -116,6 +116,48 @@ branch_slug() {
 }
 
 # ---------------------------------------------------------------------------
+# cchores_slug — deterministic, charset-bounded slug for chore/issue-{N}-{slug}
+# ---------------------------------------------------------------------------
+# INV-018 (.correctless/specs/cchores.md): derive a SAFE slug from an issue
+# title. Constrained to [a-z0-9-], lowercased, dashes collapsed, no
+# leading/trailing dash, capped at 40 chars. This is NOT free-form LLM text —
+# a hostile issue title (option-injection like `--upload-pack=evil`, shell
+# metacharacters, unicode) must yield a safe ref fragment so it can flow into
+# `git switch -c` / `--head` without ref-injection or option-injection.
+#
+# Usage: cchores_slug "Crash on --upload-pack=evil ; rm -rf /"
+cchores_slug() {
+  local title="${1:-}"
+  local slug
+  # Lowercase (portable).
+  slug="$(printf '%s' "$title" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
+  # Replace every byte NOT in [a-z0-9] with a dash (drops unicode bytes,
+  # metacharacters, leading option dashes, spaces, punctuation).
+  slug="$(printf '%s' "$slug" | LC_ALL=C sed -E 's/[^a-z0-9]+/-/g')"
+  # Collapse repeated dashes; strip leading/trailing dashes.
+  slug="$(printf '%s' "$slug" | LC_ALL=C sed -E 's/-+/-/g; s/^-+//; s/-+$//')"
+  # Empty-slug fallback: a title with NO [a-z0-9] bytes (pure CJK / punctuation /
+  # emoji) collapses to "" here, which would yield branch `chore/issue-{N}-`
+  # (trailing dash, empty slug — violates INV-018 "no trailing dash"). Substitute
+  # a deterministic, non-empty, charset-safe fallback derived from a short md5 of
+  # the ORIGINAL title (mirrors branch_slug()'s 6-char hash suffix), so distinct
+  # hostile titles still map to distinct branches. Within [a-z0-9-], no dash.
+  if [ -z "$slug" ]; then
+    local raw_hash
+    raw_hash="$(printf '%s' "$title" | (md5sum 2>/dev/null || md5))"
+    # md5 hex is [0-9a-f] — already charset-safe; take 8 chars, prefix `issue` so
+    # the slug is never empty even if hashing somehow yields nothing.
+    slug="issue-${raw_hash:0:8}"
+    slug="$(printf '%s' "$slug" | LC_ALL=C sed -E 's/[^a-z0-9]+/-/g; s/-+/-/g; s/^-+//; s/-+$//')"
+    [ -n "$slug" ] || slug="fix"
+  fi
+  # Cap at 40 chars, then re-strip a trailing dash exposed by the cut.
+  slug="${slug:0:40}"
+  slug="$(printf '%s' "$slug" | LC_ALL=C sed -E 's/-+$//')"
+  printf '%s' "$slug"
+}
+
+# ---------------------------------------------------------------------------
 # repo_root — absolute path to the git repository root (cached)
 # ---------------------------------------------------------------------------
 

@@ -230,6 +230,20 @@ If the manifest does not exist or `status` is `"complete"`, produce no output fo
 
 The workflow state is authoritative — the manifest report is a diagnostic signal, not an override of workflow state.
 
+### 6a-bis. Incomplete /cchores Run Detection (INV-016 / ABS-043)
+
+Check for a `/cchores` chore-run manifest at `.correctless/artifacts/chore-run-{branch_slug}.json` (derive `branch_slug` via `workflow-advance.sh status` output or `scripts/lib.sh`). Read it **exactly as** the `pipeline-manifest-*` manifest in 6a is read. If the manifest exists and `status` is not `"complete"` (i.e. it is `"in_progress"`, `"aborted"`, or `"noop"`), report:
+
+> **Incomplete /cchores run detected.** Selected issue: #{selected_issue}. Status: {status}. {abort_reason if aborted}. An `in_progress` status denotes a truncated run. Re-run `/cchores` to resume.
+
+An `in_progress` chore-run manifest denotes truncation (content/state equality on `status`, not mtime — EA-008). If the manifest does not exist or `status` is `"complete"`, produce no output for this section (dormant — PAT-019).
+
+**Retained abort branches**: scan `.correctless/artifacts/chore-abort-*.md` and `.correctless/artifacts/chore-report-*.md` for any `/cchores` abort that **retained** a local-only chore branch (a chore branch with commits that was not pushed — unreachable from GitHub). For each retained branch, surface it so it is not lost:
+
+> **Retained chore branch:** `{branch}` (issue #{N}) — retained locally on abort, not pushed. Resume or delete it manually.
+
+If no abort artifact references a retained branch, produce no output for this section (dormant — PAT-019).
+
 ### 6b. Deferred Findings Backlog
 
 Read `.correctless/meta/deferred-findings.json` if it exists. Show the following:
