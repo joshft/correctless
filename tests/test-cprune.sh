@@ -491,16 +491,25 @@ cleanup_fixture "$TMPDIR_005d"
 
 section "INV-006: AGENT_CONTEXT.md count verification"
 
-# Tests INV-006 [behavioral]: mismatched counts are detected
+# Counts are extracted from the AGENT_CONTEXT.md stats TABLE (the
+# `| Component | Location | Purpose |` block), anchored on the capitalized
+# component label, taking the number that BEGINS the purpose cell. Prose digits
+# elsewhere (e.g. "PAT-003 script") must never be scraped (#161 / PMB-016 Bug B).
+# Skill dirs exclude the `_*` helper convention; "shared scripts" is top-level
+# scripts/*.sh (scripts/wf/ modules are described separately in prose).
+
+# Tests INV-006 [behavioral]: mismatched counts are detected (table format)
 TMPDIR_006="$(setup_fixture_dir)"
-# Create AGENT_CONTEXT.md with wrong counts
+# Create AGENT_CONTEXT.md stats table with wrong counts (99 vs the 2 real files)
 cat > "$TMPDIR_006/.correctless/AGENT_CONTEXT.md" << 'AGENT_EOF'
 # Agent Context
 
-Ships as a single distribution with 99 skills and configurable intensity levels.
-There are 99 test files covering behavior.
-The project has 99 scripts.
-There are 99 agents defined.
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Skills | `skills/*/SKILL.md` | 99 skill definitions. Each is a slash command. |
+| Scripts | `scripts/` | 99 shared scripts + 3 workflow-advance modules in `scripts/wf/`: harness-fingerprint.sh (advisory PAT-003 script). |
+| Tests | `tests/test*.sh` | 99 test files with shared harness. |
+| Agents | `agents/*.md` | Plugin sub-agents: red, green. See ABS-010. |
 AGENT_EOF
 # Create some real files to count
 touch "$TMPDIR_006/tests/test-one.sh"
@@ -530,46 +539,78 @@ touch "$TMPDIR_006b/agents/red.md"
 cat > "$TMPDIR_006b/.correctless/AGENT_CONTEXT.md" << 'AGENT_EOF'
 # Agent Context
 
-Ships with 1 skills and stuff.
-There are 1 test files.
-The project has 1 scripts.
-There are 1 agents.
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Skills | `skills/*/SKILL.md` | 1 skill definitions. Each is a slash command. |
+| Scripts | `scripts/` | 1 shared scripts + 3 workflow-advance modules in `scripts/wf/`: harness-fingerprint.sh (advisory PAT-003 script). |
+| Tests | `tests/test*.sh` | 1 test files with shared harness. |
+| Agents | `agents/*.md` | Plugin sub-agents: red. See ABS-010. |
 AGENT_EOF
 result_006b="$(bash "$SCANNER" --category counts --base "$TMPDIR_006b" 2>/dev/null)" || true
 assert_json_array_length "INV-006-b" "Correct counts are NOT flagged" "0" "$result_006b"
 cleanup_fixture "$TMPDIR_006b"
 
-# Tests INV-006 [behavioral]: sed substitution anchors on label, not bare number
+# Tests INV-006 [behavioral, #161 regression]: an ACCURATE AGENT_CONTEXT does
+# NOT false-positive even when (a) skills/_shared exists (must be excluded from
+# the skill count), (b) scripts/wf/ modules exist (excluded from "shared scripts"),
+# and (c) the Scripts purpose cell contains the adversarial substring "PAT-003
+# script". Against the pre-fix scanner this emitted "Stated 2 skills but found 3"
+# and "Stated 003 scripts but found N" — both silent-corruption false positives.
 TMPDIR_006c="$(setup_fixture_dir)"
-# AGENT_CONTEXT with count value appearing in multiple places
 cat > "$TMPDIR_006c/.correctless/AGENT_CONTEXT.md" << 'AGENT_EOF'
 # Agent Context
 
-Chapter 5 discusses 5 design decisions across 5 skills and 5 test patterns.
-There are 5 test files covering 5 areas.
-The project has 5 scripts including 5 helpers.
-5 agents are registered across 5 modules.
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Skills | `skills/*/SKILL.md` | 2 skill definitions. Each is a slash command. |
+| Scripts | `scripts/` | 2 shared scripts + 3 workflow-advance modules in `scripts/wf/`: harness-fingerprint.sh (advisory PAT-003 script, sole writer). |
+| Tests | `tests/test*.sh` | 2 test files with shared harness. |
+| Agents | `agents/*.md` | Plugin sub-agents: red, green. See ABS-010. |
 AGENT_EOF
-touch "$TMPDIR_006c/tests/test-one.sh"
-touch "$TMPDIR_006c/tests/test-two.sh"
-touch "$TMPDIR_006c/tests/test-three.sh"
-touch "$TMPDIR_006c/scripts/lib.sh"
-touch "$TMPDIR_006c/scripts/scan.sh"
-touch "$TMPDIR_006c/scripts/build.sh"
+# 2 real skill dirs + a _shared helper that must NOT be counted
 mkdir -p "$TMPDIR_006c/skills/csetup"
 mkdir -p "$TMPDIR_006c/skills/cspec"
-mkdir -p "$TMPDIR_006c/skills/ctdd"
+mkdir -p "$TMPDIR_006c/skills/_shared"
+# 2 top-level "shared" scripts + 3 wf modules that must NOT inflate the count
+touch "$TMPDIR_006c/scripts/lib.sh"
+touch "$TMPDIR_006c/scripts/scan.sh"
+mkdir -p "$TMPDIR_006c/scripts/wf"
+touch "$TMPDIR_006c/scripts/wf/transitions.sh"
+touch "$TMPDIR_006c/scripts/wf/utility.sh"
+touch "$TMPDIR_006c/scripts/wf/metadata.sh"
+touch "$TMPDIR_006c/tests/test-one.sh"
+touch "$TMPDIR_006c/tests/test-two.sh"
 touch "$TMPDIR_006c/agents/red.md"
 touch "$TMPDIR_006c/agents/green.md"
 result_006c="$(bash "$SCANNER" --category counts --base "$TMPDIR_006c" 2>/dev/null)" || true
-# There should be mismatches detected (5 vs 3 tests, 5 vs 3 scripts, 5 vs 3 skills, 5 vs 2 agents)
-count_006c="$(echo "$result_006c" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null || echo "0")"
-if [ "$count_006c" -gt 0 ]; then
-  pass "INV-006-c" "Detects mismatches even when count value appears multiple times in file"
-else
-  fail "INV-006-c" "Should detect mismatches even when count value is ambiguous"
-fi
+assert_json_array_length "INV-006-c" "#161: accurate context with _shared + wf/ + PAT-003 prose is NOT flagged" "0" "$result_006c"
 cleanup_fixture "$TMPDIR_006c"
+
+# Tests INV-006 [behavioral]: prose digits OUTSIDE the stats table are ignored.
+# A narrative sentence claiming "999 scripts" must not override the table value.
+TMPDIR_006d="$(setup_fixture_dir)"
+cat > "$TMPDIR_006d/.correctless/AGENT_CONTEXT.md" << 'AGENT_EOF'
+# Agent Context
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Skills | `skills/*/SKILL.md` | 2 skill definitions. Each is a slash command. |
+| Scripts | `scripts/` | 2 shared scripts + 3 workflow-advance modules in `scripts/wf/`: harness-fingerprint.sh (advisory PAT-003 script). |
+| Tests | `tests/test*.sh` | 2 test files with shared harness. |
+| Agents | `agents/*.md` | Plugin sub-agents: red, green. See ABS-010. |
+
+Narrative: this project once had 999 scripts and 999 skills before refactoring.
+AGENT_EOF
+mkdir -p "$TMPDIR_006d/skills/csetup"
+mkdir -p "$TMPDIR_006d/skills/cspec"
+touch "$TMPDIR_006d/scripts/lib.sh"
+touch "$TMPDIR_006d/scripts/scan.sh"
+touch "$TMPDIR_006d/tests/test-one.sh"
+touch "$TMPDIR_006d/tests/test-two.sh"
+touch "$TMPDIR_006d/agents/red.md"
+result_006d="$(bash "$SCANNER" --category counts --base "$TMPDIR_006d" 2>/dev/null)" || true
+assert_json_array_length "INV-006-d" "Prose digits outside the stats table are ignored" "0" "$result_006d"
+cleanup_fixture "$TMPDIR_006d"
 
 # ============================================
 # INV-007: Cross-reference consistency check
