@@ -87,7 +87,14 @@ run_producer_review() {
   local cfg="$1" spec="$2"; shift 2
   local cfgdir; cfgdir="$(dirname "$cfg")"
   RUN_HIST="$(mk_isolated_history "$cfgdir")"
+  # MA-008: also isolate CORRECTLESS_ARTIFACTS to a per-test scratch dir so the
+  # producer's external-review-{run_id}.json / -schema- / -findings- writes land in
+  # scratch, NOT the real repo .correctless/artifacts/. Without this, every
+  # behavioral run leaked ~3 files into the tracked artifacts dir and the INV-004
+  # parity assertion had to grep them out (masking real writes).
+  mkdir -p "$cfgdir/artifacts" 2>/dev/null || true
   RUN_OUT="$(cd "$REPO_DIR" && CORRECTLESS_CONFIG="$cfg" CORRECTLESS_HISTORY="$RUN_HIST" \
+    CORRECTLESS_ARTIFACTS="$cfgdir/artifacts" \
     bash "$PRODUCER" review --spec "$spec" "$@" 2>&1)"
   RUN_EXIT=$?
 }
@@ -312,13 +319,17 @@ test_inv_004_read_only_sandbox_tree_parity() {
   printf '# Spec\nbody\n' > "$spec"
   bin="$(make_fake_codex "$d/b" "$(real_codex_output_fixture)" /dev/null 0)"
   write_codex_config "$cfg" "$bin"
-  before="$(cd "$REPO_DIR" && git status --porcelain 2>/dev/null | grep -vF ".correctless/artifacts/external-review-" | sort)"
+  # MA-008: run_producer_review isolates CORRECTLESS_ARTIFACTS to scratch, so the
+  # producer's output files no longer land in the repo. The parity assertion now
+  # checks the UNFILTERED git status (no grep -vF external-review- mask) — any write
+  # into the real tree, including a leaked artifact, fails the assertion.
+  before="$(cd "$REPO_DIR" && git status --porcelain 2>/dev/null | sort)"
   run_producer_review "$cfg" "$spec"
-  after="$(cd "$REPO_DIR" && git status --porcelain 2>/dev/null | grep -vF ".correctless/artifacts/external-review-" | sort)"
+  after="$(cd "$REPO_DIR" && git status --porcelain 2>/dev/null | sort)"
   if [ "$before" = "$after" ]; then
-    pass "INV-004(parity)" "tree unchanged except the artifacts/ output file (RS-011)"
+    pass "INV-004(parity)" "tree unchanged — producer writes only into the isolated artifacts dir (RS-011)"
   else
-    fail "INV-004(parity)" "producer changed tracked/untracked files outside the output path"
+    fail "INV-004(parity)" "producer changed tracked/untracked files in the real tree (unfiltered git status diverged)"
   fi
   rm -rf "$d"
 }
@@ -385,7 +396,9 @@ test_inv_005_tristate_template_step3() {
     [ "$tristate" = "true" ] && { jq '.workflow.require_external_review=true' "$c" > "$c.t" && mv "$c.t" "$c"; }
     [ "$tristate" = "false" ] && { jq '.workflow.require_external_review=false' "$c" > "$c.t" && mv "$c.t" "$c"; }
     hist="$(mk_isolated_history "$d/h-$RANDOM")"
-    out="$(CORRECTLESS_CONFIG="$c" CORRECTLESS_HISTORY="$hist" bash "$PRODUCER" review --spec "$spec" 2>&1)"
+    # MA-008: isolate artifacts to scratch so producer writes never touch the repo.
+    mkdir -p "$d/art" 2>/dev/null
+    out="$(CORRECTLESS_CONFIG="$c" CORRECTLESS_HISTORY="$hist" CORRECTLESS_ARTIFACTS="$d/art" bash "$PRODUCER" review --spec "$spec" 2>&1)"
     # Extract the LAST EXTREV_RESULT= token value; nothing else.
     tok="$(printf '%s\n' "$out" | grep -oE 'EXTREV_RESULT=[a-z]+' | tail -1 | cut -d= -f2)"
     printf '%s' "$tok"
@@ -1026,12 +1039,14 @@ test_inv_017_closed_allowlist_validation() {
   # repo history file (.correctless/meta/external-review-history.json). The
   # suite-level SHA guard remains the backstop; this makes the property hold literally.
   local RUN_HIST; RUN_HIST="$(mk_isolated_history "$d")"
+  # MA-008: isolate artifacts to scratch for every producer exec in this cell.
+  mkdir -p "$d/art" 2>/dev/null
 
   _expect_skip() { # <jq-program-building-config> <test-id> <desc>
     local cfgjson="$1" id="$2" desc="$3" c out
     c="$d/c-$RANDOM.json"
     printf '%s' "$cfgjson" > "$c"
-    out="$(CORRECTLESS_CONFIG="$c" CORRECTLESS_HISTORY="$RUN_HIST" bash "$PRODUCER" review --spec "$spec" 2>&1)"
+    out="$(CORRECTLESS_CONFIG="$c" CORRECTLESS_HISTORY="$RUN_HIST" CORRECTLESS_ARTIFACTS="$d/art" bash "$PRODUCER" review --spec "$spec" 2>&1)"
     if grep -qi "skipped" <<<"$out"; then
       pass "$id" "$desc"
     else
@@ -1072,7 +1087,7 @@ test_inv_017_closed_allowlist_validation() {
   local c out
   c="$d/timeout.json"
   printf '%s' '{"workflow":{"intensity":"high","external_models":{"codex":{"bin":"/usr/bin/codex","base_args":["exec","--sandbox","read-only"],"model":"gpt-5.5-codex","timeout_seconds":86400,"stdin":true}}}}' > "$c"
-  out="$(CORRECTLESS_CONFIG="$c" CORRECTLESS_HISTORY="$RUN_HIST" bash "$PRODUCER" review --spec "$spec" 2>&1)"
+  out="$(CORRECTLESS_CONFIG="$c" CORRECTLESS_HISTORY="$RUN_HIST" CORRECTLESS_ARTIFACTS="$d/art" bash "$PRODUCER" review --spec "$spec" 2>&1)"
   if grep -qiE "skip|clamp|300" <<<"$out"; then
     pass "INV-017(timeout-clamp)" "timeout_seconds:86400 => clamped <=300 or skipped (RS-026)"
   else
@@ -1521,7 +1536,294 @@ test_qa001_csetup_config_clean_argv() { # QA-001
   else
     fail "QA-001(argv-shape)" "duplicated/malformed argv from shipped base_args (schema=$n_schema msg=$n_msg dash=$n_dash schema_pair=$schema_ok msg_pair=$msg_ok)"
   fi
+
+  # MA-001: the producer injects --sandbox read-only UNCONDITIONALLY. The shipped
+  # base_args no longer carries it, so the final argv must still contain exactly one
+  # `--sandbox` immediately followed by exactly one `read-only`.
+  local n_sandbox n_readonly sandbox_pair_ok=0
+  n_sandbox="$(grep -cxF -- "--sandbox" "$argv_cap" 2>/dev/null || printf 0)"
+  n_readonly="$(grep -cxF -- "read-only" "$argv_cap" 2>/dev/null || printf 0)"
+  prev=""
+  while IFS= read -r line; do
+    if [ "$prev" = "--sandbox" ] && [ "$line" = "read-only" ]; then sandbox_pair_ok=1; fi
+    prev="$line"
+  done < "$argv_cap"
+  if [ "$n_sandbox" -eq 1 ] && [ "$n_readonly" -eq 1 ] && [ "$sandbox_pair_ok" -eq 1 ]; then
+    pass "QA-001(sandbox-inject)" "producer injects --sandbox read-only exactly once into the final argv (MA-001)"
+  else
+    fail "QA-001(sandbox-inject)" "final argv must carry exactly one --sandbox read-only pair (sandbox=$n_sandbox readonly=$n_readonly pair=$sandbox_pair_ok)"
+  fi
   rm -rf "$d"
+}
+
+# ===========================================================================
+# MA-001 [integration, hostile-input]: --sandbox read-only is producer-INJECTED
+# unconditionally. A config base_args that OMITS --sandbox, or TAMPERS it to a
+# non-read-only value, must still yield a final argv carrying exactly one
+# `--sandbox read-only`. Captured against the real argv via make_fake_codex.
+# ===========================================================================
+test_ma001_sandbox_producer_injected() {
+  section "MA-001: --sandbox read-only producer-injected (omitted/tampered config)"
+
+  if producer_is_stub; then
+    fail "MA-001(omitted)" "producer is a RED stub"
+    fail "MA-001(tampered)" "producer is a RED stub"
+    return
+  fi
+
+  local d cfg spec bin argv_cap
+  d="$(mk_tmp)"; cfg="$d/config.json"; spec="$d/spec.md"
+  printf '# Spec\nbody\n' > "$spec"
+
+  # Helper: count discrete --sandbox / read-only tokens + the immediate pairing.
+  _assert_sandbox_once() { # <argv_cap> <id> <desc>
+    local cap="$1" id="$2" desc="$3"
+    local ns nr prev="" line pair=0
+    ns="$(grep -cxF -- "--sandbox" "$cap" 2>/dev/null || printf 0)"
+    nr="$(grep -cxF -- "read-only" "$cap" 2>/dev/null || printf 0)"
+    while IFS= read -r line; do
+      [ "$prev" = "--sandbox" ] && [ "$line" = "read-only" ] && pair=1
+      prev="$line"
+    done < "$cap"
+    # No non-read-only sandbox value may survive anywhere in the argv.
+    local bad=0
+    for v in workspace-write danger-full-access; do
+      grep -qxF -- "$v" "$cap" 2>/dev/null && bad=1
+    done
+    if [ "$ns" -eq 1 ] && [ "$nr" -eq 1 ] && [ "$pair" -eq 1 ] && [ "$bad" -eq 0 ]; then
+      pass "$id" "$desc (sandbox=$ns readonly=$nr pair=$pair)"
+    else
+      fail "$id" "$desc — expected exactly one --sandbox read-only, no other sandbox value (sandbox=$ns readonly=$nr pair=$pair bad=$bad)"
+    fi
+  }
+
+  # (a) base_args OMITS --sandbox entirely. Pre-fix, codex runs with its default
+  # (non-read-only) sandbox; post-fix the producer injects read-only.
+  argv_cap="$d/argv-omit.txt"
+  bin="$(make_fake_codex "$d/b-omit" "$(real_codex_output_fixture)" /dev/null 0 "$argv_cap")"
+  jq -n --arg bin "$bin" '{workflow:{intensity:"high",external_models:{codex:{
+    bin:$bin, base_args:["exec"], model:"gpt-5.5-codex", timeout_seconds:120, stdin:true}}}}' > "$cfg"
+  run_producer_review "$cfg" "$spec"
+  _assert_sandbox_once "$argv_cap" "MA-001(omitted)" "base_args [\"exec\"] (no --sandbox) -> injected read-only"
+
+  # (b) base_args TAMPERS --sandbox to workspace-write. Producer strips + re-injects.
+  argv_cap="$d/argv-tamper.txt"
+  bin="$(make_fake_codex "$d/b-tamper" "$(real_codex_output_fixture)" /dev/null 0 "$argv_cap")"
+  jq -n --arg bin "$bin" '{workflow:{intensity:"high",external_models:{codex:{
+    bin:$bin, base_args:["exec","--sandbox","workspace-write","--json"], model:"gpt-5.5-codex", timeout_seconds:120, stdin:true}}}}' > "$cfg"
+  run_producer_review "$cfg" "$spec"
+  _assert_sandbox_once "$argv_cap" "MA-001(tampered)" "base_args --sandbox workspace-write -> stripped + replaced with read-only"
+
+  rm -rf "$d"
+}
+
+# ===========================================================================
+# MA-002 [integration, hostile-input]: producer-controlled value flags
+# (--output-schema / --output-last-message) in config base_args are rejected
+# fail-closed (status:skipped), exactly like --model.
+# ===========================================================================
+test_ma002_reject_producer_controlled_flags() {
+  section "MA-002: --output-schema/--output-last-message in base_args => skipped"
+
+  if producer_is_stub; then
+    fail "MA-002(output-schema)" "producer is a RED stub"
+    fail "MA-002(output-last-message)" "producer is a RED stub"
+    return
+  fi
+
+  local d spec
+  d="$(mk_tmp)"; spec="$d/spec.md"; printf '# Spec\nbody\n' > "$spec"
+  local RUN_HIST; RUN_HIST="$(mk_isolated_history "$d")"
+  mkdir -p "$d/art" 2>/dev/null
+
+  _expect_skip_ma002() { # <base_args_json> <id> <desc>
+    local bargs="$1" id="$2" desc="$3" c out
+    c="$d/c-$RANDOM.json"
+    jq -n --arg bin "/usr/bin/codex" --argjson b "$bargs" '{workflow:{intensity:"high",external_models:{codex:{
+      bin:$bin, base_args:$b, model:"gpt-5.5-codex", timeout_seconds:120, stdin:true}}}}' > "$c"
+    out="$(CORRECTLESS_CONFIG="$c" CORRECTLESS_HISTORY="$RUN_HIST" CORRECTLESS_ARTIFACTS="$d/art" bash "$PRODUCER" review --spec "$spec" 2>&1)"
+    if grep -qi "skipped" <<<"$out" && grep -qF "EXTREV_RESULT=skipped" <<<"$out"; then
+      pass "$id" "$desc"
+    else
+      fail "$id" "$desc (expected status:skipped + EXTREV_RESULT=skipped; got: ${out:0:140})"
+    fi
+  }
+
+  _expect_skip_ma002 '["exec","--output-schema","/tmp/x.json"]' \
+    "MA-002(output-schema)" "--output-schema in base_args => fail-closed skip"
+  _expect_skip_ma002 '["exec","--output-last-message","/tmp/y.json"]' \
+    "MA-002(output-last-message)" "--output-last-message in base_args => fail-closed skip"
+
+  rm -rf "$d"
+}
+
+# ===========================================================================
+# MA-003 [integration, resource-bounds]: the temp schema file does NOT leak.
+# After a run, no external-review-schema-* temp file remains in the artifacts dir
+# (the EXIT trap is wiped by locked_update_file; explicit rm must cover every path).
+# ===========================================================================
+test_ma003_schema_no_leak() {
+  section "MA-003: temp schema file removed on every return path (no leak)"
+
+  if producer_is_stub; then
+    fail "MA-003(success-no-leak)" "producer is a RED stub"
+    fail "MA-003(unparsable-no-leak)" "producer is a RED stub"
+    return
+  fi
+
+  local d cfg spec bin adir leaks
+  d="$(mk_tmp)"; cfg="$d/config.json"; spec="$d/spec.md"; printf '# Spec\nbody\n' > "$spec"
+  adir="$d/artifacts"; mkdir -p "$adir"
+
+  # Success path.
+  bin="$(make_fake_codex "$d/b-ok" "$(real_codex_output_fixture)" "$(real_codex_jsonl_fixture)" 0)"
+  write_codex_config "$cfg" "$bin"
+  ( cd "$REPO_DIR" && CORRECTLESS_CONFIG="$cfg" \
+      CORRECTLESS_HISTORY="$(mk_isolated_history "$d/h1")" \
+      CORRECTLESS_ARTIFACTS="$adir" bash "$PRODUCER" review --spec "$spec" >/dev/null 2>&1 )
+  leaks="$(find "$adir" -maxdepth 1 -name 'external-review-schema-*' 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "${leaks:-0}" -eq 0 ]; then
+    pass "MA-003(success-no-leak)" "no external-review-schema-* temp file after a successful run"
+  else
+    fail "MA-003(success-no-leak)" "schema temp file leaked after success ($leaks remaining)"
+  fi
+
+  # Unparsable path (malformed codex output) — schema is created then must be cleaned.
+  local bad="$d/bad.json"; printf '{not json' > "$bad"
+  bin="$(make_fake_codex "$d/b-bad" "$bad" /dev/null 0)"
+  write_codex_config "$cfg" "$bin"
+  ( cd "$REPO_DIR" && CORRECTLESS_CONFIG="$cfg" \
+      CORRECTLESS_HISTORY="$(mk_isolated_history "$d/h2")" \
+      CORRECTLESS_ARTIFACTS="$adir" bash "$PRODUCER" review --spec "$spec" >/dev/null 2>&1 )
+  leaks="$(find "$adir" -maxdepth 1 -name 'external-review-schema-*' 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "${leaks:-0}" -eq 0 ]; then
+    pass "MA-003(unparsable-no-leak)" "no external-review-schema-* temp file after an unparsable run"
+  else
+    fail "MA-003(unparsable-no-leak)" "schema temp file leaked after unparsable path ($leaks remaining)"
+  fi
+
+  rm -rf "$d"
+}
+
+# ===========================================================================
+# MA-004 [integration, resource-bounds]: an oversized (>EXTREV_MAX_OUTPUT_BYTES)
+# --output-last-message file is size-guarded BEFORE the first whole-file jq parse
+# -> status:unparsable, Claude-only completion, no OOM/abort.
+# ===========================================================================
+test_ma004_oversized_output_guarded() {
+  section "MA-004: >4MB codex output => unparsable before parse (no OOM)"
+
+  if producer_is_stub; then
+    fail "MA-004(oversized)" "producer is a RED stub"
+    return
+  fi
+
+  local d cfg spec bin big
+  d="$(mk_tmp)"; cfg="$d/config.json"; spec="$d/spec.md"; printf '# Spec\nbody\n' > "$spec"
+
+  # Build a >4MiB but otherwise well-formed findings file: one finding whose
+  # description is ~5MiB. Routed through --rawfile so the fixture build never
+  # transits argv (AP-039). Pre-fix, jq materializes the whole 5MB doc; post-fix
+  # the byte guard rejects it before the first parse.
+  big="$d/big.json"
+  local huge="$d/huge.txt"
+  head -c 5242880 /dev/zero | tr '\0' 'B' > "$huge"   # 5 MiB
+  jq -n --rawfile dsc "$huge" '{findings:[{id:"EXT-070",title:"t",severity:"LOW",category:"x",location:"spec:1",description:$dsc}]}' > "$big"
+  bin="$(make_fake_codex "$d/b" "$big" /dev/null 0)"
+  write_codex_config "$cfg" "$bin"
+  run_producer_review "$cfg" "$spec"
+
+  local st
+  st="$(jq -r '.reviews[-1].status // empty' "$RUN_HIST" 2>/dev/null)"
+  if [ "$RUN_EXIT" -eq 0 ] && [ "$st" = "unparsable" ] \
+     && ! grep -qiE "Argument list too long|Killed|Out of memory" <<<"$RUN_OUT"; then
+    pass "MA-004(oversized)" ">4MB output size-guarded => status:unparsable, Claude-only, no OOM/abort"
+  else
+    fail "MA-004(oversized)" "oversized output must be unparsable before parse (status=$st exit=$RUN_EXIT)"
+  fi
+
+  rm -rf "$d"
+}
+
+# ===========================================================================
+# MA-006 [integration, ux-review]: when path-resolution tooling is unavailable
+# (realpath/readlink -f both fail) for a non-empty bin, the skipped message names
+# the DISTINCT cause, not the generic config-invalid reason.
+# ===========================================================================
+test_ma006_distinct_resolution_skip_cause() {
+  section "MA-006: realpath/readlink -f unavailable => distinct skip cause"
+
+  if producer_is_stub; then
+    fail "MA-006(distinct-cause)" "producer is a RED stub"
+    return
+  fi
+
+  local d cfg spec
+  d="$(mk_tmp)"; cfg="$d/config.json"; spec="$d/spec.md"; printf '# Spec\nbody\n' > "$spec"
+
+  # Simulate the macOS-without-coreutils environment: shadow realpath + readlink
+  # with stubs that always fail, on a PATH that ALSO lacks canonicalize_path's
+  # ability to resolve (a bin that does not exist on disk, so the pure-bash
+  # fallback's `-f` existence check fails). The bin string is non-empty + valid
+  # charset so we reach the resolution step, not an earlier guard.
+  local shimdir="$d/shim"; mkdir -p "$shimdir"
+  cat > "$shimdir/realpath" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+  cat > "$shimdir/readlink" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+  chmod +x "$shimdir/realpath" "$shimdir/readlink"
+
+  # Non-empty, valid-charset bin that does NOT exist on disk (so the pure-bash
+  # canonicalize_path fallback's `-f` check also fails -> distinct cause).
+  jq -n --arg bin "/nonexistent/path/to/codex" '{workflow:{intensity:"high",external_models:{codex:{
+    bin:$bin, base_args:["exec","--json"], model:"gpt-5.5-codex", timeout_seconds:120, stdin:true}}}}' > "$cfg"
+
+  local RUN_HIST; RUN_HIST="$(mk_isolated_history "$d")"
+  mkdir -p "$d/art"
+  local out
+  out="$(cd "$REPO_DIR" && PATH="$shimdir:$PATH" CORRECTLESS_CONFIG="$cfg" \
+    CORRECTLESS_HISTORY="$RUN_HIST" CORRECTLESS_ARTIFACTS="$d/art" \
+    bash "$PRODUCER" review --spec "$spec" 2>&1)"
+
+  if grep -qiE "cannot resolve codex path|realpath/readlink -f unavailable|install coreutils" <<<"$out"; then
+    pass "MA-006(distinct-cause)" "unresolvable bin => distinct 'cannot resolve codex path' cause (not generic)"
+  else
+    fail "MA-006(distinct-cause)" "skipped message must name the distinct resolution cause (got: ${out:0:160})"
+  fi
+
+  rm -rf "$d"
+}
+
+# ===========================================================================
+# MA-005 [structural]: the `pending` un-adjudicated surface is wired into /cstatus
+# (INV-008/RS-027 promised it in BOTH /creview-spec AND /cstatus).
+# ===========================================================================
+test_ma005_cstatus_pending_wired() {
+  section "MA-005: /cstatus invokes external-review-run.sh pending"
+
+  if grep -qE "external-review-run\.sh +pending" "$CSTATUS" 2>/dev/null; then
+    pass "MA-005(cstatus-pending)" "skills/cstatus/SKILL.md invokes external-review-run.sh pending"
+  else
+    fail "MA-005(cstatus-pending)" "cstatus must invoke external-review-run.sh pending (INV-008/RS-027 dual-surface)"
+  fi
+}
+
+# ===========================================================================
+# MA-007 [structural]: the dead external_review_threshold key is removed from the
+# template (PMB-018 orphaned-config-key class).
+# ===========================================================================
+test_ma007_no_dead_threshold_key() {
+  section "MA-007: external_review_threshold removed from template (PMB-018)"
+
+  if grep -qF "external_review_threshold" "$TEMPLATE_FULL" 2>/dev/null; then
+    fail "MA-007(template)" "templates/workflow-config-full.json still declares the dead external_review_threshold key"
+  else
+    pass "MA-007(template)" "external_review_threshold removed from the full template (no readers, PMB-018)"
+  fi
 }
 
 # ===========================================================================
@@ -1550,6 +1852,13 @@ test_inv_023_upgrade_migration
 test_prh_003_no_auto_incorporation
 test_prh_005_no_shell_exec
 test_qa001_csetup_config_clean_argv
+test_ma001_sandbox_producer_injected
+test_ma002_reject_producer_controlled_flags
+test_ma003_schema_no_leak
+test_ma004_oversized_output_guarded
+test_ma005_cstatus_pending_wired
+test_ma006_distinct_resolution_skip_cause
+test_ma007_no_dead_threshold_key
 test_b2_tracked_history_untouched
 
 summary "test-external-review.sh"

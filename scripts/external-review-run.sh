@@ -32,6 +32,10 @@ EXTREV_FINDINGS_CAP=200          # max findings retained from one payload (INV-0
 EXTREV_FIELD_CAP_BYTES=8192      # per-field byte cap after neutralize (INV-019)
 EXTREV_STATUS_COMPLETED="completed"
 EXTREV_TIMEOUT_MAX=300           # clamp ceiling (INV-017, RS-026)
+# MA-004: ceiling on an untrusted codex output file BEFORE the first whole-file jq
+# parse. 4 MiB is generous vs the 200x8KB (~1.6MB) post-cap bound; anything larger
+# is treated as unparsable (discard, Claude-only) rather than risking jq/tr OOM.
+EXTREV_MAX_OUTPUT_BYTES=4194304  # 4 MiB
 
 # ---------------------------------------------------------------------------
 # Locate the repo + source the canonical helpers.
@@ -195,10 +199,15 @@ VAL_BIN=""
 declare -a VAL_ARGS=()
 VAL_MODEL=""
 VAL_TIMEOUT=""
+# MA-006: distinct skip cause surfaced in the skipped message. Defaults to the
+# generic config-invalid reason; set to a specific string when a more precise
+# cause is known (e.g. path-resolution-tool-unavailable) so the operator can
+# diagnose (INV-006 distinguish-why goal). Reset at each validation call.
+VAL_SKIP_CAUSE=""
 
 _validate_invocation() {
   local cfg="$1"
-  VAL_BIN=""; VAL_ARGS=(); VAL_MODEL=""; VAL_TIMEOUT=""
+  VAL_BIN=""; VAL_ARGS=(); VAL_MODEL=""; VAL_TIMEOUT=""; VAL_SKIP_CAUSE=""
 
   # Config must be valid JSON with a codex entry.
   jq -e '.workflow.external_models.codex' "$cfg" >/dev/null 2>&1 || return 1
@@ -212,7 +221,27 @@ _validate_invocation() {
   [ -n "$bin" ] || return 1
   local resolved
   resolved="$(realpath "$bin" 2>/dev/null || readlink -f "$bin" 2>/dev/null)"
-  [ -n "$resolved" ] || return 1
+  # MA-006: on stock macOS neither realpath nor readlink -f exists, so resolution
+  # yields empty even for a valid, present bin. Fall back to canonicalize_path
+  # (lib.sh PAT-017, pure-bash, no external command) before giving up. If the
+  # pure-bash fallback ALSO cannot produce an absolute path for a non-empty bin,
+  # emit a DISTINCT cause so the skipped message names the real problem instead of
+  # the generic config-invalid reason.
+  if [ -z "$resolved" ] && declare -f canonicalize_path >/dev/null 2>&1; then
+    local cand
+    cand="$(canonicalize_path "$bin" 2>/dev/null)"
+    # canonicalize_path is purely lexical (never touches the filesystem), so only
+    # trust an absolute result that actually exists as a file on disk.
+    if [ -n "$cand" ] && [ "${cand:0:1}" = "/" ] && [ -f "$cand" ]; then
+      resolved="$cand"
+    fi
+  fi
+  if [ -z "$resolved" ]; then
+    # Distinguish "valid bin we could not resolve (no realpath/readlink -f)" from
+    # the generic config-invalid case.
+    VAL_SKIP_CAUSE="cannot resolve codex path — realpath/readlink -f unavailable; install coreutils"
+    return 1
+  fi
   # Reject if the RESOLVED TARGET basename is not exactly codex (catches a
   # codex symlink whose target is a non-codex binary — resolve link, check target).
   [ "$(basename "$resolved")" = "codex" ] || return 1
@@ -245,14 +274,36 @@ _validate_invocation() {
   while [ "$i" -lt "$n" ]; do
     tok="${base[$i]}"
     case "$tok" in
-      exec|--json|--ephemeral|-|--output-schema|--output-last-message)
-        # bare/no-arg flags + producer-controlled-value flags accepted as tokens.
+      exec|--json|--ephemeral|-)
+        # bare/no-arg optional flags accepted as tokens.
         VAL_ARGS+=("$tok")
         ;;
-      --sandbox)
-        next="${base[$((i+1))]:-}"
-        [ "$next" = "read-only" ] || return 1
-        VAL_ARGS+=("$tok" "$next"); i=$((i+1))
+      --output-schema|--output-last-message|--output-schema=*|--output-last-message=*)
+        # MA-002: these are value-consuming PRODUCER-controlled flags. The producer
+        # force-appends its own --output-schema <file> / --output-last-message <file>
+        # (INV-001). A config-supplied copy corrupts argv (dangling flag consumes the
+        # producer's appended flag as its value), silently dropping the schema
+        # constraint. Reject fail-closed, exactly like --model.
+        return 1
+        ;;
+      --sandbox|--sandbox=*)
+        # MA-001: --sandbox read-only is a security-MANDATORY flag, producer-injected
+        # unconditionally (see cmd_review argv build). Any config-supplied --sandbox
+        # token — value-pair or =form — is STRIPPED here so config cannot omit, tamper,
+        # or override it. We do NOT reject the config (the shipped default historically
+        # carried --sandbox read-only); we drop the token (and its value for the pair
+        # form) and let the producer re-inject read-only exactly once.
+        case "$tok" in
+          --sandbox)
+            # Consume an immediately-following value token IF present (pair form).
+            next="${base[$((i+1))]:-}"
+            if [ "$i" -lt "$((n-1))" ] && case "$next" in -*) false;; *) true;; esac; then
+              i=$((i+1))
+            fi
+            ;;
+          *) : ;;   # --sandbox=<v> carries its own value; nothing extra to consume.
+        esac
+        # Intentionally append NOTHING to VAL_ARGS — producer re-injects (RS-006).
         ;;
       --cd)
         next="${base[$((i+1))]:-}"
@@ -293,8 +344,27 @@ _validate_invocation() {
 # (full objects: id,title,severity,category,location,description) to <out_file>.
 # Returns: 0 on success (>=0 findings), 2 on parse/shape failure.
 # ---------------------------------------------------------------------------
+# MA-004: byte-size guard for an UNTRUSTED file BEFORE any whole-file parser
+# (jq/tr). A compromised codex under read-only can still write a multi-hundred-MB
+# --output-last-message file; the in-jq findings/field caps run AFTER jq has
+# materialized the whole document, so they cannot prevent the parse-stage OOM.
+# Returns 0 when the file is within the ceiling, 1 when it overflows (or stat fails).
+_within_size_ceiling() {
+  local f="$1" bytes
+  [ -f "$f" ] || return 0   # absent/empty handled by callers; not an overflow.
+  # Prefer wc -c (POSIX); fall back to stat. Empty/non-numeric -> treat as overflow
+  # (fail-closed: an unmeasurable file is not safe to feed to a whole-file parser).
+  bytes="$(wc -c < "$f" 2>/dev/null | tr -d ' ')"
+  [ -n "$bytes" ] && printf '%s' "$bytes" | grep -qE '^[0-9]+$' || return 1
+  [ "$bytes" -le "$EXTREV_MAX_OUTPUT_BYTES" ]
+}
+
 _sanitize_findings() {
   local raw_file="$1" out_file="$2"
+
+  # MA-004: bound the untrusted file size BEFORE the first whole-file jq parse so a
+  # pathologically large payload cannot OOM jq/tr. Overflow -> unparsable (discard).
+  _within_size_ceiling "$raw_file" || return 2
 
   # Parse-gate: must be valid JSON with a findings array.
   jq -e '.findings | type == "array"' "$raw_file" >/dev/null 2>&1 || return 2
@@ -362,6 +432,13 @@ _cost_line() {
   local jsonl_file="$1"
   if [ ! -s "$jsonl_file" ]; then
     printf 'external cost not tracked this run; does not affect the review'
+    return 0
+  fi
+  # MA-004: the --json stream is also untrusted codex output. Bound its size before
+  # the grep/jq parse so a giant stream cannot OOM the cost-parse stage. Overflow ->
+  # graceful "unavailable" (the cost line never blocks the review).
+  if ! _within_size_ceiling "$jsonl_file"; then
+    printf 'external cost unavailable this run; does not affect the review'
     return 0
   fi
   local tokens
@@ -434,8 +511,12 @@ cmd_review() {
 
   # Validate the invocation up front (fail-closed -> skipped).
   if ! _validate_invocation "$cfg"; then
+    # MA-006: surface a DISTINCT cause when one is known (e.g. macOS without
+    # realpath/readlink -f), instead of the generic config-invalid reason.
+    local skip_reason="config invalid or codex entry absent"
+    [ -n "${VAL_SKIP_CAUSE:-}" ] && skip_reason="$VAL_SKIP_CAUSE"
     _record_run "$hist" "$(_gen_run_id "$spec_slug" "$hist")" "$spec_slug" "codex" "unknown" "skipped" "$empty_findings"
-    echo "external-review status: skipped (config invalid or codex entry absent). Disable with require_external_review:false."
+    echo "external-review status: skipped ($skip_reason). Disable with require_external_review:false."
     echo "EXTREV_RESULT=skipped"
     return 0
   fi
@@ -479,6 +560,11 @@ cmd_review() {
   local -a argv=()
   argv=("$VAL_BIN")
   argv+=("${VAL_ARGS[@]}")
+  # MA-001: --sandbox read-only is a security-MANDATORY flag. _validate_invocation
+  # STRIPS any config-supplied --sandbox token from VAL_ARGS, so the producer injects
+  # its own here UNCONDITIONALLY — read-only WRITE containment (INV-004/PRH-001) is
+  # guaranteed even if the config omits or tampers with --sandbox.
+  argv+=("--sandbox" "read-only")
   # Ensure the producer-controlled output flags + schema are present.
   argv+=("--output-schema" "$schema_file")
   argv+=("--output-last-message" "$out_file")
@@ -506,18 +592,21 @@ cmd_review() {
   local codex_version="unknown"
 
   # --- Failure-mode handling (INV-006) ---
+  # MA-003: the temp schema file is removed EXPLICITLY on every return path below.
+  # The EXIT trap installed above is silently wiped by locked_update_file's own
+  # "trap - EXIT" (lib.sh), so relying on it alone leaks the schema every run.
   if [ "$codex_rc" -ne 0 ]; then
     _record_run "$hist" "$run_id" "$spec_slug" "$VAL_MODEL" "$codex_version" "error" "$empty_findings"
     echo "external-review status: error (codex exited $codex_rc). Claude review unaffected. Disable with require_external_review:false."
     echo "EXTREV_RESULT=ran"
-    rm -f "$jsonl_file"
+    rm -f "$jsonl_file" "$schema_file"
     return 0
   fi
   if [ ! -s "$out_file" ]; then
     _record_run "$hist" "$run_id" "$spec_slug" "$VAL_MODEL" "$codex_version" "error" "$empty_findings"
     echo "external-review status: error (empty codex output). Claude review unaffected. Disable with require_external_review:false."
     echo "EXTREV_RESULT=ran"
-    rm -f "$jsonl_file"
+    rm -f "$jsonl_file" "$schema_file"
     return 0
   fi
 
@@ -527,7 +616,7 @@ cmd_review() {
     _record_run "$hist" "$run_id" "$spec_slug" "$VAL_MODEL" "$codex_version" "unparsable" "$empty_findings"
     echo "external-review status: error (unparsable codex output). Claude review unaffected. Disable with require_external_review:false."
     echo "EXTREV_RESULT=ran"
-    rm -f "$jsonl_file" "$full_file"
+    rm -f "$jsonl_file" "$full_file" "$schema_file"
     return 0
   fi
 
@@ -550,7 +639,8 @@ cmd_review() {
   _emit_fenced_synthesis "$full_file"
   echo "EXTREV_RESULT=ran"
 
-  rm -f "$jsonl_file" "$full_file" "$rec_file"
+  # MA-003: explicit schema cleanup on the success path too (EXIT trap is unreliable).
+  rm -f "$jsonl_file" "$full_file" "$rec_file" "$schema_file"
   return 0
 }
 

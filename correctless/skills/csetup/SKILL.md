@@ -332,8 +332,13 @@ bash .correctless/scripts/config-update.sh set-external-model codex \
   model gpt-5.5-codex \
   timeout_seconds 120 \
   stdin true \
-  base_args '["exec","--sandbox","read-only","--ephemeral","--json"]'
+  base_args '["exec","--ephemeral","--json"]'
 ```
+
+`base_args` carries only OPTIONAL non-security flags. The security-mandatory
+`--sandbox read-only` is injected by the producer (`external-review-run.sh`)
+unconditionally and cannot be supplied, omitted, or overridden via config
+(MA-001) — so it is intentionally absent here.
 
 ### Upgrade migration (INV-023)
 
