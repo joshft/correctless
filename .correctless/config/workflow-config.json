@@ -27,7 +27,21 @@
     "git_notes": false,
     "branching_strategy": "feature-branches",
     "merge_strategy": "squash",
-    "session_dir": "/home/josh/.claude/projects/-home-josh-Projects-correctless"
+    "session_dir": "/home/josh/.claude/projects/-home-josh-Projects-correctless",
+    "external_models": {
+      "codex": {
+        "bin": "codex",
+        "model": "gpt-5.5-codex",
+        "timeout_seconds": 120,
+        "stdin": true,
+        "base_args": [
+          "exec",
+          "--ephemeral",
+          "--json"
+        ]
+      }
+    },
+    "require_external_review": true
   },
   "mcp": {
     "serena": false,
