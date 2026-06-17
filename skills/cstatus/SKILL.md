@@ -261,6 +261,18 @@ Detect a committed-but-not-restored SFG lift sentinel. When `.correctless/.sfg-l
 
 When the sentinel is absent, omit this section entirely.
 
+### 6e. Cross-model review discoverability advisory (RS-010 / INV-023)
+
+If `codex` is on PATH (`command -v codex`) AND `.workflow.external_models` in
+`workflow-config.json` is empty or absent, emit a one-time advisory:
+
+```
+codex detected — run /csetup to enable cross-model spec review (codex reviews specs alongside Claude in /creview-spec).
+```
+
+This keeps the feature discoverable rather than invisibly dormant. If `codex` is not on
+PATH, or `external_models.codex` is already configured, omit this section entirely.
+
 ### 7. Health Check (if requested)
 
 If the human asks "is everything set up correctly?" or similar, validate:

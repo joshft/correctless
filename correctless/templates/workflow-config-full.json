@@ -29,7 +29,6 @@
     "intensity": "standard",
     "min_qa_rounds": 2,
     "max_audit_rounds": 5,
-    "require_external_review": false,
     "external_models": {},
     "external_review_threshold": "high",
     "mutation_count": 10,

@@ -1552,6 +1552,158 @@ test_prh005_no_extractor_recursion() {
   fi
 }
 
+# ---------------------------------------------------------------------------
+# cross-model-spec-review INV-010: three-form DEFAULTS for BOTH privileged
+# writers (external-review-run.sh, config-update.sh), block-both-paths
+# (Edit/Write AND Bash redirect), and the RS-016 live-guard:
+# SFG allows `Bash(config-update.sh ...)` but blocks direct Edit/redirect to the
+# config file.
+# ---------------------------------------------------------------------------
+
+test_inv010_three_form_defaults_external_review() {
+  echo ""
+  echo "=== INV-010 (cross-model-spec-review): three-form DEFAULTS + block-both-paths ==="
+
+  local test_dir="/tmp/correctless-sfg-extrev-inv010-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result script form
+  # Both privileged writers must be protected in all THREE path forms (RS-029).
+  for script in external-review-run.sh config-update.sh; do
+    for form in "scripts/$script" ".correctless/scripts/$script" "$script"; do
+      # Edit/Write tool path blocked.
+      result="$(run_hook_capture "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$form\",\"old_string\":\"a\",\"new_string\":\"b\"}}")"
+      assert_eq "INV-010: Edit $form blocked" "2" "$(extract_exit "$result")"
+
+      # Bash redirect path blocked.
+      result="$(run_hook_capture "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"echo x > $form\"}}")"
+      assert_eq "INV-010: Bash redirect to $form blocked" "2" "$(extract_exit "$result")"
+    done
+  done
+
+  rm -rf "$test_dir"
+}
+
+test_inv010_config_live_guard() {
+  echo ""
+  echo "=== INV-010 (cross-model-spec-review): config-update.sh permitted, direct config write blocked (RS-016) ==="
+
+  local test_dir="/tmp/correctless-sfg-extrev-liveguard-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result
+  # Direct Edit to workflow-config.json is blocked (it is in SFG DEFAULTS).
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":".correctless/config/workflow-config.json","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-010: direct Edit to workflow-config.json blocked" "2" "$(extract_exit "$result")"
+
+  # Direct Bash redirect to workflow-config.json is blocked.
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo {} > .correctless/config/workflow-config.json"}}')"
+  assert_eq "INV-010: redirect to workflow-config.json blocked" "2" "$(extract_exit "$result")"
+
+  # But invoking config-update.sh (no redirect) is ALLOWED (it is the sanctioned
+  # writer; the command writes via temp+mv inside the script, not a redirect).
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"bash .correctless/scripts/config-update.sh set-external-model codex model gpt-5.5-codex"}}')"
+  assert_eq "INV-010: Bash(config-update.sh ...) allowed (no redirect)" "0" "$(extract_exit "$result")"
+
+  rm -rf "$test_dir"
+}
+
+# ---------------------------------------------------------------------------
+# cross-model-spec-review INV-020: ABS-041 lift-and-restore generalized to N
+# deliverables. With deliverable A lifted (removed from DEFAULTS) and B restored,
+# the backstop must STILL FAIL until A is also restored — lifting A while B is
+# restored must NOT falsely self-deactivate.
+# ---------------------------------------------------------------------------
+
+test_inv020_multi_deliverable_lift_backstop() {
+  echo ""
+  echo "=== INV-020 (cross-model-spec-review): multi-deliverable lift backstop ==="
+
+  local backstop="$REPO_DIR/scripts/check-no-pending-sfg-lift.sh"
+  if [ ! -f "$backstop" ]; then
+    echo "  FAIL: INV-020 backstop script missing"
+    FAIL=$((FAIL + 1))
+    return
+  fi
+
+  local test_dir="/tmp/correctless-sfg-inv020-$$"
+  rm -rf "$test_dir"; mkdir -p "$test_dir/.correctless/scripts" "$test_dir/hooks"
+
+  # Distinguishing case (forces the GENERALIZATION, not the single-deliverable
+  # backstop): lift B (external-review-run.sh — un-restored) WHILE A
+  # (agents/fix-diff-reviewer.md) is itself lifted/absent from DEFAULTS. The
+  # CURRENT single-deliverable backstop self-deactivates (RS-028) the moment A is
+  # absent from DEFAULTS and returns 0 — wrongly passing even though B is still
+  # lifted. The GENERALIZED backstop must independently check each path recorded
+  # in the sentinel's lifted set and FAIL because B is recorded-lifted yet absent
+  # from DEFAULTS.
+  cp "$REPO_DIR/hooks/sensitive-file-guard.sh" "$test_dir/hooks/sensitive-file-guard.sh"
+
+  # Sentinel records the SET of lifted paths: BOTH A and B.
+  cat > "$test_dir/.correctless/.sfg-lift-active" <<EOF
+lift-active: cross-model-spec-review
+lifted: agents/fix-diff-reviewer.md
+lifted: scripts/external-review-run.sh
+EOF
+
+  # Remove BOTH A and B DEFAULTS lines (simulating both lifted, neither restored).
+  grep -v 'external-review-run.sh' "$test_dir/hooks/sensitive-file-guard.sh" \
+    | grep -v 'agents/fix-diff-reviewer.md' > "$test_dir/hooks/sfg.tmp" \
+    && mv "$test_dir/hooks/sfg.tmp" "$test_dir/hooks/sensitive-file-guard.sh"
+
+  # Generalized backstop MUST FAIL: B (and A) are recorded-lifted but un-restored.
+  # The single-deliverable backstop WRONGLY passes here (A absent => self-deactivate).
+  local rc
+  ( cd "$test_dir" && bash "$backstop" >/dev/null 2>&1 ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "  PASS: INV-020: generalized backstop FAILS while any recorded deliverable is un-restored"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: INV-020: backstop must independently check EACH lifted path (single-deliverable self-deactivation is a false pass)"
+    FAIL=$((FAIL + 1))
+  fi
+
+  # ASYMMETRIC sub-case (the true per-path discriminator): restore B
+  # (external-review-run.sh) ONLY, while A (agents/fix-diff-reviewer.md) stays
+  # ABSENT from DEFAULTS and the sentinel still records BOTH lifted. The CURRENT
+  # single-deliverable backstop self-deactivates the instant A is absent from
+  # DEFAULTS (RS-028) and returns 0 — but B is still un-restored, so a per-path
+  # backstop MUST FAIL. A backstop checking "any sentinel line / A's path only"
+  # rather than "EACH recorded path restored" wrongly passes here. (RED until
+  # GREEN generalizes; the un-generalized backstop wrongly self-deactivates.)
+  printf '\nscripts/external-review-run.sh\n.correctless/scripts/external-review-run.sh\nexternal-review-run.sh\n' \
+    >> "$test_dir/hooks/sensitive-file-guard.sh"
+  ( cd "$test_dir" && bash "$backstop" >/dev/null 2>&1 ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "  PASS: INV-020: restore-B-only still FAILS (A un-restored, per-path check)"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: INV-020: backstop must FAIL while A is recorded-lifted yet un-restored (per-path, not self-deactivate)"
+    FAIL=$((FAIL + 1))
+  fi
+
+  # Now restore A too (re-add its DEFAULTS line) and clear the sentinel -> passes.
+  printf '\nagents/fix-diff-reviewer.md\n' >> "$test_dir/hooks/sensitive-file-guard.sh"
+  rm -f "$test_dir/.correctless/.sfg-lift-active"
+  ( cd "$test_dir" && bash "$backstop" >/dev/null 2>&1 ); rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "  PASS: INV-020: backstop passes once all deliverables restored + sentinel cleared"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: INV-020: backstop must pass when sentinel cleared (got rc=$rc)"
+    FAIL=$((FAIL + 1))
+  fi
+
+  rm -rf "$test_dir"
+}
+
+# Run cross-model-spec-review INV-010 / INV-020 additions
+test_inv010_three_form_defaults_external_review
+test_inv010_config_live_guard
+test_inv020_multi_deliverable_lift_backstop
+
 # Run R2 hardening tests
 test_inv005_canonical_only_at_matcher
 test_inv005_traversal_encoded_blocks
