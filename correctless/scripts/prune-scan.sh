@@ -1384,8 +1384,12 @@ scan_counts() {
 
   local actual_tests actual_scripts actual_skills actual_agents
   actual_tests="$(find "$BASE_DIR/tests" -name 'test-*.sh' 2>/dev/null | wc -l | tr -d ' ')" || actual_tests=0
-  actual_scripts="$(find "$BASE_DIR/scripts" -name '*.sh' 2>/dev/null | wc -l | tr -d ' ')" || actual_scripts=0
-  actual_skills="$(find "$BASE_DIR/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')" || actual_skills=0
+  # "shared scripts" = top-level scripts/*.sh only; scripts/wf/ modules are
+  # described separately in the stats-table prose, not in the shared total (#161).
+  actual_scripts="$(find "$BASE_DIR/scripts" -maxdepth 1 -name '*.sh' 2>/dev/null | wc -l | tr -d ' ')" || actual_scripts=0
+  # Skill dirs exclude the project's underscore-prefixed helper convention
+  # (skills/_shared is not a skill) (#161 Bug A).
+  actual_skills="$(find "$BASE_DIR/skills" -mindepth 1 -maxdepth 1 -type d -not -name '_*' 2>/dev/null | wc -l | tr -d ' ')" || actual_skills=0
   actual_agents="$(find "$BASE_DIR/agents" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')" || actual_agents=0
 
   local content
@@ -1393,7 +1397,14 @@ scan_counts() {
 
   local label stated actual
   for label in skills tests scripts agents; do
-    stated="$(echo "$content" | grep -oE "[0-9]+ ${label%s}" | head -1 | grep -oE '[0-9]+')" || stated=""
+    # Anchor the stated count to the AGENT_CONTEXT.md stats-table row for this
+    # component: `| {Label} | <location> | {N} <unit> ... |`. The number must be
+    # the FIRST token of the purpose (3rd) cell. This rejects prose digits such
+    # as the "003" in "PAT-003 script" (#161 / PMB-016 Bug B); rows with no
+    # leading count (e.g. the Agents row) yield empty -> skipped.
+    stated="$(printf '%s\n' "$content" \
+      | grep -oiE "^\|[[:space:]]*${label}[[:space:]]*\|[^|]*\|[[:space:]]*[0-9]+" \
+      | head -1 | grep -oE '[0-9]+$')" || stated=""
     case "$label" in
       skills)  actual="$actual_skills" ;;
       tests)   actual="$actual_tests" ;;
