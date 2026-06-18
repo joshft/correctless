@@ -982,6 +982,32 @@ detect_version_file() {
 # when verifying no old-path references remain in distributions (R-015).
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# migrate_config_patterns — additive config migration (DD-007)
+# ---------------------------------------------------------------------------
+# Usage: migrate_config_patterns CONFIG_PATH
+# Adds NEW additive `patterns.*` keys to an existing installed config when they
+# are absent, NEVER overwriting a value the user already set (AP-004 idempotency).
+# Purely additive: schema_version is NOT bumped. Independently callable/testable.
+#
+# Currently migrates:
+#   - patterns.test_file_marker  (default "" — per-file flake-tolerance marker,
+#     INV-008/DD-007). Absent → added as ""; pre-set value preserved.
+migrate_config_patterns() {
+  local cfg="$1"
+  [ -n "$cfg" ] && [ -f "$cfg" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  # Add-if-absent: `if .patterns | has("test_file_marker") | not` so a set value
+  # is never overwritten. `.patterns // {}` guards a config lacking the block.
+  jq '
+    if (.patterns // {} | has("test_file_marker")) then .
+    else .patterns = ((.patterns // {}) + {"test_file_marker": ""})
+    end
+  ' "$cfg" > "$cfg.$$" 2>/dev/null && mv "$cfg.$$" "$cfg" || { rm -f "$cfg.$$" 2>/dev/null; return 1; }
+  return 0
+}
+
 migrate_old_artifacts() {
   local migrated=false
   # Old path base — built from parts to avoid grep matching literal old paths
@@ -1189,6 +1215,14 @@ if [ -f "$CONFIG_DEST" ]; then
     warn "workflow-config.json has no schema_version — may be from an older Correctless version"
   fi
   skip "workflow-config.json (already exists)"
+  # DD-007: additively migrate new patterns.* keys (test_file_marker) onto an
+  # existing config without overwriting set values. Purely additive — no
+  # schema_version bump.
+  if migrate_config_patterns "$CONFIG_DEST"; then
+    if [ "$(jq -r '.patterns.test_file_marker // "__ABSENT__"' "$CONFIG_DEST" 2>/dev/null)" != "__ABSENT__" ]; then
+      ok "Config migration: patterns.test_file_marker present"
+    fi
+  fi
   if jq -e '.workflow.intensity' "$CONFIG_DEST" >/dev/null 2>&1; then
     HAS_INTENSITY="true"
     ok "Intensity: $(jq -r '.workflow.intensity' "$CONFIG_DEST")"
@@ -1225,6 +1259,24 @@ create_if_missing "$REPO_ROOT/.correctless/preferences.md" "$SCRIPT_DIR/template
 if [ -f "$SCRIPT_DIR/templates/auto-policy.json" ]; then
   create_if_missing "$REPO_ROOT/.correctless/config/auto-policy.json" "$SCRIPT_DIR/templates/auto-policy.json" "auto-policy.json"
 fi
+
+# Install the bundled secret-redaction pattern set to .correctless/config/ so the
+# coded outbound redactor (scripts/redact-secrets.sh) has a pattern source on an
+# installed project (INV-013 / MA-S3). Without this the redactor fails closed on
+# every /cchores run because NONE of its probed sources exist on a fresh install.
+# Precedence in the redactor: a /csetup gitleaks.toml wins if present; this
+# installed file is the bundled POSIX-ERE fallback.
+if [ -f "$SCRIPT_DIR/templates/secret-patterns.txt" ]; then
+  create_if_missing "$REPO_ROOT/.correctless/config/secret-patterns.txt" "$SCRIPT_DIR/templates/secret-patterns.txt" "secret-patterns.txt (outbound redaction patterns)"
+fi
+
+# NOTE (MA-S3): setup deliberately does NOT auto-add `.correctless/artifacts/` or
+# `.correctless/meta/` to the project .gitignore. The project intentionally TRACKS
+# `.correctless/` (specs, config, architecture) and the gitignore policy is the
+# user's call (the /csetup gitignore decision). Chore artifacts are kept out of
+# commits by the scoped-staging + `git restore --staged .correctless/artifacts/
+# .correctless/meta/` belt-and-suspenders guard (INV-011), not by a setup-imposed
+# wholesale ignore — see tests/test-consolidation.sh R-002.
 
 # Record file state for the skill agent (template, existing, or missing→template)
 ARCH_STATE="$(detect_file_state "$REPO_ROOT/.correctless/ARCHITECTURE.md")"

@@ -19,6 +19,7 @@
   },
   "patterns": {
     "test_file": "",
+    "test_file_marker": "",
     "source_file": "",
     "test_fail_pattern": "",
     "build_error_pattern": ""

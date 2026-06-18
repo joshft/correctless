@@ -129,6 +129,40 @@ Before any skill invocation, at pipeline startup, verify tool availability for c
 
 - If the `pr_creation` preference is `gh` (the default), check `command -v gh`. If `gh` is not found, fail fast with: **"gh CLI not installed. Set `pr_creation: skip` in preferences.md or install gh."** This upfront check prevents hours of implementation followed by a PR creation failure.
 
+## Shared Working-Tree Lock (INV-015)
+
+Before any working-tree-mutating action (at pipeline startup, after the tool
+availability check), acquire the **shared global working-tree lock** at the
+FIXED, non-branch-scoped path `.correctless/artifacts/worktree.lock`. This lock
+is the mutual-exclusion point between ANY working-tree-mutating orchestrator —
+a concurrent `/cauto` OR a `/cchores` run — so two orchestrators never share the
+mutable working tree (AP-034). Route the acquisition through the shared
+primitive (do NOT roll a bespoke mechanism):
+
+```bash
+source .correctless/scripts/cauto-lock.sh
+if ! lock_acquire ".correctless/artifacts/worktree.lock" "/cauto"; then
+  # message names the HOLDING orchestrator ("working tree is locked by …")
+  exit 0   # exit cleanly — another orchestrator holds the lock
+fi
+```
+
+This is acquired **in addition to** `/cauto`'s existing per-branch pipeline lock.
+The holder label (`/cauto`) is recorded so a colliding run's error names the
+holding orchestrator generically rather than the cauto-only "active on this
+branch" wording.
+
+**Stale-lock recovery**: `lock_acquire` auto-recovers a stale lock whose
+recorded PID is dead (a crashed orchestrator does not permanently wedge the
+shared lock) — `lock_check_stale` cleans the dead-PID lock dir and the acquire
+retries. No manual cleanup is needed for a crashed prior run.
+
+**Release on every terminal path**: call
+`lock_release ".correctless/artifacts/worktree.lock"` on EVERY terminal path —
+success (after Step 10 / PR creation), no-op, abort, and error exits — so the
+lock is never leaked. The INV-004-style final idempotency re-check (if any) runs
+while this lock is held.
+
 ## Read Preferences (R-003)
 
 Read `.correctless/preferences.md` if it exists. This file contains project-level preferences that guide autonomous decisions. If the file does not exist, proceed with built-in defaults — do not fail or abort when preferences.md is absent.

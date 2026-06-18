@@ -101,6 +101,23 @@
 - **Violated when**: any config value is interpolated into a shell string or eval'd; an unknown flag passes the allowlist; the bin is accepted by basename without realpath; the model is split/concatenated onto argv.
 - **Test**: tests/test-external-review.sh (INV-015 argv-array, INV-017 closed allowlist, PRH-005)
 
+### TB-009: Untrusted GitHub issue content → autonomous orchestrator
+- **Crosses**: an arbitrary GitHub issue author (untrusted) → `gh issue list/view` JSON → `/cchores` orchestration context → outward `git push` / `gh pr create` / `gh issue comment`.
+- **Identity assertion**: issue title/body/comments are attacker-controllable text. `/cchores` ingests them only as DATA inside a per-invocation nonce-delimited fence (INV-009, reusing `build-caudit-prompt.sh`'s `_gen_nonce` + `_neutralize_fences`), re-asserted across the Task hop into `/cdebug`.
+- **Data sensitivity change**: unlike TB-007 (web content via a write-free research agent) and TB-008 (`/creview-spec`-only, human disposition gate), `/cchores` acts fully autonomously OUTWARD on a public surface with NO human checkpoint between untrusted issue content and push/PR/comment.
+- **Invariant**: nonce fence + neutralization + inbound size cap (INV-009); positive-gate provenance — every outward action's parameters come from the run manifest's `selected_issue`, never interpolated from observed text (INV-001); structural subcommand-pinned `gh` allowlist makes `gh pr merge`/`gh issue close` unreachable (INV-017); coded fail-closed outbound redaction across every egress sink (INV-013); embedded imperatives are never executed and never expand scope (PRH-002).
+- **Violated when**: a static (nonce-less) fence replaces the per-invocation nonce fence; issue/comment text is interpolated into a `gh`/`git` command; an outbound sink (PR title/body, branch slug, commit message, comment) bypasses the redactor; an embedded instruction triggers an unintended outward action.
+- **Acknowledged gap**: this is the strongest acknowledged-gap boundary in the project — there is NO human checkpoint. The envelope (one-issue-per-run, fail-closed aborts, no-merge, no-PR-on-failure, structural allowlist, coded redaction) is the entire defense. Authoring this TB is itself the human-approved (via spec review) decision to accept the envelope.
+- **Test**: tests/test-cchores.sh (INV-001/009/017, PRH-002/004), tests/test-redact-secrets.sh (INV-013), tests/test-architecture-drift.sh (TB-009 coverage)
+
+### TB-004d: Autonomous issue-selection authority
+- **Crosses**: a scoped sub-boundary widening TB-004 (LLM orchestrator autonomy). The LLM selects the *what* (which issue to fix), not just the *how*.
+- **Identity assertion**: the human delegates issue-*selection* within a suitability-gated (INV-003), severity-calibrated (AP-028 triad), one-per-run, fail-closed, locally-audited (INV-012/INV-019) envelope; the LLM may not select outside it. This envelope substitutes for spec-review as the human "what" gate — the adjudication recorded here is the human's approval (via this feature's spec review) of that substitution.
+- **Constraint**: if extended to batching, merging, multi-issue runs, or label-trusted selection, this exception MUST be revisited. `/cchores` does NOT create trust boundaries autonomously — authoring TB-009/TB-004d is the human-approved architectural decision, not a runtime act.
+- **Invariant**: severity is calibrated LLM judgment, NOT taken from author-supplied labels alone (INV-002); selection rationale + ranked candidates are logged for audit (INV-012); previously-aborted issues are skipped via the local trusted re-selection store (INV-019), never a public-comment-only check.
+- **Violated when**: selection batches/merges/spans multiple issues; severity is taken from labels alone; a previously-aborted issue is re-selected via a public-comment-only signal; selection acts outside the suitability-gated envelope.
+- **Test**: tests/test-cchores.sh (INV-002/003/012/019), tests/test-architecture-drift.sh (TB-004d coverage)
+
 ## Abstractions
 
 ### ABS-001: Shared script library (scripts/lib.sh)
@@ -309,11 +326,11 @@
 
 ### ABS-030: Autonomous decisions JSONL contract
 - **Artifact**: `.correctless/artifacts/autonomous-decisions-{branch_slug}.jsonl`
-- **Sole writer**: `/cauto` orchestrator via `scripts/autonomous-decision-writer.sh` (skills return decisions as structured output; `/cauto` persists them via the writer script, same SFG-bypass pattern as ABS-029/audit-record.sh)
+- **Sole writer**: the `scripts/autonomous-decision-writer.sh` script, invoked by `/cauto` OR `/cchores` (skills return decisions as structured output; the invoking orchestrator persists them via the writer script, same SFG-bypass pattern as ABS-029/audit-record.sh). No path other than this script writes the JSONL.
 - **Consumers**: R-007 pipeline summary, `/cwtf` accountability analysis
-- **Invariant**: `/cauto` verifies JSONL growth after each skill invocation. Deferred escalations gate PR creation (R-013). Skills must NOT write to this file directly.
-- **Enforced at**: `skills/cauto/SKILL.md` (sole writer, JSONL growth check, R-013 confirmation gate), `hooks/sensitive-file-guard.sh` (blocks Edit/Write/Bash redirects to `autonomous-decisions-*.jsonl`)
-- **Violated when**: A skill other than `/cauto` writes directly to the JSONL; `/cauto` skips JSONL growth check after skill invocation; deferred escalation confirmation gate is bypassed before PR creation
+- **Invariant**: the invoking orchestrator (`/cauto` or `/cchores`) verifies JSONL growth after each skill/agent invocation. Deferred escalations gate PR creation (R-013). Skills must NOT write to this file directly except via `autonomous-decision-writer.sh`.
+- **Enforced at**: `skills/cauto/SKILL.md` and `skills/cchores/SKILL.md` (writer-script invocation, JSONL growth check, R-013 confirmation gate), `hooks/sensitive-file-guard.sh` (blocks Edit/Write/Bash redirects to `autonomous-decisions-*.jsonl`)
+- **Violated when**: A skill other than `/cauto` or `/cchores` writes directly to the JSONL; the orchestrator skips JSONL growth check after skill invocation; deferred escalation confirmation gate is bypassed before PR creation
 - **Test**: `tests/test-autonomous-skill-contract.sh` (R-006, R-007, R-013 tests), `tests/test-sensitive-file-guard.sh` (behavioral block tests)
 - **Guards against**: AP-026, AP-022
 
@@ -415,6 +432,25 @@
 - **Violated-when**: a second writer touches the history file; the append is decoupled from the codex call; raw jq-to-file replaces `locked_update_file`; the codex output path omits the run_id; either privileged writer is missing from SFG DEFAULTS
 - **Test**: `tests/test-external-review.sh` (INV-007/INV-008/INV-019); `tests/test-sensitive-file-guard.sh` (INV-010/INV-020); `tests/test-architecture-drift.sh` (ABS-042 coverage)
 - **Guards against**: AP-026 (advisory-prose write contract), PMB-005 (sole-writer omission), AP-022 (dead-code-in-security-paths), AP-037 (protected deliverable)
+
+### ABS-043: Chore-run manifest contract (.correctless/artifacts/)
+- **Artifact**: `.correctless/artifacts/chore-run-{branch_slug}.json` — written as `/cchores`'s FIRST action (`{selected_issue, expected_steps, expected_end_state, status: "in_progress", started_at}`) and finalized as its LAST action to `status: "complete" | "aborted" (+ abort_reason) | "noop"`. Distinct from ABS-031's `/cauto` pipeline-manifest — no sole-writer conflict (different filename, different writer).
+- **Sole writer**: `/cchores`. **Consumers**: `/cstatus` (truncation surfacing — a manifest left `in_progress` denotes a truncated run, reported exactly as ABS-031 pipeline-manifests are), the INV-016 run-report step.
+- **Invariant**: ephemeral, gitignored, excluded from PR staging; `in_progress` denotes truncation; `branch_slug` is derived via `lib.sh branch_slug()` (verified to handle the `chore/` prefix).
+- **Enforced-at**: `skills/cchores/SKILL.md` (writer), `skills/cstatus/SKILL.md` (consumer wiring)
+- **Violated-when**: the run stops mid-pipeline with the manifest `in_progress` and no abort recorded; the manifest is committed to the PR; nothing consumes it (dead artifact)
+- **Test**: `tests/test-cchores.sh`, `tests/test-cchores-infra.sh`, `tests/test-architecture-drift.sh` (ABS-043 coverage)
+- **Guards against**: AP-030 (pipeline truncation), PMB-009 (silent truncation), AP-022 (dead-code-in-security-paths)
+
+### ABS-044: Cross-run re-selection store (.correctless/meta/)
+- **Artifact**: `.correctless/meta/cchores-attempted.json` — schema `{"schema_version": 1, "attempts": [{"issue": N, "branch_slug": "…", "outcome": "aborted|abandoned", "reason": "…", "recorded_at": "ISO"}]}`. The authoritative loop-prevention store, load-bearing for INV-002 selection and INV-011 abort.
+- **Sole writer**: `/cchores` via `lib.sh locked_update_file` (ABS-003 advisory lock — concurrent-write safe). **Consumers (read-only)**: INV-002 selection filter (skip any issue with an `aborted` attempt), `/cstatus`. Never the public comment.
+- **Invariant**: gitignored, cross-run/cross-branch durable (under `.correctless/meta/` per the ABS-033 precedent — the branch-scoped ABS-030 JSONL cannot persist across branches), never committed/pushed; re-selection suppression is recorded HERE before the public comment in the INV-011 abort order, so it survives a comment-post failure.
+- **Prune behavior**: `.correctless/meta/`-durable (NOT artifact-slug-scoped) — `/cprune` does NOT auto-delete it; stale `resolved` attempts may be pruned via `/ctriage`, not autonomous `/cprune`.
+- **Enforced-at**: `skills/cchores/SKILL.md` (writer), INV-002 selection, `skills/cstatus/SKILL.md`
+- **Violated-when**: re-selection suppression depends solely on the public comment; the store is committed; a non-`/cchores` writer touches it; concurrent writes corrupt it (must use `locked_update_file`)
+- **Test**: `tests/test-cchores.sh`, `tests/test-cchores-infra.sh`, `tests/test-architecture-drift.sh` (ABS-044 coverage)
+- **Guards against**: re-selection loops, evidence loss on comment-post failure
 
 ## Patterns
 

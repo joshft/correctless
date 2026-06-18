@@ -178,6 +178,9 @@ _classify_artifact_pattern() {
     wtf-report-*.md) echo "branch-slug" ;;
     coverage-baseline-*.out) echo "branch-slug" ;;
     cprune-lock-*-*) echo "branch-slug" ;;
+    chore-run-*.json) echo "branch-slug" ;;
+    chore-abort-*.md) echo "branch-slug" ;;
+    chore-report-*.md) echo "branch-slug" ;;
     qa-findings-*.json) echo "task-slug" ;;
     harness-notified-*.flag) echo "session-slug" ;;
     *) echo "unclassified" ;;
@@ -729,7 +732,7 @@ scan_artifacts() {
   fi
 
   # ===== Single source of truth for patterns (INV-006) =====
-  local artifact_patterns="workflow-state-*.json token-log-*.jsonl audit-trail-*.jsonl pipeline-manifest-*.json autonomous-decisions-*.jsonl escalation-*.md adherence-*.json antipattern-findings-*.json cost-cache-*.json cost-*.json review-decisions-*.json lens-recommendations-*.json probe-results-*.json wtf-report-*.md coverage-baseline-*.out cprune-lock-*-* qa-findings-*.json harness-notified-*.flag"
+  local artifact_patterns="workflow-state-*.json token-log-*.jsonl audit-trail-*.jsonl pipeline-manifest-*.json autonomous-decisions-*.jsonl escalation-*.md adherence-*.json antipattern-findings-*.json cost-cache-*.json cost-*.json review-decisions-*.json lens-recommendations-*.json probe-results-*.json wtf-report-*.md coverage-baseline-*.out cprune-lock-*-* chore-run-*.json chore-abort-*.md chore-report-*.md qa-findings-*.json harness-notified-*.flag"
 
   # ===== Step 1: load live branches and compute live-branch-slug set =====
   local branches branch_arr

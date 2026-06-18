@@ -172,12 +172,14 @@ else
   fail "R-001-11" "cannot test — harness file missing"
 fi
 
-# R-001-12: Preamble includes set -uo pipefail
+# R-001-12: Preamble enables nounset (set -u). pipefail is intentionally OFF — the
+# suite's pervasive `producer | grep -q` idiom SIGPIPEs the producer, and under pipefail
+# that propagates as the #186/AP-033 roaming flake; the harness documents this.
 if [ -f "$HARNESS" ]; then
-  if grep -q 'set -uo pipefail' "$HARNESS"; then
-    pass "R-001-12" "harness includes 'set -uo pipefail'"
+  if grep -qE '^set -u\b' "$HARNESS" && ! grep -qE '^set -uo pipefail' "$HARNESS"; then
+    pass "R-001-12" "harness enables nounset (set -u) with pipefail intentionally off (#186 mitigation)"
   else
-    fail "R-001-12" "harness missing 'set -uo pipefail'"
+    fail "R-001-12" "harness must use 'set -u' with pipefail off (not 'set -uo pipefail') — see #186/AP-033"
   fi
 else
   fail "R-001-12" "cannot test — harness file missing"

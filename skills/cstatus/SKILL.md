@@ -230,6 +230,59 @@ If the manifest does not exist or `status` is `"complete"`, produce no output fo
 
 The workflow state is authoritative — the manifest report is a diagnostic signal, not an override of workflow state.
 
+### 6a-bis. Incomplete /cchores Run Detection (INV-016 / ABS-043)
+
+`/cchores` runs on a `chore/issue-N-*` branch that the user is typically **not** on
+by the time they next open `/cstatus` (a chore launched overnight leaves them on
+`main` or another feature branch in the morning). Deriving the manifest path from
+the CURRENT branch would therefore miss every truncated chore run. So scan
+**branch-independently**, exactly like the retained-branch scan below: **glob**
+`.correctless/artifacts/chore-run-*.json` and report any manifest whose `status` is
+not `"complete"`. Name the affected branch from **inside** the manifest (its
+`branch_slug` / `branch` field), not from the current branch.
+
+For each globbed manifest with `status != "complete"`:
+
+- **`in_progress`** — a truncated run. Report:
+
+  > **Incomplete /cchores run detected** on `{branch from manifest}`. Selected issue: #{selected_issue}. Status: in_progress (truncated run). Re-run `/cchores` to resume.
+
+- **`aborted`** — Report:
+
+  > **Aborted /cchores run** on `{branch from manifest}`. Selected issue: #{selected_issue}. {abort_reason}. Re-run `/cchores` to resume.
+
+- **`noop`** — a clean run that found no suitable issue. This is NOT a truncation;
+  do not tell the user to "re-run to resume". Report instead:
+
+  > **/cchores ran and found no suitable issues** — nothing to resume. (Last run on `{branch from manifest}` selected no candidate.)
+
+Truncation/state is determined by `status` content equality, not mtime (EA-008). If
+no `chore-run-*.json` manifest exists, or every manifest has `status` `"complete"`,
+produce no output for this section (dormant — PAT-019).
+
+**Retained abort branches**: scan `.correctless/artifacts/chore-abort-*.md` and `.correctless/artifacts/chore-report-*.md` for any `/cchores` abort that **retained** a local-only chore branch (a chore branch with commits that was not pushed — unreachable from GitHub). For each retained branch, surface it so it is not lost:
+
+> **Retained chore branch:** `{branch}` (issue #{N}) — retained locally on abort, not pushed. Resume or delete it manually.
+
+If no abort artifact references a retained branch, produce no output for this section (dormant — PAT-019).
+
+### 6a-ter. /cchores attempted-issues store (INV-019 consumer)
+
+INV-019 names `/cstatus` as a consumer of the durable cross-run loop-prevention
+store `.correctless/meta/cchores-attempted.json` (the same store
+`/cchores`'s candidate selector reads via `--attempted-store`). Surfacing it here
+gives the user visibility into which issues `/cchores` has already attempted or
+suppressed, so a repeatedly-skipped issue is not invisible.
+
+Read `.correctless/meta/cchores-attempted.json` if it exists. It holds an
+`attempts` array of `{issue, branch_slug, outcome}` records. Summarize:
+
+> **/cchores attempted issues:** {N} recorded. Suppressed/attempted: #{issue} ({outcome}), … — these are excluded from future autonomous selection. To re-allow one, edit the store.
+
+If the file does not exist, is empty, or its `attempts` array is empty, produce no
+output for this section (dormant per PAT-019 — pre-upgrade and never-run projects
+see nothing).
+
 ### 6b. Deferred Findings Backlog
 
 Read `.correctless/meta/deferred-findings.json` if it exists. Show the following:

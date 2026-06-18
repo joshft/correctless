@@ -11,6 +11,7 @@ repos:
       - id: check-added-large-files
         args: ['--maxkb=500']
       - id: detect-private-key
+        exclude: '^tests/test-(redact-secrets|cchores-emit)\.sh$'
       - id: check-case-conflict
 
   # Secret scanning — catches secrets before they enter the repo

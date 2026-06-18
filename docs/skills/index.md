@@ -6,7 +6,7 @@ has_children: true
 
 # Skills
 
-Correctless ships 32 skills — slash commands that enforce a structured development workflow. Each skill is a specific step in the pipeline, from writing specs to merging code.
+Correctless ships 33 skills — slash commands that enforce a structured development workflow. Each skill is a specific step in the pipeline, from writing specs to merging code. `/cchores` is the autonomous backlog-grooming skill.
 
 Skills are organized into five categories:
 
@@ -14,6 +14,6 @@ Skills are organized into five categories:
 |:---------|:------:|:--------|
 | [Core Workflow](core-workflow) | 9 | The spec-to-merge pipeline |
 | [Code Quality](code-quality) | 5 | Fixes, refactoring, exploration |
-| [Observability](observability) | 8 | Status, metrics, accountability, triage, pruning |
+| [Observability](observability) | 9 | Status, metrics, accountability, triage, pruning, autonomous chores |
 | [High+ Intensity](high-intensity) | 8 | Adversarial review, formal modeling, auditing |
 | [Open Source](open-source) | 2 | Contributing and maintaining OSS |

@@ -1,0 +1,35 @@
+# Source: real `commands.test` capture from this repo (.correctless/artifacts/baseline-test-output-cchores.txt, 2026-06-17, all-green, exit 0).
+# Trimmed to a committed, portable AP-031 fixture (full 574KB capture is gitignored under .correctless/artifacts/).
+# Carries the ambiguity shapes a naive 'FAIL:'-keyed oracle must NOT misread: '>>> {file}' echoes, 'FAIL: 0' summaries, and the 'echo FAIL:' exempt line.
+  PASS: B-09: 'echo PASS:' not flagged (exempt)
+  PASS: B-09: 'echo FAIL:' not flagged (exempt)
+  PASS: B-09: 'echo ""' not flagged (exempt)
+  PASS: B-09: echo inside info() not flagged (exempt)
+  PASS: B-09: echo inside die() not flagged (exempt)
+PASS: 287
+FAIL: 0
+TOTAL: 287
+RESULT: PASS (all 287 tests passed)
+>>> tests/test-architecture-drift.sh
+  FAIL: 0
+>>> tests/test-core.sh
+>>> tests/test-cprune.sh
+  FAIL: 0
+  FAIL: 0
+  FAIL: 0
+  FAIL: 0
+>>> tests/test-lib.sh
+  FAIL: 0
+PASS: 186
+FAIL: 0
+TOTAL: 186
+RESULT: PASS (all 186 tests passed)
+  FAIL: 0
+  FAIL: 0
+  FAIL: 0
+  FAIL: 0
+  FAIL: 0
+PASS: 97
+FAIL: 0
+TOTAL: 97
+RESULT: PASS (all 97 tests passed)

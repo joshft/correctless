@@ -26,7 +26,7 @@ GROUP_A_SKILLS="chelp cstatus cdashboard"
 GROUP_A_DISALLOWED="Edit, Write, MultiEdit, NotebookEdit, CreateFile"
 
 # Group B: artifact-only skills — disallow Edit, MultiEdit, NotebookEdit, CreateFile (NOT Write)
-GROUP_B_SKILLS="cexplain cwtf cmetrics csummary cpr-review cmaintain cmodel cmodelupgrade ctriage"
+GROUP_B_SKILLS="cexplain cwtf cmetrics csummary cpr-review cmaintain cmodel cmodelupgrade ctriage cchores"
 GROUP_B_DISALLOWED="Edit, MultiEdit, NotebookEdit, CreateFile"
 
 # Skills that legitimately use Edit/Write and should NOT have disallowed-tools
