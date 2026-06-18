@@ -41,8 +41,15 @@ jobs:
           )
 
           for pattern in "${PATTERNS[@]}"; do
-            if grep -riEl "$pattern" skills/ templates/ 2>/dev/null; then
+            # Match lines, then drop any explicitly marked as a reviewed
+            # false-positive (e.g. security docs that quote injection phrases
+            # to instruct the agent to IGNORE them). The marker must be on the
+            # same line as the match.
+            matches=$(grep -riEn "$pattern" skills/ templates/ 2>/dev/null \
+              | grep -vi 'prompt-scan: false-positive' || true)
+            if [ -n "$matches" ]; then
               echo "::error::Injection pattern detected: '$pattern'"
+              echo "$matches"
               FAILED=1
             fi
           done
