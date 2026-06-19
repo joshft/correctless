@@ -22,7 +22,7 @@ jobs:
       matrix:
         jq_version: ["1.7.1", "1.8.1"]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install jq ${{ matrix.jq_version }}
         run: |
@@ -67,7 +67,7 @@ jobs:
     # tests/test-*.sh loop). Fails if a .correctless/.sfg-lift-active sentinel is
     # still committed (lift commit landed without its restore commit).
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Check no pending SFG lift sentinel
         run: bash scripts/check-no-pending-sfg-lift.sh
@@ -93,7 +93,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
