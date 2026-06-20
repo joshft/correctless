@@ -6,24 +6,34 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/workflow-gate.sh",
+            "command": ".correctless/hooks/workflow-gate.sh",
             "timeout_ms": 5000
           },
           {
             "type": "command",
-            "command": ".claude/hooks/sensitive-file-guard.sh",
+            "command": ".correctless/hooks/sensitive-file-guard.sh",
             "timeout_ms": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|CreateFile|NotebookEdit",
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "You are the import guard. Your job is to check whether a test file is importing internal packages that should be accessed through a documented entrypoint.\n\nPerform these steps in order:\n\n1. **Check if the file is a test file.** Look at the file path from $ARGUMENTS. Match against common test file patterns: `*_test.go`, `*.test.ts`, `*.test.js`, `*.test.tsx`, `*.spec.ts`, `*.spec.js`, `test_*.py`, `*_test.py`, `*_test.rs`, or files under `tests/`, `__tests__/`, `test/` directories. If the file is not a test file, allow the operation immediately — this hook only applies to test files.\n\n2. **Check for entrypoints.** Read `.correctless/ARCHITECTURE.md`. Look for the `correctless:entrypoints:start` and `correctless:entrypoints:end` markers. If the file does not exist, or the markers are not present, or no entrypoints are defined between the markers, allow the operation — graceful degradation when no entrypoints are configured.\n\n3. **Read the test_helpers allow-list.** Read `.correctless/config/workflow-config.json` and check for `workflow.test_helpers` (a list of glob patterns). If the field is absent, treat as empty — no packages are allow-listed.\n\n4. **Read the entrypoints YAML** between the markers. For each entrypoint, note its `scope` globs and its handler path.\n\n5. **Check imports against entrypoint scope.** Examine the file content from $ARGUMENTS for import statements. Use language-aware import detection:\n   - **Go**: `import \"pkg/...\"` or `import ( \"pkg/...\" )` blocks\n   - **TypeScript/JavaScript**: `import ... from '...'`, `import ... from \"...\"`, or `require('...')`, `require(\"...\")`\n   - **Python**: `from pkg import ...` or `import pkg`\n   - **Rust**: `use crate::...` or `mod ...`\n   For languages not in this list, allow the operation — do not block writes for unsupported languages.\n\n   For each import, check whether it matches any package within an entrypoint's `scope` globs. Exclude:\n   - The entrypoint handler itself — importing the entrypoint handler is legitimate (self-import exclusion). Only flag imports of internal packages *within* the entrypoint's scope that should be reached *through* the entrypoint, not the entrypoint itself.\n   - Any package matching a `test_helpers` glob pattern from step 3.\n\n6. **Decision.**\n   - If an internal import is found that is within an entrypoint's scope, is NOT the entrypoint handler itself, and is NOT in the test_helpers allow-list: **deny** the operation. Include in the reason: the specific internal package that was detected, the specific entrypoint name that covers this path, the `test_via` pattern to use instead, and the escape hatch: \"If this import is for test fixtures, add the package to workflow.test_helpers in workflow-config.json.\" Also include: \"If you cannot write this test through the entrypoint, ask the user for guidance.\"\n   - If no internal imports are found within any entrypoint scope: **allow** the operation.",
+            "timeout": 30
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|CreateFile|Bash",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash|Read|Grep",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/audit-trail.sh",
+            "command": ".correctless/hooks/audit-trail.sh",
             "timeout_ms": 1000
           }
         ]
@@ -33,7 +43,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/token-tracking.sh",
+            "command": ".correctless/hooks/token-tracking.sh",
+            "timeout_ms": 1000
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".correctless/hooks/auto-format.sh",
             "timeout_ms": 1000
           }
         ]
@@ -42,11 +62,11 @@
   },
   "permissions": {
     "allow": [
-      "Bash(.claude/hooks/workflow-advance.sh *)"
+      "Bash(.correctless/hooks/workflow-advance.sh *)"
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": ".claude/hooks/statusline.sh"
+    "command": ".correctless/hooks/statusline.sh"
   }
 }
