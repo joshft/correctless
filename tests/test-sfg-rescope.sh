@@ -970,6 +970,75 @@ test_qa003_backslash_escape_context_parity() {
     'echo "a \" > .env"'
 }
 
+
+# ---------------------------------------------------------------------------
+# QA-006 (round 3): backslash x redirect-operator PARITY SWEEP. A hand-rolled
+# lexer-state masker must agree with real bash on whether an operator preceded
+# by a run of backslashes is LIVE (real redirect -> write -> must BLOCK) or
+# ESCAPED (literal -> no write -> must ALLOW). Each row's expected verdict is
+# PINNED TO THE REAL-BASH ORACLE (gen-fixtures.sh differential run, 2026-06):
+# exit 2 = real bash actually wrote the target; exit 0 = no write. The round-2
+# backslash branch regressed even-length backslash runs glued to a
+# space-separated operator (a real redirect that the extractor failed to emit).
+# NOTE the non-obvious oracle the differential revealed: the two-token redirects
+# (append, numbered-fd, and-redirect) stay LIVE under ANY backslash prefix
+# because the escape consumes a non-operator byte and leaves a live operator;
+# only the single-char truncate/noclobber redirects follow even=block/odd=allow
+# parity. Source: real-bash differential oracle, NOT hand-derived (PMB-013
+# lexer-parity, AP-022 guards against the missed-write direction).
+# ---------------------------------------------------------------------------
+test_qa006_backslash_operator_parity_sweep() {
+  echo ""
+  echo "=== QA-006: backslash x operator parity sweep (oracle-pinned) ==="
+  assert_bash 'parity n=0 op=> space -> 2' '2' 'echo a > .env'
+  assert_bash 'parity n=0 op=> glued -> 2' '2' 'echo a >.env'
+  assert_bash 'parity n=1 op=> space -> 0' '0' 'echo a \> .env'
+  assert_bash 'parity n=1 op=> glued -> 0' '0' 'echo a \>.env'
+  assert_bash 'parity n=2 op=> space -> 2' '2' 'echo a \\> .env'
+  assert_bash 'parity n=2 op=> glued -> 2' '2' 'echo a \\>.env'
+  assert_bash 'parity n=3 op=> space -> 0' '0' 'echo a \\\> .env'
+  assert_bash 'parity n=3 op=> glued -> 0' '0' 'echo a \\\>.env'
+  assert_bash 'parity n=0 op=>> space -> 2' '2' 'echo a >> .env'
+  assert_bash 'parity n=0 op=>> glued -> 2' '2' 'echo a >>.env'
+  assert_bash 'parity n=1 op=>> space -> 2' '2' 'echo a \>> .env'
+  assert_bash 'parity n=1 op=>> glued -> 2' '2' 'echo a \>>.env'
+  assert_bash 'parity n=2 op=>> space -> 2' '2' 'echo a \\>> .env'
+  assert_bash 'parity n=2 op=>> glued -> 2' '2' 'echo a \\>>.env'
+  assert_bash 'parity n=3 op=>> space -> 2' '2' 'echo a \\\>> .env'
+  assert_bash 'parity n=3 op=>> glued -> 2' '2' 'echo a \\\>>.env'
+  assert_bash 'parity n=0 op=>| space -> 2' '2' 'echo a >| .env'
+  assert_bash 'parity n=0 op=>| glued -> 2' '2' 'echo a >|.env'
+  assert_bash 'parity n=1 op=>| space -> 0' '0' 'echo a \>| .env'
+  assert_bash 'parity n=1 op=>| glued -> 0' '0' 'echo a \>|.env'
+  assert_bash 'parity n=2 op=>| space -> 2' '2' 'echo a \\>| .env'
+  assert_bash 'parity n=2 op=>| glued -> 2' '2' 'echo a \\>|.env'
+  assert_bash 'parity n=3 op=>| space -> 0' '0' 'echo a \\\>| .env'
+  assert_bash 'parity n=3 op=>| glued -> 0' '0' 'echo a \\\>|.env'
+  assert_bash 'parity n=0 op=1> space -> 2' '2' 'echo a 1> .env'
+  assert_bash 'parity n=0 op=1> glued -> 2' '2' 'echo a 1>.env'
+  assert_bash 'parity n=1 op=1> space -> 2' '2' 'echo a \1> .env'
+  assert_bash 'parity n=1 op=1> glued -> 2' '2' 'echo a \1>.env'
+  assert_bash 'parity n=2 op=1> space -> 2' '2' 'echo a \\1> .env'
+  assert_bash 'parity n=2 op=1> glued -> 2' '2' 'echo a \\1>.env'
+  assert_bash 'parity n=3 op=1> space -> 2' '2' 'echo a \\\1> .env'
+  assert_bash 'parity n=3 op=1> glued -> 2' '2' 'echo a \\\1>.env'
+  assert_bash 'parity n=0 op=2> space -> 2' '2' 'echo a 2> .env'
+  assert_bash 'parity n=0 op=2> glued -> 2' '2' 'echo a 2>.env'
+  assert_bash 'parity n=1 op=2> space -> 2' '2' 'echo a \2> .env'
+  assert_bash 'parity n=1 op=2> glued -> 2' '2' 'echo a \2>.env'
+  assert_bash 'parity n=2 op=2> space -> 2' '2' 'echo a \\2> .env'
+  assert_bash 'parity n=2 op=2> glued -> 2' '2' 'echo a \\2>.env'
+  assert_bash 'parity n=3 op=2> space -> 2' '2' 'echo a \\\2> .env'
+  assert_bash 'parity n=3 op=2> glued -> 2' '2' 'echo a \\\2>.env'
+  assert_bash 'parity n=0 op=&> space -> 2' '2' 'echo a &> .env'
+  assert_bash 'parity n=0 op=&> glued -> 2' '2' 'echo a &>.env'
+  assert_bash 'parity n=1 op=&> space -> 2' '2' 'echo a \&> .env'
+  assert_bash 'parity n=1 op=&> glued -> 2' '2' 'echo a \&>.env'
+  assert_bash 'parity n=2 op=&> space -> 2' '2' 'echo a \\&> .env'
+  assert_bash 'parity n=2 op=&> glued -> 2' '2' 'echo a \\&>.env'
+  assert_bash 'parity n=3 op=&> space -> 2' '2' 'echo a \\\&> .env'
+  assert_bash 'parity n=3 op=&> glued -> 2' '2' 'echo a \\\&>.env'
+}
 # ===========================================================================
 # Run
 # ===========================================================================
@@ -1002,6 +1071,7 @@ test_inv019_cross_locale_behavioral
 test_inv020_per_segment_positional
 test_qa001_quoted_and_comment_operators_not_targets
 test_qa003_backslash_escape_context_parity
+test_qa006_backslash_operator_parity_sweep
 
 echo ""
 echo "=== Summary ==="

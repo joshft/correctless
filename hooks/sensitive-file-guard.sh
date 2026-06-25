@@ -352,6 +352,34 @@ _mask_opaque_operands() {
   printf '%s' "$out"
 }
 
+# Recognize a LIVE redirect operator that terminates a whitespace-delimited token
+# (QA-006 / AP-022). The round-2 masker (`_mask_quoted_operators`) neutralizes
+# ESCAPED operator bytes to `_`, so any redirect-operator byte (`>`/`<`/`&`/`|`)
+# that survives RAW in a masked token is genuinely live shell syntax — even when a
+# literal/masked prefix is glued to it inside one token (`\\>`, `\1>`, `\_>` from
+# `\&>`, `\\>>`). We strip a leading run of NON-operator literal/masked bytes (the
+# escaped-byte literals the masker emitted) and check whether the trailing suffix
+# is EXACTLY a redirect operator (no glued destination — that path is handled by
+# the glued `rre` regex). On match, echo the operator suffix; otherwise echo
+# nothing. An escaped odd-parity operator (already masked to `_`) leaves no live
+# operator byte, so its token yields no suffix and stays allowed (INV-007 parity).
+_redirect_op_suffix() {
+  local tok="$1" suffix
+  # Strip the leading run of bytes that are NOT redirect-operator bytes. Whatever
+  # remains begins at the first surviving (live) operator byte. The masker has
+  # already rewritten escaped operators to `_` (a non-operator byte), so this
+  # leading run is pure literal/masked prefix and never an escaped operator.
+  suffix="${tok##*[!\<\>\&\|]}"
+  # `${tok##*[!…]}` leaves nothing when the WHOLE token is operator bytes; in that
+  # case suffix == tok. When no operator byte exists at all, the greedy strip also
+  # leaves the empty string. Disambiguate: re-derive from a literal scan is
+  # unnecessary — match the suffix against the exact operator set below.
+  case "$suffix" in
+    '>'|'>>'|'>|'|'>&'|'&>'|'&>|') printf '%s' "$suffix" ;;
+    *) : ;;
+  esac
+}
+
 # Extract genuine write destinations from a Bash command — destination-driven
 # (PRH-001): a token is emitted ONLY by the redirect branch (INV-002) or the
 # writer-command branch (INV-003). No unconditional token-emit branch exists.
@@ -440,18 +468,26 @@ _extract_bash_targets() {
     done
 
     # Whitespace-separated redirect operators: next token is the destination.
+    # A token may carry a LITERAL/masked prefix glued to a LIVE redirect operator
+    # within one whitespace-delimited token — e.g. a backslash-escaped non-operator
+    # byte followed by a live `>` (`\\>`, `\1>`, `\_>` from `\&>`, `\\>>`). The
+    # round-2 masker neutralizes ESCAPED operators to `_`, so any redirect-operator
+    # byte (`>`/`<`/`&`/`|`) that SURVIVES raw in the masked token is genuinely live
+    # (QA-006 / AP-022: missing this silently ALLOWS a real write). `_redirect_op_suffix`
+    # strips a leading run of non-operator literal/masked bytes and recognizes the
+    # trailing live operator; the destination is still the next whitespace-separated
+    # token. Escaped odd-parity operators (masked to `_`) leave no live suffix and
+    # stay allowed.
     # shellcheck disable=SC2206
     local -a mtokens=($masked)
     j=0
     while [ "$j" -lt "${#mtokens[@]}" ]; do
-      op="${mtokens[$j]}"
-      case "$op" in
-        '>'|'>>'|'>|'|'1>'|'2>'|'&>'|'&>|'|'>&'|'1>>'|'2>>')
-          if [ "$((j + 1))" -lt "${#mtokens[@]}" ]; then
-            _emit_dest "${mtokens[$((j + 1))]}"
-          fi
-          ;;
-      esac
+      op="$(_redirect_op_suffix "${mtokens[$j]}")"
+      if [ -n "$op" ]; then
+        if [ "$((j + 1))" -lt "${#mtokens[@]}" ]; then
+          _emit_dest "${mtokens[$((j + 1))]}"
+        fi
+      fi
       j=$((j + 1))
     done
   done <<< "$segmented"
