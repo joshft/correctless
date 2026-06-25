@@ -791,6 +791,33 @@
         "tests/test-cross-feature-intel.sh"
       ],
       "timestamp": "2026-05-23T04:55:00Z"
+    },
+    {
+      "feature_slug": "sfg-rescope",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 108753,
+      "actual_spec_updates": 0,
+      "harness_version": 1,
+      "fix_rounds_triggered": 2,
+      "file_paths_touched": [
+        ".claude/rules/hooks-pretooluse.md",
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/antipatterns.md",
+        ".correctless/specs/sfg-rescope.md",
+        "CHANGELOG.md",
+        "CLAUDE.md",
+        "README.md",
+        "correctless/hooks/sensitive-file-guard.sh",
+        "docs/skills/cmodelupgrade.md",
+        "hooks/sensitive-file-guard.sh",
+        "tests/test-sensitive-file-guard.sh",
+        "tests/test-sfg-rescope.sh"
+      ],
+      "timestamp": "2026-06-25T09:35:00Z"
     }
   ]
 }
