@@ -34,6 +34,41 @@ QA-R1-005's clause-5 violation persisted across 7+ hook-touching PRs over ~4 day
 
 The lesson: on unexpected input, exit 2, not 0. No carve-outs, no environment-gated exceptions, no "this edge case is probably safe." If clause 5 has to be loosened, the loosening must be loud and reviewable.
 
+## Clause-5 carve-out: sensitive-file-guard extraction path fails OPEN (2026-06)
+
+There is exactly one sanctioned, documented carve-out to clause 5, added in the
+SFG re-scope (sfg-rescope spec, 2026-06). It is scoped narrowly and is "loud and
+reviewable" precisely as the rule above demands.
+
+**The carve-out**: in `hooks/sensitive-file-guard.sh`, the *write-destination
+extraction* path (`_extract_bash_targets`) fails **OPEN** on extraction
+ambiguity (INV-007). When a Bash command's write destination cannot be resolved
+to a concrete path — a dynamic destination (`echo x > "${f}"`), an
+interpreter/eval operand (`bash -c "…"`), a process-substitution operand, or any
+form that is not a recognized redirect/writer destination — the extractor emits
+the **empty set** and the command is **allowed**. Extraction is destination-
+driven (an allowlist of write forms), so this fail-open is structural, not a
+conditional escape hatch (PRH-001).
+
+**Why this does not invert the gate (PMB-020 / AP-040)**: a cooperative-loop
+PreToolUse hook is a **guardrail/speedbump** for accidental and naively-injected
+writes — it is NOT a security perimeter and cannot be one (it is trivially
+evaded: name the directory not the file, route through an interpreter, use any
+ungated tool). Treating SFG's extraction path as fail-closed produced constant
+false blocks on reads/invocations/restores (15 false blocks across two 2026-06
+dogfood sessions, zero write attacks) — a self-inflicted availability failure.
+The re-scope right-sizes the mechanism: block only genuine write destinations,
+fail open on everything else. See PMB-020 and AP-040.
+
+**The boundary stays strict (INV-008)**: this carve-out applies ONLY to write-
+destination ambiguity *within a successfully-parsed Bash command*. The hook's
+own **input-parse** path — malformed/unparseable stdin JSON — STILL fails
+**CLOSED** (exit 2), unchanged. Every OTHER PreToolUse hook (`workflow-gate.sh`,
+etc.) retains strict fail-closed on every path. The fail-open boundary sits at
+the JSON layer, not the shell layer (INV-007 / INV-008). The carve-out is
+documented here so the shipped hook does not silently contradict its own
+governing rule file.
+
 ## Tests
 
 - `tests/test-sensitive-file-guard.sh` — sensitive-file-guard.sh shape + fail-closed behavior.

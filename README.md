@@ -273,7 +273,7 @@ Correctless hooks into Claude Code's infrastructure for real-time feedback and l
 ```mermaid
 graph TB
     subgraph "Claude Code Hooks"
-        A["PreToolUse"] --> H["sensitive-file-guard.sh<br/>Secret protection"]
+        A["PreToolUse"] --> H["sensitive-file-guard.sh<br/>Write-target guardrail"]
         A --> B["workflow-gate.sh<br/>Phase enforcement"]
         C["PostToolUse"] --> D["audit-trail.sh<br/>Adherence feedback"]
         C --> G["auto-format.sh<br/>Auto-formatting"]
@@ -295,7 +295,7 @@ graph TB
 
 | Hook | Runs | Purpose |
 |------|------|---------|
-| **sensitive-file-guard.sh** | Before every file edit | Blocks writes to `.env`, credentials, keys, certificates — fail-closed, no overrides |
+| **sensitive-file-guard.sh** | Before every Edit/Write and write-pattern Bash command | Write-target guardrail: blocks Edit/Write and direct redirect/writer-command writes (`>`, `tee`, `cp`, `mv`, `sed -i`, …) to `.env`, credentials, keys, certificates. Catches accidental/naive writes; interpreter/git-mediated out-of-band writes are accepted non-goals (AP-040). The input-parse path fails closed; the write-target extraction path fails open on ambiguity |
 | **workflow-gate.sh** | Before every file edit | Blocks writes that violate the current phase (RED blocks source, QA blocks everything) |
 | **audit-trail.sh** | After every tool call | Logs modifications with phase context, alerts on violations |
 | **token-tracking.sh** | After Agent tool completion | Logs subagent token usage, cost, and duration to JSONL for `/cmetrics` analysis |

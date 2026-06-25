@@ -13,10 +13,11 @@
     "build": ""
   },
   "patterns": {
-    "test_file": "tests/test*.sh|tests/**/*",
+    "test_file": "tests/test*.sh|tests/**/*|tests/**/*",
     "source_file": "*.sh|*.md",
     "test_fail_pattern": "FAIL:",
-    "build_error_pattern": ""
+    "build_error_pattern": "",
+    "test_file_marker": ""
   },
   "workflow": {
     "intensity": "high",

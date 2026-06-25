@@ -165,9 +165,12 @@ test_inv002_block_bash_writes_to_sensitive_files() {
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cat creds.txt > .env"}}')"
   assert_eq "INV-002: cat redirect to .env blocked" "2" "$(extract_exit "$result")"
 
-  # cp .env backup -> exit 2
+  # RS-016 (sfg-rescope): cp .env backup -> exit 0. SFG is a WRITE guard, not an
+  # egress guard. `.env` here is the SOURCE (a read); the destination is the
+  # non-protected backup.txt. redact-secrets.sh owns egress, not SFG (STRIDE
+  # Information disclosure / DD-7). Inverted from exit 2.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp .env backup.txt"}}')"
-  assert_eq "INV-002: cp .env (source) blocked" "2" "$(extract_exit "$result")"
+  assert_eq "RS-016: cp .env backup.txt (source read) ALLOWED" "0" "$(extract_exit "$result")"
 
   # mv .env .env.bak -> exit 2
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"mv .env .env.bak"}}')"
@@ -730,9 +733,17 @@ test_bnd004_bash_multiple_targets() {
 
   local result
 
-  # cp .env .env.backup -> exit 2 (source is protected)
-  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp .env .env.backup"}}')"
-  assert_eq "BND-004: cp .env source blocked" "2" "$(extract_exit "$result")"
+  # RS-016 (sfg-rescope): cp .env .env.backup -> exit 2, but because the
+  # DESTINATION `.env.backup` matches `.env.*` (a protected write target), NOT
+  # because `.env` is the source. The source `.env` is a read and is no longer a
+  # block reason post-rescope. Use a non-protected destination to prove
+  # source-read is allowed:
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp .env /tmp/plain-backup.txt"}}')"
+  assert_eq "RS-016: cp .env <non-protected dest> ALLOWED (source read)" "0" "$(extract_exit "$result")"
+
+  # Destination-is-protected still blocks (cp final positional = destination):
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp plain.txt .env.backup"}}')"
+  assert_eq "BND-004: cp <src> .env.backup blocked (destination protected)" "2" "$(extract_exit "$result")"
 
   # cat file1 > .env -> exit 2 (destination is protected)
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cat file1 > .env"}}')"
@@ -960,9 +971,11 @@ test_qa006_quoted_filenames_in_bash() {
 
   local result
 
-  # Double-quoted .env in cp command -> exit 2
+  # Double-quoted .env as cp SOURCE -> exit 0 (RS-016/DD-7: SFG is a write guard,
+  # not an egress guard; .env is the source read, backup.txt is the destination).
+  # Quoted sibling of the test_inv002/test_bnd004 RS-016 inversions.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp \".env\" backup.txt"}}')"
-  assert_eq "QA-006: cp \".env\" blocked (double-quoted)" "2" "$(extract_exit "$result")"
+  assert_eq "QA-006: cp \".env\" source-read ALLOWED (double-quoted, RS-016)" "0" "$(extract_exit "$result")"
 
   # Single-quoted .env in redirect -> exit 2
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo secret > '"'"'.env'"'"'"}}')"
@@ -1299,19 +1312,24 @@ STUBLIB
 # ---------------------------------------------------------------------------
 test_inv006_over_extract_blocks_bypasses() {
   echo ""
-  echo "=== INV-006 [integration]: over-extract blocks R2 bypass enumeration ==="
+  echo "=== INV-005/INV-003 (sfg-rescope) [integration]: SPLIT — eval payloads allow, perl -i writers block ==="
+
+  # MUST-SPLIT per sfg-rescope Test Corpus Migration. The old test asserted the
+  # over-extractor blocks every "bypass". Post-rescope the guardrail accepts
+  # interpreter/eval-payload writes as non-goals (INV-005), so eval-payload rows
+  # INVERT to exit 0; the `perl -i`/`perl -pi` rows are genuine writers (INV-003,
+  # RS-001) and STAY exit 2. Do not delete wholesale.
 
   local test_dir="/tmp/correctless-sfg-inv006-$$"
   setup_test_env "$test_dir"
   cd "$test_dir" || return
 
-  local result tag cmd
-  # Each row is one R2 bypass mechanism — every one must block
-  # Each fixture surfaces .env as a bash-visible token. Quoted-string-buried
-  # paths are out-of-scope per PRH-005 / BND-002.
-  local -a bypasses=(
-    'perl-i:perl -i -pe "s/foo/bar/" .env'
-    'perl-pi:perl -pi -e "s/x/y/" .env'
+  local result tag cmd json
+
+  # Eval-payload / interpreter-mediated forms — now ALLOWED (INV-005 opaque).
+  # `ed`/`vim` invocations write via the editor, not a redirect/writer-command
+  # destination the extractor parses, and are accepted non-goals -> allow.
+  local -a now_allowed=(
     'perl-redir:perl -e "system(q{cat hostname > .env})"'
     'php-redir:php -r "system(\"cat hostname > .env\");"'
     'lua-redir:lua -e "os.execute(\"cat hostname > .env\")"'
@@ -1322,55 +1340,75 @@ test_inv006_over_extract_blocks_bypasses() {
     'ed-positional:printf "%s\n" w .env q | ed -s .env'
     'vim-ex:vim -e -c "w" .env'
   )
-  for row in "${bypasses[@]}"; do
+  for row in "${now_allowed[@]}"; do
     tag="${row%%:*}"
     cmd="${row#*:}"
-    # Build JSON payload (escape quotes/backslashes)
-    local json
     json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
     result="$(run_hook_capture "$json")"
-    assert_eq "INV-006/${tag}: bypass blocked" "2" "$(extract_exit "$result")"
+    assert_eq "INV-005/${tag}: eval/interpreter payload -> ALLOWED" "0" "$(extract_exit "$result")"
+  done
+
+  # Genuine perl -i / -pi writers — STAY blocked (INV-003, RS-001).
+  local -a still_blocked=(
+    'perl-i:perl -i -pe "s/foo/bar/" .env'
+    'perl-pi:perl -pi -e "s/x/y/" .env'
+  )
+  for row in "${still_blocked[@]}"; do
+    tag="${row%%:*}"
+    cmd="${row#*:}"
+    json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
+    result="$(run_hook_capture "$json")"
+    assert_eq "INV-003/${tag}: perl -i writer -> BLOCKED" "2" "$(extract_exit "$result")"
   done
 
   rm -rf "$test_dir"
 }
 
 # ---------------------------------------------------------------------------
-# INV-006a [structural]: disallowed per-command branches in
-# _extract_bash_targets. Enumerated literal list — each must be absent.
+# PRH-001 (sfg-rescope) [structural TRIPWIRE] — MUST-REWRITE of the old
+# INV-006a disallowed-branches test. INV-003 now REQUIRES cp)/mv)/tee)/sed)/perl)
+# writer branches, so the old "ban these case branches" assertion is INVERTED.
+#
+# Per PRH-001 detection (behavior is the proof): the behavioral corpora
+# (INV-001, INV-017 Half-A) are the real guard — they assert exit 0 and would
+# over-extract/block if an unconditional token-emit branch existed. This
+# structural grep is a LABELED TRIPWIRE only: it extracts the rewritten
+# `case "$tok"` block and asserts its `*)` default arm does NOT emit `$tok`
+# (no `_strip_quotes "$tok"` / `echo "$tok"` / `printf … "$tok"` in the default
+# arm). The whole-corpus behavior is the contract; this is a fast smoke signal.
 # ---------------------------------------------------------------------------
 test_inv006a_disallowed_branches_enumerated() {
   echo ""
-  echo "=== INV-006a [structural]: disallowed per-command branches ==="
+  echo "=== PRH-001 (sfg-rescope) [structural TRIPWIRE]: no extract-every-token default arm ==="
 
   local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
-  # Extract the body of _extract_bash_targets
   local body
   body="$(awk '
     /^_extract_bash_targets[[:space:]]*\(\)[[:space:]]*\{?$/,/^\}$/
   ' "$guard")"
   if [ -z "$body" ]; then
-    fail "INV-006a" "cannot locate _extract_bash_targets body"
+    fail "PRH-001" "cannot locate _extract_bash_targets body"
     return
   fi
 
-  local -a disallowed=(
-    cp mv rm rmdir unlink tee curl wget sed perl touch chmod chown chgrp
-    tar unzip 7z cpio ar scp sftp mkdir git python python3 node ruby ln
-  )
-  local violations=0 tok
-  for tok in "${disallowed[@]}"; do
-    # Match a `case` branch like `tok)` or `tok|other)` — escape | for grep -E
-    if printf '%s' "$body" | grep -E "(^|[[:space:]\|])${tok}(\||\))" | grep -v '^[[:space:]]*#' >/dev/null; then
-      violations=$((violations + 1))
-      echo "  INV-006a: disallowed branch found for '$tok'" >&2
-    fi
-  done
+  # TRIPWIRE 1: the abolished PRH-001 over-extractor signature must be gone.
+  # The over-extractor's tell is a BARE per-token emit of the loop variable
+  # `$tok` (`*) ... _strip_quotes "$tok"`). A destination-driven rewrite emits
+  # only redirect/writer destinations (`${tokens[...]}`, `$dest`, `$sub`), never
+  # the raw catch-all token. We scan the WHOLE extractor body (not just the `*)`
+  # arm, whose nested inner `case` `;;` truncates a naive arm-extractor) for an
+  # emit of "$tok" via _strip_quotes / echo / printf.
+  local violations=0
+  if printf '%s\n' "$body" | grep -v '^[[:space:]]*#' \
+       | grep -Eq '(_strip_quotes|echo|printf)[^#]*"\$tok"'; then
+    violations=$((violations + 1))
+    echo "  PRH-001: bare \$tok emit present (extract-every-token reintroduced)" >&2
+  fi
 
   if [ "$violations" -eq 0 ]; then
-    pass "INV-006a" "no disallowed per-command case branches in _extract_bash_targets"
+    pass "PRH-001" "no unconditional token-emit in the *) default arm (tripwire green; behavior is the proof)"
   else
-    fail "INV-006a" "$violations disallowed per-command branches remain"
+    fail "PRH-001" "extract-every-token default branch reintroduced ($violations)"
   fi
 }
 
@@ -1408,11 +1446,16 @@ test_inv007_redirect_blocks_integration() {
 }
 
 # ---------------------------------------------------------------------------
-# INV-007a [integration]: process substitution sub-tokenization
+# INV-005/CX-002/CX-006 (sfg-rescope) [integration] — INVERTED from the old
+# INV-007a "process-sub writes blocked". Process-substitution operands
+# (`>(…)`/`<(…)`) are OPAQUE at every level: the single-level sub-tokenization
+# (old hook L173-186) MUST be removed, and the `(`/`)` IFS-shatter that would
+# expose the inner `.env` token MUST be prevented (CX-006). A process-sub write
+# is exotic, not a naive accidental clobber. These INVERT exit 2 -> exit 0.
 # ---------------------------------------------------------------------------
 test_inv007a_process_substitution_blocks() {
   echo ""
-  echo "=== INV-007a [integration]: process substitution writes blocked ==="
+  echo "=== INV-005 (sfg-rescope) [integration]: process substitution operands OPAQUE (allowed) ==="
 
   local test_dir="/tmp/correctless-sfg-inv007a-$$"
   setup_test_env "$test_dir"
@@ -1425,8 +1468,14 @@ test_inv007a_process_substitution_blocks() {
   do
     json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
     result="$(run_hook_capture "$json")"
-    assert_eq "INV-007a: '$cmd' blocked" "2" "$(extract_exit "$result")"
+    assert_eq "INV-005: process-sub '$cmd' opaque -> ALLOWED" "0" "$(extract_exit "$result")"
   done
+
+  # CX-006 explicit: the canonical opaque fixture from the spec. The shattered
+  # `.env` token (from IFS splitting on `(`/`)`) MUST NOT be independently
+  # emitted -> the command must exit 0.
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x > >(tee .env)"}}')"
+  assert_eq "INV-005/CX-006: echo x > >(tee .env) opaque -> ALLOWED" "0" "$(extract_exit "$result")"
 
   rm -rf "$test_dir"
 }
@@ -1463,26 +1512,33 @@ test_inv008_canonical_pattern_matching() {
 }
 
 # ---------------------------------------------------------------------------
-# INV-013 [integration]: interpreter-chain detection in _has_write_pattern
+# INV-013 [integration]  — MUST-INVERT per sfg-rescope Test Corpus Migration.
+# INV-005 (sfg-rescope): interpreter+eval-flag chains are OPAQUE. The contents
+# of an interpreter's eval/string operand MUST NOT be parsed for redirect or
+# writer destinations, so `bash -c "echo x > .env"` etc. now ALLOW (exit 0).
+# An agent writing via `python -c "open('.env','w')"` is a perimeter threat the
+# guardrail cannot and does not defend against (DD-3 / STRIDE Tampering).
+#
+# EXCEPTION (RS-001): `perl -i`/`perl -pi` ALWAYS writes its file operand
+# regardless of the script body, so it is a WRITER (INV-003), NOT opaque — those
+# rows STAY exit 2. Only `perl -e/-pe/-ne` WITHOUT `-i` is opaque.
 # ---------------------------------------------------------------------------
 test_inv013_interpreter_chains_blocked() {
   echo ""
-  echo "=== INV-013 [integration]: interpreter chains flagged + blocked ==="
+  echo "=== INV-005 (sfg-rescope) [integration]: interpreter+eval operands are OPAQUE (allowed) ==="
 
   local test_dir="/tmp/correctless-sfg-inv013-$$"
   setup_test_env "$test_dir"
   cd "$test_dir" || return
 
-  # Each fixture surfaces .env as a bash-visible token. Quote-obfuscated
-  # forms are out-of-scope per PRH-005 / OQ-004.
-  local -a samples=(
+  # OPAQUE interpreter+eval chains — redirect/writer INSIDE the eval operand is
+  # not parsed. These INVERT from exit 2 -> exit 0 (INV-005).
+  local -a opaque=(
     'bash-c:bash -c "echo x > .env"'
     'sh-c:sh -c "echo x > .env"'
     'zsh-c:zsh -c "echo x > .env"'
     'dash-c:dash -c "echo x > .env"'
     'perl-e-redir:perl -e "system(q{cat /etc/hostname > .env})"'
-    'perl-pi:perl -pi -e "s/foo/bar/" .env'
-    'perl-i:perl -i -e 1 .env'
     'python-c-redir:python -c "import os; os.system(\"cat hostname > .env\")"'
     'python3-c-redir:python3 -c "import os; os.system(\"cat hostname > .env\")"'
     'ruby-e-redir:ruby -e "system(\"cat hostname > .env\")"'
@@ -1492,17 +1548,30 @@ test_inv013_interpreter_chains_blocked() {
     'Rscript-redir:Rscript -e "system(\"cat hostname > .env\")"'
     'nim-redir:nim e --eval:"discard execShellCmd(\"cat hostname > .env\")"'
     'node-e-redir:node -e "require(\"child_process\").execSync(\"cat hostname > .env\")"'
-    'env-perl-pi:/usr/bin/env perl -pi -e "s/x/y/" .env'
     'env-python3-redir:/usr/bin/env python3 -c "import os; os.system(\"cat h > .env\")"'
     'optlocal-ruby-redir:/opt/local/bin/ruby -e "system(\"cat h > .env\")"'
   )
   local result row tag cmd json
-  for row in "${samples[@]}"; do
+  for row in "${opaque[@]}"; do
     tag="${row%%:*}"
     cmd="${row#*:}"
     json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
     result="$(run_hook_capture "$json")"
-    assert_eq "INV-013/${tag}: blocked" "2" "$(extract_exit "$result")"
+    assert_eq "INV-005/${tag}: interpreter eval operand opaque -> ALLOWED" "0" "$(extract_exit "$result")"
+  done
+
+  # perl -i / perl -pi are WRITERS (RS-001) — STAY blocked (exit 2).
+  local -a writers=(
+    'perl-pi:perl -pi -e "s/foo/bar/" .env'
+    'perl-i:perl -i -e 1 .env'
+    'env-perl-pi:/usr/bin/env perl -pi -e "s/x/y/" .env'
+  )
+  for row in "${writers[@]}"; do
+    tag="${row%%:*}"
+    cmd="${row#*:}"
+    json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
+    result="$(run_hook_capture "$json")"
+    assert_eq "INV-003/${tag}: perl -i is a writer -> BLOCKED" "2" "$(extract_exit "$result")"
   done
 
   rm -rf "$test_dir"

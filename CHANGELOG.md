@@ -4,6 +4,9 @@ All notable changes to Correctless are documented here.
 
 ## [Unreleased]
 
+### Changed — Security posture
+- **sensitive-file-guard re-scoped to write-targets-only (guardrail)** — `hooks/sensitive-file-guard.sh` no longer over-extracts every Bash token as a candidate write target. Its `_extract_bash_targets` is now destination-driven: it blocks only genuine write destinations (output redirects `> >> >| 1> 2> &> >&`, and the writer commands `tee`/`cp`/`mv`/`install`/`ln`/`sed -i`/`perl -i`/`dd of=`/`truncate`). Previously-blocked Bash **reads and invocations are now allowed** — `bash script.sh`, `jq '.' config.json`, `cat`, `ls`, `source`, `git checkout -- <file>`, `cp <protected> <dest>` (source read), and interpreter eval chains (`bash -c "…"`, `python -c "…"`) no longer trip the guard. SFG is a guardrail/speedbump for accidental and naively-injected writes, NOT a security perimeter; interpreter-mediated and git-mediated out-of-band writes are accepted non-goals (AP-040 / PMB-020). The Edit/Write/MultiEdit tool-target path and the protected-file DEFAULTS list are unchanged. See `.correctless/specs/sfg-rescope.md`.
+
 ### Added — Skills
 - `/cauto` — Semi-auto pipeline orchestrator: runs /ctdd through PR creation with flexible phase resume, tiered decision architecture, and spec-to-PR orchestration
 - `/carchitect` — Structured architecture definition: reverse-engineer from existing code or greenfield directed discovery, produces machine-referenceable entrypoints YAML
