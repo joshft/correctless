@@ -476,8 +476,14 @@ _redirect_op_suffix() {
   # case suffix == tok. When no operator byte exists at all, the greedy strip also
   # leaves the empty string. Disambiguate: re-derive from a literal scan is
   # unnecessary — match the suffix against the exact operator set below.
+  # CLASS-FIX (operator-set canonical list): this accept-set and the glued `rre`
+  # regex in _extract_bash_targets are the TWO code sites that enumerate the
+  # redirect-operator set. They MUST stay in sync — a new operator added to one
+  # must be added to the other (drift caused the `&>>` append-both miss found in
+  # mini-audit R1: `>>` was handled but `&>>` was not). When editing this set,
+  # also edit `rre` (search "GLUED-REDIRECT OPERATOR SET").
   case "$suffix" in
-    '>'|'>>'|'>|'|'>&'|'&>'|'&>|') printf '%s' "$suffix" ;;
+    '>'|'>>'|'>|'|'>&'|'&>'|'&>>'|'&>|') printf '%s' "$suffix" ;;
     *) : ;;
   esac
 }
@@ -560,23 +566,38 @@ _extract_bash_targets() {
   local cmd seg op rest dest j masked
   local -a tokens
 
-  # Size-cap backstop (INV-007 fail-OPEN, PMB-019 bounded-medium). The quote/
-  # comment maskers are O(n) for the common case (long un-quoted args / base64
-  # blobs are handled by the bulk-run fast-paths and the array accumulation), but
-  # bash string slicing makes a PATHOLOGICAL command — one composed of thousands
-  # of tiny quoted tokens (`"x" "x" "x" …`) — super-linear, because each span
-  # boundary re-slices the remaining tail. Such a command is exotic (no realistic
-  # invocation has thousands of 2-byte quoted words), NOT a naive accidental
-  # write, so per INV-007 we fail OPEN: emit the empty target set (-> allowed)
-  # rather than risk a PreToolUse stall (AP-040 friction at scale). The cap is set
-  # well above any realistic command length (64 KiB) so no real write is capped;
-  # the common large case (a single `echo BIGBLOB > dest`, even at 200 KB) stays
-  # O(n) and is NOT affected by this cap because it never reaches a pathological
-  # span count — but a command whose RAW length exceeds the cap is treated as
-  # unresolvable ambiguity and allowed. This is the guardrail framing: SFG catches
-  # accidental/naive writes, and a 64 KiB+ command is neither.
-  local _SFG_EXTRACT_CAP=65536
-  if [ "${#COMMAND}" -gt "$_SFG_EXTRACT_CAP" ]; then
+  # TRIGGER-COUNT cap (INV-007 fail-OPEN, PMB-019 bounded-medium). The quote/
+  # comment/segment maskers are O(n) for the common case (long un-quoted args /
+  # base64 blobs are handled by the bulk-run fast-paths and the array
+  # accumulation), but the byte loops advance with tail-slices (`${s:$i}`), each
+  # O(remaining length). A command DENSE in trigger bytes (`' " ; | & ( # \`)
+  # defeats the bulk-run fast-paths and drops to byte granularity at every
+  # trigger, making the whole walk O(n^2). The cost driver is therefore the
+  # COUNT of trigger bytes (loop iterations that re-slice), NOT the raw length —
+  # the old length cap (64 KiB) was calibrated on the wrong measure and a
+  # sub-cap dense command still stalled (30 KB dense separators = 21s; 65 KB
+  # dense quotes = 49.5s; mini-audit R1 resource-bounds finding, AP-040 self-DoS).
+  #
+  # Count trigger bytes in ONE bulk parameter-expansion (O(n), no loop): delete
+  # every NON-trigger byte and take the remaining length. If the trigger count
+  # exceeds the threshold, a command carrying thousands of shell metacharacters is
+  # exotic / non-naive (no realistic accidental write looks like this), so per
+  # INV-007 we fail OPEN: emit the empty target set (-> allowed) rather than risk a
+  # PreToolUse stall. 2048 is well above any realistic command's metacharacter
+  # count, and keeps the worst sub-threshold dense input under ~1s.
+  #
+  # CRITICAL property: a long single-blob redirect (`echo <200KB-of-'a'> > .env`)
+  # has ~0 trigger bytes, so it is NOT capped — it stays O(n) via the fast-paths
+  # and STILL BLOCKS (the real write the old length cap wrongly failed open).
+  #
+  # A very generous RAW-length backstop (256 KiB) above the trigger cap remains
+  # purely as a memory guard; the trigger-count cap is the real defense.
+  local _SFG_TRIGGER_CAP=2048 _SFG_LENGTH_BACKSTOP=262144
+  local _trig="${COMMAND//[^\'\"\;\|\&\(\#\\]/}"
+  if [ "${#_trig}" -gt "$_SFG_TRIGGER_CAP" ]; then
+    return 0
+  fi
+  if [ "${#COMMAND}" -gt "$_SFG_LENGTH_BACKSTOP" ]; then
     return 0
   fi
 
@@ -598,7 +619,13 @@ _extract_bash_targets() {
   local IFS=$' \t\n'
   # Process each segment independently (INV-020). Redirect detection is
   # token-local; writer-command positional logic is bounded to the segment.
-  local rre='(&>\||&>|>&|>\||>>|[0-9]*>)([^[:space:]<>|&]+)'
+  # GLUED-REDIRECT OPERATOR SET: this alternation and the accept-set in
+  # _redirect_op_suffix are the TWO sites that enumerate redirect operators —
+  # keep them in sync (CLASS-FIX). Regex alternation is leftmost, so the LONGER
+  # operators must precede their prefixes: `&>|` and `&>>` (append-both) before
+  # `&>`, and `>>`/`>|`/`>&` before the bare `[0-9]*>`. `&>>` was the mini-audit
+  # R1 miss — the append variant of `&>`.
+  local rre='(&>\||&>>|&>|>&|>\||>>|[0-9]*>)([^[:space:]<>|&]+)'
   while IFS= read -r seg; do
     [ -n "$seg" ] || continue
 
@@ -685,10 +712,22 @@ _extract_writer_dests() {
       ;;
     cp|mv|install|ln)
       # Final non-flag positional arg within the segment is the destination.
-      # No flag-relocation form (-t/--target-directory/-d) — those fail open.
+      # Target-directory relocation (-t / --target-directory) fails open for ALL
+      # four commands (the real dest is a directory we don't resolve). The
+      # directory-create form `-d` is command-SPECIFIC: only `install -d`
+      # means "create directories" (no source/dest pair) — for cp/mv/ln, `-d`
+      # is a benign NON-relocating flag (`cp -d` = --no-dereference), so it must
+      # NOT short-circuit (mini-audit R1: `cp -d a .env` wrongly ALLOWED). For
+      # install, `-d` still fails open. (`ln -d` does not write a file; the
+      # positional logic below handles `ln` correctly either way.)
       case " ${tokens[*]} " in
-        *' -t '*|*' --target-directory'*|*' -d '*) return 0 ;;
+        *' -t '*|*' --target-directory'*) return 0 ;;
       esac
+      if [ "$base" = "install" ]; then
+        case " ${tokens[*]} " in
+          *' -d '*) return 0 ;;
+        esac
+      fi
       for ((p = start; p < ${#tokens[@]}; p++)); do
         t="${tokens[$p]}"
         case "$t" in

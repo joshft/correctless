@@ -1079,6 +1079,69 @@ test_perf_large_command_no_hang() {
     pass "PERF" "hook completed on a 100KB command (rc=$rc, no hang)"
   fi
 }
+
+# ---------------------------------------------------------------------------
+# MA-write-form-fuzz (mini-audit R1): the append-both redirect `&>>` (the append
+# variant of `&>`) writes a protected file in real bash but was a blind spot —
+# the whitespace-separated form was ALLOWED (AP-022 under-extraction) because
+# `&>>` was missing from the operator accept-set and the glued regex (and from
+# the spec's INV-002 operator list). Verified real-bash writes via /tmp oracle.
+# ---------------------------------------------------------------------------
+test_ma_append_both_redirect_block() {
+  echo ""
+  echo "=== MA: &>> (append-both) destinations block ==="
+  assert_bash "MA: echo x &>> .env (append-both, spaced) BLOCKED" "2" 'echo x &>> .env'
+  assert_bash "MA: echo x 2>&1 &>> .env (fd-dup + append-both) BLOCKED" "2" 'echo x 2>&1 &>> .env'
+  assert_bash "MA: echo x &>>.env (append-both, glued) BLOCKED" "2" 'echo x &>>.env'
+  assert_bash "MA: echo x &>> credentials.json (basename) BLOCKED" "2" 'echo x &>> credentials.json'
+}
+
+# ---------------------------------------------------------------------------
+# MA-hostile-input (mini-audit R1): the `-d` short-circuit in the cp|mv|install|ln
+# writer branch is meant for `install -d` (directory-create, accepted fail-open),
+# but it was command-AGNOSTIC, so `cp -d` / `cp ... -d` (where -d = --no-dereference,
+# a benign non-relocating flag) wrongly short-circuited to no-destination and the
+# real write was ALLOWED. The exclusion must be scoped to `install` only.
+# (ln -d does NOT write a file — verified no-write — so it is not in scope.)
+# ---------------------------------------------------------------------------
+test_ma_cp_d_flag_not_relocation() {
+  echo ""
+  echo "=== MA: cp -d destination is a real write (block); install -d stays fail-open ==="
+  assert_bash "MA: cp -d a .env (-d is --no-deref, real write) BLOCKED" "2" 'cp -d a .env'
+  assert_bash "MA: cp a .env -d (trailing -d) BLOCKED" "2" 'cp a .env -d'
+  assert_bash "MA: cp -d a secret.pem (glob) BLOCKED" "2" 'cp -d a secret.pem'
+  # Controls that must STAY as they are:
+  assert_bash "MA control: install -d .env (dir-create, accepted fail-open) ALLOWED" "0" 'install -d .env'
+  assert_bash "MA control: cp -t d a .env (target-dir relocation, fail-open) ALLOWED" "0" 'cp -t d a .env'
+}
+
+# ---------------------------------------------------------------------------
+# MA-resource-bounds (mini-audit R1): the round-3 perf fix removed the O(n^2)
+# OUTPUT accumulation but left O(n^2) INPUT re-slicing (`${s:$i}` tail-slices in
+# the byte loops). A sub-cap command with DENSE trigger bytes (quotes/separators)
+# still stalls (measured 30KB separators = 21s, 65KB quotes = 49.5s) — the raw
+# 64KiB length cap is calibrated on the wrong measure (length, not trigger
+# density). This guards that a dense-trigger sub-(length-)cap command does NOT
+# hang; the fix bounds cost on trigger count (fail-open per INV-007) or removes
+# the re-slicing.
+# ---------------------------------------------------------------------------
+test_ma_dense_trigger_no_hang() {
+  echo ""
+  echo "=== MA: dense-trigger command must not hang (residual O(n^2) guard) ==="
+  local dense cmd json rc
+  # ~24KB of dense single-quote spans + a real redirect so the prefilter fires
+  # and the masker runs over the whole thing.
+  dense="$(printf "'x' %.0s" $(seq 1 6000))"
+  cmd="$dense > .env"
+  json="$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')"
+  printf '%s' "$json" | timeout 6 bash "$HOOK" >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" = 124 ]; then
+    fail "MA-resource" "hook hung (>6s) on a 24KB dense-quote command — residual O(n^2)"
+  else
+    pass "MA-resource" "hook completed on a 24KB dense-quote command (rc=$rc, no hang)"
+  fi
+}
 # ===========================================================================
 # Run
 # ===========================================================================
@@ -1113,6 +1176,9 @@ test_qa001_quoted_and_comment_operators_not_targets
 test_qa003_backslash_escape_context_parity
 test_qa006_backslash_operator_parity_sweep
 test_perf_large_command_no_hang
+test_ma_append_both_redirect_block
+test_ma_cp_d_flag_not_relocation
+test_ma_dense_trigger_no_hang
 
 echo ""
 echo "=== Summary ==="
