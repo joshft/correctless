@@ -938,6 +938,38 @@ test_qa001_quoted_and_comment_operators_not_targets() {
     'echo x | tee .env'
 }
 
+# ---------------------------------------------------------------------------
+# QA-003 (round 2): escape-context parity with the shell lexer. A backslash-
+# escaped quote (\" / \') OUTSIDE any quoted span is a LITERAL quote in real
+# bash — it does NOT open a quoted span, so a redirect/writer that follows is a
+# REAL, LIVE write. The operator-masker must not treat the post-backslash quote
+# as a span opener (which would mask the real operator and SILENTLY ALLOW the
+# write — AP-022 guard breakage). All three command forms below are bash -n
+# VALID and write the protected file in a real shell, so they MUST block.
+# Controls assert the genuinely-quoted forms (\" INSIDE a double quote) still
+# allow, pinning all three escape contexts (outside / single / double).
+# ---------------------------------------------------------------------------
+test_qa003_backslash_escape_context_parity() {
+  echo ""
+  echo "=== QA-003: backslash-escaped quote escape-context parity ==="
+
+  # Must BLOCK — \" / \' outside quotes is a literal quote; the trailing
+  # redirect/separator+writer is a REAL write (verified bash -n valid + writes).
+  assert_bash "QA-003: echo \\\" > .env (escaped quote outside, real redirect) BLOCKED" "2" \
+    'echo \" > .env'
+  assert_bash "QA-003: echo \\\"; tee .env (escaped quote, real sep+tee) BLOCKED" "2" \
+    'echo \"; tee .env'
+  assert_bash "QA-003: printf \\\" ; cp x .env (escaped quote, real cp) BLOCKED" "2" \
+    'printf \" ; cp x .env'
+  assert_bash "QA-003: echo \\' > .env (escaped single-quote outside) BLOCKED" "2" \
+    "echo \\' > .env"
+
+  # Controls — \" INSIDE a double-quoted span keeps the span open, so the
+  # operator is genuinely quoted -> ALLOW (must not over-block).
+  assert_bash "QA-003 control: echo \"a \\\" > .env\" (escaped quote inside dquote) ALLOWED" "0" \
+    'echo "a \" > .env"'
+}
+
 # ===========================================================================
 # Run
 # ===========================================================================
@@ -969,6 +1001,7 @@ test_inv019_lc_all_c_structural
 test_inv019_cross_locale_behavioral
 test_inv020_per_segment_positional
 test_qa001_quoted_and_comment_operators_not_targets
+test_qa003_backslash_escape_context_parity
 
 echo ""
 echo "=== Summary ==="

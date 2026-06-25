@@ -253,6 +253,26 @@ _mask_quoted_operators() {
         prev="$ch"
         continue
         ;;
+      '\')
+        # Backslash OUTSIDE any quote: in real bash it escapes the FOLLOWING
+        # byte to a literal, so a `\"`/`\'` here does NOT open a quoted span and
+        # any redirect/separator that follows is LIVE syntax (QA-003 escape-
+        # context parity; AP-022 guard-breakage otherwise). Copy the backslash
+        # and the next byte verbatim, masking the next byte only if it is itself
+        # an operator (it is a literal, not real syntax). Advance by 2 and set
+        # `prev` to the ESCAPED byte so word-boundary `#` logic stays correct.
+        if [ "$((i + 1))" -lt "$n" ]; then
+          out="$out$ch"
+          local eb="${s:$((i + 1)):1}"
+          case "$eb" in
+            '>'|'<'|'|'|'&'|';'|'#') out="${out}_"; prev="_" ;;
+            *) out="$out$eb"; prev="$eb" ;;
+          esac
+          i=$((i + 2)); continue
+        fi
+        # Trailing lone backslash at end of string: copy verbatim.
+        out="$out$ch"; prev="$ch"; i=$((i + 1)); continue
+        ;;
       '#')
         # Comment only at a word boundary (start-of-string or after whitespace).
         if [ -z "$prev" ] || [ "$prev" = " " ] || [ "$prev" = $'\t' ] || [ "$prev" = $'\n' ]; then
