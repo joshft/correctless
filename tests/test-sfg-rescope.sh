@@ -1142,6 +1142,85 @@ test_ma_dense_trigger_no_hang() {
     pass "MA-resource" "hook completed on a 24KB dense-quote command (rc=$rc, no hang)"
   fi
 }
+
+# ---------------------------------------------------------------------------
+# MA-R2 (mini-audit round 2): three further gaps in the destination grammar /
+# cost model.
+#   (1) `<>` read-write redirect (O_RDWR|O_CREAT) creates+writes a file but was
+#       missing from both operator sites (same enumeration-drift class as &>>).
+#   (2) A protected-path write whose payload is a large heredoc body fails open
+#       — the heredoc body must NOT shield the structural `> dest` from
+#       extraction (the body is inert content, extracted destination is O(1)).
+#   (3) An operator-filled quoted span (`>`/`<` inside quotes) defeats the
+#       masker's bulk-run fast path and is O(n^2); the cost gate must bound it.
+# ---------------------------------------------------------------------------
+test_ma_r2_readwrite_redirect_block() {
+  echo ""
+  echo "=== MA-R2: <> read-write redirect destinations block ==="
+  assert_bash "MA-R2: echo data 1<> .env (read-write redirect) BLOCKED" "2" 'echo data 1<> .env'
+  assert_bash "MA-R2: echo data <> .env (bare read-write) BLOCKED" "2" 'echo data <> .env'
+  assert_bash "MA-R2: exec 3<> .env (read-write fd open) BLOCKED" "2" 'exec 3<> .env'
+  # read-write to a sink is still allowed (INV-006)
+  assert_bash "MA-R2: echo x 1<> /dev/null (sink) ALLOWED" "0" 'echo x 1<> /dev/null'
+}
+
+test_ma_r2_heredoc_body_does_not_shield() {
+  echo ""
+  echo "=== MA-R2: heredoc-body write to a protected path still blocks ==="
+  # Small heredoc write: structural `cat > .env <<EOF` -> block.
+  local hd
+  hd=$'cat > .env <<EOF\nline with "quotes" and ;|& metachars\nmore content\nEOF'
+  assert_bash "MA-R2: small heredoc write to .env BLOCKED" "2" "$hd"
+  # LARGE heredoc body (>2048 trigger bytes) must NOT fail open — the body is
+  # excised / not charged against the cost gate; the `> .env` is still extracted.
+  local body line _
+  line='x"y;z|w&v(q)#r'
+  body=""
+  for _ in $(seq 1 400); do body="$body$line"$'\n'; done   # ~5600 trigger bytes
+  local hd2="cat > credentials.json <<EOF"$'\n'"$body"$'\n'"EOF"
+  assert_bash "MA-R2: large-body heredoc write to credentials.json BLOCKED" "2" "$hd2"
+  # comment-padded write (realistic size) blocks via the comment-aware masker
+  assert_bash "MA-R2: echo x > .env # trailing comment BLOCKED" "2" 'echo x > .env # a trailing comment'
+}
+
+test_ma_r2_operator_filled_span_no_hang() {
+  echo ""
+  echo "=== MA-R2: operator-filled quoted span must not hang (O(n^2) guard) ==="
+  local big cmd json rc
+  # ~60KB of '>' inside a single quoted span + a real redirect. Currently O(n^2)
+  # (the cost gate counts ~2 triggers and the 256KiB length backstop lets it
+  # through). After the fix the cost gate bounds it (fail-open or fast).
+  big="$(printf '>%.0s' $(seq 1 60000))"
+  cmd="echo \"$big\" > .env"
+  json="$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')"
+  printf '%s' "$json" | timeout 6 bash "$HOOK" >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" = 124 ]; then
+    fail "MA-R2-resource" "hook hung (>6s) on a 60KB operator-filled quoted span"
+  else
+    pass "MA-R2-resource" "hook completed on a 60KB operator-filled span (rc=$rc, no hang)"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# CLASS FIX (mini-audit): write-redirect-operator COMPLETENESS sweep. The
+# operator accept-set is hand-maintained and drifted TWICE (&>> missed in R1,
+# <> missed in R2) — the enumeration-incompleteness class (PMB-016/AP-036).
+# This sweep is derived from the bash write-redirect grammar: every operator
+# here was confirmed by a real-bash oracle to CREATE/WRITE its target file
+# (`echo data <op> TGT` creates TGT). Each must therefore BLOCK when the target
+# is a protected path. A future operator added to bash (or a regression dropping
+# one from the accept-set) is caught here, not by an external adversarial fuzz.
+# Source: real-bash differential oracle (gen: op-grammar.sh, 2026-06).
+# ---------------------------------------------------------------------------
+test_class_write_redirect_operator_completeness() {
+  echo ""
+  echo "=== CLASS: every bash write-redirect operator blocks a protected dest ==="
+  local op
+  for op in '>' '>>' '>|' '<>' '&>' '&>>' '>&' '1>' '2>' '1>>' '2>>' '1>|' '3>' '3>>' '1<>' '2<>'; do
+    assert_bash "CLASS: echo data $op .env BLOCKED" "2" "echo data $op .env"
+  done
+}
 # ===========================================================================
 # Run
 # ===========================================================================
@@ -1179,6 +1258,10 @@ test_perf_large_command_no_hang
 test_ma_append_both_redirect_block
 test_ma_cp_d_flag_not_relocation
 test_ma_dense_trigger_no_hang
+test_ma_r2_readwrite_redirect_block
+test_ma_r2_heredoc_body_does_not_shield
+test_ma_r2_operator_filled_span_no_hang
+test_class_write_redirect_operator_completeness
 
 echo ""
 echo "=== Summary ==="

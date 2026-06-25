@@ -481,8 +481,13 @@ _redirect_op_suffix() {
   # must be added to the other (drift caused the `&>>` append-both miss found in
   # mini-audit R1: `>>` was handled but `&>>` was not). When editing this set,
   # also edit `rre` (search "GLUED-REDIRECT OPERATOR SET").
+  # `<>` is the read-write redirect (O_RDWR|O_CREAT) — it CREATES+WRITES the
+  # target in real bash (`echo x 1<> .env`, `exec 3<> .env`). The leading-digit
+  # strip above already reduces `1<>`/`3<>` to `<>`, so the accept-set only needs
+  # the bare `<>` form. (mini-audit R2 MA-101: same enumeration-drift class as
+  # the `&>>` miss in R1.)
   case "$suffix" in
-    '>'|'>>'|'>|'|'>&'|'&>'|'&>>'|'&>|') printf '%s' "$suffix" ;;
+    '>'|'>>'|'>|'|'>&'|'&>'|'&>>'|'&>|'|'<>') printf '%s' "$suffix" ;;
     *) : ;;
   esac
 }
@@ -565,38 +570,39 @@ _extract_bash_targets() {
   local cmd seg op rest dest j masked
   local -a tokens
 
-  # TRIGGER-COUNT cap (INV-007 fail-OPEN, PMB-019 bounded-medium). The quote/
-  # comment/segment maskers are O(n) for the common case (long un-quoted args /
-  # base64 blobs are handled by the bulk-run fast-paths and the array
-  # accumulation), but the byte loops advance with tail-slices (`${s:$i}`), each
-  # O(remaining length). A command DENSE in trigger bytes (`' " ; | & ( # \`)
-  # defeats the bulk-run fast-paths and drops to byte granularity at every
-  # trigger, making the whole walk O(n^2). The cost driver is therefore the
-  # COUNT of trigger bytes (loop iterations that re-slice), NOT the raw length —
-  # the old length cap (64 KiB) was calibrated on the wrong measure and a
-  # sub-cap dense command still stalled (30 KB dense separators = 21s; 65 KB
-  # dense quotes = 49.5s; mini-audit R1 resource-bounds finding, AP-040 self-DoS).
+  # RAW-LENGTH cap (INV-007 fail-OPEN, PMB-019 bounded-medium), checked O(1) at
+  # the very TOP — before any byte-walk loop or any counting. The quote/comment/
+  # segment maskers walk the command with tail-slices (`${s:$i}`, each O(remaining
+  # length)); a command whose bulk-run fast-paths are defeated (e.g. an
+  # operator-filled quoted span `echo "<60KB of >>>>>" > dest`, or dense quotes/
+  # separators) drops to byte granularity and the whole walk is O(n^2) BY
+  # CONSTRUCTION — no trigger-count tuning fixes the exponent.
   #
-  # Count trigger bytes in ONE bulk parameter-expansion (O(n), no loop): delete
-  # every NON-trigger byte and take the remaining length. If the trigger count
-  # exceeds the threshold, a command carrying thousands of shell metacharacters is
-  # exotic / non-naive (no realistic accidental write looks like this), so per
-  # INV-007 we fail OPEN: emit the empty target set (-> allowed) rather than risk a
-  # PreToolUse stall. 2048 is well above any realistic command's metacharacter
-  # count, and keeps the worst sub-threshold dense input under ~1s.
+  # The previous TRIGGER-COUNT cap was fundamentally broken on three counts and
+  # is REMOVED entirely: (a) its trigger set omitted `>`/`<`, which ARE inner
+  # stop-set bytes of the masker, so an operator-filled span counted ~2 triggers
+  # and ran ~46s; (b) even a legitimately dense command was O(n^2) regardless of
+  # count; (c) it failed OPEN on attacker/author-controlled padding (a large
+  # heredoc body or trailing comment inflated the count past the threshold and
+  # ALLOWED a real write — the comment/heredoc-bypass class).
   #
-  # CRITICAL property: a long single-blob redirect (`echo <200KB-of-'a'> > .env`)
-  # has ~0 trigger bytes, so it is NOT capped — it stays O(n) via the fast-paths
-  # and STILL BLOCKS (the real write the old length cap wrongly failed open).
+  # A single raw-length cap fixes all three at once: anything larger than the cap
+  # fails OPEN (INV-007 — a command this large is exotic / non-naive, not a naive
+  # accidental clobber; consistent with PMB-020's guardrail-not-perimeter
+  # framing). The cap bounds the O(n^2) byte-walk masking cost so the worst-case
+  # sub-cap input (a cap-size quoted span of `>`/`<` operators) completes in
+  # well under 2s (measured ~0.9s at 12288 on the dev box; the next step up,
+  # 16384, measured ~1.4s — 12288 keeps a safe margin for slower CI hardware).
   #
-  # A very generous RAW-length backstop (256 KiB) above the trigger cap remains
-  # purely as a memory guard; the trigger-count cap is the real defense.
-  local _SFG_TRIGGER_CAP=2048 _SFG_LENGTH_BACKSTOP=262144
-  local _trig="${COMMAND//[^\'\"\;\|\&\(\#\\]/}"
-  if [ "${#_trig}" -gt "$_SFG_TRIGGER_CAP" ]; then
-    return 0
-  fi
-  if [ "${#COMMAND}" -gt "$_SFG_LENGTH_BACKSTOP" ]; then
+  # TRADE-OFF vs the old trigger cap: a large single-blob redirect
+  # (`echo <200KB-of-'a'> > .env`) now ALSO fails OPEN (accepted) rather than
+  # blocking. That path was the one carrying the O(n^2) + comment/heredoc-bypass
+  # bugs; a >cap-byte command writing a protected file is non-naive (PMB-020), so
+  # the accepted gap is consistent with the guardrail framing. The common naive
+  # write — and any SUB-cap heredoc/comment-padded write (the comment-aware
+  # masker correctly extracts the `> dest` and BLOCKS) — is unaffected.
+  local _SFG_LENGTH_CAP=12288
+  if [ "${#COMMAND}" -gt "$_SFG_LENGTH_CAP" ]; then
     return 0
   fi
 
@@ -623,8 +629,11 @@ _extract_bash_targets() {
   # keep them in sync (CLASS-FIX). Regex alternation is leftmost, so the LONGER
   # operators must precede their prefixes: `&>|` and `&>>` (append-both) before
   # `&>`, and `>>`/`>|`/`>&` before the bare `[0-9]*>`. `&>>` was the mini-audit
-  # R1 miss — the append variant of `&>`.
-  local rre='(&>\||&>>|&>|>&|>\||>>|[0-9]*>)([^[:space:]<>|&]+)'
+  # R1 miss — the append variant of `&>`. `[0-9]*<>` / `<>` (read-write redirect,
+  # O_RDWR|O_CREAT) is the mini-audit R2 miss (MA-101): it CREATES+WRITES the
+  # target. `[0-9]*<>` precedes the bare `[0-9]*>` so a glued `1<>file` matches
+  # the read-write form, not a spurious `[0-9]*>` (which cannot match `1<` anyway).
+  local rre='(&>\||&>>|&>|>&|>\||>>|[0-9]*<>|<>|[0-9]*>)([^[:space:]<>|&]+)'
   while IFS= read -r seg; do
     [ -n "$seg" ] || continue
 
