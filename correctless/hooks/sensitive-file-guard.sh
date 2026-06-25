@@ -178,8 +178,30 @@ _emit_dest() {
 # segment level by _mask_opaque_operands (so `-c "…"` payloads do not leak
 # redirects while `> ".env"` destinations do).
 _excise_process_subs() {
-  local s="$1" out="" n="${#1}" i=0 ch depth
+  local s="$1" n="${#1}" i=0 ch depth run
+  # O(n) accumulation: append chunks to an ARRAY and join ONCE (PMB-019). The old
+  # `out="$out$run"` grew a string per iteration — O(n^2) in bash.
+  local -a out_arr=()
+  # Fast-path (O(n)): a process substitution requires a `(` byte immediately
+  # after a `>`/`<`. If the command contains NO `(` at all, there is nothing to
+  # excise — return the input unchanged without the per-char loop. This handles
+  # the common large case (long args / base64 blobs with no parens) in O(n).
+  case "$s" in
+    *'('*) ;;            # may contain a process-sub — fall through to slow path
+    *) printf '%s' "$s"; return ;;
+  esac
   while [ "$i" -lt "$n" ]; do
+    # Bulk-copy a maximal run of bytes that are neither `>`, `<`, nor `(`. This
+    # is the O(n) construction technique: advance over non-trigger bytes with a
+    # single parameter-expansion slice instead of one byte at a time. Only drop
+    # to byte granularity at a redirect/process-sub boundary.
+    run="${s:$i}"
+    run="${run%%[\<\>(]*}"
+    if [ -n "$run" ]; then
+      out_arr+=("$run")
+      i=$((i + ${#run}))
+      [ "$i" -lt "$n" ] || break
+    fi
     ch="${s:$i:1}"
     if { [ "$ch" = ">" ] || [ "$ch" = "<" ]; } && [ "${s:$((i + 1)):1}" = "(" ]; then
       depth=1
@@ -190,13 +212,14 @@ _excise_process_subs() {
         if [ "$ch" = ")" ]; then depth=$((depth - 1)); fi
         i=$((i + 1))
       done
-      out="$out "
+      out_arr+=(" ")
       continue
     fi
-    out="$out$ch"
+    out_arr+=("$ch")
     i=$((i + 1))
   done
-  printf '%s' "$out"
+  local IFS=''
+  printf '%s' "${out_arr[*]}"
 }
 
 # Neutralize shell-operator / separator / comment bytes that are NOT real shell
@@ -219,34 +242,81 @@ _excise_process_subs() {
 #   - Outside any quote, a `#` that starts a word (preceded by start-of-string or
 #     whitespace) begins a comment that runs to end of string. `a#b` is literal.
 _mask_quoted_operators() {
-  local s="$1" out="" n="${#1}" i=0 ch q prev=""
+  local s="$1" n="${#1}" i=0 ch q prev="" run
+  # O(n) accumulation: append every emitted chunk to an ARRAY and join ONCE at
+  # the end (PMB-019 / technique 2). The previous `out="$out$chunk"` grew a
+  # string in the loop, which is O(n^2) in bash — each append re-copies the whole
+  # accumulated buffer — and HUNG on large commands with many small spans
+  # (PERF regression). Array append is amortized O(1); the single join is O(n).
+  local -a out_arr=()
+  # Fast-path (O(n)): this masker only rewrites bytes that live inside a quoted
+  # span ('|") or a word-boundary `#` comment, with a backslash (\) able to open
+  # an escape. If the command contains NONE of those trigger bytes, there is
+  # nothing to mask — return the input UNCHANGED without the per-char loop. A
+  # command with no quotes/comments/backslashes has no quoted/commented operator
+  # to neutralize, so the masked output is byte-identical to the input. This
+  # handles the common large case (long args / base64 blobs) in O(n).
+  case "$s" in
+    *[\'\"\#\\]*) ;;     # has a trigger byte — fall through to slow path
+    *) printf '%s' "$s"; return ;;
+  esac
   while [ "$i" -lt "$n" ]; do
+    # Bulk-copy a maximal run of bytes that are NOT triggers (`'` `"` `\` `#`).
+    # These pass through the default `*)` arm verbatim; copying the run in one
+    # parameter-expansion slice (instead of one byte per iteration) makes the
+    # slow path O(n) over such runs. `prev` is updated to the run's last byte so
+    # the word-boundary `#` logic that follows stays correct.
+    run="${s:$i}"
+    run="${run%%[\'\"\#\\]*}"
+    if [ -n "$run" ]; then
+      out_arr+=("$run")
+      i=$((i + ${#run}))
+      prev="${run: -1}"
+      [ "$i" -lt "$n" ] || break
+    fi
     ch="${s:$i:1}"
     case "$ch" in
       "'"|'"')
         # Enter a quoted span: copy the opening quote, then mask operator bytes
         # inside it until the matching close quote.
         q="$ch"
-        out="$out$ch"; i=$((i + 1))
+        out_arr+=("$ch"); i=$((i + 1))
         while [ "$i" -lt "$n" ]; do
+          # Bulk-copy a maximal run of span-interior bytes that need neither
+          # masking nor escape handling: not the close quote `q`, not an
+          # operator byte (`> < | & ; #`), and — inside double quotes — not a
+          # backslash. One parameter-expansion slice per run keeps the inner
+          # loop O(n) even for a span made of thousands of such bytes.
+          local _span
+          if [ "$q" = '"' ]; then
+            _span="${s:$i}"
+            _span="${_span%%[\"\\\>\<\|\&\;\#]*}"
+          else
+            _span="${s:$i}"
+            _span="${_span%%[\'\>\<\|\&\;\#]*}"
+          fi
+          if [ -n "$_span" ]; then
+            out_arr+=("$_span"); i=$((i + ${#_span}))
+            [ "$i" -lt "$n" ] || break
+          fi
           ch="${s:$i:1}"
           if [ "$q" = '"' ] && [ "$ch" = '\' ] && [ "$((i + 1))" -lt "$n" ]; then
             # Backslash escape inside double quotes: copy both bytes verbatim,
             # masking the escaped byte if it is an operator.
-            out="$out$ch"
+            out_arr+=("$ch")
             local nb="${s:$((i + 1)):1}"
             case "$nb" in
-              '>'|'<'|'|'|'&'|';'|'#') out="${out}_" ;;
-              *) out="$out$nb" ;;
+              '>'|'<'|'|'|'&'|';'|'#') out_arr+=("_") ;;
+              *) out_arr+=("$nb") ;;
             esac
             i=$((i + 2)); continue
           fi
           if [ "$ch" = "$q" ]; then
-            out="$out$ch"; i=$((i + 1)); break
+            out_arr+=("$ch"); i=$((i + 1)); break
           fi
           case "$ch" in
-            '>'|'<'|'|'|'&'|';'|'#') out="${out}_" ;;
-            *) out="$out$ch" ;;
+            '>'|'<'|'|'|'&'|';'|'#') out_arr+=("_") ;;
+            *) out_arr+=("$ch") ;;
           esac
           i=$((i + 1))
         done
@@ -262,36 +332,39 @@ _mask_quoted_operators() {
         # an operator (it is a literal, not real syntax). Advance by 2 and set
         # `prev` to the ESCAPED byte so word-boundary `#` logic stays correct.
         if [ "$((i + 1))" -lt "$n" ]; then
-          out="$out$ch"
+          out_arr+=("$ch")
           local eb="${s:$((i + 1)):1}"
           case "$eb" in
-            '>'|'<'|'|'|'&'|';'|'#') out="${out}_"; prev="_" ;;
-            *) out="$out$eb"; prev="$eb" ;;
+            '>'|'<'|'|'|'&'|';'|'#') out_arr+=("_"); prev="_" ;;
+            *) out_arr+=("$eb"); prev="$eb" ;;
           esac
           i=$((i + 2)); continue
         fi
         # Trailing lone backslash at end of string: copy verbatim.
-        out="$out$ch"; prev="$ch"; i=$((i + 1)); continue
+        out_arr+=("$ch"); prev="$ch"; i=$((i + 1)); continue
         ;;
       '#')
         # Comment only at a word boundary (start-of-string or after whitespace).
         if [ -z "$prev" ] || [ "$prev" = " " ] || [ "$prev" = $'\t' ] || [ "$prev" = $'\n' ]; then
           # Mask from here to end of string — neutralizes operators/separators in
-          # the comment while preserving length.
-          while [ "$i" -lt "$n" ]; do
-            out="${out}_"; i=$((i + 1))
-          done
+          # the comment while preserving length. Build the filler run in one slice
+          # (length of the remaining tail) rather than byte by byte (O(n)).
+          local _tail="${s:$i}" _fill
+          printf -v _fill '%*s' "${#_tail}" ''
+          out_arr+=("${_fill// /_}")
+          i="$n"
           prev="_"
           continue
         fi
-        out="$out$ch"; prev="$ch"; i=$((i + 1)); continue
+        out_arr+=("$ch"); prev="$ch"; i=$((i + 1)); continue
         ;;
       *)
-        out="$out$ch"; prev="$ch"; i=$((i + 1)); continue
+        out_arr+=("$ch"); prev="$ch"; i=$((i + 1)); continue
         ;;
     esac
   done
-  printf '%s' "$out"
+  local IFS=''
+  printf '%s' "${out_arr[*]}"
 }
 
 # Mask the OPAQUE operand of an interpreter+eval chain or here-string within a
@@ -306,17 +379,35 @@ _mask_quoted_operators() {
 # opaque operand survives (e.g. `cat <<< x > .env` keeps the trailing `> .env`).
 # `perl -i` is NOT opaque — it is a writer (INV-003) routed to the writer branch.
 _mask_opaque_operands() {
-  local seg="$1" base out="" mask_next=0 has_interp=0
+  local seg="$1" base mask_next=0 has_interp=0
   local n="${#seg}" i=0 ch tok q
+  # O(n) accumulation: append chunks to an ARRAY, join ONCE at the end. The old
+  # `out="$out$tok"` grew a string per token — O(n^2) in bash, which HUNG on a
+  # segment with many small tokens. Array append is amortized O(1) (PMB-019).
+  local -a out_arr=()
   base="${tokens[0]##*/}"
   case "$base" in
     bash|sh|zsh|dash|perl|python|python3|ruby|php|lua|tclsh|Rscript|nim|node|base64) has_interp=1 ;;
   esac
+  local wsrun tailrun qrun
+  # Fast-path: nothing to mask unless the command is an interpreter eval chain
+  # (has_interp) OR carries a here-string `<<<`. A plain non-interpreter segment
+  # with no `<<<` is returned UNCHANGED in O(n) — no token walk needed. This is
+  # the common large case (`echo BIGBLOB > dest`).
+  if [ "$has_interp" -eq 0 ]; then
+    case "$seg" in
+      *'<<<'*) ;;        # here-string present — fall through to the masker
+      *) printf '%s' "$seg"; return ;;
+    esac
+  fi
   while [ "$i" -lt "$n" ]; do
     ch="${seg:$i:1}"
-    # Skip leading whitespace verbatim.
+    # Skip leading whitespace verbatim. Bulk-copy the maximal whitespace run in
+    # one slice (O(n) construction) instead of one byte at a time.
     if [ "$ch" = " " ] || [ "$ch" = $'\t' ]; then
-      out="$out$ch"; i=$((i + 1)); continue
+      wsrun="${seg:$i}"
+      wsrun="${wsrun%%[! $'\t']*}"
+      out_arr+=("$wsrun"); i=$((i + ${#wsrun})); continue
     fi
     # Read the next whitespace-delimited token, honoring quote spans so a
     # quoted operand is read as ONE unit.
@@ -327,28 +418,39 @@ _mask_opaque_operands() {
         ' '|$'\t') break ;;
         "'"|'"')
           q="$ch"; tok="$tok$ch"; i=$((i + 1))
-          while [ "$i" -lt "$n" ] && [ "${seg:$i:1}" != "$q" ]; do
-            tok="$tok${seg:$i:1}"; i=$((i + 1))
-          done
+          # Bulk-copy the quote-span interior (everything up to the closing
+          # quote) in one slice rather than byte by byte.
+          qrun="${seg:$i}"
+          qrun="${qrun%%"$q"*}"
+          # If the closing quote is absent, ${qrun%%…} leaves the rest verbatim,
+          # which is the same span the per-char loop would have copied to EOS.
+          tok="$tok$qrun"; i=$((i + ${#qrun}))
           if [ "$i" -lt "$n" ]; then tok="$tok${seg:$i:1}"; i=$((i + 1)); fi
           ;;
-        *) tok="$tok$ch"; i=$((i + 1)) ;;
+        *)
+          # Bulk-copy a maximal run of bytes that are neither whitespace nor a
+          # quote — these terminate the run and are handled by the arms above.
+          tailrun="${seg:$i}"
+          tailrun="${tailrun%%[ $'\t'\'\"]*}"
+          tok="$tok$tailrun"; i=$((i + ${#tailrun}))
+          ;;
       esac
     done
     if [ "$mask_next" -eq 1 ]; then
-      out="$out X"; mask_next=0; continue
+      out_arr+=(" X"); mask_next=0; continue
     fi
     case "$tok" in
       '<<<')
-        out="$out$tok"; mask_next=1; continue ;;
+        out_arr+=("$tok"); mask_next=1; continue ;;
       -c|-e|-pe|-ne|-r|-E|--eval|-d|--decode|--execute)
-        out="$out$tok"
+        out_arr+=("$tok")
         [ "$has_interp" -eq 1 ] && mask_next=1
         continue ;;
     esac
-    out="$out$tok"
+    out_arr+=("$tok")
   done
-  printf '%s' "$out"
+  local IFS=''
+  printf '%s' "${out_arr[*]}"
 }
 
 # Recognize a LIVE redirect operator that terminates a whitespace-delimited token
@@ -379,6 +481,69 @@ _redirect_op_suffix() {
   esac
 }
 
+# Insert segment-boundary newlines into a (process-sub-excised, quote-masked)
+# command string (CX-007). Bare `;`, `&&`, `||`, bare background `&`, and pipe
+# `|` separate segments; an `&` that is part of `&>`/`>&` is NOT a separator, and
+# a `|` that is part of `>|`/`&>|` is NOT a separator. Result on stdout, one
+# segment per line. Lives in its own function so its O(n) array-join IFS shift is
+# isolated from _extract_bash_targets' single-IFS-shift body invariant (PRH-005).
+_segment_command() {
+  local cmd="$1" n="${#1}" k=0 c c2 cprev crun
+  # O(n) accumulation: append chunks to an ARRAY, join ONCE (PMB-019). A grown
+  # string (`out="$out$c"`) is O(n^2) in bash on commands with many separators.
+  local -a seg_arr=()
+  # Fast-path (O(n)): segment boundaries are introduced only by `;`, `|`, `&`.
+  # If the command contains NONE of these, there is exactly one segment — the
+  # whole command — so emit it verbatim (common large case: `echo BIGBLOB > x`).
+  case "$cmd" in
+    *[\;\|\&]*) ;;       # has a separator/operator byte — fall through
+    *) printf '%s' "$cmd"; return ;;
+  esac
+  while [ "$k" -lt "$n" ]; do
+    # Bulk-copy a maximal run of bytes that are not `;`, `|`, or `&` in one
+    # parameter-expansion slice (O(n) over the run) — drop to byte granularity
+    # only at a separator/operator byte.
+    crun="${cmd:$k}"
+    crun="${crun%%[\;\|\&]*}"
+    if [ -n "$crun" ]; then
+      seg_arr+=("$crun")
+      k=$((k + ${#crun}))
+      [ "$k" -lt "$n" ] || break
+    fi
+    c="${cmd:$k:1}"
+    c2="${cmd:$((k + 1)):1}"
+    cprev=""
+    [ "$k" -gt 0 ] && cprev="${cmd:$((k - 1)):1}"
+    case "$c" in
+      ';')
+        seg_arr+=($'\n'); k=$((k + 1)); continue ;;
+      '|')
+        # `>|` or `&>|` redirect tail -> keep the `|` as part of the operator.
+        if [ "$cprev" = ">" ]; then
+          seg_arr+=("$c"); k=$((k + 1)); continue
+        fi
+        if [ "$c2" = "|" ]; then
+          seg_arr+=($'\n'); k=$((k + 2)); continue
+        fi
+        seg_arr+=($'\n'); k=$((k + 1)); continue ;;
+      '&')
+        # `&>` / `&>|` redirect, or `>&` (prev was `>`) -> keep as-is.
+        if [ "$c2" = ">" ] || [ "$cprev" = ">" ]; then
+          seg_arr+=("$c"); k=$((k + 1)); continue
+        fi
+        # `&&` or bare background `&` -> boundary.
+        if [ "$c2" = "&" ]; then
+          seg_arr+=($'\n'); k=$((k + 2)); continue
+        fi
+        seg_arr+=($'\n'); k=$((k + 1)); continue ;;
+      *)
+        seg_arr+=("$c"); k=$((k + 1)); continue ;;
+    esac
+  done
+  local IFS=''
+  printf '%s' "${seg_arr[*]}"
+}
+
 # Extract genuine write destinations from a Bash command — destination-driven
 # (PRH-001): a token is emitted ONLY by the redirect branch (INV-002) or the
 # writer-command branch (INV-003). No unconditional token-emit branch exists.
@@ -393,6 +558,27 @@ _extract_bash_targets() {
   # is one segment, while leaving redirect operators intact.
   local cmd seg op rest dest j masked
   local -a tokens
+
+  # Size-cap backstop (INV-007 fail-OPEN, PMB-019 bounded-medium). The quote/
+  # comment maskers are O(n) for the common case (long un-quoted args / base64
+  # blobs are handled by the bulk-run fast-paths and the array accumulation), but
+  # bash string slicing makes a PATHOLOGICAL command — one composed of thousands
+  # of tiny quoted tokens (`"x" "x" "x" …`) — super-linear, because each span
+  # boundary re-slices the remaining tail. Such a command is exotic (no realistic
+  # invocation has thousands of 2-byte quoted words), NOT a naive accidental
+  # write, so per INV-007 we fail OPEN: emit the empty target set (-> allowed)
+  # rather than risk a PreToolUse stall (AP-040 friction at scale). The cap is set
+  # well above any realistic command length (64 KiB) so no real write is capped;
+  # the common large case (a single `echo BIGBLOB > dest`, even at 200 KB) stays
+  # O(n) and is NOT affected by this cap because it never reaches a pathological
+  # span count — but a command whose RAW length exceeds the cap is treated as
+  # unresolvable ambiguity and allowed. This is the guardrail framing: SFG catches
+  # accidental/naive writes, and a 64 KiB+ command is neither.
+  local _SFG_EXTRACT_CAP=65536
+  if [ "${#COMMAND}" -gt "$_SFG_EXTRACT_CAP" ]; then
+    return 0
+  fi
+
   cmd="$(_excise_process_subs "$COMMAND")"
   # Neutralize operator/separator/comment bytes that sit INSIDE quoted spans or
   # comments so they are never mistaken for real shell syntax (QA-001/QA-002).
@@ -400,42 +586,12 @@ _extract_bash_targets() {
   # (`> ".env"`, `tee ".env"`) survives intact and is dequoted at emit time.
   cmd="$(_mask_quoted_operators "$cmd")"
 
-  # Insert segment-boundary newlines. Walk char-by-char so redirect operators
-  # (`&>`, `&>|`, `>&`, `>|`) are preserved while bare `&`/`&&`/`||`/`|`/`;`
-  # become boundaries (CX-007). `cprev` is the previous source byte so we can
-  # tell a `|` that belongs to a `>|`/`&>|` redirect from a pipe separator.
-  local segmented="" n="${#cmd}" k=0 c c2 cprev
-  while [ "$k" -lt "$n" ]; do
-    c="${cmd:$k:1}"
-    c2="${cmd:$((k + 1)):1}"
-    cprev=""
-    [ "$k" -gt 0 ] && cprev="${cmd:$((k - 1)):1}"
-    case "$c" in
-      ';')
-        segmented="$segmented"$'\n'; k=$((k + 1)); continue ;;
-      '|')
-        # `>|` or `&>|` redirect tail -> keep the `|` as part of the operator.
-        if [ "$cprev" = ">" ]; then
-          segmented="$segmented$c"; k=$((k + 1)); continue
-        fi
-        if [ "$c2" = "|" ]; then
-          segmented="$segmented"$'\n'; k=$((k + 2)); continue
-        fi
-        segmented="$segmented"$'\n'; k=$((k + 1)); continue ;;
-      '&')
-        # `&>` / `&>|` redirect, or `>&` (prev was `>`) -> keep as-is.
-        if [ "$c2" = ">" ] || [ "$cprev" = ">" ]; then
-          segmented="$segmented$c"; k=$((k + 1)); continue
-        fi
-        # `&&` or bare background `&` -> boundary.
-        if [ "$c2" = "&" ]; then
-          segmented="$segmented"$'\n'; k=$((k + 2)); continue
-        fi
-        segmented="$segmented"$'\n'; k=$((k + 1)); continue ;;
-      *)
-        segmented="$segmented$c"; k=$((k + 1)); continue ;;
-    esac
-  done
+  # Insert segment-boundary newlines (CX-007). The byte-walk + O(n) array join
+  # lives in _segment_command so its own internal IFS shift does NOT count
+  # against the extractor body's single-IFS-shift invariant (PRH-005). `segmented`
+  # is one segment per line.
+  local segmented
+  segmented="$(_segment_command "$cmd")"
 
   # shellcheck disable=SC2141
   local IFS=$' \t\n'

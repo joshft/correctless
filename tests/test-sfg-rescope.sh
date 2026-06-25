@@ -252,6 +252,19 @@ test_inv006_sink_devices_excluded() {
   assert_bash "INV-006: > /dev/stderr ALLOWED" "0" "echo x > /dev/stderr"
   assert_bash "INV-006: >/dev/fd/3 ALLOWED" "0" "echo x >/dev/fd/3"
 
+  # Structural tripwire (PRH-001 style; added 2026-06 from mutation testing).
+  # The behavioral assertions above pass WHETHER OR NOT sink devices are
+  # excluded — no sink device matches a DEFAULTS pattern, so emitting one is
+  # harmless at the exit-code level. A mutation that changes the early-return
+  # exclusion to a no-op SURVIVES the behavioral corpus. This tripwire pins that
+  # the early-return exclusion branch exists so dropping it is caught.
+  local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
+  if grep -Fq '/dev/fd/*) return 0' "$guard"; then
+    pass "INV-006 [structural tripwire]" "sink-device exclusion returns early (not emitted)"
+  else
+    fail "INV-006 [structural tripwire]" "sink-device early-return exclusion branch missing"
+  fi
+
   rm -rf "$test_dir"
 }
 
@@ -1039,6 +1052,33 @@ test_qa006_backslash_operator_parity_sweep() {
   assert_bash 'parity n=3 op=&> space -> 2' '2' 'echo a \\\&> .env'
   assert_bash 'parity n=3 op=&> glued -> 2' '2' 'echo a \\\&>.env'
 }
+
+# ---------------------------------------------------------------------------
+# PERF (round-3 probe round, config-fuzz): the destination-extraction path MUST
+# NOT be super-linear in command length. The round-1..3 masker walks the command
+# byte-by-byte; a naive per-char string append is O(n^2) and HANGS on large
+# commands (measured: 50KB timed out >15s vs the pre-feature hook's ~1.1s). Since
+# _has_write_pattern fires on the ubiquitous `2>/dev/null` idiom, ANY large
+# command with a redirect pays this — re-introducing friction (AP-040) at scale
+# and risking a PreToolUse stall. This guard pins that a 100KB command completes
+# (does not hang) under a generous timeout; the verdict (allow via size-cap
+# fail-open per INV-007, or block via an O(n) extractor) is left to the impl.
+# ---------------------------------------------------------------------------
+test_perf_large_command_no_hang() {
+  echo ""
+  echo "=== PERF: large command must not hang (O(n^2) regression guard) ==="
+  local big cmd json rc
+  big="$(head -c 100000 /dev/zero | tr '\0' 'a')"
+  cmd="echo $big > .env"
+  json="$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')"
+  printf '%s' "$json" | timeout 8 bash "$HOOK" >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" = 124 ]; then
+    fail "PERF" "hook hung (>8s) on a 100KB command — O(n^2) extraction regression"
+  else
+    pass "PERF" "hook completed on a 100KB command (rc=$rc, no hang)"
+  fi
+}
 # ===========================================================================
 # Run
 # ===========================================================================
@@ -1072,6 +1112,7 @@ test_inv020_per_segment_positional
 test_qa001_quoted_and_comment_operators_not_targets
 test_qa003_backslash_escape_context_parity
 test_qa006_backslash_operator_parity_sweep
+test_perf_large_command_no_hang
 
 echo ""
 echo "=== Summary ==="
