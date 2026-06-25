@@ -19,7 +19,7 @@
 
 #### TB-001b: Custom PR command exception
 - **Scoped exception**: `/cauto` may execute a custom PR creation command from `preferences.md` when `pr_creation: custom` is configured. The command string is eval'd to support shell operators.
-- **Trust model**: Same as TB-001a — the command originates from `preferences.md`, which is scaffolded by `/csetup` and edited only by the project owner. The file is local and under the owner's control. `sensitive-file-guard.sh` prevents LLM writes to `preferences.md`.
+- **Trust model**: Same as TB-001a — the command originates from `preferences.md`, which is scaffolded by `/csetup` and edited only by the project owner. The file is local and under the owner's control. `sensitive-file-guard.sh` guards against accidental/naive Edit/Write and direct redirect/writer-command writes to `preferences.md` (a write-target guardrail — interpreter/git-mediated writes are accepted non-goals per AP-040; see ABS-045).
 - **Constraint**: If the trust model for `preferences.md` is ever extended (shared team preferences, marketplace templates), this exception MUST be revisited — eval of externally-supplied commands is arbitrary code execution.
 - **Test**: R-008 in semi-auto-mode tests (TB-001b reference presence)
 
@@ -199,7 +199,7 @@
 
 ### ABS-012: Intent summary (.correctless/artifacts/)
 - **What**: Immutable markdown file at `.correctless/artifacts/intent-{slug}.md` written once at pipeline startup from the approved spec. Captures what the human wants, key constraints, explicit risk acceptances (≤500 words). Passed to the supervisor on every activation. Referenced from DD-000.
-- **Invariant**: Written once, never modified. SHA-256 hash stored in workflow state at creation, verified on each supervisor activation and on `/cauto resume`. Mismatch triggers hard stop (INV-013). Protected by sensitive-file-guard.
+- **Invariant**: Written once, never modified. SHA-256 hash stored in workflow state at creation, verified on each supervisor activation and on `/cauto resume`. Mismatch triggers hard stop (INV-013). The SHA-256 hash verification is the structural integrity leg; `sensitive-file-guard.sh` adds a write-target guardrail over the Edit/Write and direct redirect/writer-command paths (accidental/naive writes only — interpreter/git-mediated writes are accepted non-goals, AP-040; see ABS-045).
 - **Enforced at**: `scripts/intent-hash.sh` (intent_create, intent_verify), `hooks/sensitive-file-guard.sh` (protected path)
 - **Violated when**: Intent file modified after creation, hash check skipped, or mismatch does not trigger hard stop
 - **Test**: test-auto-report.sh — INV-013 suite
@@ -227,7 +227,7 @@
 
 ### ABS-016: Auto-policy config (.correctless/config/)
 - **What**: JSON config at `.correctless/config/auto-policy.json` defining Tier 0 policy rules. Sections: review_dispositions, qa_dispositions, spec_update, drift, security, budget, time, hard_stops. Controlled category vocabulary (14 values) and disposition vocabulary (8 values). First-match-wins evaluation. Scaffolded by `/csetup` with conservative defaults.
-- **Invariant**: Tier 0 evaluation is deterministic — same DR-xxx + same policy = same disposition (INV-001). Policy integrity verified via SHA-256 hash on each Tier 0 evaluation (INV-018). `security.never_relax_autonomously` hardcoded in orchestrator, not overridable. Malformed JSON → all decisions route to Tier 1+ (BND-001). Protected by sensitive-file-guard.
+- **Invariant**: Tier 0 evaluation is deterministic — same DR-xxx + same policy = same disposition (INV-001). Policy integrity verified via SHA-256 hash on each Tier 0 evaluation (INV-018). `security.never_relax_autonomously` hardcoded in orchestrator, not overridable. Malformed JSON → all decisions route to Tier 1+ (BND-001). The SHA-256 policy-integrity hash is the structural integrity leg; `sensitive-file-guard.sh` adds a write-target guardrail over the Edit/Write and direct redirect/writer-command paths (accidental/naive writes only — interpreter/git-mediated writes are accepted non-goals, AP-040; see ABS-045).
 - **Enforced at**: `scripts/auto-policy.sh` (policy_evaluate, policy_hash), `hooks/sensitive-file-guard.sh`
 - **Violated when**: Non-deterministic evaluation, hash mismatch not detected, security floor bypassed via config
 - **Test**: test-auto-policy.sh — INV-001, INV-018, BND-001 suites
@@ -451,6 +451,16 @@
 - **Violated-when**: re-selection suppression depends solely on the public comment; the store is committed; a non-`/cchores` writer touches it; concurrent writes corrupt it (must use `locked_update_file`)
 - **Test**: `tests/test-cchores.sh`, `tests/test-cchores-infra.sh`, `tests/test-architecture-drift.sh` (ABS-044 coverage)
 - **Guards against**: re-selection loops, evidence loss on comment-post failure
+
+### ABS-045: sensitive-file-guard capability boundary (write-target guardrail)
+- **What**: `hooks/sensitive-file-guard.sh` (the guard) is a Claude Code **PreToolUse hook** and therefore a **write-target guardrail / speedbump** for accidental and naively-injected writes (PMB-020 / AP-040). This entry is the single authoritative statement of the guard's capability boundary; every other ABS entry whose enforcement leans on the guard (ABS-012, ABS-016, ABS-029, ABS-030, ABS-035, ABS-038, ABS-040, ABS-041, ABS-042) scopes its clause to "tool-target + direct redirect/writer-command destinations; interpreter/git-mediated out-of-band writes are accepted non-goals (AP-040)" and See-links here.
+- **Capability (what the guard DOES cover)**: the Edit/Write/MultiEdit/NotebookEdit/CreateFile `file_path` tool-target path (unchanged), AND the **direct** Bash write-destination path — output redirects (`>`, `>>`, `>|`, `1>`, `2>`, `&>`, `&>|`, `>&`, glued forms) and the writer commands `tee`/`cp`/`mv`/`install`/`ln`/`sed -i`/`perl -i`/`dd of=`/`truncate`, minus sink devices. Extraction is **destination-driven** (an allowlist of write forms): only genuine write destinations are emitted; reads, invocations, flags, and incidental tokens are never targets.
+- **Accepted non-goals (what the guard does NOT cover, by construction)**: interpreter-mediated writes (`bash -c "…"`, `python -c "…"`, `base64 -d`), git working-tree restores (`git checkout -- <file>`, `git restore`), process-substitution payloads (`>(…)`), flag-relocated destinations (`cp -t`, `install -d`), `ln` one-arg, and destinations containing IFS bytes. A motivated agent or a crafted injection can trivially route around the guard (name the directory not the file, route through an interpreter). Modeling those as covered is the AP-040 category error.
+- **Posture**: the write-destination **extraction** path fails **OPEN** on ambiguity (INV-007 — destination-driven, no unconditional token-emit branch); the hook's **input-parse** path (malformed stdin JSON) still fails **CLOSED** (INV-008). The PAT-001 clause-5 carve-out is documented in `.claude/rules/hooks-pretooluse.md` (INV-013). Where a sole-writer contract needs coverage against interpreter/git-mediated writes, that coverage must come from a `cmd_*` phase-transition gate (ABS-029 pattern), not from this hook alone.
+- **Enforced-at**: `hooks/sensitive-file-guard.sh` (`_extract_bash_targets` destination-driven extractor; LC_ALL=C at hook scope per INV-019), `.claude/rules/hooks-pretooluse.md` (clause-5 carve-out), `tests/test-sfg-rescope.sh` (INV-001..020, PRH-001..003), `tests/test-sensitive-file-guard.sh` (Edit/Write tool-path + Bash migration corpus)
+- **Violated-when**: a doc, comment, or future spec frames the guard as covering interpreter/git-mediated out-of-band writes or as anything stronger than a write-target guardrail; the extractor reintroduces an unconditional token-emit branch (PRH-001); a sole-writer contract relies on this hook alone for interpreter/git-write coverage
+- **Test**: `tests/test-sfg-rescope.sh`, `tests/test-sensitive-file-guard.sh`
+- **Guards against**: AP-040 (mechanism-capability mismatch — over-strong framing on a guardrail), AP-022 (the guard must still fire on real direct writes — not become dead code)
 
 ## Patterns
 

@@ -20,6 +20,12 @@ set -euo pipefail
 # Disable glob expansion — patterns like *.pem must not expand to filenames
 set -f
 
+# Byte-oriented, locale-independent tokenization / lowercasing / matching
+# (INV-019). Extraction runs BEFORE canonicalize_path's internal LC_ALL=C, so
+# the hook-scope setting is what makes block decisions reproducible across the
+# agent's locale.
+LC_ALL=C
+
 # ============================================
 # STEP 1: Check jq availability (EA-004)
 # ============================================
@@ -128,72 +134,346 @@ collect_targets() {
   esac
 }
 
-# Strip shell-quote and interpreter-wrapper bytes iteratively from both ends.
-# Required because IFS-splitting on `perl -e "system(q{cat > .env})"` yields
-# tokens like `.env}` and `"system` — the matcher only sees the canonical
-# path once wrappers are peeled. False-positive risk on legitimate paths
-# containing these bytes is accepted per OQ-004.
+# Strip shell-quote bytes iteratively from both ends of a candidate
+# destination token. Destination-driven extraction (INV-007) only ever calls
+# this on an already-isolated redirect/writer destination, never on every
+# token — so the over-extraction wrapper-peeling rationale of the old version
+# no longer applies; this is a light dequote of surrounding quote bytes.
 _strip_quotes() {
   local s="$1" prev
   while :; do
     prev="$s"
-    s="${s#[\"\'\{\(\[\\]}"
-    s="${s%[\"\'\}\)\];,\\]}"
+    s="${s#[\"\']}"
+    s="${s%[\"\']}"
     [ "$s" = "$prev" ] && break
   done
-  echo "$s"
+  printf '%s' "$s"
 }
 
-# Extract file targets from a Bash command (INV-006, INV-007, INV-007a).
-# Over-extracts every non-flag token plus every redirect target — no
-# per-command dispatch (PRH-002).
-_extract_bash_targets() {
-  local cmd="$COMMAND"
-  # shellcheck disable=SC2141
-  local IFS=$' \t\n;|&()`'
-  # Intentional word-split; set -f at top of hook prevents pathname
-  # expansion of glob bytes inside the command.
-  # shellcheck disable=SC2206
-  local -a tokens=($cmd)
-  local i=0 tok inner sub_tok
+# Emit a candidate destination unless it is a sink device (INV-006) or an
+# unresolvable/dynamic value (INV-007: e.g. `${f}`, `$out`, empty). Anything
+# that survives is a genuine write target. Reads/invocations/incidental tokens
+# never reach here — only the redirect branch (INV-002) and writer-command
+# branch (INV-003) call this.
+_emit_dest() {
+  local dest
+  dest="$(_strip_quotes "$1")"
+  [ -n "$dest" ] || return 0
+  # Dynamic / unresolvable destination -> fail open (INV-007).
+  case "$dest" in
+    *'$'*) return 0 ;;
+  esac
+  # Sink devices are never write targets (INV-006).
+  case "$dest" in
+    /dev/null|/dev/stdout|/dev/stderr|/dev/fd/*) return 0 ;;
+  esac
+  printf '%s\n' "$dest"
+}
 
-  while [ $i -lt ${#tokens[@]} ]; do
-    tok="${tokens[$i]}"
-    case "$tok" in
-      ">"|">>"|"1>"|"2>"|"&>"|">&")
-        # Whitespace-separated redirect (INV-007); next token is the target.
-        if [ $((i + 1)) -lt ${#tokens[@]} ]; then
-          _strip_quotes "${tokens[$((i + 1))]}"
-          i=$((i + 2)); continue
-        fi
-        ;;
-      -*)
-        ;;
-      *)
-        # Process substitution (INV-007a) — single-level sub-tokenize.
-        # `(` is special in case patterns, so prefix-check via substring.
-        if [ "${tok:0:2}" = ">(" ] || [ "${tok:0:2}" = "<(" ]; then
-          inner="${tok#?\(}"
-          inner="${inner%\)}"
-          for sub_tok in $inner; do
-            case "$sub_tok" in
-              -*) ;;
-              *) _strip_quotes "$sub_tok" ;;
-            esac
+# Excise process-substitution spans `>(…)` / `<(…)` from a command string
+# (INV-005 / CX-006), balanced-paren aware, so the `(`/`)` bytes never reach the
+# tokenizer to shatter an inner path and the operand stays opaque. Result on
+# stdout. Quotes are deliberately PRESERVED here — a quoted redirect/writer
+# DESTINATION (`echo > ".env"`, `cp ".env" backup`) must still resolve;
+# interpreter eval-operand opacity (INV-005) is applied separately at the
+# segment level by _mask_opaque_operands (so `-c "…"` payloads do not leak
+# redirects while `> ".env"` destinations do).
+_excise_process_subs() {
+  local s="$1" out="" n="${#1}" i=0 ch depth
+  while [ "$i" -lt "$n" ]; do
+    ch="${s:$i:1}"
+    if { [ "$ch" = ">" ] || [ "$ch" = "<" ]; } && [ "${s:$((i + 1)):1}" = "(" ]; then
+      depth=1
+      i=$((i + 2))
+      while [ "$i" -lt "$n" ] && [ "$depth" -gt 0 ]; do
+        ch="${s:$i:1}"
+        if [ "$ch" = "(" ]; then depth=$((depth + 1)); fi
+        if [ "$ch" = ")" ]; then depth=$((depth - 1)); fi
+        i=$((i + 1))
+      done
+      out="$out "
+      continue
+    fi
+    out="$out$ch"
+    i=$((i + 1))
+  done
+  printf '%s' "$out"
+}
+
+# Mask the OPAQUE operand of an interpreter+eval chain or here-string within a
+# single segment string `$1` (INV-005). Returns (on stdout) the segment with:
+#   - the word following a here-string `<<<` replaced by a placeholder, and
+#   - when the segment's command is an interpreter (bash/sh/python/node/…) and
+#     carries an eval flag (-c/-e/-pe/-ne/--eval/-d/…), the eval flag's operand
+#     (a full quoted span, or one bare word) replaced by a placeholder.
+# Because word-splitting shatters a quoted operand (`"echo x > .env"`) across
+# several tokens, the masking is quote-span-aware: it consumes from the start of
+# the operand up to its matching closing quote. A redirect/writer OUTSIDE the
+# opaque operand survives (e.g. `cat <<< x > .env` keeps the trailing `> .env`).
+# `perl -i` is NOT opaque — it is a writer (INV-003) routed to the writer branch.
+_mask_opaque_operands() {
+  local seg="$1" base out="" mask_next=0 has_interp=0
+  local n="${#seg}" i=0 ch tok q
+  base="${tokens[0]##*/}"
+  case "$base" in
+    bash|sh|zsh|dash|perl|python|python3|ruby|php|lua|tclsh|Rscript|nim|node|base64) has_interp=1 ;;
+  esac
+  while [ "$i" -lt "$n" ]; do
+    ch="${seg:$i:1}"
+    # Skip leading whitespace verbatim.
+    if [ "$ch" = " " ] || [ "$ch" = $'\t' ]; then
+      out="$out$ch"; i=$((i + 1)); continue
+    fi
+    # Read the next whitespace-delimited token, honoring quote spans so a
+    # quoted operand is read as ONE unit.
+    tok=""
+    while [ "$i" -lt "$n" ]; do
+      ch="${seg:$i:1}"
+      case "$ch" in
+        ' '|$'\t') break ;;
+        "'"|'"')
+          q="$ch"; tok="$tok$ch"; i=$((i + 1))
+          while [ "$i" -lt "$n" ] && [ "${seg:$i:1}" != "$q" ]; do
+            tok="$tok${seg:$i:1}"; i=$((i + 1))
           done
+          if [ "$i" -lt "$n" ]; then tok="$tok${seg:$i:1}"; i=$((i + 1)); fi
+          ;;
+        *) tok="$tok$ch"; i=$((i + 1)) ;;
+      esac
+    done
+    if [ "$mask_next" -eq 1 ]; then
+      out="$out X"; mask_next=0; continue
+    fi
+    case "$tok" in
+      '<<<')
+        out="$out$tok"; mask_next=1; continue ;;
+      -c|-e|-pe|-ne|-r|-E|--eval|-d|--decode|--execute)
+        out="$out$tok"
+        [ "$has_interp" -eq 1 ] && mask_next=1
+        continue ;;
+    esac
+    out="$out$tok"
+  done
+  printf '%s' "$out"
+}
+
+# Extract genuine write destinations from a Bash command — destination-driven
+# (PRH-001): a token is emitted ONLY by the redirect branch (INV-002) or the
+# writer-command branch (INV-003). No unconditional token-emit branch exists.
+# Reads, invocations, flags, sources, and interpreter/eval operands resolve to
+# the empty set -> allowed (INV-001, INV-005, INV-007). Segmentation (INV-020)
+# bounds each writer's positional logic to its own command segment.
+_extract_bash_targets() {
+  # Excise process-sub spans up front (INV-005/CX-006), then mark segment
+  # boundaries. Bare `;`, `&&`, `||`, bare background `&`, and pipe `|`
+  # separate segments; an `&` that is part of `&>`/`>&` is NOT a separator
+  # (CX-007). We translate every unquoted separator to a newline so each line
+  # is one segment, while leaving redirect operators intact.
+  local cmd seg op rest dest j masked
+  local -a tokens
+  cmd="$(_excise_process_subs "$COMMAND")"
+
+  # Insert segment-boundary newlines. Walk char-by-char so redirect operators
+  # (`&>`, `&>|`, `>&`, `>|`) are preserved while bare `&`/`&&`/`||`/`|`/`;`
+  # become boundaries (CX-007). `cprev` is the previous source byte so we can
+  # tell a `|` that belongs to a `>|`/`&>|` redirect from a pipe separator.
+  local segmented="" n="${#cmd}" k=0 c c2 cprev
+  while [ "$k" -lt "$n" ]; do
+    c="${cmd:$k:1}"
+    c2="${cmd:$((k + 1)):1}"
+    cprev=""
+    [ "$k" -gt 0 ] && cprev="${cmd:$((k - 1)):1}"
+    case "$c" in
+      ';')
+        segmented="$segmented"$'\n'; k=$((k + 1)); continue ;;
+      '|')
+        # `>|` or `&>|` redirect tail -> keep the `|` as part of the operator.
+        if [ "$cprev" = ">" ]; then
+          segmented="$segmented$c"; k=$((k + 1)); continue
+        fi
+        if [ "$c2" = "|" ]; then
+          segmented="$segmented"$'\n'; k=$((k + 2)); continue
+        fi
+        segmented="$segmented"$'\n'; k=$((k + 1)); continue ;;
+      '&')
+        # `&>` / `&>|` redirect, or `>&` (prev was `>`) -> keep as-is.
+        if [ "$c2" = ">" ] || [ "$cprev" = ">" ]; then
+          segmented="$segmented$c"; k=$((k + 1)); continue
+        fi
+        # `&&` or bare background `&` -> boundary.
+        if [ "$c2" = "&" ]; then
+          segmented="$segmented"$'\n'; k=$((k + 2)); continue
+        fi
+        segmented="$segmented"$'\n'; k=$((k + 1)); continue ;;
+      *)
+        segmented="$segmented$c"; k=$((k + 1)); continue ;;
+    esac
+  done
+
+  # shellcheck disable=SC2141
+  local IFS=$' \t\n'
+  # Process each segment independently (INV-020). Redirect detection is
+  # token-local; writer-command positional logic is bounded to the segment.
+  local rre='(&>\||&>|>&|>\||>>|[0-9]*>)([^[:space:]<>|&]+)'
+  while IFS= read -r seg; do
+    [ -n "$seg" ] || continue
+
+    # Tokenize the raw (unmasked) segment for writer-command positional logic
+    # (INV-003) — perl -i / sed -i operands must be read from the real tokens.
+    # shellcheck disable=SC2206
+    tokens=($seg)
+    [ "${#tokens[@]}" -gt 0 ] || continue
+
+    # --- Writer-command destinations (INV-003), bounded to this segment ---
+    _extract_writer_dests
+
+    # --- Redirect destinations (INV-002) — computed on the OPAQUE-MASKED
+    # segment so a redirect inside an interpreter eval operand or here-string
+    # operand (INV-005) does not leak, while a redirect OUTSIDE it survives.
+    masked="$(_mask_opaque_operands "$seg")"
+
+    # Glued/inline redirects: `cmd>file`, `cmd2>file`, `cmd&>file`, `cmd>|file`.
+    rest="$masked"
+    while [[ "$rest" =~ $rre ]]; do
+      _emit_dest "${BASH_REMATCH[2]}"
+      rest="${rest#*"${BASH_REMATCH[0]}"}"
+    done
+
+    # Whitespace-separated redirect operators: next token is the destination.
+    # shellcheck disable=SC2206
+    local -a mtokens=($masked)
+    j=0
+    while [ "$j" -lt "${#mtokens[@]}" ]; do
+      op="${mtokens[$j]}"
+      case "$op" in
+        '>'|'>>'|'>|'|'1>'|'2>'|'&>'|'&>|'|'>&'|'1>>'|'2>>')
+          if [ "$((j + 1))" -lt "${#mtokens[@]}" ]; then
+            _emit_dest "${mtokens[$((j + 1))]}"
+          fi
+          ;;
+      esac
+      j=$((j + 1))
+    done
+  done <<< "$segmented"
+}
+
+# Detect writer-command destinations within a single already-tokenized segment.
+# Uses the segment's token array `tokens` set by the caller. Emits destinations
+# via _emit_dest. Interpreter/eval chains (INV-005) and git working-tree
+# commands (INV-004) are deliberately NOT writers here.
+_extract_writer_dests() {
+  local cmd0="${tokens[0]}" base last_nonflag="" t p of_val cmd_idx=0
+  base="${cmd0##*/}"
+
+  # `/usr/bin/env [VAR=val…] CMD …` — resolve the real command after env so
+  # `env perl -pi … .env` is treated as a perl writer. The argument-index base
+  # (cmd_idx) shifts so positional logic starts after the resolved command.
+  if [ "$base" = "env" ]; then
+    for ((p = 1; p < ${#tokens[@]}; p++)); do
+      t="${tokens[$p]}"
+      case "$t" in
+        -*|*=*) ;;             # env flags / VAR=val assignments — skip
+        *) cmd_idx="$p"; base="${t##*/}"; break ;;
+      esac
+    done
+    [ "$cmd_idx" -eq 0 ] && return 0
+  fi
+
+  local start=$((cmd_idx + 1))
+  case "$base" in
+    tee)
+      # Every non-`-`-leading arg after `tee` is a destination (INV-003).
+      for ((p = start; p < ${#tokens[@]}; p++)); do
+        t="${tokens[$p]}"
+        case "$t" in
+          -*) ;;
+          *) _emit_dest "$t" ;;
+        esac
+      done
+      ;;
+    cp|mv|install|ln)
+      # Final non-flag positional arg within the segment is the destination.
+      # No flag-relocation form (-t/--target-directory/-d) — those fail open.
+      case " ${tokens[*]} " in
+        *' -t '*|*' --target-directory'*|*' -d '*) return 0 ;;
+      esac
+      for ((p = start; p < ${#tokens[@]}; p++)); do
+        t="${tokens[$p]}"
+        case "$t" in
+          -*) ;;
+          *) last_nonflag="$t" ;;
+        esac
+      done
+      [ -n "$last_nonflag" ] && _emit_dest "$last_nonflag"
+      ;;
+    sed)
+      # sed -i / sed -i.bak: the file operand(s) after the script. The frozen
+      # prefilter only fires on immediate `-i`, so only that form reaches here.
+      # Emit every trailing non-flag arg that is not the script expression.
+      _extract_inplace_operand "$start"
+      ;;
+    perl)
+      # perl -i / perl -i -pe / perl -pi: in-place writer (RS-001). Operand is
+      # the trailing file arg. perl -e/-pe/-ne WITHOUT -i never reaches here as
+      # a writer (opaque, INV-005) because the prefilter requires `-i`.
+      _extract_inplace_operand "$start"
+      ;;
+    dd)
+      # dd of=… — position-independent within this segment; if= is a read.
+      for ((p = start; p < ${#tokens[@]}; p++)); do
+        t="${tokens[$p]}"
+        case "$t" in
+          of=*) of_val="${t#of=}"; _emit_dest "$of_val" ;;
+        esac
+      done
+      ;;
+    truncate)
+      # truncate [-s N] FILE — emit every trailing non-flag, non-size operand.
+      for ((p = start; p < ${#tokens[@]}; p++)); do
+        t="${tokens[$p]}"
+        case "$t" in
+          -s) p=$((p + 1)) ;;   # skip the size value
+          -s*) ;;               # -s0 glued: skip
+          --size=*) ;;
+          -*) ;;
+          *) _emit_dest "$t" ;;
+        esac
+      done
+      ;;
+  esac
+}
+
+# Shared in-place-edit operand extractor for `sed -i` / `perl -i`. The in-place
+# flag is required (prefilter, CX-013). The file operand is the trailing
+# non-flag, non-script argument. For sed/perl the script may be a bare arg
+# (e.g. `s/a/b/`) — we treat the LAST non-flag arg as the file destination, and
+# emit every trailing non-flag run except the first non-flag (the script) when a
+# single script+file pair is present. To stay simple and correct for the
+# in-scope fixtures, emit every non-flag arg AFTER the first non-flag arg.
+_extract_inplace_operand() {
+  local start="${1:-1}" p t script_via_flag=0 script_consumed=0
+  for ((p = start; p < ${#tokens[@]}; p++)); do
+    t="${tokens[$p]}"
+    case "$t" in
+      -e|-pe|-ne|-pi|--expression|-f)
+        # script-bearing flag: its value is the next token (a separate script
+        # source, so a bare positional is NOT the script -> it is the file).
+        script_via_flag=1
+        case "${tokens[$((p + 1))]:-}" in
+          -*|'') ;;
+          *) p=$((p + 1)) ;;
+        esac
+        ;;
+      -*) ;;   # other flags (e.g. -i, -i.bak, -0777, -w)
+      *)
+        if [ "$script_via_flag" -eq 0 ] && [ "$script_consumed" -eq 0 ]; then
+          # No script flag seen yet: the first bare positional is the script.
+          script_consumed=1
         else
-          _strip_quotes "$tok"
+          _emit_dest "$t"   # file operand
         fi
         ;;
     esac
-    i=$((i + 1))
-  done
-
-  # Inline-attached redirects (INV-007) — `cmd>file`, `cmd2>file`, `cmd&>file`.
-  local re='(>{1,2}|[12]>|&>|>&)([^[:space:]\;\|]+)' rest="$cmd"
-  while [[ "$rest" =~ $re ]]; do
-    _strip_quotes "${BASH_REMATCH[2]}"
-    rest="${rest#*${BASH_REMATCH[0]}}"
   done
 }
 
@@ -372,8 +652,8 @@ while IFS= read -r target; do
   matched_pattern="$(_check_file_against_patterns "$canonical_target")" || true
 
   if [ -n "$matched_pattern" ]; then
-    echo "BLOCKED [sensitive-file]: $target matches protected pattern '$matched_pattern'.
-  Edit this file outside Claude Code, or add an exclusion to protected_files.custom_patterns in .correctless/config/workflow-config.json if this file is not actually sensitive." >&2
+    echo "BLOCKED [sensitive-file]: this command writes to '$target', which matches protected pattern '$matched_pattern'.
+  SFG is a write-target guardrail — it catches accidental/naive writes to protected files. If this is a genuine, intended edit to a deliverable, use the sanctioned lift-and-restore procedure in .claude/rules/sfg-deliverable.md. Otherwise, make the write outside Claude Code." >&2
     exit 2
   fi
 done <<< "$FILE_TARGETS"
