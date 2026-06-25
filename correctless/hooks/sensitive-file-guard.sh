@@ -199,6 +199,81 @@ _excise_process_subs() {
   printf '%s' "$out"
 }
 
+# Neutralize shell-operator / separator / comment bytes that are NOT real shell
+# syntax because they sit INSIDE a quoted span or after a word-boundary `#`
+# comment (QA-001/QA-002, INV-001/INV-007/INV-020). Length is PRESERVED byte for
+# byte — only the offending bytes (`> < | & ; #`) are rewritten to a benign
+# filler (`_`); quote characters and every other byte are kept verbatim. This is
+# deliberately scoped to OPERATOR/SEPARATOR *detection*, not destination reading:
+# a quoted redirect/writer DESTINATION (`echo x > ".env"`, `tee ".env"`) keeps
+# its bytes (the inner content has no operators), so downstream destination
+# extraction still resolves it and `_strip_quotes` removes the surrounding
+# quotes at emit time. Only an operator byte that lives *inside* a quoted
+# argument (`echo "a > .env"`) or a comment (`ls foo # > .env`) is masked, so it
+# can never be mistaken for real shell syntax.
+#
+# Quote model (byte-oriented, INV-019):
+#   - A single-quoted span runs from `'` to the next `'` verbatim (no escapes).
+#   - A double-quoted span runs from `"` to the next unescaped `"`; inside it a
+#     backslash escapes the following byte (so `\"` does not close the span).
+#   - Outside any quote, a `#` that starts a word (preceded by start-of-string or
+#     whitespace) begins a comment that runs to end of string. `a#b` is literal.
+_mask_quoted_operators() {
+  local s="$1" out="" n="${#1}" i=0 ch q prev=""
+  while [ "$i" -lt "$n" ]; do
+    ch="${s:$i:1}"
+    case "$ch" in
+      "'"|'"')
+        # Enter a quoted span: copy the opening quote, then mask operator bytes
+        # inside it until the matching close quote.
+        q="$ch"
+        out="$out$ch"; i=$((i + 1))
+        while [ "$i" -lt "$n" ]; do
+          ch="${s:$i:1}"
+          if [ "$q" = '"' ] && [ "$ch" = '\' ] && [ "$((i + 1))" -lt "$n" ]; then
+            # Backslash escape inside double quotes: copy both bytes verbatim,
+            # masking the escaped byte if it is an operator.
+            out="$out$ch"
+            local nb="${s:$((i + 1)):1}"
+            case "$nb" in
+              '>'|'<'|'|'|'&'|';'|'#') out="${out}_" ;;
+              *) out="$out$nb" ;;
+            esac
+            i=$((i + 2)); continue
+          fi
+          if [ "$ch" = "$q" ]; then
+            out="$out$ch"; i=$((i + 1)); break
+          fi
+          case "$ch" in
+            '>'|'<'|'|'|'&'|';'|'#') out="${out}_" ;;
+            *) out="$out$ch" ;;
+          esac
+          i=$((i + 1))
+        done
+        prev="$ch"
+        continue
+        ;;
+      '#')
+        # Comment only at a word boundary (start-of-string or after whitespace).
+        if [ -z "$prev" ] || [ "$prev" = " " ] || [ "$prev" = $'\t' ] || [ "$prev" = $'\n' ]; then
+          # Mask from here to end of string — neutralizes operators/separators in
+          # the comment while preserving length.
+          while [ "$i" -lt "$n" ]; do
+            out="${out}_"; i=$((i + 1))
+          done
+          prev="_"
+          continue
+        fi
+        out="$out$ch"; prev="$ch"; i=$((i + 1)); continue
+        ;;
+      *)
+        out="$out$ch"; prev="$ch"; i=$((i + 1)); continue
+        ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
 # Mask the OPAQUE operand of an interpreter+eval chain or here-string within a
 # single segment string `$1` (INV-005). Returns (on stdout) the segment with:
 #   - the word following a here-string `<<<` replaced by a placeholder, and
@@ -271,6 +346,11 @@ _extract_bash_targets() {
   local cmd seg op rest dest j masked
   local -a tokens
   cmd="$(_excise_process_subs "$COMMAND")"
+  # Neutralize operator/separator/comment bytes that sit INSIDE quoted spans or
+  # comments so they are never mistaken for real shell syntax (QA-001/QA-002).
+  # Length-preserving and quote-preserving — a quoted redirect/writer DESTINATION
+  # (`> ".env"`, `tee ".env"`) survives intact and is dequoted at emit time.
+  cmd="$(_mask_quoted_operators "$cmd")"
 
   # Insert segment-boundary newlines. Walk char-by-char so redirect operators
   # (`&>`, `&>|`, `>&`, `>|`) are preserved while bare `&`/`&&`/`||`/`|`/`;`

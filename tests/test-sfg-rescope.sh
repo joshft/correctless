@@ -896,6 +896,48 @@ test_inv020_per_segment_positional() {
   rm -rf "$test_dir"
 }
 
+# ---------------------------------------------------------------------------
+# QA-001 / QA-002 (round 1): redirect operators and command separators that
+# appear INSIDE a quoted string argument or a word-boundary `#` comment are NOT
+# real redirects/separators — they must NOT produce a write target. The
+# destination-driven model assumes operator detection reflects REAL (unquoted,
+# non-comment) shell syntax; quote/comment-blindness re-introduces AP-040
+# false-block friction through a different door (fails CLOSED, not in the
+# accepted fail-open set). Controls assert that a REAL redirect to a quoted
+# DESTINATION and a quoted writer DESTINATION still block.
+# ---------------------------------------------------------------------------
+test_qa001_quoted_and_comment_operators_not_targets() {
+  echo ""
+  echo "=== QA-001/QA-002: quoted/commented operators are NOT write targets ==="
+
+  # Must ALLOW — the `>`/`>>` is inside a quoted echo/printf ARGUMENT (a read).
+  assert_bash "QA-001: echo \"a > .env\" (quoted operator in arg) ALLOWED" "0" \
+    'echo "a > .env"'
+  assert_bash "QA-001: echo 'x > .env' (single-quoted operator) ALLOWED" "0" \
+    "echo 'x > .env'"
+  assert_bash "QA-001: printf of a string containing >> credentials.json ALLOWED" "0" \
+    'printf "%s\n" "x >> credentials.json"'
+  # Must ALLOW — the `>` is inside a word-boundary `#` comment.
+  assert_bash "QA-001: ls foo # > .env (redirect in comment) ALLOWED" "0" \
+    'ls foo # > .env'
+
+  # QA-002 — separators inside quotes are not segment boundaries.
+  assert_bash "QA-002: echo \"a | tee .env\" (quoted pipe+tee in arg) ALLOWED" "0" \
+    'echo "a | tee .env"'
+  assert_bash "QA-002: echo \"a; rm .env\" (quoted separator in arg) ALLOWED" "0" \
+    'echo "a; rm .env"'
+
+  # Controls — REAL operators must STILL block (the fix must not over-mask).
+  assert_bash "QA-001 control: echo x > .env (real redirect) BLOCKED" "2" \
+    'echo x > .env'
+  assert_bash "QA-001 control: echo x > \".env\" (real redirect, quoted dest) BLOCKED" "2" \
+    'echo x > ".env"'
+  assert_bash "QA-001 control: tee \".env\" (quoted writer dest) BLOCKED" "2" \
+    'tee ".env"'
+  assert_bash "QA-002 control: echo x | tee .env (real pipe+tee) BLOCKED" "2" \
+    'echo x | tee .env'
+}
+
 # ===========================================================================
 # Run
 # ===========================================================================
@@ -926,6 +968,7 @@ test_inv018_structural_class_coverage
 test_inv019_lc_all_c_structural
 test_inv019_cross_locale_behavioral
 test_inv020_per_segment_positional
+test_qa001_quoted_and_comment_operators_not_targets
 
 echo ""
 echo "=== Summary ==="
