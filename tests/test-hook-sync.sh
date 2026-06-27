@@ -451,13 +451,17 @@ test_inv005_hooks_use_shared_functions() {
     FAIL=$((FAIL + 1))
   fi
 
+  # INV-005 (sfg-edit-write-only): SFG no longer calls _has_write_pattern — its
+  # only call site was the deleted Bash extraction branch. workflow-gate.sh still
+  # consumes _has_write_pattern independently (asserted above). Inverted from
+  # `-gt 0` to `-eq 0`. RED: the #205 hook still calls _has_write_pattern.
   local sfg_calls_fn
   sfg_calls_fn="$(grep -c '_has_write_pattern ' "$REPO_DIR/hooks/sensitive-file-guard.sh" 2>/dev/null)" || sfg_calls_fn="0"
-  if [ "$sfg_calls_fn" -gt 0 ]; then
-    echo "  PASS: INV-005: sensitive-file-guard.sh calls _has_write_pattern"
+  if [ "$sfg_calls_fn" -eq 0 ]; then
+    echo "  PASS: INV-005: sensitive-file-guard.sh no longer calls _has_write_pattern (Bash path removed)"
     PASS=$((PASS + 1))
   else
-    echo "  FAIL: INV-005: sensitive-file-guard.sh does not call _has_write_pattern"
+    echo "  FAIL: INV-005: sensitive-file-guard.sh still calls _has_write_pattern ($sfg_calls_fn call(s))"
     FAIL=$((FAIL + 1))
   fi
 
@@ -713,19 +717,28 @@ test_qa002_sensitive_guard_edit_without_lib() {
 }
 EOF
 
-  # All tool types now fail-closed when lib.sh (and thus canonicalize_path) is missing
+  # Edit/Write tool types fail-closed when lib.sh (and thus canonicalize_path)
+  # is missing (INV-005a). The Bash-write case is REMOVED (sfg-edit-write-only):
+  # Bash now fast-path exits 0 BEFORE sourcing lib.sh, so it never reaches the
+  # lib.sh-missing fail-closed branch — asserting exit 2 for Bash would FAIL the
+  # suite post-GREEN. The Edit/Write fail-closed cases are retained.
   local json_input exit_code stderr_out
   for case in \
     'Edit-nonsensitive:{"tool_name":"Edit","tool_input":{"file_path":"src/app.ts","old_string":"old","new_string":"new"}}' \
     'Write-nonsensitive:{"tool_name":"Write","tool_input":{"file_path":"src/utils.ts","content":"export {}"}}' \
-    'Edit-sensitive:{"tool_name":"Edit","tool_input":{"file_path":".env","old_string":"old","new_string":"new"}}' \
-    'Bash-write:{"tool_name":"Bash","tool_input":{"command":"cp a.ts b.ts"}}'
+    'Edit-sensitive:{"tool_name":"Edit","tool_input":{"file_path":".env","old_string":"old","new_string":"new"}}'
   do
     local tag="${case%%:*}"
     json_input="${case#*:}"
     stderr_out="$(echo "$json_input" | bash hooks/sensitive-file-guard.sh 2>&1 >/dev/null)" && exit_code=0 || exit_code=$?
     assert_exit_code "QA-002/${tag}: exits 2 without lib.sh (INV-005a fail-closed)" "2" "$exit_code"
   done
+
+  # INV-001 (sfg-edit-write-only): a Bash command with lib.sh missing still
+  # exits 0 — Bash is fast-path-allowed before lib.sh is even sourced.
+  # RED: against the #205 hook this Bash command exits 2 (over-extractor fires).
+  stderr_out="$(echo '{"tool_name":"Bash","tool_input":{"command":"cp a.ts b.ts"}}' | bash hooks/sensitive-file-guard.sh 2>&1 >/dev/null)" && exit_code=0 || exit_code=$?
+  assert_exit_code "QA-002/Bash-write: exits 0 (Bash fast-path, never inspected)" "0" "$exit_code"
 
   # Verify the remediation message is clear (INV-005a message contract)
   json_input='{"tool_name":"Edit","tool_input":{"file_path":"src/app.ts","old_string":"a","new_string":"b"}}'

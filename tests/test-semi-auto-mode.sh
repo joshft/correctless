@@ -812,9 +812,14 @@ test_r019_preferences_in_sensitive_guard() {
   result="$(run_sfg_hook '{"tool_name":"Edit","tool_input":{"file_path":".correctless/preferences.md","old_string":"a","new_string":"b"}}')"
   assert_eq "R-019: Edit to .correctless/preferences.md is blocked" "2" "$result"
 
-  # R-019: hook blocks Bash writes to .correctless/preferences.md
+  # INV-001 (sfg-edit-write-only): the Bash-redirect leg for preferences.md is
+  # REMOVED. TB-001b's preferences.md->eval (RCE-adjacent) is the highest-
+  # consequence Class-B file, but the residual is accepted (PMB-020/AP-040: the
+  # Bash leg was always evadable via an interpreter; the surviving Edit/Write leg
+  # blocks the agent's direct tool-call forge; preferences.md is owner-scaffolded
+  # + human-approved). This INVERTS exit 2 -> exit 0. RED: exits 2 against #205.
   result="$(run_sfg_hook '{"tool_name":"Bash","tool_input":{"command":"cat data > .correctless/preferences.md"}}')"
-  assert_eq "R-019: Bash redirect to .correctless/preferences.md is blocked" "2" "$result"
+  assert_eq "INV-001: Bash redirect to .correctless/preferences.md ALLOWED (Bash never inspected)" "0" "$result"
 
   # R-019: negative test — docs/preferences.md should NOT be blocked (path-qualified pattern)
   result="$(run_sfg_hook '{"tool_name":"Write","tool_input":{"file_path":"docs/preferences.md","content":"test"}}')"

@@ -802,7 +802,14 @@ test_inv009_install_mirror_protected() {
   fi
 }
 
-test_inv009_writer_script_protected_bash_redirects() {
+# NOTE (sfg-edit-write-only, 2026-06): SFG no longer inspects Bash commands at
+# all (INV-001). The Bash-redirect/tee block of audit-record.sh was removed as an
+# accepted residual — audit-record.sh is ABS-029 Tier-1, whose cmd_audit_done
+# content gate detects a forged out-of-band write at the next transition, so the
+# SFG Bash-block was redundant for detection. The Edit/Write tool-path block
+# (test_inv009...edit_mirror above) is RETAINED. These two functions are inverted
+# from the old exit-2 contract to assert the new exit-0 (Bash-never-blocked) one.
+test_inv009_writer_script_bash_not_inspected() {
   local fail_count=0
   for cmd in \
     'echo x > scripts/audit-record.sh' \
@@ -814,27 +821,27 @@ test_inv009_writer_script_protected_bash_redirects() {
     json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
     local rc
     rc=$(echo "$json" | bash "$SENSITIVE_GUARD" >/dev/null 2>&1; echo $?)
-    if [ "$rc" != "2" ]; then
+    if [ "$rc" != "0" ]; then
       fail_count=$((fail_count + 1))
-      echo "  INV-009: '$cmd' not blocked (exit=$rc)" >&2
+      echo "  INV-009: Bash '$cmd' unexpectedly inspected/blocked (exit=$rc)" >&2
     fi
   done
   if [ "$fail_count" -eq 0 ]; then
-    pass "INV-009-redirects" "all 5 redirect forms blocked"
+    pass "INV-009-redirects" "Bash redirects no longer inspected (all 5 exit 0; cmd_audit_done gate covers integrity)"
   else
-    fail "INV-009-redirects" "$fail_count of 5 redirect forms unblocked"
+    fail "INV-009-redirects" "$fail_count of 5 redirect forms still blocked (SFG must not inspect Bash)"
   fi
 }
 
-test_inv009_writer_script_protected_tee() {
+test_inv009_writer_script_tee_not_inspected() {
   local cmd='cat src | tee scripts/audit-record.sh'
   local json rc
   json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
   rc=$(echo "$json" | bash "$SENSITIVE_GUARD" >/dev/null 2>&1; echo $?)
-  if [ "$rc" = "2" ]; then
-    pass "INV-009-tee" "tee write to scripts/audit-record.sh blocked"
+  if [ "$rc" = "0" ]; then
+    pass "INV-009-tee" "Bash tee to scripts/audit-record.sh no longer inspected (exit 0)"
   else
-    fail "INV-009-tee" "tee write not blocked (exit=$rc)"
+    fail "INV-009-tee" "tee still blocked (exit=$rc); SFG must not inspect Bash"
   fi
 }
 
@@ -1083,8 +1090,8 @@ test_inv008_override_bypasses_with_log_entry
 test_inv009_writer_script_in_defaults
 test_inv009_writer_script_protected_edit
 test_inv009_install_mirror_protected
-test_inv009_writer_script_protected_bash_redirects
-test_inv009_writer_script_protected_tee
+test_inv009_writer_script_bash_not_inspected
+test_inv009_writer_script_tee_not_inspected
 test_prh001_only_caudit_writes
 test_prh002_no_escape_hatch
 test_prh003_path_construction_isolated
