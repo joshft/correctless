@@ -273,14 +273,14 @@ Correctless hooks into Claude Code's infrastructure for real-time feedback and l
 ```mermaid
 graph TB
     subgraph "Claude Code Hooks"
-        A["PreToolUse"] --> H["sensitive-file-guard.sh<br/>Write-target guardrail"]
+        A["PreToolUse"] --> H["sensitive-file-guard.sh<br/>Edit/Write tool-path guard"]
         A --> B["workflow-gate.sh<br/>Phase enforcement"]
         C["PostToolUse"] --> D["audit-trail.sh<br/>Adherence feedback"]
         C --> G["auto-format.sh<br/>Auto-formatting"]
         E["Statusline"] --> F["statusline.sh<br/>Phase + cost + context"]
     end
 
-    H -->|"block/allow"| M[".env, keys, credentials"]
+    H -->|"block/allow Edit/Write only"| M[".env, keys, credentials<br/>(Bash writes unguarded)"]
     B -->|"block/allow"| I["Every file edit"]
     D -->|"alerts"| J["Real-time violations"]
     G -->|"formats"| L["Edited files"]
@@ -295,7 +295,7 @@ graph TB
 
 | Hook | Runs | Purpose |
 |------|------|---------|
-| **sensitive-file-guard.sh** | Before every Edit/Write and write-pattern Bash command | Write-target guardrail: blocks Edit/Write and direct redirect/writer-command writes (`>`, `tee`, `cp`, `mv`, `sed -i`, …) to `.env`, credentials, keys, certificates. Catches accidental/naive writes; interpreter/git-mediated out-of-band writes are accepted non-goals (AP-040). The input-parse path fails closed; the write-target extraction path fails open on ambiguity |
+| **sensitive-file-guard.sh** | Before every Edit/Write tool call (Bash is never inspected) | Edit/Write tool-path guardrail: blocks `Edit`/`Write`/`MultiEdit`/`NotebookEdit`/`CreateFile` writes to `.env`, credentials, keys, certificates. Catches accidental/naive Edit/Write tool calls; ALL Bash-mediated writes (redirects, writer commands, interpreters, git) are unguarded accepted non-goals (AP-040). The input-parse path fails closed; an unparsable `custom_patterns` config degrades to DEFAULTS-only matching (never fully open) |
 | **workflow-gate.sh** | Before every file edit | Blocks writes that violate the current phase (RED blocks source, QA blocks everything) |
 | **audit-trail.sh** | After every tool call | Logs modifications with phase context, alerts on violations |
 | **token-tracking.sh** | After Agent tool completion | Logs subagent token usage, cost, and duration to JSONL for `/cmetrics` analysis |

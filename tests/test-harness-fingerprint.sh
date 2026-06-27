@@ -1006,35 +1006,40 @@ test_prh002_structural_enforcement() {
     fail "PRH-002d" "test-sensitive-file-guard.sh missing model-baselines.json case"
   fi
 
-  # Live invocation: feed guard a Bash-redirect command targeting both files; must block
+  # INV-001 (sfg-edit-write-only): the Bash-redirect leg is REMOVED. The
+  # harness-fingerprint.json / model-baselines.json Bash-block was ABS-027's only
+  # structural leg against out-of-band writes (Tier 3) — the residual downgrade
+  # is accepted; the surviving leg is the Edit/Write tool-path (PRH-002h below)
+  # plus the advisory fingerprint. These INVERT exit 2 -> exit 0.
+  # RED: each exits 2 against the #205 hook.
   if [ -f "$GUARD" ]; then
     local out code
     out=$(echo '{"tool_name":"Bash","tool_input":{"command":"echo X > .correctless/meta/harness-fingerprint.json"}}' | bash "$GUARD" 2>&1; echo "EXIT=$?")
     code=$(echo "$out" | grep '^EXIT=' | sed 's/^EXIT=//')
-    if [ "$code" = "2" ]; then
-      pass "PRH-002e" "live: Bash redirect to fingerprint file is blocked (exit 2)"
+    if [ "$code" = "0" ]; then
+      pass "PRH-002e" "live: Bash redirect to fingerprint file ALLOWED (exit 0; Bash never inspected)"
     else
-      fail "PRH-002e" "live: Bash redirect to fingerprint file exited $code (expected 2)"
+      fail "PRH-002e" "live: Bash redirect to fingerprint file exited $code (expected 0)"
     fi
 
     out=$(echo '{"tool_name":"Bash","tool_input":{"command":"echo X > .correctless/meta/model-baselines.json"}}' | bash "$GUARD" 2>&1; echo "EXIT=$?")
     code=$(echo "$out" | grep '^EXIT=' | sed 's/^EXIT=//')
-    if [ "$code" = "2" ]; then
-      pass "PRH-002f" "live: Bash redirect to baseline file is blocked (exit 2)"
+    if [ "$code" = "0" ]; then
+      pass "PRH-002f" "live: Bash redirect to baseline file ALLOWED (exit 0; Bash never inspected)"
     else
-      fail "PRH-002f" "live: Bash redirect to baseline file exited $code (expected 2)"
+      fail "PRH-002f" "live: Bash redirect to baseline file exited $code (expected 0)"
     fi
 
     # tee variant
     out=$(echo '{"tool_name":"Bash","tool_input":{"command":"echo X | tee .correctless/meta/harness-fingerprint.json"}}' | bash "$GUARD" 2>&1; echo "EXIT=$?")
     code=$(echo "$out" | grep '^EXIT=' | sed 's/^EXIT=//')
-    if [ "$code" = "2" ]; then
-      pass "PRH-002g" "live: Bash tee to fingerprint file is blocked"
+    if [ "$code" = "0" ]; then
+      pass "PRH-002g" "live: Bash tee to fingerprint file ALLOWED (exit 0; Bash never inspected)"
     else
-      fail "PRH-002g" "live: Bash tee to fingerprint file exited $code (expected 2)"
+      fail "PRH-002g" "live: Bash tee to fingerprint file exited $code (expected 0)"
     fi
 
-    # Edit variant
+    # Edit variant — STILL blocked (retained Edit/Write leg, INV-002).
     out=$(echo '{"tool_name":"Edit","tool_input":{"file_path":".correctless/meta/model-baselines.json","old_string":"a","new_string":"b"}}' | bash "$GUARD" 2>&1; echo "EXIT=$?")
     code=$(echo "$out" | grep '^EXIT=' | sed 's/^EXIT=//')
     if [ "$code" = "2" ]; then

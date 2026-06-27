@@ -148,57 +148,58 @@ test_inv001_block_write_tools_on_sensitive_files() {
 }
 
 # ---------------------------------------------------------------------------
-# INV-002: Block Bash write commands to sensitive files
+# INV-001 (sfg-edit-write-only): Bash commands are NEVER inspected or blocked.
+# Every former-must-block Bash redirect/writer-command envelope now exits 0.
+# Inverted wholesale from the old "INV-002: Block Bash write commands" test —
+# SFG is now a pure Edit/Write tool-path guard; the Bash extraction path is
+# deleted. RED precondition: each command exits 2 against the #205 hook.
 # ---------------------------------------------------------------------------
 
-test_inv002_block_bash_writes_to_sensitive_files() {
+test_inv001_bash_never_blocked_to_sensitive_files() {
   echo ""
-  echo "=== INV-002: Block Bash write commands to sensitive files ==="
+  echo "=== INV-001 (sfg-edit-write-only): Bash write commands to sensitive files now ALLOWED ==="
 
-  local test_dir="/tmp/correctless-sfg-inv002-$$"
+  local test_dir="/tmp/correctless-sfg-inv001bash-$$"
   setup_test_env "$test_dir"
   cd "$test_dir" || return
 
   local result
 
-  # cat x > .env -> exit 2
+  # cat x > .env -> now exit 0 (Bash never inspected)
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cat creds.txt > .env"}}')"
-  assert_eq "INV-002: cat redirect to .env blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: cat redirect to .env ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
-  # RS-016 (sfg-rescope): cp .env backup -> exit 0. SFG is a WRITE guard, not an
-  # egress guard. `.env` here is the SOURCE (a read); the destination is the
-  # non-protected backup.txt. redact-secrets.sh owns egress, not SFG (STRIDE
-  # Information disclosure / DD-7). Inverted from exit 2.
+  # cp .env backup -> exit 0 (source read; always was allowed post-#205)
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp .env backup.txt"}}')"
-  assert_eq "RS-016: cp .env backup.txt (source read) ALLOWED" "0" "$(extract_exit "$result")"
+  assert_eq "INV-001: cp .env backup.txt ALLOWED" "0" "$(extract_exit "$result")"
 
-  # mv .env .env.bak -> exit 2
+  # mv .env .env.bak -> now exit 0
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"mv .env .env.bak"}}')"
-  assert_eq "INV-002: mv .env blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: mv .env ALLOWED" "0" "$(extract_exit "$result")"
 
-  # tee .env -> exit 2
+  # tee .env -> now exit 0
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x | tee .env"}}')"
-  assert_eq "INV-002: tee .env blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: tee .env ALLOWED" "0" "$(extract_exit "$result")"
 
-  # echo x >> .env -> exit 2
+  # echo x >> .env -> now exit 0
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo secret >> .env"}}')"
-  assert_eq "INV-002: echo append to .env blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: echo append to .env ALLOWED" "0" "$(extract_exit "$result")"
 
-  # sed -i on .env -> exit 2
+  # sed -i on .env -> now exit 0
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"sed -i s/old/new/ .env"}}')"
-  assert_eq "INV-002: sed -i .env blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: sed -i .env ALLOWED" "0" "$(extract_exit "$result")"
 
-  # Negative: Bash write to non-sensitive file -> exit 0
+  # Non-sensitive Bash write -> exit 0 (unchanged)
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cat data > output.txt"}}')"
-  assert_eq "INV-002: cat > output.txt allowed (non-sensitive)" "0" "$(extract_exit "$result")"
+  assert_eq "INV-001: cat > output.txt allowed (non-sensitive)" "0" "$(extract_exit "$result")"
 
-  # Negative: cp between non-sensitive files -> exit 0
+  # cp between non-sensitive files -> exit 0 (unchanged)
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp src/old.ts src/new.ts"}}')"
-  assert_eq "INV-002: cp non-sensitive files allowed" "0" "$(extract_exit "$result")"
+  assert_eq "INV-001: cp non-sensitive files allowed" "0" "$(extract_exit "$result")"
 
-  # Wildcard-matched sensitive: cat > api.secret -> exit 2
+  # Wildcard-matched sensitive via Bash: cat > api.secret -> now exit 0
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cat data > api.secret"}}')"
-  assert_eq "INV-002: cat > api.secret blocked (matches *.secret)" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: cat > api.secret ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
   rm -rf "$test_dir"
 }
@@ -733,25 +734,23 @@ test_bnd004_bash_multiple_targets() {
 
   local result
 
-  # RS-016 (sfg-rescope): cp .env .env.backup -> exit 2, but because the
-  # DESTINATION `.env.backup` matches `.env.*` (a protected write target), NOT
-  # because `.env` is the source. The source `.env` is a read and is no longer a
-  # block reason post-rescope. Use a non-protected destination to prove
-  # source-read is allowed:
+  # INV-001 (sfg-edit-write-only): Bash is never inspected. A protected source
+  # OR a protected destination in a Bash command both now exit 0. Inverted from
+  # the old destination-protected exit-2 assertions.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp .env /tmp/plain-backup.txt"}}')"
-  assert_eq "RS-016: cp .env <non-protected dest> ALLOWED (source read)" "0" "$(extract_exit "$result")"
+  assert_eq "INV-001: cp .env <non-protected dest> ALLOWED (source read)" "0" "$(extract_exit "$result")"
 
-  # Destination-is-protected still blocks (cp final positional = destination):
+  # Destination-is-protected: now ALLOWED (Bash never inspected).
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp plain.txt .env.backup"}}')"
-  assert_eq "BND-004: cp <src> .env.backup blocked (destination protected)" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: cp <src> .env.backup ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
-  # cat file1 > .env -> exit 2 (destination is protected)
+  # cat file1 > .env -> now exit 0 (Bash never inspected)
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cat file1 > .env"}}')"
-  assert_eq "BND-004: cat redirect to .env blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: cat redirect to .env ALLOWED" "0" "$(extract_exit "$result")"
 
-  # cp normal.txt .env -> exit 2 (destination is protected)
+  # cp normal.txt .env -> now exit 0 (Bash never inspected)
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp normal.txt .env"}}')"
-  assert_eq "BND-004: cp to .env dest blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: cp to .env dest ALLOWED" "0" "$(extract_exit "$result")"
 
   rm -rf "$test_dir"
 }
@@ -770,9 +769,10 @@ test_qa001_chained_inline_redirects() {
 
   local result
 
-  # echo a>/dev/null; echo secret>.env — second redirect targets .env
+  # INV-001 (sfg-edit-write-only): chained inline redirect to .env now ALLOWED
+  # (Bash never inspected). Inverted from exit 2.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo a>/dev/null; echo secret>.env"}}')"
-  assert_eq "QA-001: chained inline redirect echo a>/dev/null; echo secret>.env blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: chained inline redirect echo a>/dev/null; echo secret>.env ALLOWED" "0" "$(extract_exit "$result")"
 
   rm -rf "$test_dir"
 }
@@ -821,9 +821,10 @@ test_qa003_bare_redirect_at_start() {
 
   local result
 
-  # > .env at command start
+  # INV-001 (sfg-edit-write-only): bare redirect to .env now ALLOWED (Bash never
+  # inspected). Inverted from exit 2.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"> .env"}}')"
-  assert_eq "QA-003: bare redirect > .env blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: bare redirect > .env ALLOWED" "0" "$(extract_exit "$result")"
 
   rm -rf "$test_dir"
 }
@@ -977,13 +978,13 @@ test_qa006_quoted_filenames_in_bash() {
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"cp \".env\" backup.txt"}}')"
   assert_eq "QA-006: cp \".env\" source-read ALLOWED (double-quoted, RS-016)" "0" "$(extract_exit "$result")"
 
-  # Single-quoted .env in redirect -> exit 2
+  # INV-001 (sfg-edit-write-only): single-quoted .env redirect now ALLOWED.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo secret > '"'"'.env'"'"'"}}')"
-  assert_eq "QA-006: echo > '.env' blocked (single-quoted)" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: echo > '.env' ALLOWED (single-quoted, Bash never inspected)" "0" "$(extract_exit "$result")"
 
-  # Double-quoted inline redirect -> exit 2
+  # INV-001: double-quoted inline redirect now ALLOWED.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo secret>\".env\""}}')"
-  assert_eq "QA-006: echo>\".env\" blocked (inline double-quoted)" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: echo>\".env\" ALLOWED (inline double-quoted, Bash never inspected)" "0" "$(extract_exit "$result")"
 
   rm -rf "$test_dir"
 }
@@ -997,7 +998,7 @@ echo "Hook: $HOOK"
 echo ""
 
 test_inv001_block_write_tools_on_sensitive_files
-test_inv002_block_bash_writes_to_sensitive_files
+test_inv001_bash_never_blocked_to_sensitive_files
 test_inv003_allow_read_operations
 test_inv004_defaults_without_config
 test_inv005_custom_patterns
@@ -1036,6 +1037,60 @@ test_da003_fail_closed_on_jq_failure() {
 }
 
 # ===========================================================================
+# MA-R2-H1: Fail-closed on non-string / absent tool_name
+#
+# A non-scalar-string tool_name (array/object/number/null) or an ABSENT
+# tool_name is unexpected input. The hook's jq filter raises error("non-string
+# tool_name"), $_PARSED is empty, and the STEP-2 fail-closed guard exits 2
+# (INV-006 / PAT-001 clause 5: on unexpected input, exit 2 — never exit 0, and
+# never crash with exit 127 from `eval` running an @sh-rendered multi-token
+# array as a command). file_path is likewise coerced to a scalar; an
+# array-valued file_path must not crash the hook.
+# ===========================================================================
+
+test_ma_r2_h1_fail_closed_on_non_string_tool_name() {
+  echo ""
+  echo "=== MA-R2-H1: Fail-closed (exit 2) on non-string / absent tool_name (INV-006 / PAT-001 clause 5) ==="
+
+  local result
+
+  # tool_name as ARRAY — must NOT exit 0, must NOT crash (127); exit 2.
+  result="$(run_hook_capture '{"tool_name":["foo","Edit"],"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: array tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # tool_name as OBJECT.
+  result="$(run_hook_capture '{"tool_name":{"x":"Edit"},"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: object tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # tool_name as NUMBER.
+  result="$(run_hook_capture '{"tool_name":123,"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: number tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # tool_name as NULL.
+  result="$(run_hook_capture '{"tool_name":null,"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: null tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # tool_name ABSENT (no key at all).
+  result="$(run_hook_capture '{"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: absent tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # A Write with an ARRAY-valued file_path must NOT crash (exit 0 or 2, never
+  # 127). tool_name is a valid string, so the array file_path is coerced to ""
+  # by the jq guard and yields no protected match → allowed (exit 0). The
+  # critical assertion is "not 127".
+  result="$(run_hook_capture '{"tool_name":"Write","tool_input":{"file_path":[".env"]}}')"
+  local fp_exit
+  fp_exit="$(extract_exit "$result")"
+  if [ "$fp_exit" = "0" ] || [ "$fp_exit" = "2" ]; then
+    echo "  PASS: MA-R2-H1: array file_path does not crash (exit $fp_exit, never 127)"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: MA-R2-H1: array file_path crashed or misbehaved (expected 0 or 2, got '$fp_exit')"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# ===========================================================================
 # DA-004: Hook allowlist sync — deterministic check
 # ===========================================================================
 
@@ -1068,6 +1123,7 @@ test_da004_hook_allowlist_sync() {
 }
 
 test_da003_fail_closed_on_jq_failure
+test_ma_r2_h1_fail_closed_on_non_string_tool_name
 test_da004_hook_allowlist_sync
 
 # ---------------------------------------------------------------------------
@@ -1091,17 +1147,18 @@ test_hf002_harness_meta_protection() {
   result="$(run_hook_capture '{"tool_name":"Write","tool_input":{"file_path":".correctless/meta/model-baselines.json","content":"x"}}')"
   assert_eq "HF-002: Write model-baselines.json blocked" "2" "$(extract_exit "$result")"
 
-  # Bash redirect to harness-fingerprint.json blocked
+  # INV-001/ABS-027 (sfg-edit-write-only): the Bash-redirect leg for the meta
+  # files is REMOVED — accepted residual downgrade (Tier 3, no cmd_* gate).
+  # These INVERT exit 2 -> exit 0. The Edit/Write arms above remain the only
+  # structural protection.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x > .correctless/meta/harness-fingerprint.json"}}')"
-  assert_eq "HF-002: redirect > harness-fingerprint.json blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: redirect > harness-fingerprint.json ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
-  # Bash tee on model-baselines.json blocked
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x | tee .correctless/meta/model-baselines.json"}}')"
-  assert_eq "HF-002: tee model-baselines.json blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: tee model-baselines.json ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
-  # Append redirect blocked
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x >> .correctless/meta/harness-fingerprint.json"}}')"
-  assert_eq "HF-002: append >> harness-fingerprint.json blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: append >> harness-fingerprint.json ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
   rm -rf "$test_dir"
 }
@@ -1148,17 +1205,17 @@ test_abs030_autonomous_decisions_protection() {
   result="$(run_hook_capture '{"tool_name":"Write","tool_input":{"file_path":".correctless/artifacts/autonomous-decisions-test.jsonl","content":"{}"}}')"
   assert_eq "ABS-030: Write autonomous-decisions-test.jsonl blocked" "2" "$(extract_exit "$result")"
 
-  # Bash redirect to autonomous-decisions-*.jsonl blocked
+  # INV-001/ABS-030 (sfg-edit-write-only): the Bash-redirect leg for the JSONL
+  # is REMOVED — accepted residual downgrade (Tier 2, no cmd_* gate; surviving
+  # leg is the advisory R-013 growth check). These INVERT exit 2 -> exit 0.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x > .correctless/artifacts/autonomous-decisions-test.jsonl"}}')"
-  assert_eq "ABS-030: redirect > autonomous-decisions-test.jsonl blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: redirect > autonomous-decisions-test.jsonl ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
-  # Bash tee on autonomous-decisions-*.jsonl blocked
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x | tee .correctless/artifacts/autonomous-decisions-test.jsonl"}}')"
-  assert_eq "ABS-030: tee autonomous-decisions-test.jsonl blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: tee autonomous-decisions-test.jsonl ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
-  # Append redirect blocked
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x >> .correctless/artifacts/autonomous-decisions-test.jsonl"}}')"
-  assert_eq "ABS-030: append >> autonomous-decisions-test.jsonl blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: append >> autonomous-decisions-test.jsonl ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
   rm -rf "$test_dir"
 }
@@ -1242,9 +1299,11 @@ test_inv005_traversal_encoded_blocks() {
   result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":"subdir//.env","old_string":"a","new_string":"b"}}')"
   assert_eq "INV-005: Edit subdir//.env blocked" "2" "$(extract_exit "$result")"
 
-  # Bash redirect with traversal-encoded target
+  # INV-001 (sfg-edit-write-only): Bash redirect with a traversal-encoded
+  # protected target now ALLOWED (Bash never inspected). Inverted from exit 2.
+  # The Edit traversal cases above remain blocked (canonical matching preserved).
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo secret > subdir/../.env"}}')"
-  assert_eq "INV-005: Bash > subdir/../.env blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: Bash > subdir/../.env ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
   rm -rf "$test_dir"
 }
@@ -1348,77 +1407,42 @@ test_inv006_over_extract_blocks_bypasses() {
     assert_eq "INV-005/${tag}: eval/interpreter payload -> ALLOWED" "0" "$(extract_exit "$result")"
   done
 
-  # Genuine perl -i / -pi writers — STAY blocked (INV-003, RS-001).
-  local -a still_blocked=(
+  # INV-001 (sfg-edit-write-only): the former perl -i / -pi "still-blocked"
+  # writers now ALLOW — Bash is never inspected at all. Inverted exit 2 -> 0.
+  local -a now_allowed_writers=(
     'perl-i:perl -i -pe "s/foo/bar/" .env'
     'perl-pi:perl -pi -e "s/x/y/" .env'
   )
-  for row in "${still_blocked[@]}"; do
+  for row in "${now_allowed_writers[@]}"; do
     tag="${row%%:*}"
     cmd="${row#*:}"
     json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
     result="$(run_hook_capture "$json")"
-    assert_eq "INV-003/${tag}: perl -i writer -> BLOCKED" "2" "$(extract_exit "$result")"
+    assert_eq "INV-001/${tag}: perl -i writer -> ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
   done
 
   rm -rf "$test_dir"
 }
 
 # ---------------------------------------------------------------------------
-# PRH-001 (sfg-rescope) [structural TRIPWIRE] — MUST-REWRITE of the old
-# INV-006a disallowed-branches test. INV-003 now REQUIRES cp)/mv)/tee)/sed)/perl)
-# writer branches, so the old "ban these case branches" assertion is INVERTED.
-#
-# Per PRH-001 detection (behavior is the proof): the behavioral corpora
-# (INV-001, INV-017 Half-A) are the real guard — they assert exit 0 and would
-# over-extract/block if an unconditional token-emit branch existed. This
-# structural grep is a LABELED TRIPWIRE only: it extracts the rewritten
-# `case "$tok"` block and asserts its `*)` default arm does NOT emit `$tok`
-# (no `_strip_quotes "$tok"` / `echo "$tok"` / `printf … "$tok"` in the default
-# arm). The whole-corpus behavior is the contract; this is a fast smoke signal.
+# (sfg-edit-write-only) DELETED: the old INV-006a `_extract_bash_targets`
+# body-awk tripwire (`test_inv006a_disallowed_branches_enumerated`). The
+# function it inspected is deleted (INV-005), so a test that awks its body and
+# hard-fails when absent cannot be inverted — it is removed. INV-005's "no
+# helper defined" structural grep (test_inv005_extraction_path_removed)
+# replaces it.
 # ---------------------------------------------------------------------------
-test_inv006a_disallowed_branches_enumerated() {
-  echo ""
-  echo "=== PRH-001 (sfg-rescope) [structural TRIPWIRE]: no extract-every-token default arm ==="
-
-  local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
-  local body
-  body="$(awk '
-    /^_extract_bash_targets[[:space:]]*\(\)[[:space:]]*\{?$/,/^\}$/
-  ' "$guard")"
-  if [ -z "$body" ]; then
-    fail "PRH-001" "cannot locate _extract_bash_targets body"
-    return
-  fi
-
-  # TRIPWIRE 1: the abolished PRH-001 over-extractor signature must be gone.
-  # The over-extractor's tell is a BARE per-token emit of the loop variable
-  # `$tok` (`*) ... _strip_quotes "$tok"`). A destination-driven rewrite emits
-  # only redirect/writer destinations (`${tokens[...]}`, `$dest`, `$sub`), never
-  # the raw catch-all token. We scan the WHOLE extractor body (not just the `*)`
-  # arm, whose nested inner `case` `;;` truncates a naive arm-extractor) for an
-  # emit of "$tok" via _strip_quotes / echo / printf.
-  local violations=0
-  if printf '%s\n' "$body" | grep -v '^[[:space:]]*#' \
-       | grep -Eq '(_strip_quotes|echo|printf)[^#]*"\$tok"'; then
-    violations=$((violations + 1))
-    echo "  PRH-001: bare \$tok emit present (extract-every-token reintroduced)" >&2
-  fi
-
-  if [ "$violations" -eq 0 ]; then
-    pass "PRH-001" "no unconditional token-emit in the *) default arm (tripwire green; behavior is the proof)"
-  else
-    fail "PRH-001" "extract-every-token default branch reintroduced ($violations)"
-  fi
-}
 
 # ---------------------------------------------------------------------------
-# INV-007 [integration]: redirect detection covers all 5 operators in both
-# whitespace-separated and inline-attached forms.
+# INV-001 (sfg-edit-write-only) [integration] — INVERTED from the old INV-007
+# "redirect forms blocked". Every redirect operator form against a protected
+# path now ALLOWS (exit 0) because Bash is never inspected. The whole-operator
+# corpus is retained as a regression guard that no redirect form re-introduces
+# a block.
 # ---------------------------------------------------------------------------
 test_inv007_redirect_blocks_integration() {
   echo ""
-  echo "=== INV-007 [integration]: redirect forms blocked ==="
+  echo "=== INV-001 (sfg-edit-write-only) [integration]: redirect forms now ALLOWED ==="
 
   local test_dir="/tmp/correctless-sfg-inv007-$$"
   setup_test_env "$test_dir"
@@ -1439,7 +1463,7 @@ test_inv007_redirect_blocks_integration() {
     local json
     json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
     result="$(run_hook_capture "$json")"
-    assert_eq "INV-007: '$cmd' blocked" "2" "$(extract_exit "$result")"
+    assert_eq "INV-001: '$cmd' ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
   done
 
   rm -rf "$test_dir"
@@ -1560,66 +1584,30 @@ test_inv013_interpreter_chains_blocked() {
     assert_eq "INV-005/${tag}: interpreter eval operand opaque -> ALLOWED" "0" "$(extract_exit "$result")"
   done
 
-  # perl -i / perl -pi are WRITERS (RS-001) — STAY blocked (exit 2).
-  local -a writers=(
+  # INV-001 (sfg-edit-write-only): the former perl -i / perl -pi "writer" rows
+  # now ALLOW too — Bash is never inspected. Inverted exit 2 -> 0.
+  local -a now_allowed=(
     'perl-pi:perl -pi -e "s/foo/bar/" .env'
     'perl-i:perl -i -e 1 .env'
     'env-perl-pi:/usr/bin/env perl -pi -e "s/x/y/" .env'
   )
-  for row in "${writers[@]}"; do
+  for row in "${now_allowed[@]}"; do
     tag="${row%%:*}"
     cmd="${row#*:}"
     json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
     result="$(run_hook_capture "$json")"
-    assert_eq "INV-003/${tag}: perl -i is a writer -> BLOCKED" "2" "$(extract_exit "$result")"
+    assert_eq "INV-001/${tag}: perl -i ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
   done
 
   rm -rf "$test_dir"
 }
 
 # ---------------------------------------------------------------------------
-# PRH-005 [structural]: no recursion / no eval / no IFS shift inside
-# _extract_bash_targets body.
+# (sfg-edit-write-only) DELETED: the old PRH-005 `_extract_bash_targets`
+# body-awk structural test (`test_prh005_no_extractor_recursion`). The
+# extractor is deleted (INV-005); a body-awk test that hard-fails when the
+# function is absent cannot be inverted — it is removed.
 # ---------------------------------------------------------------------------
-test_prh005_no_extractor_recursion() {
-  echo ""
-  echo "=== PRH-005 [structural]: extractor body has no recursion / eval / IFS shift ==="
-
-  local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
-  local body
-  body="$(awk '
-    /^_extract_bash_targets[[:space:]]*\(\)[[:space:]]*\{?$/,/^\}$/
-  ' "$guard")"
-  if [ -z "$body" ]; then
-    fail "PRH-005" "cannot locate _extract_bash_targets body"
-    return
-  fi
-
-  local violations=0
-  # Recursion: function name appearing inside its own body
-  if printf '%s' "$body" | tail -n +2 | head -n -1 | grep -E '^[[:space:]]*[^#]*_extract_bash_targets' >/dev/null; then
-    violations=$((violations + 1))
-    echo "  PRH-005: recursive call to _extract_bash_targets" >&2
-  fi
-  # eval
-  if printf '%s' "$body" | grep -v '^[[:space:]]*#' | grep -E '\beval\b' >/dev/null; then
-    violations=$((violations + 1))
-    echo "  PRH-005: eval found in body" >&2
-  fi
-  # Nested IFS shifts: more than one `local IFS=` or any `IFS=` after the first
-  local ifs_count
-  ifs_count="$(printf '%s' "$body" | grep -v '^[[:space:]]*#' | grep -cE '(\blocal[[:space:]]+IFS=|^[[:space:]]*IFS=)' || true)"
-  if [ "$ifs_count" -gt 1 ]; then
-    violations=$((violations + 1))
-    echo "  PRH-005: $ifs_count IFS reassignments in body (>1)" >&2
-  fi
-
-  if [ "$violations" -eq 0 ]; then
-    pass "PRH-005" "no recursion / no eval / single IFS shift in _extract_bash_targets"
-  else
-    fail "PRH-005" "$violations PRH-005 violations"
-  fi
-}
 
 # ---------------------------------------------------------------------------
 # cross-model-spec-review INV-010: three-form DEFAULTS for BOTH privileged
@@ -1641,13 +1629,14 @@ test_inv010_three_form_defaults_external_review() {
   # Both privileged writers must be protected in all THREE path forms (RS-029).
   for script in external-review-run.sh config-update.sh; do
     for form in "scripts/$script" ".correctless/scripts/$script" "$script"; do
-      # Edit/Write tool path blocked.
+      # Edit/Write tool path STILL blocked (retained leg, INV-002).
       result="$(run_hook_capture "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$form\",\"old_string\":\"a\",\"new_string\":\"b\"}}")"
       assert_eq "INV-010: Edit $form blocked" "2" "$(extract_exit "$result")"
 
-      # Bash redirect path blocked.
+      # INV-001 (sfg-edit-write-only): the Bash redirect path is now ALLOWED
+      # (Bash never inspected). Inverted exit 2 -> 0.
       result="$(run_hook_capture "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"echo x > $form\"}}")"
-      assert_eq "INV-010: Bash redirect to $form blocked" "2" "$(extract_exit "$result")"
+      assert_eq "INV-001: Bash redirect to $form ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
     done
   done
 
@@ -1667,9 +1656,10 @@ test_inv010_config_live_guard() {
   result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":".correctless/config/workflow-config.json","old_string":"a","new_string":"b"}}')"
   assert_eq "INV-010: direct Edit to workflow-config.json blocked" "2" "$(extract_exit "$result")"
 
-  # Direct Bash redirect to workflow-config.json is blocked.
+  # INV-001 (sfg-edit-write-only): direct Bash redirect to workflow-config.json
+  # now ALLOWED (Bash never inspected). Inverted exit 2 -> 0.
   result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo {} > .correctless/config/workflow-config.json"}}')"
-  assert_eq "INV-010: redirect to workflow-config.json blocked" "2" "$(extract_exit "$result")"
+  assert_eq "INV-001: redirect to workflow-config.json ALLOWED (Bash never inspected)" "0" "$(extract_exit "$result")"
 
   # But invoking config-update.sh (no redirect) is ALLOWED (it is the sanctioned
   # writer; the command writes via temp+mv inside the script, not a redirect).
@@ -1768,22 +1758,170 @@ EOF
   rm -rf "$test_dir"
 }
 
+# ===========================================================================
+# sfg-edit-write-only NEW TESTS (RED): INV-005 structural, INV-001 corpus,
+# INV-010 BLOCKED-message body.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# INV-005 [structural]: the entire Bash extraction path is DELETED from the
+# hook (no dead code; AP-022). The hook MUST define NONE of the 10 extraction
+# helpers, MUST contain no _SFG_LENGTH_CAP, no COMMAND=/${#COMMAND} Bash-length
+# logic, and no `if [ "$TOOL_NAME" = "Bash" ]` extraction branch.
+# RED: the #205 hook still defines all of these, so this currently FAILS.
+# ---------------------------------------------------------------------------
+test_inv005_extraction_path_removed() {
+  echo ""
+  echo "=== INV-005 [structural]: Bash extraction path fully removed from hook ==="
+
+  local guard="$REPO_DIR/hooks/sensitive-file-guard.sh"
+  local violations=0
+
+  # The 10 deleted helpers must not be DEFINED in the hook.
+  local fn
+  for fn in \
+    _extract_bash_targets \
+    _strip_quotes \
+    _excise_process_subs \
+    _mask_quoted_operators \
+    _mask_opaque_operands \
+    _segment_command \
+    _extract_writer_dests \
+    _extract_inplace_operand \
+    _redirect_op_suffix \
+    _emit_dest
+  do
+    if grep -qE "^[[:space:]]*${fn}[[:space:]]*\(\)" "$guard"; then
+      violations=$((violations + 1))
+      echo "  INV-005: hook still defines deleted helper ${fn}()" >&2
+    fi
+  done
+
+  # No length-cap sentinel.
+  if grep -qF '_SFG_LENGTH_CAP' "$guard"; then
+    violations=$((violations + 1))
+    echo "  INV-005: hook still references _SFG_LENGTH_CAP" >&2
+  fi
+
+  # No Bash command-length logic (COMMAND= assignment or ${#COMMAND} length).
+  if grep -qE '\$\{#COMMAND\}' "$guard"; then
+    violations=$((violations + 1))
+    echo "  INV-005: hook still computes \${#COMMAND} Bash-length" >&2
+  fi
+  if grep -qE '^[[:space:]]*(local[[:space:]]+)?COMMAND=' "$guard"; then
+    violations=$((violations + 1))
+    echo "  INV-005: hook still assigns COMMAND= (Bash command capture)" >&2
+  fi
+
+  # No Bash extraction branch (the case/if that routed Bash into extraction).
+  if grep -qE 'if[[:space:]]+\[[[:space:]]+"\$TOOL_NAME"[[:space:]]*=[[:space:]]*"Bash"[[:space:]]+\]' "$guard"; then
+    violations=$((violations + 1))
+    echo "  INV-005: hook still has an 'if [ \"\$TOOL_NAME\" = \"Bash\" ]' extraction branch" >&2
+  fi
+  # The collect_targets Bash arm that dispatched to the extractor must be gone.
+  if grep -qE 'Bash\)[[:space:]]*_extract_bash_targets' "$guard"; then
+    violations=$((violations + 1))
+    echo "  INV-005: hook still has a 'Bash) _extract_bash_targets' arm" >&2
+  fi
+
+  if [ "$violations" -eq 0 ]; then
+    pass "INV-005" "hook defines none of the deleted extraction helpers / caps / Bash branch"
+  else
+    fail "INV-005" "$violations extraction-path remnants still present in the hook"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# INV-001 [integration]: representative corpus of former-must-block Bash
+# envelopes — all now exit 0. Driven through the real hook via run_hook_capture.
+# RED: each of these exits 2 against the #205 hook (verified out-of-band).
+# ---------------------------------------------------------------------------
+test_inv001_bash_corpus_never_blocked() {
+  echo ""
+  echo "=== INV-001 [integration]: former-must-block Bash corpus all ALLOWED ==="
+
+  local test_dir="/tmp/correctless-sfg-inv001corpus-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result row tag cmd json
+  local -a corpus=(
+    'echo-redir:echo x > .env'
+    'tee:echo x | tee .env'
+    'cp-dest:cp x .env'
+    'mv-dest:mv x .env'
+    'sed-i:sed -i s/a/b/ .env'
+    'append:echo x >> .env'
+    'pem-redir:cat key > server.pem'
+    'meta-redir:echo x > .correctless/meta/harness-fingerprint.json'
+    'prefs-redir:cat data > .correctless/preferences.md'
+  )
+  for row in "${corpus[@]}"; do
+    tag="${row%%:*}"
+    cmd="${row#*:}"
+    json=$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')
+    result="$(run_hook_capture "$json")"
+    assert_eq "INV-001/${tag}: Bash '$cmd' -> ALLOWED (exit 0)" "0" "$(extract_exit "$result")"
+  done
+
+  rm -rf "$test_dir"
+}
+
+# ---------------------------------------------------------------------------
+# INV-010 [integration]: when an Edit to a protected path is blocked, the
+# emitted BLOCKED message MUST use Edit/Write tool-target framing and MUST NOT
+# contain the word "command" (it only ever fires on an Edit/Write tool target).
+# RED: the #205 message references "command" framing -> currently FAILS.
+# ---------------------------------------------------------------------------
+test_inv010_blocked_message_edit_framing() {
+  echo ""
+  echo "=== INV-010 [integration]: BLOCKED message uses Edit/Write framing, no 'command' ==="
+
+  local test_dir="/tmp/correctless-sfg-inv010msg-$$"
+  setup_test_env "$test_dir"
+  cd "$test_dir" || return
+
+  local result stderr
+  result="$(run_hook_capture '{"tool_name":"Edit","tool_input":{"file_path":".env","old_string":"a","new_string":"b"}}')"
+  assert_eq "INV-010: Edit .env still blocked (exit 2)" "2" "$(extract_exit "$result")"
+  stderr="$(extract_stderr "$result")"
+
+  # Must NOT contain the word "command" (the old Bash-write framing).
+  assert_not_contains "INV-010: BLOCKED message does not say 'command'" "command" "$stderr"
+
+  # A-1: the message must RETAIN an actionable recovery path — a least-resistance
+  # GREEN must not satisfy the "no 'command'" assertion by deleting the whole
+  # recovery sentence. The current hook cites the sanctioned lift-and-restore
+  # procedure at `.claude/rules/sfg-deliverable.md`; assert that pointer persists.
+  # (Mutually satisfiable with test_inv008_blocked_message_format, which pins the
+  # `BLOCKED [sensitive-file]:` prefix + `matches protected pattern` + filepath.)
+  assert_contains "INV-010: BLOCKED message retains recovery pointer to sfg-deliverable.md" ".claude/rules/sfg-deliverable.md" "$stderr"
+
+  rm -rf "$test_dir"
+}
+
 # Run cross-model-spec-review INV-010 / INV-020 additions
 test_inv010_three_form_defaults_external_review
 test_inv010_config_live_guard
 test_inv020_multi_deliverable_lift_backstop
+
+# Run sfg-edit-write-only new tests
+test_inv001_bash_corpus_never_blocked
+test_inv010_blocked_message_edit_framing
 
 # Run R2 hardening tests
 test_inv005_canonical_only_at_matcher
 test_inv005_traversal_encoded_blocks
 test_inv005a_canonicalize_version_probe
 test_inv006_over_extract_blocks_bypasses
-test_inv006a_disallowed_branches_enumerated
 test_inv007_redirect_blocks_integration
 test_inv007a_process_substitution_blocks
 test_inv008_canonical_pattern_matching
 test_inv013_interpreter_chains_blocked
-test_prh005_no_extractor_recursion
+# (sfg-edit-write-only) test_inv006a_disallowed_branches_enumerated and
+# test_prh005_no_extractor_recursion deleted — they awk the deleted
+# _extract_bash_targets body (INV-005). Replaced by test_inv005_extraction_path_removed.
+test_inv005_extraction_path_removed
 
 # ---------------------------------------------------------------------------
 # Summary

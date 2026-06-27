@@ -131,7 +131,7 @@ Eight hooks enforce the workflow:
 
 | Hook | Type | Purpose |
 |---|---|---|
-| **sensitive-file-guard.sh** | PreToolUse | Blocks writes to `.env`, credentials, keys. Fail-closed, no overrides. |
+| **sensitive-file-guard.sh** | PreToolUse | Blocks Edit/Write tool-path writes to `.env`, credentials, keys (Bash writes are never inspected — accepted non-goals, AP-040). No overrides. |
 | **workflow-gate.sh** | PreToolUse | Enforces phase-specific file restrictions (RED blocks source, QA blocks everything). |
 | **import-guard.json** | PreToolUse (agent) | Detects when tests bypass documented entrypoints. |
 | **audit-trail.sh** | PostToolUse | Logs every file modification with phase context to JSONL. Tracks adherence metrics. |

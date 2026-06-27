@@ -36,7 +36,8 @@
 # observed (see OQ-006 in spec for heuristic). Bumping this value triggers a
 # version_bumped signal on the next /cspec invocation in any open session.
 # DO NOT bump autonomously — sensitive-file-guard protects this script from
-# autonomous Edit/Write once committed.
+# autonomous Edit/Write once committed. Protection is Edit/Write-tool-path only;
+# Bash-mediated bumps are an accepted non-goal (advisory fingerprint, ABS-027/AP-040).
 # ============================================================================
 HARNESS_VERSION=1
 

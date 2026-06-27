@@ -79,7 +79,7 @@ When to bump (OQ-006 heuristic):
 - `/cverify` — writes `harness_version` field on every new calibration entry (BND-005 prerequisite — without this, the post-fingerprint pool stays empty and the three-tier lookup collapses)
 - `/csetup` Step 2.6 — scaffolds `templates/test-features/baseline.md` to `.correctless/test-features/baseline.md` (idempotent guard via `[ ! -f ]`)
 - `/cauto` Auto Run Report — surfaces any `harness-notified-*.flag` files in "What to Review First" (INV-016)
-- `hooks/sensitive-file-guard.sh` — protects `scripts/harness-fingerprint.sh`, `.correctless/meta/harness-fingerprint.json`, and `.correctless/meta/model-baselines.json` from non-sanctioned writers (Edit/Write AND Bash redirects)
+- `hooks/sensitive-file-guard.sh` — protects `scripts/harness-fingerprint.sh`, `.correctless/meta/harness-fingerprint.json`, and `.correctless/meta/model-baselines.json` from non-sanctioned writers on the **Edit/Write tool-path only** (Bash-mediated writes — redirects, writer commands, interpreters, git — are accepted non-goals, AP-040; see ABS-045)
 
 ## Examples
 
@@ -127,7 +127,7 @@ cat .correctless/meta/harness-fingerprint.json
 
 ## Test Coverage
 
-`tests/test-harness-fingerprint.sh` — 110 passed, 0 failed. Covers INV-001..019, PRH-001..006, BND-001..005. Cross-suite coverage in `test-architecture-drift.sh` (ABS-027 presence), `test-sensitive-file-guard.sh` (HF-002 redirect-block + HF-006 Edit-block), `test-allowed-tools-check.sh` (cmodelupgrade frontmatter), `test-scripts-namespace-migration.sh` (HF-PMB003: harness-fingerprint.sh installed), and `test-skill-path-discovery.sh` (R-005(g)-cmodelupgrade).
+`tests/test-harness-fingerprint.sh` — 110 passed, 0 failed. Covers INV-001..019, PRH-001..006, BND-001..005. Cross-suite coverage in `test-architecture-drift.sh` (ABS-027 presence), `test-sensitive-file-guard.sh` (HF-006 Edit/Write tool-path block — the former HF-002 Bash-redirect block was removed by sfg-edit-write-only; Bash writes are now accepted non-goals, AP-040), `test-allowed-tools-check.sh` (cmodelupgrade frontmatter), `test-scripts-namespace-migration.sh` (HF-PMB003: harness-fingerprint.sh installed), and `test-skill-path-discovery.sh` (R-005(g)-cmodelupgrade).
 
 ## See Also
 

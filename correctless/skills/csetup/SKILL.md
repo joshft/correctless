@@ -323,8 +323,9 @@ Before offering to enable cross-model review, disclose the egress boundary expli
 ### Enabling (only via the sanctioned writer)
 
 If the user opts in, write the structured codex entry via the config updater — NEVER edit
-`workflow-config.json` directly (it is SFG-protected; direct Edit/redirect is blocked,
-BND-003):
+`workflow-config.json` directly. Routing writes through the config updater is a sole-writer
+(who-writes) convention; SFG guards only the Edit/Write tool-path (BND-003), so a direct Bash
+redirect to the file is no longer blocked (accepted residual, AP-040):
 
 ```bash
 bash .correctless/scripts/config-update.sh set-external-model codex \

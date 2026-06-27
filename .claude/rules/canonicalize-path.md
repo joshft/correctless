@@ -71,8 +71,13 @@ must preserve every invariant below.
 non-empty input, or that lets a Unicode dot lookalike collapse into a
 traversal, opens the exact bypass class the R2 audit enumerated 32 findings
 against. The function is small and cheap; correctness here is non-negotiable
-because it gates every Bash and Edit/Write/MultiEdit operation through the
-PreToolUse hook.
+because it gates every Edit/Write tool-path operation
+(`Edit`/`Write`/`MultiEdit`/`NotebookEdit`/`CreateFile`) through the
+PreToolUse hook. Bash is no longer inspected by `sensitive-file-guard.sh`
+(sfg-edit-write-only / AP-040): the hook fast-paths `Bash` to `exit 0` before
+`canonicalize_path` runs. The `_has_write_pattern` helper still lives in
+`lib.sh` and is used by `workflow-gate.sh`, so this rule's `lib.sh`-load
+intent remains correct for that consumer.
 
 The historical pattern — see PAT-001 HP-3 (`workflow-gate.sh fails closed on
 malformed stdin JSON`) — is that fail-open variants persist in security

@@ -2,10 +2,13 @@
 # Correctless — config updater (cross-model-spec-review, INV-016/INV-023).
 #
 # PRIVILEGED config writer. The ONLY sanctioned writer of the SFG-protected
-# workflow-config.json for the external-review fields. /csetup invokes this
-# instead of an Edit/redirect (BND-003, no-direct-redirect). jq-merge, atomic
-# temp+mv, every field via --arg/--argjson (never interpolated into the jq
-# program — PRH-006). Fail-closed on malformed existing config.
+# workflow-config.json external-review fields (BND-003). /csetup routes through
+# this script as the sole writer (a who-writes / sole-writer convention). SFG
+# guards only the Edit/Write tool-path, so a direct Bash redirect is no longer
+# blocked (sfg-edit-write-only / AP-040) — the sole-writer convention, not SFG,
+# is the integrity leg. jq-merge, atomic temp+mv, every field via
+# --arg/--argjson (never interpolated into the jq program — PRH-006).
+# Fail-closed on malformed existing config.
 #
 # Subcommands:
 #   set-external-model codex <key> <value> [<key> <value> ...] [--config <path>]
