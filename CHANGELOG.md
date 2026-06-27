@@ -4,6 +4,11 @@ All notable changes to Correctless are documented here.
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-06-27
+
+### Fixed
+- Corrected the plugin description's skill count in `marketplace.json` (32 → 33).
+
 ## [3.1.0] - 2026-06-27
 
 ### Changed — Security posture (DOWNGRADE)
