@@ -38,6 +38,7 @@ CONTRIBUTING_MD="CONTRIBUTING.md"
 RULE_FILE=".claude/rules/hooks-pretooluse.md"
 SFG_DELIVERABLE_RULE=".claude/rules/sfg-deliverable.md"
 ANTIPATTERNS_MD=".correctless/antipatterns.md"
+FEATURES_MD="FEATURES.md"
 
 # ============================================================================
 # Normalization helper — collapse runs of whitespace to a single space and
@@ -155,9 +156,13 @@ assert_no_reject_in_file() {
 }
 
 # --- Non-CLAUDE.md corpus files ---
+# FEATURES.md is a current-state feature catalog (MA-001): the full reject-list
+# applies (no PMB-style append-only exclusion needed — it carries no historical
+# ledger that legitimately quotes old SFG behavior).
 assert_no_reject_in_file "ARCHITECTURE.md" "$ARCH_FILE"
 assert_no_reject_in_file "AGENT_CONTEXT.md" "$AGENT_CONTEXT"
 assert_no_reject_in_file "README.md" "$README_MD"
+assert_no_reject_in_file "FEATURES.md" "$FEATURES_MD"
 assert_no_reject_in_file "sfg-deliverable.md" "$SFG_DELIVERABLE_RULE"
 
 # --- docs/** minus journals ---
@@ -275,6 +280,7 @@ SINGLE_SURFACES=(
   "$AGENT_CONTEXT"
   "$README_MD"
   "$CONTRIBUTING_MD"
+  "$FEATURES_MD"
 )
 
 # Single-file surfaces with CLAUDE.md replaced by its Postmortem-stripped
@@ -299,6 +305,7 @@ SINGLE_SURFACES_CLAUDE_NO_PMB=(
   "$AGENT_CONTEXT"
   "$README_MD"
   "$CONTRIBUTING_MD"
+  "$FEATURES_MD"
 )
 
 # hooks/** and .claude/rules/** file lists.
@@ -500,6 +507,57 @@ else
     pass "INV-008 defaults-exception" "rule file documents the DEFAULTS-only-on-config-failure narrow exception"
   else
     fail "INV-008 defaults-exception" "rule file missing narrow-exception wording (degrades-to-DEFAULTS-only=$has_degrade custom_patterns=$has_custom DEFAULTS-remain-enforced=$has_defaults)"
+  fi
+fi
+
+# ============================================================================
+# INV-007 (MA-002): NARROW skills/** false-rationale reject leg.
+#
+# Skill prose (skills/**/SKILL.md) previously justified routing writes through a
+# sole-writer script by claiming "the SFG permits this because the command
+# contains no direct redirect to the protected path" / "direct Edit/redirect is
+# blocked". That rationale is now FALSE — SFG guards only the Edit/Write
+# tool-path and no longer inspects Bash at all (a direct Bash redirect is an
+# accepted residual, AP-040). The routing is a sole-writer (who-writes)
+# convention, not a redirect-blocking guarantee.
+#
+# CRITICAL scoping: assert ZERO occurrences of ONLY these four specific
+# false-rationale literals. Do NOT broaden to "Bash redirect" / "blocks Bash" —
+# skill prose legitimately discusses SFG, Bash, and workflow-gate in many other
+# (true) contexts, and a broad grep would false-fail.
+# ============================================================================
+
+SKILLS_FALSE_RATIONALE=(
+  "no direct redirect"
+  "direct Edit/redirect is blocked"
+  "contains no direct redirect"
+  "direct redirect to the protected path"
+)
+
+skills_files=()
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  skills_files+=("$f")
+done <<EOF_SKILLS
+$(find skills -type f -name '*.md' 2>/dev/null || true)
+EOF_SKILLS
+
+skills_rationale_hit=0
+if [ "${#skills_files[@]}" -eq 0 ]; then
+  pass "INV-007 skills-false-rationale" "no skills/** files to scan"
+else
+  for f in "${skills_files[@]}"; do
+    [ -f "$f" ] || continue
+    norm="$(normalize_stream < "$f")"
+    for lit in "${SKILLS_FALSE_RATIONALE[@]}"; do
+      if printf '%s' "$norm" | grep -qF -- "$lit"; then
+        fail "INV-007 skills-false-rationale" "$f still contains false SFG-redirect rationale: '$lit'"
+        skills_rationale_hit=1
+      fi
+    done
+  done
+  if [ "$skills_rationale_hit" -eq 0 ]; then
+    pass "INV-007 skills-false-rationale" "no false 'no direct redirect' SFG rationale in skills/**"
   fi
 fi
 

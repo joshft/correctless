@@ -355,13 +355,13 @@ Mechanical enforcement via Claude Code's hook runner. Hooks compose — each han
 
 Uses `classify_file()` from lib.sh to distinguish source, test, config, and doc files. Override mechanism with activation counter. Exit 2 = block, exit 0 = allow.
 
-**sensitive-file-guard.sh** — Protects security-critical files from LLM writes:
+**sensitive-file-guard.sh** — Protects security-critical files from LLM Edit/Write tool calls:
 - `.correctless/config/workflow-config.json`, `auto-policy.json`, `preferences.md`
 - `hooks/workflow-advance.sh`, `scripts/harness-fingerprint.sh`, `scripts/audit-record.sh`
 - `.env`, credentials, secrets
 - `CLAUDE.md`, `.claude/settings.json`
 
-Over-extracting Bash target extraction (every non-flag token is a candidate, canonical-path matcher filters). Covers redirect operators (`>`, `>>`, `1>`, `2>`, `&>`), interpreter+eval-flag chains, and Unicode-lookalike traversal attacks. Uses `canonicalize_path` for path normalization (PAT-017).
+Matches `tool_input.file_path` for `Edit`/`Write`/`MultiEdit`/`NotebookEdit`/`CreateFile` against the protected-pattern list. It does NOT inspect Bash commands at all — Bash-mediated writes (redirects, writer commands, interpreters, git) are accepted non-goals (AP-040). Uses `canonicalize_path` for path normalization (PAT-017) so traversal-encoded targets (`subdir/../.env`) still match.
 
 **import-guard.json** — Agent hook (JSON config, not bash) that denies test writes bypassing documented entrypoints. Enforces that integration tests exercise the system through its documented API surface.
 
@@ -486,12 +486,12 @@ Each skill computes `max(project_intensity, feature_intensity)`:
 
 ### Sensitive File Protection
 
-`sensitive-file-guard.sh` (PreToolUse, fail-closed) blocks LLM writes to security-critical files. Over-extracting Bash target extraction: every non-flag token is a candidate; the canonical-path matcher filters false positives. Covers:
-- Direct tool writes (Write, Edit)
-- Bash redirects (`>`, `>>`, `1>`, `2>`, `&>`) in whitespace-separated and inline-attached forms
-- Interpreter + eval-flag chains (`bash -c`, `python -c`, etc.)
+`sensitive-file-guard.sh` (PreToolUse, fail-closed on input-parse) blocks LLM Edit/Write tool calls to security-critical files. It matches `tool_input.file_path` for `Edit`/`Write`/`MultiEdit`/`NotebookEdit`/`CreateFile` against the protected-pattern list and does NOT inspect Bash commands. Covers:
+- Direct tool writes (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`, `CreateFile`)
 - Path canonicalization via `canonicalize_path` (PAT-017) — closes traversal attacks (`subdir/../.env` vs `.env`)
 - Unicode-lookalike traversal (ASCII-only `.` recognition per INV-002a)
+
+Bash-mediated writes (redirects, writer commands, interpreters, git) are ALL accepted non-goals (AP-040) — SFG is a guardrail against the agent's own careless Edit/Write tool call, not a Bash-write perimeter.
 
 ### Spec Integrity Verification
 
@@ -734,13 +734,13 @@ Workflow state in `.correctless/artifacts/workflow-state-{branch-slug}.json`. Ea
 
 ### Sole-Writer Contracts
 
-Security-critical files have documented sole-writer contracts enforced by sensitive-file-guard:
-- `workflow-advance.sh` → workflow state files
-- `audit-record.sh` → audit findings artifacts
-- `harness-fingerprint.sh` → harness fingerprint store
-- `compute-session-cost.sh` → cost artifacts
-- `/cmodelupgrade` → model baselines
-- `autonomous-decision-writer.sh` → autonomous decisions JSONL
+Security-critical files have documented sole-writer contracts. Structural enforcement is the Edit/Write tool-path (sensitive-file-guard) plus, where a phase-transition artifact exists, the content-based `cmd_*` gate in `workflow-advance.sh` (ABS-029/041). Bash-mediated out-of-band writes are accepted non-goals (AP-040); for files without a `cmd_*` gate the sole-writer claim is an advisory residual:
+- `workflow-advance.sh` → workflow state files (`cmd_*` gate)
+- `audit-record.sh` → audit findings artifacts (`cmd_audit_done` gate, ABS-029)
+- `harness-fingerprint.sh` → harness fingerprint store (advisory residual — no `cmd_*` gate)
+- `compute-session-cost.sh` → cost artifacts (advisory residual)
+- `/cmodelupgrade` → model baselines (advisory residual)
+- `autonomous-decision-writer.sh` → autonomous decisions JSONL (advisory residual — no `cmd_*` gate)
 
 ### Path-Scoped Rules (ABS-009)
 

@@ -171,7 +171,7 @@ When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECI
 ## Antipattern integration
 
 Direct mitigation of:
-- **AP-022** (dead-code-in-security-paths) — the `Write(.correctless/meta/model-baselines.json)` permission is in the allowed-tools frontmatter and exercised by Step 5; sensitive-file-guard structurally blocks all other writers (PRH-002).
+- **AP-022** (dead-code-in-security-paths) — the `Write(.correctless/meta/model-baselines.json)` permission is in the allowed-tools frontmatter and exercised by Step 5; sensitive-file-guard structurally blocks other Edit/Write tool-path writers (PRH-002). Bash-mediated writes to the baseline are accepted non-goals (AP-040) and `model-baselines.json` has no `cmd_*` content gate, so the sole-writer claim is an advisory residual.
 - **AP-024** (hardcoded file list instead of glob) — Step 2's cost artifact read MUST glob `cost-*.json`, never hardcode a slug list. PMB-003 root cause.
 - **AP-025 / PMB-004** (skill references workflow artifact by concept without path discovery) — Step 0 derives every artifact path via explicit `workflow-advance.sh status` + `branch_slug` resolution. No conversation-context assumptions.
 - **DA-004** (self-referential metrics) — Step 6a forbids rendering against zero/null baselines.
