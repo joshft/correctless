@@ -46,10 +46,20 @@ command -v jq >/dev/null 2>&1 || { echo "BLOCKED [sensitive-file]: jq not found"
 
 INPUT="$(cat)"
 TOOL_NAME="" TOOL_INPUT_FILE="" TOOL_INPUT_EDITS=""
+# tool_name MUST be a scalar string. A non-string (array/object/number/bool/null
+# or absent) tool_name is unexpected input → jq errors → empty $_PARSED → the
+# STEP-2 guard below exits 2 (fail-closed, INV-006 / PAT-001 clause 5). This also
+# prevents @sh from rendering a multi-element array as multiple shell tokens,
+# which would make `eval "$_PARSED"` run an arbitrary command (exit 127, not a
+# fail-closed exit 2). file_path/edits are coerced to scalar strings for the same
+# token-safety reason; a non-string target simply yields no protected match.
 _PARSED="$(echo "$INPUT" | jq -r '
-  @sh "TOOL_NAME=\(.tool_name // "")",
-  @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
-  @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))"
+  if (.tool_name | type) != "string" then error("non-string tool_name")
+  else
+    @sh "TOOL_NAME=\(.tool_name)",
+    @sh "TOOL_INPUT_FILE=\(.tool_input.file_path | if type == "string" then . else "" end)",
+    @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path | select(type == "string")] | join("\n"))"
+  end
 ' 2>/dev/null)" || true
 # Fail-closed: if jq produced no output (parse failure), block the operation (DA-003)
 if [ -z "$_PARSED" ]; then

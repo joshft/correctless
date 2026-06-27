@@ -1037,6 +1037,60 @@ test_da003_fail_closed_on_jq_failure() {
 }
 
 # ===========================================================================
+# MA-R2-H1: Fail-closed on non-string / absent tool_name
+#
+# A non-scalar-string tool_name (array/object/number/null) or an ABSENT
+# tool_name is unexpected input. The hook's jq filter raises error("non-string
+# tool_name"), $_PARSED is empty, and the STEP-2 fail-closed guard exits 2
+# (INV-006 / PAT-001 clause 5: on unexpected input, exit 2 — never exit 0, and
+# never crash with exit 127 from `eval` running an @sh-rendered multi-token
+# array as a command). file_path is likewise coerced to a scalar; an
+# array-valued file_path must not crash the hook.
+# ===========================================================================
+
+test_ma_r2_h1_fail_closed_on_non_string_tool_name() {
+  echo ""
+  echo "=== MA-R2-H1: Fail-closed (exit 2) on non-string / absent tool_name (INV-006 / PAT-001 clause 5) ==="
+
+  local result
+
+  # tool_name as ARRAY — must NOT exit 0, must NOT crash (127); exit 2.
+  result="$(run_hook_capture '{"tool_name":["foo","Edit"],"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: array tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # tool_name as OBJECT.
+  result="$(run_hook_capture '{"tool_name":{"x":"Edit"},"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: object tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # tool_name as NUMBER.
+  result="$(run_hook_capture '{"tool_name":123,"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: number tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # tool_name as NULL.
+  result="$(run_hook_capture '{"tool_name":null,"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: null tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # tool_name ABSENT (no key at all).
+  result="$(run_hook_capture '{"tool_input":{"file_path":".env"}}')"
+  assert_eq "MA-R2-H1: absent tool_name fail-closes (exit 2)" "2" "$(extract_exit "$result")"
+
+  # A Write with an ARRAY-valued file_path must NOT crash (exit 0 or 2, never
+  # 127). tool_name is a valid string, so the array file_path is coerced to ""
+  # by the jq guard and yields no protected match → allowed (exit 0). The
+  # critical assertion is "not 127".
+  result="$(run_hook_capture '{"tool_name":"Write","tool_input":{"file_path":[".env"]}}')"
+  local fp_exit
+  fp_exit="$(extract_exit "$result")"
+  if [ "$fp_exit" = "0" ] || [ "$fp_exit" = "2" ]; then
+    echo "  PASS: MA-R2-H1: array file_path does not crash (exit $fp_exit, never 127)"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: MA-R2-H1: array file_path crashed or misbehaved (expected 0 or 2, got '$fp_exit')"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# ===========================================================================
 # DA-004: Hook allowlist sync — deterministic check
 # ===========================================================================
 
@@ -1069,6 +1123,7 @@ test_da004_hook_allowlist_sync() {
 }
 
 test_da003_fail_closed_on_jq_failure
+test_ma_r2_h1_fail_closed_on_non_string_tool_name
 test_da004_hook_allowlist_sync
 
 # ---------------------------------------------------------------------------

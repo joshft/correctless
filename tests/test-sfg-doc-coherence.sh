@@ -36,7 +36,6 @@ AGENT_CONTEXT=".correctless/AGENT_CONTEXT.md"
 README_MD="README.md"
 CONTRIBUTING_MD="CONTRIBUTING.md"
 RULE_FILE=".claude/rules/hooks-pretooluse.md"
-SFG_DELIVERABLE_RULE=".claude/rules/sfg-deliverable.md"
 ANTIPATTERNS_MD=".correctless/antipatterns.md"
 FEATURES_MD="FEATURES.md"
 
@@ -115,6 +114,13 @@ echo "============================================="
 # ============================================================================
 
 # Reject literals shared across the non-CLAUDE.md corpus files.
+#
+# MA-R2-CC class fix (2026-06): the corpus is now DERIVED from `git ls-files
+# '*.md'` (see build_reject_corpus) so a NEW doc is auto-covered. Round 1 missed
+# FEATURES.md and round 2 missed .claude/rules/canonicalize-path.md precisely
+# because the corpus was an enumerated allowlist; a git-derived corpus closes
+# that class. The `gates every Bash` literal (canonicalize-path.md phrasing) is
+# pinned here so the canonicalize-path surface is caught going forward.
 REJECT_LITERALS=(
   "direct redirect/writer-command"
   "direct-redirect"
@@ -123,9 +129,46 @@ REJECT_LITERALS=(
   "Bash redirects via _has_write_pattern"
   "write-target extraction path"
   "fails open on ambiguity"
+  "gates every Bash"
 )
 
-# Build the docs/** corpus minus the two excluded journals.
+# ============================================================================
+# Generalized reject-substring corpus (MA-R2-CC class fix).
+#
+# Corpus = every tracked Markdown file (`git ls-files '*.md'`) MINUS:
+#   - docs/dev-journal.md, docs/workflow-history.md (append-only journals)
+#   - .correctless/specs/**, .correctless/artifacts/**,
+#     .correctless/verification/**  (this very spec + working artifacts +
+#     verification reports legitimately quote the old SFG behavior)
+#   - *-archived.md, *ARCHITECTURE_DEPRECATED.md  (frozen history)
+#   - skills/** and agents/** AND their `correctless/` byte-mirrors
+#     (these legitimately discuss SFG/Bash/workflow-gate in non-SFG contexts —
+#     they keep the NARROW 4-phrase false-rationale leg below; the full
+#     reject-list would false-fail there)
+#   - CLAUDE.md  (handled separately via the claude_md_minus_postmortems
+#     PMB-ledger projection — its append-only Postmortem entries legitimately
+#     quote old SFG behavior)
+#
+# .claude/rules/**/*.md ARE in the corpus via git ls-files — that is how
+# canonicalize-path.md and hooks-pretooluse.md get covered.
+# ============================================================================
+
+build_reject_corpus() {
+  git ls-files '*.md' 2>/dev/null | while IFS= read -r f; do
+    case "$f" in
+      docs/dev-journal.md|docs/workflow-history.md) continue ;;
+      .correctless/specs/*|.correctless/artifacts/*|.correctless/verification/*) continue ;;
+      *-archived.md|*ARCHITECTURE_DEPRECATED.md) continue ;;
+      skills/*|agents/*) continue ;;
+      correctless/skills/*|correctless/agents/*) continue ;;
+      CLAUDE.md) continue ;;
+    esac
+    printf '%s\n' "$f"
+  done
+}
+
+# Build the docs/** corpus minus the two excluded journals (still used by the
+# dangling-reference checks below, which keep their original docs/** scoping).
 build_docs_corpus() {
   # Emit one path per line for every file under docs/ except the two journals.
   find docs -type f 2>/dev/null \
@@ -155,27 +198,23 @@ assert_no_reject_in_file() {
   fi
 }
 
-# --- Non-CLAUDE.md corpus files ---
-# FEATURES.md is a current-state feature catalog (MA-001): the full reject-list
-# applies (no PMB-style append-only exclusion needed — it carries no historical
-# ledger that legitimately quotes old SFG behavior).
-assert_no_reject_in_file "ARCHITECTURE.md" "$ARCH_FILE"
-assert_no_reject_in_file "AGENT_CONTEXT.md" "$AGENT_CONTEXT"
-assert_no_reject_in_file "README.md" "$README_MD"
-assert_no_reject_in_file "FEATURES.md" "$FEATURES_MD"
-assert_no_reject_in_file "sfg-deliverable.md" "$SFG_DELIVERABLE_RULE"
-
-# --- docs/** minus journals ---
-docs_corpus="$(build_docs_corpus)"
-if [ -z "$docs_corpus" ]; then
-  pass "INV-007 reject(docs/**)" "no docs/** files to scan"
+# --- Generalized git-derived corpus (non-CLAUDE.md) ---
+# Every tracked Markdown file minus the exclusions in build_reject_corpus. This
+# auto-covers ARCHITECTURE.md, AGENT_CONTEXT.md, README.md, FEATURES.md,
+# sfg-deliverable.md, hooks-pretooluse.md, canonicalize-path.md, docs/** (minus
+# journals), templates/**, helpers/**, .correctless/checklists/**, and any NEW
+# doc added later — without an enumerated allowlist that can silently miss a
+# surface (MA-R2-CC class fix).
+reject_corpus="$(build_reject_corpus)"
+if [ -z "$reject_corpus" ]; then
+  fail "INV-007 reject(corpus)" "git ls-files '*.md' returned no corpus — derivation broken?"
 else
-  while IFS= read -r dpath; do
-    [ -z "$dpath" ] && continue
-    assert_no_reject_in_file "docs:${dpath#docs/}" "$dpath"
-  done <<EOF_DOCS
-$docs_corpus
-EOF_DOCS
+  while IFS= read -r cpath; do
+    [ -z "$cpath" ] && continue
+    assert_no_reject_in_file "${cpath}" "$cpath"
+  done <<EOF_CORPUS
+$reject_corpus
+EOF_CORPUS
 fi
 
 # --- CLAUDE.md, scoped to the two named convention blocks ---
