@@ -37,6 +37,7 @@ README_MD="README.md"
 CONTRIBUTING_MD="CONTRIBUTING.md"
 RULE_FILE=".claude/rules/hooks-pretooluse.md"
 SFG_DELIVERABLE_RULE=".claude/rules/sfg-deliverable.md"
+ANTIPATTERNS_MD=".correctless/antipatterns.md"
 
 # ============================================================================
 # Normalization helper — collapse runs of whitespace to a single space and
@@ -265,10 +266,36 @@ done <<EOF_DOCS2
 $(build_docs_corpus)
 EOF_DOCS2
 
-# Single-file current-state surfaces (non-glob).
+# Single-file current-state surfaces (non-glob). CLAUDE.md is included raw here;
+# the per-token dangling checks below choose, per token, whether to scan the raw
+# file or the Postmortem-stripped projection (see CLAUDE_MD_NO_PMB).
 SINGLE_SURFACES=(
   "$ARCH_FILE"
   "$CLAUDE_MD"
+  "$AGENT_CONTEXT"
+  "$README_MD"
+  "$CONTRIBUTING_MD"
+)
+
+# Single-file surfaces with CLAUDE.md replaced by its Postmortem-stripped
+# projection. The `_extract_bash_targets` SYMBOL dangling check consumes this so
+# that the append-only `### YYYY-MM-DD — Postmortem` PMB-ledger entries (which
+# legitimately quote the deleted extractor) are excluded — exactly as the
+# amend/reject-substring assertion above excludes them via the SAME shared
+# helper (claude_md_minus_postmortems). The two scopings consume one helper so
+# they cannot drift (QA-001 class fix). Every OTHER current-state surface
+# (hooks/**, ARCHITECTURE.md, README.md, AGENT_CONTEXT.md, docs/**,
+# .claude/rules/**) stays strict; only CLAUDE.md gets the PMB-ledger exclusion,
+# and only for the symbol. The `test-sfg-rescope` FILENAME check below keeps the
+# raw CLAUDE.md (SINGLE_SURFACES) strict — a deleted test FILENAME must never
+# appear in current PMB prose.
+CLAUDE_MD_NO_PMB="$(mktemp)"
+trap 'rm -f "$CLAUDE_MD_NO_PMB"' EXIT
+claude_md_minus_postmortems > "$CLAUDE_MD_NO_PMB"
+
+SINGLE_SURFACES_CLAUDE_NO_PMB=(
+  "$ARCH_FILE"
+  "$CLAUDE_MD_NO_PMB"
   "$AGENT_CONTEXT"
   "$README_MD"
   "$CONTRIBUTING_MD"
@@ -322,18 +349,29 @@ $(find tests -type f -name '*.sh' 2>/dev/null || true)
 EOF_TESTS_ALL
 
 # --- `test-sfg-rescope` dangling check: repo-wide over current-state surfaces
-#     (the deleted test file must not be referenced anywhere current-state). ---
+#     (the deleted test file must not be referenced anywhere current-state).
+#     `.correctless/antipatterns.md` is included for the FILENAME check ONLY
+#     (QA-002 class fix): a deleted test FILENAME must never appear as a
+#     current-state reference. It is deliberately NOT added to the
+#     `_extract_bash_targets` SYMBOL check nor the reject-substring check, because
+#     antipatterns.md legitimately names deleted mechanisms in its historical
+#     "What went wrong" prose — a mechanical symbol/substring grep would
+#     false-fail there. ---
 assert_no_token_in_files "test-sfg-rescope" "INV-007 dangling(test-sfg-rescope)" \
   "${SINGLE_SURFACES[@]}" \
+  "$ANTIPATTERNS_MD" \
   "${hooks_files[@]}" \
   "${rules_files[@]}" \
   "${tests_files_rescope[@]}" \
   "${docs_corpus_files[@]}"
 
-# --- `_extract_bash_targets` dangling check: same surfaces, but tests/** is
-#     scoped to exclude the two test-data-bearing files. ---
+# --- `_extract_bash_targets` dangling check: same surfaces, but (a) CLAUDE.md is
+#     scanned via its Postmortem-stripped projection (the append-only PMB ledger
+#     legitimately quotes the deleted symbol — same exclusion the amend check
+#     applies, via the SAME shared helper so they cannot drift), and (b) tests/**
+#     is scoped to exclude the two test-data-bearing files. ---
 assert_no_token_in_files "_extract_bash_targets" "INV-007 dangling(_extract_bash_targets)" \
-  "${SINGLE_SURFACES[@]}" \
+  "${SINGLE_SURFACES_CLAUDE_NO_PMB[@]}" \
   "${hooks_files[@]}" \
   "${rules_files[@]}" \
   "${tests_files_scoped[@]}" \
