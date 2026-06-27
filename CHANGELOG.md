@@ -4,6 +4,8 @@ All notable changes to Correctless are documented here.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-06-27
+
 ### Changed — Security posture (DOWNGRADE)
 - **sensitive-file-guard reduced to the Edit/Write tool-path only — Bash writes are no longer guarded (security downgrade, not a simplification)** — `hooks/sensitive-file-guard.sh` no longer inspects ANY Bash command. The entire Bash write-target detection path was deleted; for `tool_name == "Bash"` the hook now fast-paths `exit 0` before reading any config. **SFG no longer guards ANY Bash write to a protected file** — a direct `echo x > .env`, `tee .env`, `cp x .env`, `sed -i … .env`, an interpreter write (`bash -c '… > .env'`), or a git restore (`git checkout -- .env`) is **allowed**. The guard now catches ONLY the agent's naive Edit/Write tool call (`Edit`/`Write`/`MultiEdit`/`NotebookEdit`/`CreateFile` against `tool_input.file_path`). This is a deliberate, documented security **downgrade**: per PMB-020/AP-040, a cooperative-loop PreToolUse hook is a guardrail/speedbump, the Bash-redirect leg was always trivially evadable via an interpreter, and removing it eliminates ~550 lines of fragile extraction code and its false-positive friction. **Files whose only structural Bash leg this removes (no `cmd_*` content gate behind them): `.correctless/meta/harness-fingerprint.json`, `.correctless/meta/model-baselines.json`, `.correctless/preferences.md`** (plus the wider non-`cmd_*`-gated DEFAULTS set — see ABS-045 Security Residual). **Existing-user note: your `custom_patterns` continue to guard the Edit/Write tool-path; they no longer guard Bash redirects/writer commands.** The protected-file DEFAULTS/`custom_patterns` list is unchanged. See `.correctless/specs/sfg-edit-write-only.md` and ABS-045.
 
