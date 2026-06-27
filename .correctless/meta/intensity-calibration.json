@@ -818,6 +818,45 @@
         "tests/test-sfg-rescope.sh"
       ],
       "timestamp": "2026-06-25T09:35:00Z"
+    },
+    {
+      "feature_slug": "sfg-edit-write-only",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 81275,
+      "actual_spec_updates": 1,
+      "harness_version": 1,
+      "fix_rounds_triggered": 1,
+      "file_paths_touched": [
+        ".claude/rules/canonicalize-path.md",
+        ".claude/rules/hooks-pretooluse.md",
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/antipatterns.md",
+        "CHANGELOG.md",
+        "CLAUDE.md",
+        "FEATURES.md",
+        "README.md",
+        "hooks/sensitive-file-guard.sh",
+        "scripts/config-update.sh",
+        "scripts/harness-fingerprint.sh",
+        "skills/cauto/SKILL.md",
+        "skills/cmodelupgrade/SKILL.md",
+        "skills/csetup/SKILL.md",
+        "docs/features/harness-fingerprint.md",
+        "docs/skills/cmodelupgrade.md",
+        "docs/standard-workflow.md",
+        "tests/test-audit-findings-persistence.sh",
+        "tests/test-harness-fingerprint.sh",
+        "tests/test-hook-sync.sh",
+        "tests/test-semi-auto-mode.sh",
+        "tests/test-sensitive-file-guard.sh",
+        "tests/test-sfg-doc-coherence.sh",
+        "tests/test-sfg-rescope.sh"
+      ],
+      "timestamp": "2026-06-27T04:27:33Z"
     }
   ]
 }
