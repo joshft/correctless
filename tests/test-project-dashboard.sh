@@ -1992,6 +1992,64 @@ test_redesign_r011_distribution_sync() {
   fi
 }
 
+
+# ============================================================================
+# ARG_MAX regression: single large artifact must not transit argv (issue #144)
+# AP-039 / PMB-019 — read_file_json() passes file content via `jq --arg content`,
+# which puts the entire file on the command line. A single artifact larger than
+# MAX_ARG_STRLEN (~128KB on Linux) makes jq die with "Argument list too long",
+# silently dropping that artifact's content from the rendered dashboard.
+# ============================================================================
+
+test_argmax_large_artifact() {
+  echo ""
+  echo "--- ARG_MAX: single large artifact must not transit argv (issue #144) ---"
+
+  local TEST_DIR
+  TEST_DIR=$(setup_dashboard_project)
+  trap 'rm -rf "$TEST_DIR"' RETURN
+
+  # Build a SINGLE spec artifact >= 200KB (AP-039 scale-fixture contract) with a
+  # unique sentinel embedded so we can detect whether its content reached the HTML.
+  local sentinel="ARGMAX_SENTINEL_7f3a"
+  local big_spec="$TEST_DIR/.correctless/specs/huge.md"
+  {
+    echo "# Huge Spec"
+    echo "$sentinel"
+    # ~250KB of filler in one file (single-argument overflow, not aggregate)
+    head -c 250000 /dev/zero | tr '\0' 'X'
+    echo ""
+    echo "$sentinel"
+  } > "$big_spec"
+
+  # Sanity: confirm the fixture is genuinely large enough to overflow one argv slot.
+  local fsize
+  fsize=$(wc -c < "$big_spec")
+  if [ "$fsize" -lt 200000 ]; then
+    fail "ARGMAX-fixture" "Large-artifact fixture is only ${fsize} bytes (<200KB) — cannot exercise ARG_MAX"
+    return
+  fi
+
+  # Run the builder directly, capturing BOTH stdout and stderr.
+  local output
+  output=$(bash "$REPO_DIR/scripts/build-dashboard.sh" "$TEST_DIR" 2>&1)
+
+  # ARGMAX-a: the run must NOT emit "Argument list too long" anywhere.
+  if echo "$output" | grep -qi 'Argument list too long'; then
+    fail "ARGMAX-a" "Builder emitted 'Argument list too long' on a 250KB single artifact — content transits argv (read_file_json --arg content)"
+  else
+    pass "ARGMAX-a" "No 'Argument list too long' on a 250KB single artifact"
+  fi
+
+  # ARGMAX-b: the large artifact's content (sentinel) must reach the dashboard HTML.
+  local _f="$TEST_DIR/.correctless/dashboard/index.html"
+  if [ -f "$_f" ] && grep -qF "$sentinel" "$_f"; then
+    pass "ARGMAX-b" "Large artifact content embedded in dashboard (sentinel present)"
+  else
+    fail "ARGMAX-b" "Large artifact content silently dropped — sentinel '$sentinel' missing from dashboard HTML"
+  fi
+}
+
 # ============================================================================
 # Run all tests
 # ============================================================================
@@ -2024,6 +2082,7 @@ test_redesign_r008_existing_intents
 test_redesign_r009_empty_state_redesign
 test_redesign_r010_cdn_pattern
 test_redesign_r011_distribution_sync
+test_argmax_large_artifact
 
 echo ""
 echo "========================================="
