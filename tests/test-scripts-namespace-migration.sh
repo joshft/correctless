@@ -614,6 +614,80 @@ test_pmb003_all_scripts_installed() {
   cleanup
 }
 
+
+# ---------------------------------------------------------------------------
+# Issue #197 [regression]: setup on the correctless SOURCE repo must NOT delete
+# tracked scripts/lib.sh and scripts/antipattern-scan.sh.
+#
+# The install_hooks() upgrade-migration loop runs `mv scripts/<old> .correctless/scripts/`
+# whenever scripts/lib.sh or scripts/antipattern-scan.sh exist. On a target project
+# that is correct (scripts/ is not source). On the correctless source repo itself,
+# scripts/ is the TRACKED source of truth — the mv DELETES source files. There is
+# no guard for the source-repo case.
+#
+# SAFETY: this test runs `setup` ONLY inside its own throwaway /tmp git repo with
+# CWD inside that repo, so `git rev-parse --show-toplevel` resolves to the temp dir,
+# NEVER the real correctless tree.
+# ---------------------------------------------------------------------------
+
+test_source_repo_scripts_not_deleted() {
+  echo ""
+  echo "=== Issue #197: setup on source repo must NOT delete tracked scripts/ source ==="
+
+  local orig_pwd="$PWD"
+  local srcdir
+  srcdir="$(mktemp -d "/tmp/correctless-test-srcrepo-$$-XXXXXX")"
+
+  # --- Build a throwaway repo that LOOKS like the correctless source repo ---
+  cd "$srcdir" || { echo "  FAIL: cannot cd into temp repo $srcdir"; FAIL=$((FAIL + 1)); rm -rf "$srcdir"; return; }
+  git init -q
+  git branch -M main
+
+  # Keep setup's language/tooling detection happy the same way setup_test_project does
+  echo '{"name": "correctless-like", "scripts": {"test": "echo ok"}}' > package.json
+  echo 'export function hello() {}' > index.ts
+
+  # Source-repo markers: top-level skills/, agents/, templates/, sync.sh
+  mkdir -p skills agents templates scripts
+  echo '# sync source' > sync.sh
+  echo '# skill placeholder' > skills/placeholder.md
+  echo '# agent placeholder' > agents/placeholder.md
+  echo '{}' > templates/placeholder.json
+
+  # scripts/ is TRACKED source of truth — sentinel content + a 3rd script so it is
+  # clearly source (not merely the two install-set files).
+  echo 'SENTINEL_LIB=correctless-source-lib' > scripts/lib.sh
+  echo 'SENTINEL_SCAN=correctless-source-scan' > scripts/antipattern-scan.sh
+  echo '# another tracked source script' > scripts/build-dashboard.sh
+
+  git add -A
+  git -c user.email='t@example.test' -c user.name='test' commit -q -m "init source-like repo"
+
+  # Make the correctless `setup` script reachable exactly like setup_test_project does,
+  # so $SCRIPT_DIR/hooks and $SCRIPT_DIR/scripts exist for install_hooks().
+  mkdir -p .claude/skills/workflow
+  rsync -a --exclude='.git' --exclude='tests' "$REPO_DIR/" .claude/skills/workflow/
+
+  # Run setup with CWD = temp repo root (git toplevel resolves to $srcdir).
+  .claude/skills/workflow/setup >/dev/null 2>&1 || true
+
+  # --- RED assertions: tracked source scripts must STILL exist after setup ---
+  assert_file_exists "Issue #197: scripts/lib.sh NOT deleted from source repo" \
+    "$srcdir/scripts/lib.sh"
+  assert_file_exists "Issue #197: scripts/antipattern-scan.sh NOT deleted from source repo" \
+    "$srcdir/scripts/antipattern-scan.sh"
+
+  # Belt-and-suspenders: git must not report the tracked scripts as deleted.
+  local deletions
+  deletions="$(git -C "$srcdir" status --porcelain -- scripts/lib.sh scripts/antipattern-scan.sh \
+    | grep -E '^[ ]?D' || true)"
+  assert_eq "Issue #197: git status shows no deletion of tracked source scripts" "" "$deletions"
+
+  # --- Cleanup + restore CWD ---
+  cd "$orig_pwd" 2>/dev/null || cd "$REPO_DIR" 2>/dev/null || true
+  rm -rf "$srcdir"
+}
+
 # ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
@@ -636,6 +710,7 @@ test_r007_agent_context_source_refs_unchanged
 test_integration_hooks_find_lib_after_setup
 test_integration_upgrade_then_hooks
 test_pmb003_all_scripts_installed
+test_source_repo_scripts_not_deleted
 
 echo ""
 echo "======================"
