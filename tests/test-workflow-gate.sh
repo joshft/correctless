@@ -883,6 +883,54 @@ test_inv013a_workflow_gate_consumes_extended_pattern
 test_inv013a_no_local_redefinition
 
 # ---------------------------------------------------------------------------
+# Test: Non-scalar tool_name fails CLOSED (exit 2) — never fail-open (#207)
+# ---------------------------------------------------------------------------
+# PAT-001 clause 5: a PreToolUse gate must exit 2 (block) on unexpected /
+# malformed input — never a non-0/non-2 code, and never exit 0.
+#
+# Root cause (hooks/workflow-gate.sh ~L51-63): the bulk parse
+#   jq -r @sh "TOOL_NAME=\(.tool_name // "")"
+# interpolates tool_name unguarded, so a NON-scalar tool_name escapes the
+# scalar contract that the downstream `eval` + `case "$TOOL_NAME"` assumes:
+#   - array  ["foo","Edit"]  -> @sh renders  TOOL_NAME='foo' 'Edit'
+#                               the `[ -z "$_PARSED" ]` guard passes (non-empty),
+#                               then `eval` runs the command `Edit` -> exit 127
+#                               (the hook dies under set -e BEFORE the gate decision)
+#   - number 42              -> @sh renders  TOOL_NAME=42 ; eval succeeds, the
+#                               case falls through every write-tool branch -> exit 0
+#                               (silent fail-open ALLOW)
+#   - object {"a":"Edit"}    -> @sh cannot render an object -> jq errors ->
+#                               empty _PARSED -> already exits 2 (correct today)
+# All three variants MUST block with exit 2 after the fix.
+
+test_non_scalar_tool_name_fails_closed() {
+  echo ""
+  echo "=== Non-scalar tool_name (#207): fails closed (exit 2), never 127 / never 0 ==="
+
+  setup_test_env
+  set_phase "tdd-impl"
+
+  local result exit_code
+
+  # Array tool_name -> currently exits 127 (eval runs the bare word `Edit`).
+  result="$(run_gate_raw '{"tool_name":["foo","Edit"],"tool_input":{"file_path":"src/x.go"}}')"
+  exit_code="$(extract_exit "$result")"
+  assert_eq "non-scalar tool_name: array fails closed (exit 2, not 127)" "2" "$exit_code"
+
+  # Object tool_name -> @sh cannot render object, empty _PARSED -> already 2.
+  result="$(run_gate_raw '{"tool_name":{"a":"Edit"},"tool_input":{"file_path":"src/x.go"}}')"
+  exit_code="$(extract_exit "$result")"
+  assert_eq "non-scalar tool_name: object fails closed (exit 2)" "2" "$exit_code"
+
+  # Number tool_name -> currently exits 0 (silent fail-open allow).
+  result="$(run_gate_raw '{"tool_name":42,"tool_input":{"file_path":"src/x.go"}}')"
+  exit_code="$(extract_exit "$result")"
+  assert_eq "non-scalar tool_name: number fails closed (exit 2, not 0)" "2" "$exit_code"
+}
+
+test_non_scalar_tool_name_fails_closed
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 

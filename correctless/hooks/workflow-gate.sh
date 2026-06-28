@@ -47,13 +47,22 @@ INPUT="$(cat)"
 # shellcheck disable=SC2034  # Variables assigned via eval+jq below, used later
 TOOL_NAME="" TOOL_INPUT_FILE="" TOOL_INPUT_COMMAND="" TOOL_INPUT_NEW="" TOOL_INPUT_EDITS="" TOOL_INPUT_EDITS_NEW=""
 # QA-R1-005: Fail-closed on malformed stdin JSON (PreToolUse must not degrade to fail-open)
+# #207: tool_name MUST be a scalar string. A non-string (array/object/number/bool/null
+# or absent) tool_name is unexpected input → jq errors → empty $_PARSED → the guard
+# below exits 2 (fail-closed, PAT-001 clause 5). This also prevents @sh from rendering
+# a multi-element array as multiple shell tokens, which would make `eval "$_PARSED"`
+# run an arbitrary command (exit 127, not a fail-closed exit 2). The other interpolated
+# fields are coerced to scalar-or-empty for the same token-safety reason.
 _PARSED="$(echo "$INPUT" | jq -r '
-  @sh "TOOL_NAME=\(.tool_name // "")",
-  @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
-  @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
-  @sh "TOOL_INPUT_NEW=\(.tool_input.new_string // .tool_input.content // "")",
-  @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))",
-  @sh "TOOL_INPUT_EDITS_NEW=\([.tool_input.edits[]?.new_string // empty] | join("\n"))"
+  if (.tool_name | type) != "string" then error("non-string tool_name")
+  else
+    @sh "TOOL_NAME=\(.tool_name)",
+    @sh "TOOL_INPUT_FILE=\(.tool_input.file_path | if type == "string" then . else "" end)",
+    @sh "TOOL_INPUT_COMMAND=\(.tool_input.command | if type == "string" then . else "" end)",
+    @sh "TOOL_INPUT_NEW=\((.tool_input.new_string // .tool_input.content) | if type == "string" then . else "" end)",
+    @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path | select(type == "string")] | join("\n"))",
+    @sh "TOOL_INPUT_EDITS_NEW=\([.tool_input.edits[]?.new_string | select(type == "string")] | join("\n"))"
+  end
 ' 2>/dev/null)" || true
 if [ -z "$_PARSED" ]; then
   echo "BLOCKED [fail-closed]: failed to parse tool input JSON" >&2
