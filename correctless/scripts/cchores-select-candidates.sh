@@ -146,12 +146,23 @@ fi
 #   - from .headRefName: capture the digits in `chore/issue-{N}-` anchored at the
 #     start of the ref and terminated by the literal `-`, so `3` != `33`.
 # Both yield NUMERIC issue ids; membership is then exact numeric equality.
+#
+# AP-039 / PMB-019: the issues blob is UNBOUNDED (every issue body) and MUST NOT
+# transit argv. Passing it via `--argjson issues "$ISSUES_JSON"` puts the whole
+# serialized array on jq's command line, which dies with `Argument list too
+# long` (exit 126) once the single argument exceeds the per-arg ARG_MAX (~128KB
+# on Linux). Instead we feed each blob through a file descriptor via `--rawfile`
+# from process substitution (no persisted temp file) and parse it inside jq with
+# `fromjson`. prs/store get the same treatment for robustness against the class.
 # ---------------------------------------------------------------------------
 RESULT="$(
   jq -n \
-    --argjson issues "$ISSUES_JSON" \
-    --argjson prs "$OPEN_PRS_JSON" \
-    --argjson store "$ATTEMPTED_JSON" '
+    --rawfile issues_raw <(printf '%s' "$ISSUES_JSON") \
+    --rawfile prs_raw <(printf '%s' "$OPEN_PRS_JSON") \
+    --rawfile store_raw <(printf '%s' "$ATTEMPTED_JSON") '
+    ($issues_raw | fromjson) as $issues |
+    ($prs_raw    | fromjson) as $prs    |
+    ($store_raw  | fromjson) as $store  |
     # --- issue numbers referenced by open PRs (exact-ref, RS-027) ---------
     (
       [ $prs[]
