@@ -275,6 +275,12 @@ install_hooks() {
   local migrated=false
   for old_script in lib.sh antipattern-scan.sh; do
     if [ -f "$REPO_ROOT/scripts/$old_script" ]; then
+      # Never delete tracked source (e.g. running setup on the correctless source
+      # repo itself, where scripts/ IS the source of truth — issue #197). The
+      # delete-from-source migration is only safe for an untracked stale install.
+      if git -C "$REPO_ROOT" ls-files --error-unmatch "scripts/$old_script" >/dev/null 2>&1; then
+        continue
+      fi
       mv "$REPO_ROOT/scripts/$old_script" "$script_dest/$old_script"
       migrated=true
     fi
