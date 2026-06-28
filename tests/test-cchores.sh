@@ -335,6 +335,83 @@ else
 fi
 rm -rf "$SC_DIR"
 
+# --------------------------------------------------------------------------
+# INV-002l [behavioral, SCALE — AP-039 / PMB-019 regression, GitHub #209]:
+# the candidate filter must NOT pass the unbounded issues-JSON blob through a
+# BOUNDED medium (argv). At scripts/cchores-select-candidates.sh:152 the full
+# $ISSUES_JSON (every issue body) is handed to `jq -n --argjson issues
+# "$ISSUES_JSON"` — i.e. on the command line. Once the serialized blob exceeds
+# the per-arg ARG_MAX budget (~128KB single-arg on Linux), the `jq` exec fails
+# with `jq: Argument list too long` (exit 126) and the whole pipeline aborts.
+#
+# This is the "unbounded data through a bounded medium (argv)" class. The fix
+# must route the JSON through stdin / a tempfile (e.g. `--rawfile` / `--slurpfile`
+# / `jq -f` reading the array from a file), not argv. This test FAILS NOW
+# (exit 126 / Argument list too long) and PASSES once the JSON no longer transits
+# argv.
+#
+# Fixture is generated DETERMINISTICALLY in-process (no network, no gh): ~220
+# issues each carrying a ~2KB padded body, so the serialized array is comfortably
+# over the single-arg ARG_MAX threshold (>= ~300KB). With an empty open-PRs set
+# and an empty attempted-store, EVERY issue number passes through unchanged, in
+# input order — so we assert exit 0 (NOT 126) AND that the full set survives.
+# --------------------------------------------------------------------------
+SCALE_DIR="$(mktemp -d)"
+echo '[]' > "$SCALE_DIR/open-prs.json"
+echo '{"schema_version":1,"attempts":[]}' > "$SCALE_DIR/attempted.json"
+
+# Build a LARGE issues array: numbers 1001..1220, each with a ~2KB padded body.
+# `range(1001;1221)` => 220 issues; the body padding ("x" * 2000) forces the
+# serialized JSON well past the ~128KB single-arg ARG_MAX ceiling.
+jq -n '
+  ( [range(0;2000) | "x"] | join("") ) as $pad
+  | [ range(1001;1221)
+      | { number: .,
+          title: ("scale issue \(.)"),
+          body: ("padding-\(.)-" + $pad),
+          labels: [{name:"bug"}],
+          createdAt: "2026-06-14T00:00:00Z" } ]
+' > "$SCALE_DIR/issues-large.json" 2>/dev/null
+
+# Sanity: confirm the fixture really is over the bounded-medium threshold so a
+# PASS cannot come from an accidentally-small blob.
+SCALE_BYTES="$(wc -c < "$SCALE_DIR/issues-large.json" | tr -d ' ')"
+if [ "${SCALE_BYTES:-0}" -lt 300000 ]; then
+  fail "INV-002l-fixture" "large issues fixture too small ($SCALE_BYTES bytes) — must be >= 300KB to exceed argv ARG_MAX"
+else
+  pass "INV-002l-fixture" "large issues fixture is $SCALE_BYTES bytes (over single-arg ARG_MAX threshold)"
+fi
+
+if [ -x "$SELECT_CANDIDATES" ]; then
+  SCALE_ERR_FILE="$SCALE_DIR/large.err"
+  SCALE_OUT="$(bash "$SELECT_CANDIDATES" \
+    --attempted-store "$SCALE_DIR/attempted.json" \
+    --open-prs-file "$SCALE_DIR/open-prs.json" \
+    < "$SCALE_DIR/issues-large.json" 2>"$SCALE_ERR_FILE")"
+  SCALE_CODE=$?
+
+  # (a) exit 0, NOT 126 / `Argument list too long`.
+  if [ "$SCALE_CODE" -eq 0 ] && ! grep -qiE 'argument list too long' "$SCALE_ERR_FILE" 2>/dev/null; then
+    pass "INV-002l" "large issues JSON (>=300KB) does not overflow argv — exit 0, no 'Argument list too long' (AP-039 #209)"
+  else
+    fail "INV-002l" "argv overflow: exit=$SCALE_CODE, stderr: $(tr '\n' ' ' < "$SCALE_ERR_FILE" 2>/dev/null) (AP-039 / PMB-019 — JSON must transit stdin/tempfile, not argv)"
+  fi
+
+  # (b) the filtered set is the full pass-through, input order preserved. With an
+  # empty PR set and empty store, every issue number survives — assert the count
+  # and a couple of representative endpoints (#1001 first, #1220 last).
+  SCALE_NUMS="$(printf '%s' "$SCALE_OUT" | jq -r 'if type=="array" then "\(length)|\(.[0])|\(.[-1])" else "PARSE_ERR" end' 2>/dev/null || echo "JQ_ERR")"
+  if [ "$SCALE_NUMS" = "220|1001|1220" ]; then
+    pass "INV-002l-passthrough" "all 220 issues pass through in order (first=1001, last=1220) with empty prs+store"
+  else
+    fail "INV-002l-passthrough" "expected '220|1001|1220' (count|first|last) got '$SCALE_NUMS'"
+  fi
+else
+  fail "INV-002l"             "candidate-filter helper absent — argv-overflow regression unverifiable"
+  fail "INV-002l-passthrough" "candidate-filter helper absent — scale pass-through unverifiable"
+fi
+rm -rf "$SCALE_DIR"
+
 # INV-002k [structural, B-3]: keep the exact gh issue list command-shape pinned in
 # the skill (the helper consumes this JSON; the skill must still issue the canonical
 # command with --state open --limit 100 --json number,title,body,labels,createdAt).
