@@ -356,16 +356,17 @@ fi
 # STEP 12: Collect Artifact Browser data
 # ============================================================================
 
-# Helper: read a file and return JSON-safe content via jq --arg
+# Helper: read a file and return JSON-safe content via jq --rawfile.
+# --rawfile reads the file directly from the filesystem; content never transits
+# argv, so a single large artifact cannot overflow MAX_ARG_STRLEN (AP-039/PMB-019,
+# issue #144). read_file_json is only called on globbed existing files.
 read_file_json() {
   local filepath="$1"
   local name
   name=$(basename "$filepath")
-  local content
-  content=$(cat "$filepath" 2>/dev/null || echo "")
   local mtime
   mtime=$(stat -c '%Y' "$filepath" 2>/dev/null || stat -f '%m' "$filepath" 2>/dev/null || echo "0")
-  jq -n --arg name "$name" --arg path "$filepath" --arg content "$content" --arg mtime "$mtime" \
+  jq -n --rawfile content "$filepath" --arg name "$name" --arg path "$filepath" --arg mtime "$mtime" \
     '{"name": $name, "path": $path, "content": $content, "mtime": ($mtime | tonumber)}'
 }
 
