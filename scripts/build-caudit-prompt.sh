@@ -374,11 +374,15 @@ build_caudit_prompt() {
      && jq -e . "$findings_path" >/dev/null 2>&1; then
     # Filter: drop null/empty/whitespace-only descriptions; dedupe id; sort by id.
     local filtered
+    # Normalize the artifact shape: the canonical writer audit-record.sh
+    # write-round persists {"findings":[...],"rejected":[...]}; older/bare inputs
+    # are a plain array. Project .findings for the object form, else use as-is.
     filtered="$(jq -c '
-      [ .[]
-        | select(.description != null)
-        | select((.description | gsub("\\s";"") ) != "")
-      ]
+      (if type=="object" then .findings else . end)
+      | [ .[]
+          | select(.description != null)
+          | select((.description | gsub("\\s";"") ) != "")
+        ]
       | unique_by(.id)
       | sort_by(.id)
     ' "$findings_path" 2>/dev/null || echo '[]')"

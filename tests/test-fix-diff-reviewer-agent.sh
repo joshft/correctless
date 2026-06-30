@@ -3497,6 +3497,84 @@ cs_check_cardinality() {
 }
 
 # ============================================================================
+# Issue #216: build_caudit_prompt findings-artifact shape — object vs bare array
+#
+# Relocated from the standalone tests/test-caudit-prompt-findings-shape.sh,
+# which was deleted to keep net-new test files at 0 (a new file broke
+# tests/test-ap031-fixture-divergence.sh R-006(c)'s documented-count assertion).
+# This file is the correct semantic home: it already exercises
+# build_caudit_prompt and the <UNTRUSTED_FINDING_DESCRIPTION fence.
+#
+# The canonical writer scripts/audit-record.sh write-round persists the
+# per-round findings artifact as an OBJECT {"findings":[...],"rejected":[...]}.
+# The reader build_caudit_prompt MUST emit the <UNTRUSTED_FINDING_DESCRIPTION
+# fence for the object form (issue #216 regression guard) AND the bare-array
+# form (back-compat), and MUST OMIT the fence for an empty-findings object
+# (advisory path). Uses plain pass/fail (NOT cs_pass/cs_fail) so the CS-007
+# cardinality membership-equality check is unaffected.
+# ============================================================================
+
+check_issue_216_findings_shape() {
+  section "issue #216: findings-artifact shape — object vs bare array"
+
+  if [ ! -f "$CS_PROMPT_HELPER" ]; then
+    fail "ISSUE216(helper)" "$CS_PROMPT_HELPER missing — cannot exercise build_caudit_prompt"
+    return
+  fi
+  # shellcheck disable=SC1090
+  source "$CS_PROMPT_HELPER" 2>/dev/null || { fail "ISSUE216(helper)" "helper failed to source"; return; }
+  if ! declare -F build_caudit_prompt >/dev/null 2>&1; then
+    fail "ISSUE216(helper)" "build_caudit_prompt not defined after sourcing helper"
+    return
+  fi
+
+  local tmp
+  tmp="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '$tmp'" RETURN
+
+  # Minimal non-empty diff fixture (arg 1). Content is irrelevant to the fence;
+  # the producer only needs a readable, non-empty file.
+  local diff_fixture="$tmp/diff.txt"
+  printf 'diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n' > "$diff_fixture"
+
+  # ----- OBJ-SHAPE: object {findings,rejected} artifact must emit the fence -----
+  # This is the EXACT shape audit-record.sh write-round persists — the issue
+  # #216 regression guard (object form, not a bare array).
+  local obj_f="$tmp/object-shape.json"
+  printf '%s' '{"findings":[{"id":"CR-1","description":"a real finding description"}],"rejected":[]}' > "$obj_f"
+  local out_obj
+  out_obj="$(build_caudit_prompt "$diff_fixture" "$obj_f" "rule text" 2>/dev/null)"
+  if printf '%s' "$out_obj" | grep -qF '<UNTRUSTED_FINDING_DESCRIPTION'; then
+    pass "ISSUE216(OBJ-SHAPE)" "object {findings,rejected} artifact with a real finding emits <UNTRUSTED_FINDING_DESCRIPTION fence"
+  else
+    fail "ISSUE216(OBJ-SHAPE)" "object-shaped findings artifact dropped the fence (got advisory instead) — issue #216"
+  fi
+
+  # ----- ARR-SHAPE: bare-array artifact must also emit the fence (back-compat) -----
+  local arr_f="$tmp/bare-array.json"
+  printf '%s' '[{"id":"CR-1","description":"x"}]' > "$arr_f"
+  local out_arr
+  out_arr="$(build_caudit_prompt "$diff_fixture" "$arr_f" "rule text" 2>/dev/null)"
+  if printf '%s' "$out_arr" | grep -qF '<UNTRUSTED_FINDING_DESCRIPTION'; then
+    pass "ISSUE216(ARR-SHAPE)" "bare-array findings artifact still emits the fence (fallback path preserved)"
+  else
+    fail "ISSUE216(ARR-SHAPE)" "bare-array findings artifact did NOT emit the fence — fallback path broken"
+  fi
+
+  # ----- OBJ-EMPTY: empty-findings object must NOT emit the fence (advisory) -----
+  local empty_f="$tmp/object-empty.json"
+  printf '%s' '{"findings":[],"rejected":[]}' > "$empty_f"
+  local out_empty
+  out_empty="$(build_caudit_prompt "$diff_fixture" "$empty_f" "rule text" 2>/dev/null)"
+  if printf '%s' "$out_empty" | grep -qF '<UNTRUSTED_FINDING_DESCRIPTION'; then
+    fail "ISSUE216(OBJ-EMPTY)" "empty {findings:[],rejected:[]} artifact emitted a fence — should advise instead"
+  else
+    pass "ISSUE216(OBJ-EMPTY)" "empty-findings object correctly omits the fence (advisory path)"
+  fi
+}
+
+# ============================================================================
 # Run all checks
 # ============================================================================
 
@@ -3540,6 +3618,7 @@ check_orphan_variables
 check_gap002_dd009_metadata
 check_gap008_abs010_narrow_scope
 check_class_shaped_bug_detection
+check_issue_216_findings_shape
 
 # ============================================================================
 # Summary
