@@ -264,6 +264,137 @@ WCONF
 }
 
 # ---------------------------------------------------------------------------
+# Bug 5: GREEN-gate retry-once + stream-to-file — issue #186
+# ---------------------------------------------------------------------------
+# The GREEN gate `tests_pass()` in hooks/workflow-advance.sh bails on the first
+# suite failure. Under output-capture + concurrent load, a nested $() inside a
+# test can transiently return empty, so a single spurious assertion failure
+# intermittently blocks the phase transition even though the suite is green.
+# Fix contract:
+#   - retry-once: on a GREEN-gate suite failure, re-run the suite once; only a
+#     failure that persists across BOTH runs blocks.
+#   - persistent failure still blocks (retry must not swallow real breakage).
+#   - a clean pass is unaffected.
+#   - the RED gate (tests_fail_not_build_error) keeps its "must fail first"
+#     semantics — retry-once must NOT leak into it.
+
+# Drive a fresh throwaway project to the tdd-impl phase so that `ADV qa` runs the
+# GREEN gate (tests_pass). $1 = commands.test, $2 = commands.test_new (always a
+# RED-gate failure so `ADV impl` reaches tdd-impl without invoking $1),
+# $3 = branch name. Callers MUST pass the test command single-quoted so that any
+# $(...) / $((...)) / $var inside it is preserved literally (jq --arg embeds the
+# already-set shell variable verbatim — no shell or JSON-escaping hazard).
+green_gate_reach_impl() {
+  local test_cmd="$1" test_new="$2" branch="$3"
+  setup_test_project
+  .claude/skills/workflow/setup >/dev/null 2>&1
+  git checkout -q -b "$branch"
+
+  jq -n --arg t "$test_cmd" --arg tn "$test_new" '
+    {
+      project: { name: "test-app", language: "typescript", description: "" },
+      commands: { test: $t, test_new: $tn, lint: "echo ok", build: "echo ok" },
+      patterns: {
+        test_file: "*.test.ts",
+        source_file: "*.ts",
+        test_fail_pattern: "FAIL",
+        build_error_pattern: "SyntaxError|Cannot find module"
+      },
+      is_monorepo: false,
+      packages: {},
+      workflow: { min_qa_rounds: 1, require_review: true, auto_update_antipatterns: true }
+    }' > .correctless/config/workflow-config.json
+
+  ADV init "green gate flake" >/dev/null 2>&1
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/green-gate-flake.md
+  ADV review >/dev/null 2>&1
+  ADV tests >/dev/null 2>&1
+  echo '// test' > green.test.ts
+  git add green.test.ts >/dev/null 2>&1
+  # RED gate uses commands.test_new (always fails) → reaches tdd-impl without
+  # touching the flaky counter in commands.test.
+  ADV impl >/dev/null 2>&1
+}
+
+test_green_gate_retry_once() {
+  echo ""
+  echo "=== Bug 5: GREEN-gate retry-once + stream-to-file (issue #186) ==="
+
+  # Flaky counter lives INSIDE the throwaway project (relative path resolved from
+  # the eval cwd, which is TEST_DIR) — never a hardcoded /tmp path.
+  local counter="$TEST_DIR/.flaky-counter"
+  # STATEFUL command: FAIL on the 1st invocation, PASS on the 2nd. No embedded
+  # double quotes → embeds cleanly as a JSON string via jq --arg.
+  local flaky_cmd='c=$(cat .flaky-counter 2>/dev/null || echo 0); c=$((c+1)); echo $c > .flaky-counter; if [ $c -eq 1 ]; then echo FAILhere; exit 1; else echo PASS; exit 0; fi'
+
+  # --- #186.1 [integration] PRIMARY (RED today): retry-once tolerates a single
+  #     transient flake. First tests_pass run fails; retry re-runs; 2nd passes;
+  #     the gate must SUCCEED. Current code bails on the first failure → FAILS. ---
+  green_gate_reach_impl "$flaky_cmd" 'echo NEW_FAIL && exit 1' feature/green-gate-flake
+  rm -f "$counter"   # fresh counter for this assertion
+  local flaky_out flaky_exit
+  flaky_out="$(ADV qa 2>&1)" && flaky_exit=0 || flaky_exit=$?
+  assert_eq "#186.1: GREEN gate SUCCEEDS when test fails once then passes on retry" "0" "$flaky_exit"
+  # Surface the gate output for the RED-phase report (only when it blocked).
+  if [ "$flaky_exit" != "0" ]; then
+    echo "  ---- #186.1 gate output (RED — expected once fix lands) ----"
+    echo "$flaky_out" | sed 's/^/  | /'
+    echo "  ------------------------------------------------------------"
+  fi
+
+  # --- #186.2 [integration] guard: a PERSISTENT failure still BLOCKS. Prevents
+  #     retry-once from swallowing real breakage. Passes before AND after fix. ---
+  green_gate_reach_impl 'echo FAILhere; exit 1' 'echo NEW_FAIL && exit 1' feature/green-gate-persist
+  local persist_exit
+  (ADV qa >/dev/null 2>&1) && persist_exit=0 || persist_exit=$?
+  assert_eq "#186.2: GREEN gate BLOCKS when the suite fails on both runs" "1" "$persist_exit"
+
+  # --- #186.3 [integration] a CLEAN pass is unaffected. Passes before/after. ---
+  green_gate_reach_impl 'echo PASS; exit 0' 'echo NEW_FAIL && exit 1' feature/green-gate-clean
+  local clean_exit
+  (ADV qa >/dev/null 2>&1) && clean_exit=0 || clean_exit=$?
+  assert_eq "#186.3: GREEN gate SUCCEEDS when the suite passes cleanly" "0" "$clean_exit"
+
+  # --- #186.4 [integration] regression guard: retry-once must NOT leak into the
+  #     RED gate. tests_fail_not_build_error still requires tests to FAIL; a
+  #     passing commands.test (no test_new) must still BLOCK `ADV impl` with the
+  #     "tests pass — they need to fail first" semantics. Passes before/after. ---
+  setup_test_project
+  .claude/skills/workflow/setup >/dev/null 2>&1
+  git checkout -q -b feature/red-gate-unchanged
+  cat > .correctless/config/workflow-config.json <<'WCONF'
+{
+  "project": { "name": "test-app", "language": "typescript", "description": "" },
+  "commands": {
+    "test": "echo PASSED; exit 0",
+    "lint": "echo ok",
+    "build": "echo ok"
+  },
+  "patterns": {
+    "test_file": "*.test.ts",
+    "source_file": "*.ts",
+    "test_fail_pattern": "FAIL",
+    "build_error_pattern": "SyntaxError|Cannot find module"
+  },
+  "is_monorepo": false,
+  "packages": {},
+  "workflow": { "min_qa_rounds": 1, "require_review": true, "auto_update_antipatterns": true }
+}
+WCONF
+  ADV init "red gate unchanged" >/dev/null 2>&1
+  mkdir -p .correctless/specs
+  echo "# Spec" > .correctless/specs/red-gate-unchanged.md
+  ADV review >/dev/null 2>&1
+  ADV tests >/dev/null 2>&1
+  echo '// test' > red.test.ts
+  git add red.test.ts >/dev/null 2>&1
+  local red_exit
+  (ADV impl >/dev/null 2>&1) && red_exit=0 || red_exit=$?
+  assert_eq "#186.4: RED gate still BLOCKS impl when tests pass (retry not leaked into RED gate)" "1" "$red_exit"
+}
+
+# ---------------------------------------------------------------------------
 # Bug 3: QA Findings Status — R-006, R-007
 # ---------------------------------------------------------------------------
 
@@ -395,6 +526,7 @@ echo "====================================="
 
 test_slug_truncation
 test_red_gate_test_new
+test_green_gate_retry_once
 test_qa_findings_status
 test_sync_check
 

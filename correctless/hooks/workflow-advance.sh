@@ -260,6 +260,29 @@ has_formal_model() {
 # Test execution helpers
 # ---------------------------------------------------------------------------
 
+# Run the configured test command, streaming output to a temp file (bounded
+# memory — avoids accumulating the whole suite in one shell variable, which under
+# output-capture + concurrent load can transiently truncate, issue #186).
+# Sets TEST_CAPTURE_FILE to the temp path; returns the command's exit code.
+run_test_to_file() {
+  TEST_CAPTURE_FILE="$(mktemp)"
+  # Run in a subshell so an `exit` in the configured test command terminates the
+  # subshell, not this hook process (the previous `$(eval ...)` form relied on
+  # command-substitution subshell isolation for the same reason).
+  ( eval "$1" ) > "$TEST_CAPTURE_FILE" 2>&1
+}
+
+# GREEN gate: run the suite once, retry ONCE on failure to absorb the issue #186
+# output-capture flake. Returns 0 if EITHER attempt passes; returns non-zero only
+# when BOTH attempts fail. Leaves TEST_CAPTURE_FILE pointing at the last run's
+# output (caller is responsible for removing it).
+green_suite_passes() {
+  run_test_to_file "$1" && return 0
+  rm -f "$TEST_CAPTURE_FILE"
+  run_test_to_file "$1" && return 0   # retry once (#186)
+  return 1
+}
+
 tests_fail_not_build_error() {
   local test_cmd fail_pattern build_pattern
   # Use first affected package's config, or global fallback
@@ -278,27 +301,35 @@ tests_fail_not_build_error() {
 
   [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
 
-  local output exit_code
-  output="$(eval "$test_cmd" 2>&1)" && exit_code=0 || exit_code=$?
+  # Stream test output to a temp file (issue #186 — no retry on the RED gate;
+  # tests MUST fail here). run_test_to_file sets TEST_CAPTURE_FILE.
+  local exit_code
+  run_test_to_file "$test_cmd" && exit_code=0 || exit_code=$?
 
   if [ "$exit_code" -eq 0 ]; then
+    rm -f "$TEST_CAPTURE_FILE"
     die "Tests pass — they need to fail first (RED phase). Write tests that exercise the spec rules, then advance."
   fi
 
   # Check for build errors vs test failures
   if [ -n "$build_pattern" ] && [ "$build_pattern" != "null" ]; then
-    if echo "$output" | grep -qE "$build_pattern"; then
+    if grep -qE "$build_pattern" "$TEST_CAPTURE_FILE"; then
       # Could be build error — check if there are also test failures
       if [ -n "$fail_pattern" ] && [ "$fail_pattern" != "null" ]; then
-        if echo "$output" | grep -qE "$fail_pattern"; then
+        if grep -qE "$fail_pattern" "$TEST_CAPTURE_FILE"; then
+          rm -f "$TEST_CAPTURE_FILE"
           return 0  # Has both build-like and fail-like output — treat as test failure
         fi
       fi
-      die "Tests don't compile (build error), not a test failure. Fix compilation errors before advancing.\n\nOutput:\n$output"
+      local build_out
+      build_out="$(cat "$TEST_CAPTURE_FILE")"
+      rm -f "$TEST_CAPTURE_FILE"
+      die "Tests don't compile (build error), not a test failure. Fix compilation errors before advancing.\n\nOutput:\n$build_out"
     fi
   fi
 
   # Exit code non-zero and no build error detected — it's a test failure
+  rm -f "$TEST_CAPTURE_FILE"
   return 0
 }
 
@@ -309,37 +340,47 @@ tests_pass() {
     packages="$(detect_affected_packages)"
     for pkg in $packages; do
       [ "$pkg" = "." ] && continue
-      local cmd output exit_code
+      local cmd
       cmd="$(read_package_config '.commands.test' "$pkg")"
       [ -n "$cmd" ] && [ "$cmd" != "null" ] || continue
       any_run=true
-      output="$(eval "$cmd" 2>&1)" && exit_code=0 || exit_code=$?
-      if [ "$exit_code" -ne 0 ]; then
-        die "Tests do not pass in package '$pkg'. Fix failures before advancing.\n\nOutput (last 30 lines):\n$(echo "$output" | tail -30)"
+      # GREEN gate: retry once to absorb the issue #186 output-capture flake.
+      if ! green_suite_passes "$cmd"; then
+        local fail_tail
+        fail_tail="$(tail -30 "$TEST_CAPTURE_FILE")"
+        rm -f "$TEST_CAPTURE_FILE"
+        die "Tests do not pass in package '$pkg'. Fix failures before advancing.\n\nOutput (last 30 lines):\n$fail_tail"
       fi
+      rm -f "$TEST_CAPTURE_FILE"
     done
     # If no package tests ran, fall back to global test command
     if [ "$any_run" = "false" ]; then
-      local test_cmd output exit_code
+      local test_cmd
       test_cmd="$(read_config_field '.commands.test')"
       [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
-      output="$(eval "$test_cmd" 2>&1)" && exit_code=0 || exit_code=$?
-      if [ "$exit_code" -ne 0 ]; then
-        die "Tests do not pass. Fix failures before advancing.\n\nOutput (last 30 lines):\n$(echo "$output" | tail -30)"
+      if ! green_suite_passes "$test_cmd"; then
+        local fail_tail
+        fail_tail="$(tail -30 "$TEST_CAPTURE_FILE")"
+        rm -f "$TEST_CAPTURE_FILE"
+        die "Tests do not pass. Fix failures before advancing.\n\nOutput (last 30 lines):\n$fail_tail"
       fi
+      rm -f "$TEST_CAPTURE_FILE"
     fi
     return 0
   fi
 
-  local test_cmd output exit_code
+  local test_cmd
   test_cmd="$(read_config_field '.commands.test')"
   [ -n "$test_cmd" ] && [ "$test_cmd" != "null" ] || die "No test command configured"
 
-  output="$(eval "$test_cmd" 2>&1)" && exit_code=0 || exit_code=$?
-
-  if [ "$exit_code" -ne 0 ]; then
-    die "Tests do not pass. Fix failures before advancing.\n\nOutput (last 30 lines):\n$(echo "$output" | tail -30)"
+  # GREEN gate: retry once to absorb the issue #186 output-capture flake.
+  if ! green_suite_passes "$test_cmd"; then
+    local fail_tail
+    fail_tail="$(tail -30 "$TEST_CAPTURE_FILE")"
+    rm -f "$TEST_CAPTURE_FILE"
+    die "Tests do not pass. Fix failures before advancing.\n\nOutput (last 30 lines):\n$fail_tail"
   fi
+  rm -f "$TEST_CAPTURE_FILE"
   return 0
 }
 
