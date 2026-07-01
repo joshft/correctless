@@ -947,12 +947,38 @@ test_il_inv007_generalized_mechanism() {
 
   # (c) timeout literals collapsed — a generalized map means each literal is
   # not duplicated across the fresh-install + update seams (currently 2x each).
+  #
+  # Idiom fix (test-quality bug): `grep -c PAT f || echo 0` is BROKEN — grep -c
+  # prints `0` AND exits 1 on no match, so `|| echo 0` appends a SECOND line and
+  # the count var becomes $'0\n0', which makes `[ "$n" -le 1 ]` throw
+  # "integer expression expected" (a spurious FAIL) the moment a literal reaches
+  # 0 occurrences. Capture the single value and default it instead.
   local n5000 n1000
-  n5000="$(grep -c 'timeout_ms: 5000' "$setup_file" 2>/dev/null || echo 0)"
-  n1000="$(grep -c 'timeout_ms: 1000' "$setup_file" 2>/dev/null || echo 0)"
+  n5000="$(grep -c 'timeout_ms: 5000' "$setup_file" 2>/dev/null)"; n5000=${n5000:-0}
+  n1000="$(grep -c 'timeout_ms: 1000' "$setup_file" 2>/dev/null)"; n1000=${n1000:-0}
   local collapsed="false"
   if [ "$n5000" -le 1 ] && [ "$n1000" -le 1 ]; then collapsed="true"; fi
   assert_eq "IL-INV-007: timeout literals not duplicated (map, not per-seam literal)" "true" "$collapsed"
+
+  # (d) POSITIVE structural assertion (class-fix for the bespoke-per-type bypass).
+  # The (b) negative grep (no `InstructionsLoaded)` case arm) and the (c) literal
+  # count are BOTH defeated by a bespoke `if [ "$hook_type" = "InstructionsLoaded" ]`
+  # / `elif` block that special-cases the type while passing the timeout via a
+  # variable — reintroducing AP-024/PMB-003 per-type special-casing invisibly.
+  # Enforce that within register_hooks(), the literal `InstructionsLoaded` appears
+  # ONLY inside comments and the generalized KNOWN_HOOK_TYPES associative-array
+  # declaration (the `[InstructionsLoaded]=` element) — NEVER inside executable
+  # code. Any remaining occurrence after stripping those two legitimate homes is a
+  # bespoke per-type statement (if/elif/case/test/[) branching on the hook type.
+  local func_body
+  func_body="$(sed -n '/^register_hooks()/,/^}/p' "$setup_file")"
+  local il_in_code
+  il_in_code="$(printf '%s\n' "$func_body" \
+    | grep -v '^[[:space:]]*#' \
+    | grep -v '^[[:space:]]*\[InstructionsLoaded\]=' \
+    | grep -c 'InstructionsLoaded')"
+  il_in_code=${il_in_code:-0}
+  assert_eq "IL-INV-007: InstructionsLoaded only in KNOWN_HOOK_TYPES + comments (no bespoke per-type branch)" "0" "$il_in_code"
 }
 
 # ============================================================================

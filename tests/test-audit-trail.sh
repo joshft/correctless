@@ -82,6 +82,33 @@ else
 fi
 
 # ============================================================================
+# audit-trail ts FORMAT: the FRESHLY-EMITTED entry's .ts must be ISO-8601
+# (date -u +%FT%TZ) — the SAME format hooks/instructions-loaded.sh emits and the
+# /cwtf `.ts // .timestamp` join + /cmetrics staleness math depend on. The
+# INV-015a/b checks above assert .ts PRESENCE only, and the AP-031 fixture checks
+# below read a STATIC file — neither would catch a mutant that changes the live
+# emission to epoch (date +%s -> "1751..."). This runs the hook and locks the
+# generated format, mirroring test-instructions-loaded.sh's INV-003-ts regex.
+# ============================================================================
+section "audit-trail ts format: fresh entry .ts is ISO-8601"
+
+if [ -f "$AUDIT_HOOK" ]; then
+  ts_line="$(run_audit_with_session "sess-ts-check")"
+  if [ -n "$ts_line" ] && printf '%s' "$ts_line" | jq -e . >/dev/null 2>&1; then
+    fresh_ts="$(printf '%s' "$ts_line" | jq -r '.ts' 2>/dev/null)"
+    if printf '%s' "$fresh_ts" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'; then
+      pass "INV-015-ts" "fresh audit entry .ts matches ISO-8601 ^YYYY-MM-DDTHH:MM:SSZ\$ (date -u +%FT%TZ)"
+    else
+      fail "INV-015-ts" "audit entry .ts '$fresh_ts' is not ISO-8601 — epoch/format drift breaks /cwtf join + /cmetrics staleness"
+    fi
+  else
+    fail "INV-015-ts" "no valid audit entry produced to inspect .ts"
+  fi
+else
+  fail "INV-015-ts" "hooks/audit-trail.sh not found"
+fi
+
+# ============================================================================
 # INV-015c: empty/null session_id is shown as such (never treated as a match)
 # ============================================================================
 section "INV-015c: empty session_id shown as-is"

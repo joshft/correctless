@@ -187,6 +187,26 @@ d="$(make_env yes)"
 il_run "$d" "$NULLPATH_START_PAYLOAD" >/dev/null
 if [ "$(log_lines "$d")" = "0" ]; then pass "INV-002e" "absent file_path + session_start writes no entry"; else fail "INV-002e" "absent-path non-glob reason wrote a log line"; fi
 
+# (g) NON-boundary substring: `.claude/rules/` embedded WITHOUT a preceding `/`
+# boundary (e.g. `evil.claude/rules/secret`, `x.claude/rules/y`) must NOT be
+# treated as a rule-file load. canonicalize_path leaves these unchanged and the
+# boundary-anchored prefix check (`.claude/rules/*` | `*/.claude/rules/*`)
+# rejects them — nothing is logged. A substring mutant (`*.claude/rules/*`)
+# would MATCH these and write a log line (AP-032 class). This locks the boundary
+# semantics that no other INV-002 case exercises (the traversal case (c) tests a
+# path that canonicalizes OUTSIDE the tree; this tests a path that never was a
+# rule path to begin with because `.claude/rules/` is a mid-token substring).
+for _sp in "evil.claude/rules/secret" "x.claude/rules/y"; do
+  d="$(make_env yes)"
+  _substr_payload="$(jq -nc --arg fp "$_sp" '{session_id:"s-1",file_path:$fp,load_reason:"path_glob_match",cwd:"/proj"}')"
+  il_run "$d" "$_substr_payload" >/dev/null
+  if [ "$(log_lines "$d")" = "0" ]; then
+    pass "INV-002g[$_sp]" "non-boundary '.claude/rules/' substring writes no entry"
+  else
+    fail "INV-002g[$_sp]" "substring '$_sp' logged — boundary prefix-check degraded to substring match (AP-032)"
+  fi
+done
+
 # grep: path decision uses canonicalize_path (PAT-017), not substring/suffix
 if [ -f "$IL_HOOK" ]; then
   if grep -q 'canonicalize_path' "$IL_HOOK"; then pass "INV-002f" "hook uses canonicalize_path (PAT-017)"; else fail "INV-002f" "hook does not reference canonicalize_path — substring/suffix matching is prohibited (AP-032/RS-011)"; fi

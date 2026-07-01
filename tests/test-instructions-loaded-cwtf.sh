@@ -173,6 +173,44 @@ else
 fi
 
 # ============================================================================
+# AP-014/AP-039 STRUCTURAL: the extracted cwtf:rule-load-extract block must read
+# IL_LOG / AUDIT_TRAIL by LINE-STREAMING from the file path (jq -R / jq -Rr),
+# NEVER by slurping the whole file into a shell variable or onto argv.
+#
+# The "data does not transit argv / no whole-file slurp" contract is only guarded
+# above by the `jq -s` prose grep (INV-008d). A `content="$(cat "$IL_LOG")"` or
+# `$(<"$AUDIT_TRAIL")` whole-file slurp into a variable bypasses that grep
+# entirely and passes every other test. This block-scoped assertion (over the
+# EXTRACTED block, not all of SKILL.md) kills that mutant: it rejects any
+# $(cat ...IL_LOG/AUDIT_TRAIL...), any $(< ...IL_LOG/AUDIT_TRAIL...), and (belt)
+# any `jq -s`. The current block reads both files line-by-line via jq -R/-Rr, so
+# this PASSES on correct code.
+# ============================================================================
+section "AP-014/AP-039: extracted block line-streams IL_LOG/AUDIT_TRAIL (no whole-file slurp)"
+
+blk_slurp="$(extract_cwtf_block)"
+if [ -z "${blk_slurp//[[:space:]]/}" ]; then
+  fail "INV-008-noslurp" "cwtf rule-load-extract block absent — cannot verify no-slurp contract"
+else
+  _slurp_hit=""
+  for _pat in \
+    '\$\(cat[^)]*IL_LOG' \
+    '\$\(<[^)]*IL_LOG' \
+    '\$\(cat[^)]*AUDIT_TRAIL' \
+    '\$\(<[^)]*AUDIT_TRAIL' \
+    'jq -s'; do
+    if printf '%s\n' "$blk_slurp" | grep -qE -- "$_pat"; then
+      _slurp_hit="$_slurp_hit [$_pat]"
+    fi
+  done
+  if [ -z "$_slurp_hit" ]; then
+    pass "INV-008-noslurp" "block reads IL_LOG/AUDIT_TRAIL via jq -R/-Rr from the path (no cat/\$(<)/jq -s slurp)"
+  else
+    fail "INV-008-noslurp" "block slurps a whole file into a variable/argv (AP-014/AP-039):$_slurp_hit"
+  fi
+fi
+
+# ============================================================================
 # QA-001 / INV-015 [integration] EXECUTABLE CONTRACT: an empty-string session
 # folds into the "unattributed" group — it can never form its own (blank-named)
 # group. Uses a SEPARATE fixture (audit-trail-emptysession.jsonl) so the
