@@ -95,11 +95,24 @@ if [ -f "$AUDIT_HOOK" ]; then
     else
       fail "INV-015c" "empty session_id was rewritten to '$val'"
     fi
+    # QA-001 / INV-015: canonical-empty->null. An empty stdin session_id MUST be
+    # emitted as JSON null (not ""), matching hooks/instructions-loaded.sh. This
+    # is the producer half of the guarantee that a "" session can never form its
+    # own /cwtf group or match a real session — it collapses to the same shape as
+    # a genuinely absent session.
+    if printf '%s' "$line" | jq -e '.session_id == null' >/dev/null 2>&1; then
+      pass "INV-015c-null" "empty stdin session_id normalized to JSON null (not empty string)"
+    else
+      _stype="$(printf '%s' "$line" | jq -r '.session_id | type' 2>/dev/null)"
+      fail "INV-015c-null" "empty session_id emitted as JSON $_stype, want null (canonical-empty->null)"
+    fi
   else
     fail "INV-015c" "entry lacks session_id field for empty-session case (RED)"
+    fail "INV-015c-null" "no audit entry to inspect for canonical-empty->null"
   fi
 else
   fail "INV-015c" "hooks/audit-trail.sh not found"
+  fail "INV-015c-null" "hooks/audit-trail.sh not found"
 fi
 
 # ============================================================================

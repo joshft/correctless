@@ -168,8 +168,10 @@ edit_sessions=""
 if [ -n "$AUDIT_TRAIL" ] && [ -f "$AUDIT_TRAIL" ]; then
   # hook-edit entries = those whose .file is under hooks/ (time read as .ts // .timestamp, RS-030)
   hook_edits="$(jq -R 'fromjson? | select((.file // "") | startswith("hooks/")) | 1' "$AUDIT_TRAIL" 2>/dev/null | grep -c .)"
-  # edit-session ids (missing session_id -> unattributed), de-duplicated
-  edit_sessions="$(jq -Rr 'fromjson? | select((.file // "") | startswith("hooks/")) | (.session_id // "unattributed")' "$AUDIT_TRAIL" 2>/dev/null | sort -u)"
+  # edit-session ids (missing/null/empty session_id -> unattributed), de-duplicated.
+  # `// "unattributed"` alone does NOT catch "" (jq // only catches null/false), so
+  # empty-string sessions are folded into unattributed explicitly (QA-001 / INV-015).
+  edit_sessions="$(jq -Rr 'fromjson? | select((.file // "") | startswith("hooks/")) | (.session_id // "" | if . == "" then "unattributed" else . end)' "$AUDIT_TRAIL" 2>/dev/null | sort -u)"
 fi
 edit_session_count="$(printf '%s\n' "$edit_sessions" | grep -c .)"
 
@@ -186,11 +188,14 @@ printf '%s\n' "$edit_sessions" | while IFS= read -r sess; do
   echo "=== edit-session: ${sess} ==="
   jq -Rr --arg s "$sess" 'fromjson?
      | select((.file // "") | startswith("hooks/"))
-     | select((.session_id // "unattributed") == $s)
+     | select((.session_id // "" | if . == "" then "unattributed" else . end) == $s)
      | "  hook-edit: \(.file) at \((.ts // .timestamp) // "?")"' "$AUDIT_TRAIL" 2>/dev/null
+  # Rule-loads are only attributed to real (non-unattributed) sessions. The key is
+  # normalized identically so a null/empty-session rule-load can never match a real
+  # $s, and the "unattributed" group never claims any rule-load (QA-001 / INV-015).
   if [ "$sess" != "unattributed" ]; then
     jq -Rr --arg s "$sess" 'fromjson?
-       | select((.session_id // "") == $s)
+       | select((.session_id // "" | if . == "" then "unattributed" else . end) == $s)
        | "  rule-load: \(.rule_file // "(null)") (trigger_file_path \(.trigger_file_path // "?")) at \(.ts // "?")"' "$IL_LOG" 2>/dev/null
   fi
 done

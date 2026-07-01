@@ -107,7 +107,7 @@ _audit_branch="$(git --no-optional-locks branch --show-current 2>/dev/null || tr
 # as a display-alignment aid for the /cwtf side-by-side view. Additive + backward-compatible.
 printf '%s\n' "$FILES" | jq -Rnc \
   --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$_audit_branch" --arg session "$SESSION_ID" \
-  '[inputs | select(length > 0)] | .[] | {ts:$ts,phase:$phase,tool:$tool,file:.,branch:$branch,session_id:$session}' \
+  '[inputs | select(length > 0)] | .[] | {ts:$ts,phase:$phase,tool:$tool,file:.,branch:$branch,session_id:(if $session == "" then null else $session end)}' \
   >> "$TRAIL" 2>/dev/null
 
 # --- Adherence feedback (Lite: violations only, Full: + coverage tracking) ---

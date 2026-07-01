@@ -173,6 +173,55 @@ else
 fi
 
 # ============================================================================
+# QA-001 / INV-015 [integration] EXECUTABLE CONTRACT: an empty-string session
+# folds into the "unattributed" group — it can never form its own (blank-named)
+# group. Uses a SEPARATE fixture (audit-trail-emptysession.jsonl) so the
+# FIX-sess-distinct / FIX-sess-grouping assertions on audit-trail-sessioned.jsonl
+# (which expect exactly 2 distinct sessions) are not perturbed.
+#
+# Fixture: hooks/audit-trail.sh edit with session_id:"" (empty) + hooks/workflow-
+# gate.sh edit with session 3333... . Correct grouping -> {unattributed, 3333...},
+# never a group whose name is the empty string.
+# ============================================================================
+section "QA-001 executable contract: empty-string session folds into unattributed"
+
+AUDIT_EMPTY="$FIXTURES/audit-trail-emptysession.jsonl"
+blk_e="$(extract_cwtf_block)"
+if [ -z "${blk_e//[[:space:]]/}" ]; then
+  fail "QA-001-empty" "cwtf rule-load-extract block absent — cannot exercise grouping"
+elif [ ! -f "$AUDIT_EMPTY" ]; then
+  fail "QA-001-empty" "audit-trail-emptysession.jsonl fixture missing"
+else
+  tmp_e="$(mktemp)"
+  printf '%s\n' "$blk_e" > "$tmp_e"
+  # IL_LOG intentionally absent — this contract is purely about edit-session
+  # grouping derived from AUDIT_TRAIL, independent of any rule-load evidence.
+  out_e="$(IL_LOG="$FIXTURES/no-such-il-log-$$.jsonl" AUDIT_TRAIL="$AUDIT_EMPTY" bash "$tmp_e" 2>/dev/null || true)"
+  rm -f "$tmp_e"
+
+  # The empty-string session must surface under the unattributed group.
+  if grep -qi 'unattributed' <<< "$out_e"; then
+    pass "QA-001-empty-unattr" "empty-string session shown in the unattributed group"
+  else
+    fail "QA-001-empty-unattr" "no unattributed group for the empty-string session"
+  fi
+  # No blank-named edit-session group: the header is `=== edit-session: <name> ===`,
+  # so an empty name would render as `edit-session:  ===` (whitespace then ===).
+  # A real name (`unattributed`, a uuid) has non-space text before ` ===`.
+  if grep -qE 'edit-session:[[:space:]]+===' <<< "$out_e"; then
+    fail "QA-001-empty-noblank" "blank-named edit-session group present — empty session formed its own group"
+  else
+    pass "QA-001-empty-noblank" "no blank-named edit-session group (empty folded into unattributed)"
+  fi
+  # The genuine (non-empty) session still forms its own distinct group.
+  if grep -q '33333333-3333-3333-3333-333333333333' <<< "$out_e"; then
+    pass "QA-001-empty-real" "non-empty session 3333... still forms its own group"
+  else
+    fail "QA-001-empty-real" "non-empty session 3333... missing from output"
+  fi
+fi
+
+# ============================================================================
 # PRH-005 [unit]: no automated MG-001/MG-002 verdict, no ts<=edit.ts join
 # ============================================================================
 section "PRH-005: no automated classification"
@@ -189,10 +238,50 @@ else
 fi
 
 # ============================================================================
-# INV-009 [unit]: dormant when log absent/empty; distinguishes empty vs all-null
+# INV-009 [integration] EXECUTABLE CONTRACT (primary) — mirror the B1 pattern:
+# RUN the extracted block and assert on its OUTPUT across the empty/absent and
+# all-null branches, not just SKILL.md prose. The spec Enforcement for INV-009 is
+# a behavioral CI test (empty / all-null / populated).
+#   (a) EMPTY/ABSENT IL_LOG -> non-alarming dormant advisory + clean exit 0.
+#   (b) ALL-NULL log         -> field-drift note (unreliable, not healthy).
+# The prose greps below are retained as a SECONDARY tripwire only.
 # ============================================================================
-section "INV-009: dormant / all-null distinction"
+section "INV-009 executable contract: dormant + all-null branches"
 
+blk9="$(extract_cwtf_block)"
+if [ -z "${blk9//[[:space:]]/}" ]; then
+  fail "INV-009-exec" "cwtf rule-load-extract block absent — INV-009 unimplemented"
+else
+  tmp9="$(mktemp)"
+  printf '%s\n' "$blk9" > "$tmp9"
+
+  # (a) EMPTY/ABSENT IL_LOG: dormant advisory + exit 0. Point IL_LOG at a file
+  # that does not exist ([ ! -s ] is true for both absent and empty).
+  out_dormant="$(IL_LOG="$FIXTURES/no-such-il-log-$$.jsonl" AUDIT_TRAIL="" bash "$tmp9" 2>/dev/null)"
+  rc_dormant=$?
+  if [ "$rc_dormant" -eq 0 ]; then
+    pass "INV-009-dormant-rc" "block exits 0 when IL_LOG is absent/empty"
+  else
+    fail "INV-009-dormant-rc" "block exited $rc_dormant on absent IL_LOG (want 0)"
+  fi
+  if grep -qi 'populates' <<< "$out_dormant" && grep -q '2\.1\.69' <<< "$out_dormant"; then
+    pass "INV-009-dormant-msg" "absent-log output is the non-alarming dormant advisory (log populates on first rule open; harness >=2.1.69)"
+  else
+    fail "INV-009-dormant-msg" "absent-log output lacks the non-alarming dormant advisory"
+  fi
+
+  # (b) ALL-NULL log: field-drift note. Fixture has 2 rule-loads, both null.
+  out_allnull="$(IL_LOG="$LOG_ALLNULL" AUDIT_TRAIL="" bash "$tmp9" 2>/dev/null || true)"
+  if grep -q 'all with null rule_file' <<< "$out_allnull" && grep -qi 'field drift' <<< "$out_allnull"; then
+    pass "INV-009-allnull-msg" "all-null log prints the field-drift note (rule-load evidence unreliable)"
+  else
+    fail "INV-009-allnull-msg" "all-null log did not surface the field-drift note"
+  fi
+  rm -f "$tmp9"
+fi
+
+# INV-009 SECONDARY tripwire (prose greps — cheap, but cannot catch a wrong
+# dormant/all-null branch; the executable assertions above are primary).
 if [ -f "$CWTF" ]; then
   if has '2\.1\.69'; then pass "INV-009a" "dormant advisory names harness >=2.1.69 requirement"; else fail "INV-009a" "no dormant advisory referencing harness 2.1.69"; fi
   if has 'null rule_file|field drift|field-drift'; then pass "INV-009b" "surfaces all-null field-drift note (RS-008/UX-001)"; else fail "INV-009b" "no all-null field-drift note"; fi
@@ -202,10 +291,49 @@ else
 fi
 
 # ============================================================================
-# INV-016 [unit]: liveness / self-diagnostic denominators line
+# INV-016 [integration] EXECUTABLE CONTRACT (primary) — RUN the block over a
+# POPULATED log and assert the liveness/denominators line reports counts that
+# match the fixtures (DA-004 silent-telemetry guard: the denominators must be
+# real, not zero/placeholder). Prose greps retained as SECONDARY tripwire.
+#
+# IL_LOG=instructions-loaded-log-sample.jsonl -> 3 parseable rule-loads,
+#   last-written 2026-06-15T03:06:00Z.
+# AUDIT_TRAIL=audit-trail-sessioned.jsonl -> 4 hook-edit entries across 3
+#   edit-sessions (111, 222, unattributed).
 # ============================================================================
-section "INV-016: liveness / denominators line"
+section "INV-016 executable contract: liveness denominators over populated log"
 
+blk16="$(extract_cwtf_block)"
+if [ -z "${blk16//[[:space:]]/}" ]; then
+  fail "INV-016-exec" "cwtf rule-load-extract block absent — INV-016 unimplemented"
+else
+  tmp16="$(mktemp)"
+  printf '%s\n' "$blk16" > "$tmp16"
+  out_live="$(IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="$AUDIT_SESS" bash "$tmp16" 2>/dev/null || true)"
+  rm -f "$tmp16"
+
+  # Rule-load denominator matches the fixture (3 parseable events).
+  if grep -qE 'read 3 rule-load event\(s\)' <<< "$out_live"; then
+    pass "INV-016-count" "liveness line reports the 3-event rule-load denominator"
+  else
+    fail "INV-016-count" "liveness line missing 'read 3 rule-load event(s)' denominator"
+  fi
+  # hook-edit + edit-session denominators match the fixture (4 edits, 3 sessions).
+  if grep -qE '4 hook-edit entries' <<< "$out_live" && grep -qE 'across 3 edit-session\(s\)' <<< "$out_live"; then
+    pass "INV-016-denoms" "hook-edit (4) + edit-session (3) denominators match fixture"
+  else
+    fail "INV-016-denoms" "hook-edit/edit-session denominators do not match fixture"
+  fi
+  # Liveness line carries the log's last-written ts (the block emits the raw jq
+  # string, so the ts may be quoted — tolerate the surrounding quote).
+  if grep -qE 'log last written "?2026-06-15T03:06:00Z"?' <<< "$out_live"; then
+    pass "INV-016-lastwritten" "liveness line shows the log last-written ts from the fixture"
+  else
+    fail "INV-016-lastwritten" "liveness line missing 'log last written <ts>' marker"
+  fi
+fi
+
+# INV-016 SECONDARY tripwire (prose greps).
 if [ -f "$CWTF" ]; then
   if has 'last written'; then pass "INV-016a" "liveness line shows log last-written ts"; else fail "INV-016a" "no 'last written' liveness marker"; fi
   if has 'rule-load event' && has 'hook-edit'; then pass "INV-016b" "denominators name rule-load + hook-edit counts"; else fail "INV-016b" "no rule-load/hook-edit denominators (DA-004 silent-telemetry guard)"; fi
