@@ -127,6 +127,78 @@ When the artifact exists, check:
 
 **(c) Lens selection rationale**: Report the full lens selection from the artifact — which lenses were recommended, which were selected (ran), and which were excluded (budget exceeded or other reason from `failure_reason`).
 
+## Step 5.6: Rule-Load Observability (InstructionsLoaded)
+
+This step presents **direct rule-load evidence** so you can judge, for yourself, whether a `.claude/rules/*.md` rule (for example `hooks-pretooluse.md`) was actually loaded into agent editing context around the hook edits in this workflow. It is a plain-language, side-by-side view of two local logs — it draws **no** conclusion and emits **no** verdict. The human classifies.
+
+**Two sources:**
+
+1. **Rule-load events** — `.correctless/meta/instructions-loaded.jsonl` (the InstructionsLoaded telemetry log). Each line records a rule file that was loaded, with `trigger_file_path` (the file whose open triggered the load) and a timestamp.
+2. **Hook-edit entries** — the target workflow/branch's `audit-trail-*.jsonl`. Locate it by globbing `audit-trail-*.jsonl` for the target branch (edits made off-workflow do not appear in the audit trail — note this caveat when the picture looks thin).
+
+**How to group (RS-027):** do **not** filter rule-loads by the session running `/cwtf` — `/cwtf` usually analyzes a *past* workflow, so the invoking session is not the session that made the edits. Instead, derive the set of edit-session ids from the **target workflow's hook-edit entries** (audit-trail lines whose `.file` is under `hooks/`), then present rule-loads **grouped per edit-session**. A hook-edit with no `session_id` (pre-instrumentation) is shown in an **unattributed** group; rule-loads are not attributed to it. Sessions that appear in the rule-load log but never made a hook-edit are intentionally excluded.
+
+**Consumer contract:** both logs are read line-by-line with the project JSONL consumer contract — `jq -R 'fromjson? ...'` (try/catch, skip malformed lines), **never** slurping the whole file into a variable/argv, and never a single-shot slurp of all lines. Hook-edit times are read as `.ts // .timestamp` (RS-030) because the audit-trail file is mixed-shape: the audit hook writes `ts`, `/cauto` writes `timestamp` to the same file. Uses only `/cwtf`'s existing `Bash(jq*)`/`Bash(grep*)`/`Bash(find*)` tools — no new helper script.
+
+**Liveness (INV-016):** always print the denominators the presentation worked from (how many rule-load events, how many with null `rule_file`, how many hook-edit entries, across how many edit-sessions, and when the log was last written) so a dead or field-drifted channel is visible rather than silently producing an empty picture.
+
+**Dormant / field-drift (INV-009):** if the log is absent or empty, print a single non-alarming advisory explaining it populates the first time a `.claude/rules/*.md`-scoped file is opened and requires harness ≥2.1.69, then continue. If the log is present but **every** `rule_file` is null, surface a field-drift note ("all with null rule_file — possible harness field drift").
+
+Run this presentation block (inputs: `IL_LOG` = the instructions-loaded.jsonl path; `AUDIT_TRAIL` = the target branch's audit-trail-*.jsonl path):
+
+<!-- cwtf:rule-load-extract:start -->
+```bash
+# Inputs (env): IL_LOG = instructions-loaded.jsonl ; AUDIT_TRAIL = target branch audit-trail-*.jsonl
+IL_LOG="${IL_LOG:-.correctless/meta/instructions-loaded.jsonl}"
+AUDIT_TRAIL="${AUDIT_TRAIL:-}"
+
+# Dormant when the log is absent/empty (INV-009) — explain why, never alarm.
+if [ ! -s "$IL_LOG" ]; then
+  echo "no direct rule-load signal yet — the InstructionsLoaded log populates the first time a .claude/rules/*.md-scoped file is opened; requires harness >=2.1.69"
+fi
+
+# Liveness denominators (INV-016 / DA-004): counted via the try/catch consumer
+# contract only — never a whole-file slurp into a variable.
+rule_loads="$(jq -R 'fromjson? | 1' "$IL_LOG" 2>/dev/null | grep -c .)"
+null_rules="$(jq -R 'fromjson? | select(.rule_file == null) | 1' "$IL_LOG" 2>/dev/null | grep -c .)"
+last_written="$(jq -R 'fromjson? | (.ts // .timestamp) // empty' "$IL_LOG" 2>/dev/null | tail -1)"
+
+hook_edits=0
+edit_sessions=""
+if [ -n "$AUDIT_TRAIL" ] && [ -f "$AUDIT_TRAIL" ]; then
+  # hook-edit entries = those whose .file is under hooks/ (time read as .ts // .timestamp, RS-030)
+  hook_edits="$(jq -R 'fromjson? | select((.file // "") | startswith("hooks/")) | 1' "$AUDIT_TRAIL" 2>/dev/null | grep -c .)"
+  # edit-session ids (missing session_id -> unattributed), de-duplicated
+  edit_sessions="$(jq -Rr 'fromjson? | select((.file // "") | startswith("hooks/")) | (.session_id // "unattributed")' "$AUDIT_TRAIL" 2>/dev/null | sort -u)"
+fi
+edit_session_count="$(printf '%s\n' "$edit_sessions" | grep -c .)"
+
+echo "Liveness: read ${rule_loads} rule-load event(s) (${null_rules} with null rule_file) and ${hook_edits} hook-edit entries across ${edit_session_count} edit-session(s) for the target workflow; log last written ${last_written:-never}"
+
+# Field-drift note (INV-009): present-but-all-null is unreliable, not healthy.
+if [ "${rule_loads:-0}" -gt 0 ] && [ "${rule_loads}" = "${null_rules}" ]; then
+  echo "${rule_loads} rule-load events, all with null rule_file — possible harness field drift; treat the rule-load evidence as unreliable"
+fi
+
+# Present raw evidence grouped by the TARGET workflow's edit-session ids (RS-027).
+printf '%s\n' "$edit_sessions" | while IFS= read -r sess; do
+  [ -z "$sess" ] && continue
+  echo "=== edit-session: ${sess} ==="
+  jq -Rr --arg s "$sess" 'fromjson?
+     | select((.file // "") | startswith("hooks/"))
+     | select((.session_id // "unattributed") == $s)
+     | "  hook-edit: \(.file) at \((.ts // .timestamp) // "?")"' "$AUDIT_TRAIL" 2>/dev/null
+  if [ "$sess" != "unattributed" ]; then
+    jq -Rr --arg s "$sess" 'fromjson?
+       | select((.session_id // "") == $s)
+       | "  rule-load: \(.rule_file // "(null)") (trigger_file_path \(.trigger_file_path // "?")) at \(.ts // "?")"' "$IL_LOG" 2>/dev/null
+  fi
+done
+```
+<!-- cwtf:rule-load-extract:end -->
+
+Present the block's output as-is under a "Rule-load evidence" heading. Do **not** compute or state whether a rule "was" or "was not" in context for a given edit — show the timestamps side by side and let the reader judge.
+
 ## Step 6: Deviation Detection
 
 Cross-reference what happened against what should have happened:

@@ -45,6 +45,8 @@ OPUS_4_7_MIGRATION.md
 .correctless/hooks/
 .correctless/scripts/
 .correctless/meta/
+# InstructionsLoaded rule-load telemetry (runtime, local-only — INV-010)
+.correctless/meta/instructions-loaded.jsonl
 
 # Serena local data
 .serena/
