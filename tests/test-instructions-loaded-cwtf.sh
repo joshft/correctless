@@ -295,8 +295,19 @@ else
 
   # (a) EMPTY/ABSENT IL_LOG: dormant advisory + exit 0. Point IL_LOG at a file
   # that does not exist ([ ! -s ] is true for both absent and empty).
-  out_dormant="$(IL_LOG="$FIXTURES/no-such-il-log-$$.jsonl" AUDIT_TRAIL="" bash "$tmp9" 2>/dev/null)"
+  # RECONCILE (MA-004 self-glob): the block now falls back to
+  # `find .correctless/artifacts -name 'audit-trail-*.jsonl'` when AUDIT_TRAIL is
+  # empty/unresolved. Run from the repo root that would find the repo's real
+  # audit-trails (36 hook-edits) and the benign dormant branch is replaced by the
+  # dead-channel WARNING. To exercise the genuinely-fresh (dead-vs-fresh) branch,
+  # run in an ISOLATED temp cwd whose .correctless/artifacts is empty, so the
+  # self-glob finds nothing (audit_located=0 AND hook_edits=0). The dead-channel
+  # and self-glob-hit branches are covered by MA-003 / MA-004 below.
+  iso_dormant="$(mktemp -d)"
+  mkdir -p "$iso_dormant/.correctless/artifacts"
+  out_dormant="$( cd "$iso_dormant" && IL_LOG="$FIXTURES/no-such-il-log-$$.jsonl" AUDIT_TRAIL="" bash "$tmp9" 2>/dev/null )"
   rc_dormant=$?
+  rm -rf "$iso_dormant"
   if [ "$rc_dormant" -eq 0 ]; then
     pass "INV-009-dormant-rc" "block exits 0 when IL_LOG is absent/empty"
   else
@@ -445,5 +456,267 @@ if [ -f "$LOG_ALLNULL" ]; then
 else
   fail "FIX-allnull" "instructions-loaded-log-allnull.jsonl fixture missing"
 fi
+
+# ============================================================================
+# MINI-AUDIT FIX ROUND (MA-001..MA-008) — regression tests locking 8 fixes to
+# the cwtf:rule-load-extract block. Each assertion runs the EXTRACTED block over
+# a crafted fixture and asserts on the GREEN agent's reported verbatim output
+# substrings. Fixtures added this round:
+#   instructions-loaded-log-poison.jsonl   (MA-001: objects + interleaved scalars)
+#   audit-trail-correctless-hooks.jsonl    (MA-002: installed-project hook paths)
+#   instructions-loaded-log-unmatched.jsonl (MA-006: no session matches an edit)
+#   instructions-loaded-log-corrupt.jsonl   (MA-008a: 0 parseable object lines)
+#   instructions-loaded-log-partialnull.jsonl (MA-008b: >50% null rule_file)
+#
+# MA-001 is the jq-1.7-abort guard: on jq 1.7 (CI) a VALID-but-non-object or
+# mistyped line raises a downstream `.field`/`test`/`startswith` runtime error
+# that bare `fromjson?` does NOT catch, aborting the whole stream. `| objects`
+# + `(.file // "") | tostring` skips those lines on 1.7 AND 1.8. We run on 1.8
+# here (where even the old code survives) — the poison-line test documents the
+# contract and catches a regression that reintroduces an un-guarded pipeline.
+# ============================================================================
+
+# One extraction shared by every MA assertion (absolute path — survives cwd cd).
+MA_BLK="$(mktemp)"
+extract_cwtf_block > "$MA_BLK"
+
+# Run the block from an ISOLATED temp cwd whose .correctless/artifacts is empty,
+# so the MA-004 self-glob (`find .correctless/artifacts -name audit-trail-*.jsonl`)
+# finds nothing. Args: IL_LOG AUDIT_TRAIL. Echoes stdout; sets MA_RC to exit code.
+MA_RC=0
+run_block_iso() {
+  local il="$1" at="$2" iso out
+  iso="$(mktemp -d)"
+  mkdir -p "$iso/.correctless/artifacts"
+  out="$( cd "$iso" && IL_LOG="$il" AUDIT_TRAIL="$at" bash "$MA_BLK" 2>/dev/null )"
+  MA_RC=$?
+  rm -rf "$iso"
+  printf '%s' "$out"
+}
+
+if [ ! -s "$MA_BLK" ]; then
+  section "MA fix round: extracted block absent — MA-001..MA-008 cannot run"
+  fail "MA-block" "cwtf rule-load-extract block absent — mini-audit fixes unverifiable"
+else
+  NOLOG="$FIXTURES/no-such-il-log-$$.jsonl"
+  LOG_POISON="$FIXTURES/instructions-loaded-log-poison.jsonl"
+  AUDIT_CH="$FIXTURES/audit-trail-correctless-hooks.jsonl"
+  LOG_UNMATCHED="$FIXTURES/instructions-loaded-log-unmatched.jsonl"
+  LOG_CORRUPT="$FIXTURES/instructions-loaded-log-corrupt.jsonl"
+  LOG_PARTIALNULL="$FIXTURES/instructions-loaded-log-partialnull.jsonl"
+
+  # ------------------------------------------------------------------------
+  # MA-001 [integration]: non-object / mistyped JSONL lines are never fatal.
+  # ------------------------------------------------------------------------
+  section "MA-001: poison lines (scalars + mistyped objects) do not abort the pipeline"
+
+  out_ma1="$(IL_LOG="$LOG_POISON" AUDIT_TRAIL="$AUDIT_SESS" bash "$MA_BLK" 2>/dev/null)"
+  rc_ma1=$?
+  if [ "$rc_ma1" -eq 0 ]; then
+    pass "MA-001-il-rc" "block exits 0 with scalar/mistyped lines interleaved in IL_LOG (jq-1.7-abort guard)"
+  else
+    fail "MA-001-il-rc" "block exited $rc_ma1 on poisoned IL_LOG (want 0 — pipeline aborted?)"
+  fi
+  if grep -q '.claude/rules/hooks-pretooluse.md' <<< "$out_ma1" \
+     && grep -q '.claude/rules/canonicalize-path.md' <<< "$out_ma1"; then
+    pass "MA-001-il-goodcount" "good rule-load events still rendered despite interleaved poison lines"
+  else
+    fail "MA-001-il-goodcount" "good rule-loads dropped — poison line truncated the stream"
+  fi
+  if grep -qE 'Liveness: read [0-9]+ rule-load event' <<< "$out_ma1"; then
+    pass "MA-001-il-liveness" "normal liveness output still produced with poisoned IL_LOG"
+  else
+    fail "MA-001-il-liveness" "no liveness line — poisoned IL_LOG broke normal output"
+  fi
+
+  # Also poison AUDIT_TRAIL (temp copy of the sessioned fixture + scalar lines).
+  ma1_audit="$(mktemp)"
+  cat "$AUDIT_SESS" > "$ma1_audit"
+  printf '5\n"x"\n[1,2,3]\n{"file":5,"session_id":7}\ntrue\n' >> "$ma1_audit"
+  out_ma1b="$(IL_LOG="$LOG_POISON" AUDIT_TRAIL="$ma1_audit" bash "$MA_BLK" 2>/dev/null)"
+  rc_ma1b=$?
+  rm -f "$ma1_audit"
+  if [ "$rc_ma1b" -eq 0 ] && grep -qE '4 hook-edit entries' <<< "$out_ma1b"; then
+    pass "MA-001-audit-safe" "scalar/mistyped lines in AUDIT_TRAIL skipped; 4 real hook-edits still counted, exit 0"
+  else
+    fail "MA-001-audit-safe" "poisoned AUDIT_TRAIL aborted or miscounted (rc=$rc_ma1b)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-002 [integration]: hook-edit filter matches a hooks/ path COMPONENT
+  # (test("(^|/)hooks/")) so installed-project paths (.correctless/hooks/...,
+  # absolute /x/hooks/...) count, while scripts/foo.sh and webhooks/x.sh do not.
+  # ------------------------------------------------------------------------
+  section "MA-002: installed-project hook paths counted; non-hook paths excluded"
+
+  out_ma2="$(IL_LOG="$NOLOG" AUDIT_TRAIL="$AUDIT_CH" bash "$MA_BLK" 2>/dev/null)"
+  if grep -q '.correctless/hooks/workflow-advance.sh' <<< "$out_ma2"; then
+    pass "MA-002-correctless-hook" "installed-project hook (.correctless/hooks/workflow-advance.sh) appears in output"
+  else
+    fail "MA-002-correctless-hook" ".correctless/hooks/... path silently excluded (test('(^|/)hooks/') regression)"
+  fi
+  if grep -q '/x/hooks/y.sh' <<< "$out_ma2"; then
+    pass "MA-002-abs-hook" "absolute hook path (/x/hooks/y.sh) appears in output"
+  else
+    fail "MA-002-abs-hook" "absolute /x/hooks/... path silently excluded"
+  fi
+  if grep -qE '2 hook-edit entries' <<< "$out_ma2"; then
+    pass "MA-002-count" "exactly 2 hook-edits counted (the two hooks/-component paths)"
+  else
+    fail "MA-002-count" "hook-edit count wrong — non-hook path leaked in or hook path dropped"
+  fi
+  if grep -q 'scripts/foo.sh' <<< "$out_ma2"; then
+    fail "MA-002-nonhook" "scripts/foo.sh counted as a hook-edit (over-match)"
+  else
+    pass "MA-002-nonhook" "scripts/foo.sh NOT counted as a hook-edit"
+  fi
+  if grep -q 'webhooks/x.sh' <<< "$out_ma2"; then
+    fail "MA-002-webhooks" "webhooks/x.sh matched — '(^|/)hooks/' anchor missing (substring over-match)"
+  else
+    pass "MA-002-webhooks" "webhooks/x.sh NOT matched (anchor requires start-or-slash before hooks/)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-003 [integration]: dormant (fresh) vs dead-channel branches.
+  # ------------------------------------------------------------------------
+  section "MA-003: dead-vs-fresh — benign advisory (fresh) vs dead-channel WARNING"
+
+  out_ma3_fresh="$(run_block_iso "$NOLOG" "")"
+  rc_ma3_fresh="$MA_RC"
+  if grep -q 'requires harness >=2.1.69 AND that /csetup has registered' <<< "$out_ma3_fresh" \
+     && [ "$rc_ma3_fresh" -eq 0 ]; then
+    pass "MA-003-fresh" "empty log + 0 hook-edits emits the benign dormant advisory, exit 0"
+  else
+    fail "MA-003-fresh" "fresh branch missing dormant advisory or non-zero exit (rc=$rc_ma3_fresh)"
+  fi
+
+  out_ma3_dead="$(IL_LOG="$NOLOG" AUDIT_TRAIL="$AUDIT_CH" bash "$MA_BLK" 2>/dev/null)"
+  if grep -q 'the channel may be dead (hook not registered or not firing)' <<< "$out_ma3_dead"; then
+    pass "MA-003-dead-msg" "empty log + hook-edits>0 emits the dead-channel note (not the benign advisory)"
+  else
+    fail "MA-003-dead-msg" "dead-channel note absent when hook-edits>0 with empty log"
+  fi
+  if grep -q 'WARNING:' <<< "$out_ma3_dead" \
+     && grep -q 'hook-edit(s) occurred but zero rule-load events' <<< "$out_ma3_dead"; then
+    pass "MA-003-dead-warning" "dead-channel line is a WARNING naming hook-edits-with-zero-rule-loads"
+  else
+    fail "MA-003-dead-warning" "dead-channel WARNING substring missing"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-004 [integration]: unresolved AUDIT_TRAIL — do not report "0 hook-edits"
+  # as if measured; contrast with a real audit-trail found by the self-glob.
+  # ------------------------------------------------------------------------
+  section "MA-004: unresolved hook-edit source vs self-glob hit"
+
+  out_ma4="$(run_block_iso "$LOG_SAMPLE" "")"
+  rc_ma4="$MA_RC"
+  # -F (fixed-string): the literal substring carries a '*' and '.' that a basic regex would misread.
+  if grep -qF 'hook-edit source not located (audit-trail-*.jsonl not found)' <<< "$out_ma4" \
+     && grep -qF 'hook-edit attribution unavailable' <<< "$out_ma4" \
+     && [ "$rc_ma4" -eq 0 ]; then
+    pass "MA-004-unresolved" "empty AUDIT_TRAIL + no artifacts -> attribution-unavailable liveness, exit 0"
+  else
+    fail "MA-004-unresolved" "unresolved-source liveness wording missing or non-zero exit (rc=$rc_ma4)"
+  fi
+  if grep -q '0 hook-edit entries across' <<< "$out_ma4"; then
+    fail "MA-004-not-measured" "reports '0 hook-edit entries' as if measured when source is unresolved"
+  else
+    pass "MA-004-not-measured" "does not fabricate a measured '0 hook-edit entries' denominator"
+  fi
+
+  # Contrast: a real audit-trail-*.jsonl in artifacts IS found by the self-glob.
+  ma4_iso="$(mktemp -d)"
+  mkdir -p "$ma4_iso/.correctless/artifacts"
+  cat "$AUDIT_SESS" > "$ma4_iso/.correctless/artifacts/audit-trail-glob-hit.jsonl"
+  out_ma4b="$( cd "$ma4_iso" && IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="" bash "$MA_BLK" 2>/dev/null )"
+  rm -rf "$ma4_iso"
+  if grep -qE '[0-9]+ hook-edit entries across' <<< "$out_ma4b" \
+     && ! grep -q 'not located' <<< "$out_ma4b"; then
+    pass "MA-004-glob-hit" "self-glob finds artifacts/audit-trail-*.jsonl and reports measured hook-edits"
+  else
+    fail "MA-004-glob-hit" "self-glob did not attribute hook-edits from a real audit-trail in artifacts"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-005 [integration]: liveness last-written ts is UNQUOTED (-Rr, not -R).
+  # Replaces the prior quote-tolerant last-written assertion.
+  # ------------------------------------------------------------------------
+  section "MA-005: liveness 'log last written' timestamp is unquoted"
+
+  out_ma5="$(IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="$AUDIT_SESS" bash "$MA_BLK" 2>/dev/null)"
+  if grep -qE 'log last written 2026-[0-9-]+T[0-9:]+Z' <<< "$out_ma5" \
+     && ! grep -q 'log last written "' <<< "$out_ma5"; then
+    pass "MA-005-unquoted-ts" "last-written ts rendered raw (log last written 2026-...Z, no surrounding quote)"
+  else
+    fail "MA-005-unquoted-ts" "last-written ts is quoted or malformed (want unquoted -Rr output)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-006 [integration]: rule-loads exist but none match an edit-session id ->
+  # surface the distinct rule-load session_ids (EA-005 format-drift hint).
+  # ------------------------------------------------------------------------
+  section "MA-006: unmatched rule-load sessions surface a format-drift note"
+
+  out_ma6="$(IL_LOG="$LOG_UNMATCHED" AUDIT_TRAIL="$AUDIT_SESS" bash "$MA_BLK" 2>/dev/null)"
+  if grep -q 'none matched an edit-session_id — possible session_id format drift' <<< "$out_ma6" \
+     && grep -q 'rule-load session_ids seen:' <<< "$out_ma6"; then
+    pass "MA-006-drift-note" "no-match case prints the EA-005 format-drift note with observed session_ids"
+  else
+    fail "MA-006-drift-note" "unmatched-session drift note missing"
+  fi
+  # Non-triggering: the sample+sessioned fixtures where 2 rule-loads DO attribute.
+  out_ma6b="$(IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="$AUDIT_SESS" bash "$MA_BLK" 2>/dev/null)"
+  if grep -q 'none matched an edit-session_id' <<< "$out_ma6b"; then
+    fail "MA-006-no-false-note" "drift note printed even though 2 rule-loads attribute (false positive)"
+  else
+    pass "MA-006-no-false-note" "drift note absent when rule-loads attribute to edit-sessions"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-007 [integration]: the unattributed (pre-instrumentation) group carries
+  # the "predates session_id instrumentation / not evidence unloaded" caveat.
+  # ------------------------------------------------------------------------
+  section "MA-007: unattributed group header explains pre-instrumentation edits"
+
+  out_ma7="$(IL_LOG="$NOLOG" AUDIT_TRAIL="$AUDIT_SESS" bash "$MA_BLK" 2>/dev/null)"
+  if grep -q 'these edits predate session_id instrumentation' <<< "$out_ma7" \
+     && grep -q 'absence of rule-loads here is NOT evidence the rule was unloaded' <<< "$out_ma7"; then
+    pass "MA-007-unattr-caveat" "session-less hook-edit renders the unattributed-group caveat"
+  else
+    fail "MA-007-unattr-caveat" "unattributed-group caveat wording missing"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-008 [integration]: corrupted log (0 parseable objects) + partial null.
+  # ------------------------------------------------------------------------
+  section "MA-008: corrupted-log note + partial null-ratio note"
+
+  out_ma8a="$(run_block_iso "$LOG_CORRUPT" "")"
+  if grep -q 'log present but 0 parseable JSONL lines — possible corruption or torn writes' <<< "$out_ma8a"; then
+    pass "MA-008-corrupt" "non-empty log with 0 parseable objects emits the corruption/torn-writes note"
+  else
+    fail "MA-008-corrupt" "corruption note missing for a non-empty, unparsable log"
+  fi
+
+  out_ma8b="$(run_block_iso "$LOG_PARTIALNULL" "")"
+  if grep -q 'high null-rule ratio (' <<< "$out_ma8b" \
+     && grep -q 'possible harness field drift' <<< "$out_ma8b"; then
+    pass "MA-008-partialnull" ">50% (not 100%) null rule_file emits the high-null-ratio field-drift note"
+  else
+    fail "MA-008-partialnull" "partial null-ratio note missing (want 'high null-rule ratio (' + field drift)"
+  fi
+
+  # 100%-null wording unchanged (co-checked with the existing INV-009-allnull-msg).
+  out_ma8c="$(run_block_iso "$LOG_ALLNULL" "")"
+  if grep -q 'all with null rule_file' <<< "$out_ma8c" \
+     && grep -qi 'field drift' <<< "$out_ma8c"; then
+    pass "MA-008-allnull-wording" "100%-null log still emits the 'all with null rule_file' field-drift note"
+  else
+    fail "MA-008-allnull-wording" "100%-null wording changed — 'all with null rule_file' + field drift expected"
+  fi
+fi
+
+rm -f "$MA_BLK"
 
 summary "test-instructions-loaded-cwtf"

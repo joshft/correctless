@@ -152,53 +152,122 @@ Run this presentation block (inputs: `IL_LOG` = the instructions-loaded.jsonl pa
 IL_LOG="${IL_LOG:-.correctless/meta/instructions-loaded.jsonl}"
 AUDIT_TRAIL="${AUDIT_TRAIL:-}"
 
-# Dormant when the log is absent/empty (INV-009) — explain why, never alarm.
-if [ ! -s "$IL_LOG" ]; then
-  echo "no direct rule-load signal yet — the InstructionsLoaded log populates the first time a .claude/rules/*.md-scoped file is opened; requires harness >=2.1.69"
+# Every jq over IL_LOG / AUDIT_TRAIL guards with `fromjson? | objects` (MA-001):
+# bare `fromjson?` only catches fromjson's own parse error, so a VALID-but-non-object
+# line (5, "x", [1,2]) or a mistyped field ({"file":5}) would raise a downstream
+# `.field`/`test`/`startswith` runtime error that `?` does NOT catch — and on jq 1.7
+# (CI) that aborts the whole stream, truncating evidence and breaking liveness.
+# `objects` drops any non-object line so a forged/torn/scalar/mistyped line is
+# skipped, never fatal, on jq 1.7 AND 1.8. Fields used in matching are also coerced
+# (`(.file // "") | tostring`) so a non-string field can never error.
+#
+# Hook-edit filter (MA-002): match a hooks/ path COMPONENT wherever it lives, so an
+# INSTALLED downstream project (hooks recorded as .correctless/hooks/... or absolute)
+# is not silently excluded. The predicate is byte-identical at all three sites (the
+# hook_edits count, the edit_sessions derivation, and the per-session render) so
+# counts and grouping stay consistent. Non-hook audit-trail entries (/cauto
+# skill|type orchestration events with no hooks/ file, /caudit records) still fail
+# the test and are excluded.
+
+# --- Resolve the hook-edit source (MA-004) ----------------------------------
+# Distinguish "audit-trail path not resolved" from "resolved, zero hook edits".
+audit_located=1
+if [ -z "$AUDIT_TRAIL" ] || [ ! -f "$AUDIT_TRAIL" ]; then
+  # Not passed / missing: attempt to locate the target workflow's audit trail
+  # (best-effort most-recent) rather than silently reporting "0 hook-edit entries".
+  AUDIT_TRAIL="$(find .correctless/artifacts -maxdepth 1 -name 'audit-trail-*.jsonl' -type f 2>/dev/null | sort | tail -1)"
+  { [ -n "$AUDIT_TRAIL" ] && [ -f "$AUDIT_TRAIL" ]; } || audit_located=0
 fi
 
-# Liveness denominators (INV-016 / DA-004): counted via the try/catch consumer
-# contract only — never a whole-file slurp into a variable.
-rule_loads="$(jq -R 'fromjson? | 1' "$IL_LOG" 2>/dev/null | grep -c .)"
-null_rules="$(jq -R 'fromjson? | select(.rule_file == null) | 1' "$IL_LOG" 2>/dev/null | grep -c .)"
-last_written="$(jq -R 'fromjson? | (.ts // .timestamp) // empty' "$IL_LOG" 2>/dev/null | tail -1)"
-
+# --- Hook-edit denominators + edit-session ids (computed FIRST, MA-003) ------
 hook_edits=0
 edit_sessions=""
-if [ -n "$AUDIT_TRAIL" ] && [ -f "$AUDIT_TRAIL" ]; then
-  # hook-edit entries = those whose .file is under hooks/ (time read as .ts // .timestamp, RS-030)
-  hook_edits="$(jq -R 'fromjson? | select((.file // "") | startswith("hooks/")) | 1' "$AUDIT_TRAIL" 2>/dev/null | grep -c .)"
+if [ "$audit_located" -eq 1 ]; then
+  # hook-edit entries = those whose .file has a hooks/ path component (MA-002);
+  # time read as .ts // .timestamp (RS-030).
+  hook_edits="$(jq -R 'fromjson? | objects | select((.file // "") | tostring | test("(^|/)hooks/")) | 1' "$AUDIT_TRAIL" 2>/dev/null | grep -c .)"
   # edit-session ids (missing/null/empty session_id -> unattributed), de-duplicated.
   # `// "unattributed"` alone does NOT catch "" (jq // only catches null/false), so
   # empty-string sessions are folded into unattributed explicitly (QA-001 / INV-015).
-  edit_sessions="$(jq -Rr 'fromjson? | select((.file // "") | startswith("hooks/")) | (.session_id // "" | if . == "" then "unattributed" else . end)' "$AUDIT_TRAIL" 2>/dev/null | sort -u)"
+  edit_sessions="$(jq -Rr 'fromjson? | objects | select((.file // "") | tostring | test("(^|/)hooks/")) | (.session_id // "" | if . == "" then "unattributed" else . end)' "$AUDIT_TRAIL" 2>/dev/null | sort -u)"
 fi
 edit_session_count="$(printf '%s\n' "$edit_sessions" | grep -c .)"
 
-echo "Liveness: read ${rule_loads} rule-load event(s) (${null_rules} with null rule_file) and ${hook_edits} hook-edit entries across ${edit_session_count} edit-session(s) for the target workflow; log last written ${last_written:-never}"
+# --- Rule-load denominators (try/catch consumer contract; never whole-file slurp)
+rule_loads="$(jq -R 'fromjson? | objects | 1' "$IL_LOG" 2>/dev/null | grep -c .)"
+null_rules="$(jq -R 'fromjson? | objects | select(.rule_file == null) | 1' "$IL_LOG" 2>/dev/null | grep -c .)"
+# MA-005: -Rr so the timestamp prints raw (unquoted) in the liveness line.
+last_written="$(jq -Rr 'fromjson? | objects | (.ts // .timestamp) // empty' "$IL_LOG" 2>/dev/null | tail -1)"
 
-# Field-drift note (INV-009): present-but-all-null is unreliable, not healthy.
-if [ "${rule_loads:-0}" -gt 0 ] && [ "${rule_loads}" = "${null_rules}" ]; then
-  echo "${rule_loads} rule-load events, all with null rule_file — possible harness field drift; treat the rule-load evidence as unreliable"
+# --- Dormant vs dead channel (MA-003) ---------------------------------------
+# hook_edits is already computed. Empty/absent IL_LOG is benign ONLY when no hook
+# edits happened; if hook edits happened with zero rule-loads the channel may be
+# dead (hook not registered / not firing), not merely quiet.
+if [ ! -s "$IL_LOG" ]; then
+  if [ "${hook_edits:-0}" -eq 0 ]; then
+    echo "no direct rule-load signal yet — the InstructionsLoaded log populates the first time a .claude/rules/*.md-scoped file is opened; requires harness >=2.1.69 AND that /csetup has registered the InstructionsLoaded hook in this project's settings.json (re-run /csetup if you recently upgraded)"
+  else
+    echo "WARNING: ${hook_edits} hook-edit(s) occurred but zero rule-load events were recorded — the channel may be dead (hook not registered or not firing), not merely quiet."
+  fi
+elif [ "${rule_loads:-0}" -eq 0 ]; then
+  # MA-008(a): the file has bytes but nothing parses as an object.
+  echo "log present but 0 parseable JSONL lines — possible corruption or torn writes; treat as no signal"
 fi
 
-# Present raw evidence grouped by the TARGET workflow's edit-session ids (RS-027).
+# --- Liveness denominators (INV-016 / DA-004) -------------------------------
+if [ "$audit_located" -eq 1 ]; then
+  echo "Liveness: read ${rule_loads} rule-load event(s) (${null_rules} with null rule_file) and ${hook_edits} hook-edit entries across ${edit_session_count} edit-session(s) for the target workflow; log last written ${last_written:-never}"
+else
+  # MA-004: no source located — do NOT report "0 hook-edit entries" as if measured.
+  echo "Liveness: read ${rule_loads} rule-load event(s) (${null_rules} with null rule_file); hook-edit source not located (audit-trail-*.jsonl not found) — hook-edit attribution unavailable; log last written ${last_written:-never}"
+fi
+
+# --- Field-drift note (INV-009 / MA-008b) -----------------------------------
+if [ "${rule_loads:-0}" -gt 0 ] && [ "${rule_loads}" = "${null_rules}" ]; then
+  echo "${rule_loads} rule-load events, all with null rule_file — possible harness field drift; treat the rule-load evidence as unreliable"
+elif [ "${rule_loads:-0}" -gt 0 ] && [ "$(( null_rules * 2 ))" -gt "${rule_loads}" ]; then
+  echo "high null-rule ratio (${null_rules}/${rule_loads}) — possible harness field drift; treat the rule-load evidence as unreliable"
+fi
+
+# --- Raw evidence grouped by the TARGET workflow's edit-session ids (RS-027) --
 printf '%s\n' "$edit_sessions" | while IFS= read -r sess; do
   [ -z "$sess" ] && continue
   echo "=== edit-session: ${sess} ==="
-  jq -Rr --arg s "$sess" 'fromjson?
-     | select((.file // "") | startswith("hooks/"))
+  # MA-007: the unattributed group predates session_id instrumentation.
+  if [ "$sess" = "unattributed" ]; then
+    echo "  these edits predate session_id instrumentation — rule-loads cannot be attributed to them; absence of rule-loads here is NOT evidence the rule was unloaded."
+  fi
+  jq -Rr --arg s "$sess" 'fromjson? | objects
+     | select((.file // "") | tostring | test("(^|/)hooks/"))
      | select((.session_id // "" | if . == "" then "unattributed" else . end) == $s)
      | "  hook-edit: \(.file) at \((.ts // .timestamp) // "?")"' "$AUDIT_TRAIL" 2>/dev/null
   # Rule-loads are only attributed to real (non-unattributed) sessions. The key is
   # normalized identically so a null/empty-session rule-load can never match a real
   # $s, and the "unattributed" group never claims any rule-load (QA-001 / INV-015).
   if [ "$sess" != "unattributed" ]; then
-    jq -Rr --arg s "$sess" 'fromjson?
+    jq -Rr --arg s "$sess" 'fromjson? | objects
        | select((.session_id // "" | if . == "" then "unattributed" else . end) == $s)
        | "  rule-load: \(.rule_file // "(null)") (trigger_file_path \(.trigger_file_path // "?")) at \(.ts // "?")"' "$IL_LOG" 2>/dev/null
   fi
 done
+
+# --- Unmatched rule-load sessions (MA-006 / EA-005) --------------------------
+# If rule-loads exist but NONE matched any edit-session id, surface the DISTINCT
+# rule-load session_ids so a human can spot session_id format drift across events.
+if [ "${rule_loads:-0}" -gt 0 ]; then
+  real_edit_sessions="$(printf '%s\n' "$edit_sessions" | grep -v '^unattributed$' | grep -v '^$')"
+  if [ -z "$real_edit_sessions" ]; then
+    attributed=0
+  else
+    attributed="$(jq -Rr 'fromjson? | objects | (.session_id // "" | if . == "" then "unattributed" else . end)' "$IL_LOG" 2>/dev/null | grep -Fxf <(printf '%s\n' "$real_edit_sessions") 2>/dev/null | grep -c .)"
+  fi
+  if [ "${attributed:-0}" -eq 0 ]; then
+    rl_sess_seen="$(jq -Rr 'fromjson? | objects | (.session_id // "(null)")' "$IL_LOG" 2>/dev/null | sort -u | grep . | tr '\n' ' ')"
+    echo "note: ${rule_loads} rule-load event(s) exist but none matched an edit-session_id — possible session_id format drift across events (EA-005); rule-load session_ids seen: ${rl_sess_seen}"
+  fi
+fi
+
+exit 0
 ```
 <!-- cwtf:rule-load-extract:end -->
 
