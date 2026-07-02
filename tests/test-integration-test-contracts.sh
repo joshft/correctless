@@ -24,7 +24,10 @@ CTDD_SKILL="skills/ctdd/SKILL.md"
 CTDD_RED_AGENT="agents/ctdd-red.md"
 SPEC_LITE="templates/spec-lite.md"
 SPEC_FULL="templates/spec-full.md"
-ARCH_FILE=".correctless/ARCHITECTURE.md"
+# ABS-023/ABS-024 bodies moved to the abstractions fragment (index+body-out
+# fragmentation); every check below reads ABS-023/ABS-024 body content, and the
+# fragment carries both headings and bodies.
+ARCH_FILE="docs/architecture/abstractions.md"
 DOCS_CSPEC="docs/skills/cspec.md"
 DOCS_CTDD="docs/skills/ctdd.md"
 AGENT_CONTEXT=".correctless/AGENT_CONTEXT.md"

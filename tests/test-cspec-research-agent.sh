@@ -63,7 +63,9 @@ _cache_step2_block() {
 }
 
 _cache_abs010_block() {
-  [ -f "$ARCH_FILE" ] && ABS010_BLOCK="$(_extract_abs010_block "$ARCH_FILE")"
+  # ABS-010 body moved to the abstractions fragment (index+body-out fragmentation).
+  local abs_frag="docs/architecture/abstractions.md"
+  [ -f "$abs_frag" ] && ABS010_BLOCK="$(_extract_abs010_block "$abs_frag")"
 }
 
 # ============================================================================

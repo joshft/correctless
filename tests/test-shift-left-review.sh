@@ -664,12 +664,13 @@ assert_contains "R-012a ARCHITECTURE has TB-003" \
 assert_grep "R-012b TB-003 mentions historical findings" \
   'TB-003.*historical|historical.*TB-003' "$ARCHITECTURE"
 
-# TB-003 has the invariant about treating findings as advisory
+# TB-003 has the invariant about treating findings as advisory.
+# Body moved to the trust-boundaries fragment (index+body-out fragmentation).
 assert_grep "R-012c TB-003 invariant about advisory data" \
-  '(advisory|data.*not.*instruction|treat.*finding.*data)' "$ARCHITECTURE"
+  '(advisory|data.*not.*instruction|treat.*finding.*data)' "$REPO_DIR/docs/architecture/trust-boundaries.md"
 
 # QA-003: TB-003 must have all 6 structural fields (using extract_entry for ### precision)
-TB003_SECTION="$(extract_entry "$ARCHITECTURE" 'TB-003' || echo "")"
+TB003_SECTION="$(extract_entry "$REPO_DIR/docs/architecture/trust-boundaries.md" 'TB-003' || echo "")"
 if [ -n "$TB003_SECTION" ]; then
   assert_contains "R-012d TB-003 has Crosses field" "Crosses" "$TB003_SECTION"
   assert_contains "R-012e TB-003 has Identity assertion" "Identity assertion" "$TB003_SECTION"
@@ -698,7 +699,8 @@ echo "=== R-013: Architecture entries ABS-002, PAT-004, ENV-003 ==="
 assert_contains "R-013a ARCHITECTURE has ABS-002" \
   "ABS-002" "$ARCH_CONTENT"
 
-ABS002_SECTION="$(extract_entry "$ARCHITECTURE" 'ABS-002' || echo "")"
+# ABS-002 body moved to the abstractions fragment (index+body-out fragmentation).
+ABS002_SECTION="$(extract_entry "$REPO_DIR/docs/architecture/abstractions.md" 'ABS-002' || echo "")"
 if [ -n "$ABS002_SECTION" ]; then
   assert_grep "R-013b ABS-002 mentions ephemeral classification" \
     '([Ee]phemeral|not stable|not persisted)' <(echo "$ABS002_SECTION")
@@ -713,7 +715,8 @@ fi
 assert_contains "R-013c ARCHITECTURE has PAT-004" \
   "PAT-004" "$ARCH_CONTENT"
 
-PAT004_SECTION="$(extract_entry "$ARCHITECTURE" 'PAT-004' || echo "")"
+# PAT-004 body moved to the patterns fragment (index+body-out fragmentation).
+PAT004_SECTION="$(extract_entry "$REPO_DIR/docs/architecture/patterns.md" 'PAT-004' || echo "")"
 if [ -n "$PAT004_SECTION" ]; then
   assert_grep "R-013d PAT-004 mentions file count or budget" \
     '(file count|data budget|budget)' <(echo "$PAT004_SECTION")
@@ -728,7 +731,8 @@ fi
 assert_contains "R-013e ARCHITECTURE has ENV-003" \
   "ENV-003" "$ARCH_CONTENT"
 
-ENV003_SECTION="$(extract_entry "$ARCHITECTURE" 'ENV-003' || echo "")"
+# ENV-003 body moved to the environment fragment (index+body-out fragmentation).
+ENV003_SECTION="$(extract_entry "$REPO_DIR/docs/architecture/environment.md" 'ENV-003' || echo "")"
 if [ -n "$ENV003_SECTION" ]; then
   assert_grep "R-013f ENV-003 mentions filename sort" \
     '(filename.*sort|filename.*order)' <(echo "$ENV003_SECTION")

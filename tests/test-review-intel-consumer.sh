@@ -583,7 +583,9 @@ section "INV-009: ABS-037 consumer list and statefulness update"
 
 # Tests INV-009 [unit]: ABS-037 lists /creview-spec and /creview as consumers
 # Use a tighter range: ABS-037 to the next ### heading (any kind, not just ABS)
-abs037_section=$(sed -n '/### ABS-037/,/^### [A-Z]/{ /^### [A-Z]/!p; /### ABS-037/p; }' "$ARCHITECTURE_DOC")
+# ABS-037 body moved to the abstractions fragment (index+body-out fragmentation);
+# heading stays in root.
+abs037_section=$(sed -n '/### ABS-037/,/^### [A-Z]/{ /^### [A-Z]/!p; /### ABS-037/p; }' "$REPO_DIR/docs/architecture/abstractions.md")
 
 if echo "$abs037_section" | grep -q 'creview-spec' && echo "$abs037_section" | grep -q 'creview[^-]'; then
   pass "INV-009a" "ABS-037 lists both review skills as consumers"
@@ -617,7 +619,9 @@ else
 fi
 
 # Tests INV-009 [unit]: TB-003 lists both review skills
-tb003_section=$(sed -n '/### TB-003/,/### TB-00[0-9]/p' "$ARCHITECTURE_DOC")
+# TB-003 body moved to the trust-boundaries fragment (index+body-out fragmentation);
+# heading stays in root.
+tb003_section=$(sed -n '/### TB-003/,/### TB-00[0-9]/p' "$REPO_DIR/docs/architecture/trust-boundaries.md")
 
 if echo "$tb003_section" | grep -q 'creview-spec' && echo "$tb003_section" | grep -q 'creview[^-]'; then
   pass "INV-009e" "TB-003 lists both review skills"

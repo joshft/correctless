@@ -447,9 +447,40 @@ extract_file_paths() {
 # ============================================
 
 # ---- architecture ----
-scan_architecture() {
+# A project's architecture is "fragmented" (index+body-out) only when the root
+# ARCHITECTURE.md actually carries the index See-links into docs/architecture/ —
+# NOT merely because a docs/architecture/ directory exists. A monolithic target
+# repo (correctless runs on other repos) may keep unrelated docs there (ADRs, C4
+# diagrams); detecting the marker rather than the directory keeps the monolithic
+# root scan intact on those repos (QA H-1).
+_arch_is_fragmented() {
   local arch_file="$BASE_DIR/.correctless/ARCHITECTURE.md"
-  if [ ! -f "$arch_file" ]; then
+  [ -f "$arch_file" ] && grep -q 'See \[docs/architecture/' "$arch_file" &&
+    compgen -G "$BASE_DIR/docs/architecture/*.md" >/dev/null 2>&1
+}
+
+# Emit architecture entry content for scanning. When fragmented, scan the
+# fragment bodies ONLY — the root is then a pure index (heading + See-link) with
+# no scannable file references. Scanning root + fragments would double-count each
+# entry in total_entries and cap the BND-002 bulk-warning ratio at 50%, silently
+# disabling that safety valve. The exempt PAT-001/PAT-017 .claude/rules refs are
+# covered by tests/test-architecture-drift.sh (PAT-001(a)/PAT-017(a)). Otherwise
+# scan the monolithic root ARCHITECTURE.md.
+_emit_arch_scan_content() {
+  local arch_file="$BASE_DIR/.correctless/ARCHITECTURE.md"
+  if _arch_is_fragmented; then
+    cat "$BASE_DIR"/docs/architecture/*.md
+  elif [ -f "$arch_file" ]; then
+    cat "$arch_file"
+  fi
+}
+
+_arch_has_scan_sources() {
+  [ -f "$BASE_DIR/.correctless/ARCHITECTURE.md" ]
+}
+
+scan_architecture() {
+  if ! _arch_has_scan_sources; then
     echo "[]"
     return
   fi
@@ -481,7 +512,7 @@ scan_architecture() {
     elif [ "$in_entry" = true ]; then
       current_text+=$'\n'"$line"
     fi
-  done < "$arch_file"
+  done < <(_emit_arch_scan_content)
 
   if [ -n "$current_id" ] && [ "$in_entry" = true ]; then
     _process_arch_entry "$current_id" "$current_text"
@@ -1426,8 +1457,7 @@ scan_counts() {
 
 # ---- crossrefs ----
 scan_crossrefs() {
-  local arch_file="$BASE_DIR/.correctless/ARCHITECTURE.md"
-  if [ ! -f "$arch_file" ]; then
+  if ! _arch_has_scan_sources; then
     echo "[]"
     return
   fi
@@ -1457,7 +1487,7 @@ scan_crossrefs() {
     elif [ "$in_entry" = true ]; then
       current_text+=$'\n'"$line"
     fi
-  done < "$arch_file"
+  done < <(_emit_arch_scan_content)
 
   if [ -n "$current_id" ] && [ "$in_entry" = true ]; then
     _process_crossref_entry "$current_id" "$current_text"

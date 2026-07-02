@@ -902,8 +902,10 @@ test_pre003_architecture_entries() {
   file_contains "$arch" "TB-004" \
     "PRE-003: ARCHITECTURE.md has TB-004 (LLM orchestrator autonomy boundary)"
 
-  # PRE-003: TB-001b — Custom PR command exception
-  file_contains "$arch" "TB-001b" \
+  # PRE-003: TB-001b — Custom PR command exception. TB-001b is a sub-entry
+  # (#### TB-001b:) inside the TB-001 body, moved to the trust-boundaries
+  # fragment (index+body-out fragmentation).
+  file_contains "$REPO_DIR/docs/architecture/trust-boundaries.md" "TB-001b" \
     "PRE-003: ARCHITECTURE.md has TB-001b (custom PR command exception)"
 
   # PRE-003: ABS-007 — Escalation file contract

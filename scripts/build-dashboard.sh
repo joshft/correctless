@@ -399,7 +399,16 @@ collect_artifacts ".correctless/specs/*.md" > "$TMPDIR_DASHBOARD/specs.json"
 collect_artifacts ".correctless/verification/*.md" > "$TMPDIR_DASHBOARD/verifications.json"
 collect_artifacts ".correctless/artifacts/review-spec-findings-*.md" ".correctless/artifacts/review-findings-*.md" > "$TMPDIR_DASHBOARD/review_findings.json"
 collect_artifacts ".correctless/artifacts/research/*.md" > "$TMPDIR_DASHBOARD/research.json"
-collect_artifacts ".correctless/ARCHITECTURE.md" ".correctless/AGENT_CONTEXT.md" ".correctless/antipatterns.md" > "$TMPDIR_DASHBOARD/architecture.json"
+# Embed the architecture docs. Only pull the docs/architecture/ fragments when
+# ARCHITECTURE.md is actually fragmented (carries the index See-links) — a
+# monolithic target repo may keep unrelated docs there (ADRs, C4 diagrams), and
+# those must not pollute the dashboard's architecture browser (QA M-1).
+arch_sources=(".correctless/ARCHITECTURE.md")
+if grep -q 'See \[docs/architecture/' ".correctless/ARCHITECTURE.md" 2>/dev/null; then
+  arch_sources+=("docs/architecture/*.md")
+fi
+arch_sources+=(".correctless/AGENT_CONTEXT.md" ".correctless/antipatterns.md")
+collect_artifacts "${arch_sources[@]}" > "$TMPDIR_DASHBOARD/architecture.json"
 collect_artifacts ".correctless/artifacts/qa-findings-*.json" > "$TMPDIR_DASHBOARD/qa_findings.json"
 collect_artifacts ".correctless/artifacts/findings/audit-*-history.md" > "$TMPDIR_DASHBOARD/audit_history.json"
 collect_artifacts ".correctless/artifacts/pipeline-manifest-*.json" > "$TMPDIR_DASHBOARD/pipeline_manifests.json"

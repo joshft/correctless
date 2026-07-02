@@ -31,6 +31,16 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.." || { echo "FATAL: cannot cd to repo root"
 source "tests/test-helpers.sh"
 
 ARCH_FILE=".correctless/ARCHITECTURE.md"
+# Architecture entry bodies moved to per-section fragments (index+body-out
+# fragmentation); root retains only headings + See-links. Body content and the
+# current-state doc surface now span these fragment files.
+ARCH_ABS_FRAG="docs/architecture/abstractions.md"
+ARCH_FRAGMENTS=(
+  "docs/architecture/trust-boundaries.md"
+  "docs/architecture/abstractions.md"
+  "docs/architecture/patterns.md"
+  "docs/architecture/environment.md"
+)
 CLAUDE_MD="CLAUDE.md"
 AGENT_CONTEXT=".correctless/AGENT_CONTEXT.md"
 README_MD="README.md"
@@ -315,6 +325,7 @@ EOF_DOCS2
 # file or the Postmortem-stripped projection (see CLAUDE_MD_NO_PMB).
 SINGLE_SURFACES=(
   "$ARCH_FILE"
+  "${ARCH_FRAGMENTS[@]}"
   "$CLAUDE_MD"
   "$AGENT_CONTEXT"
   "$README_MD"
@@ -340,6 +351,7 @@ claude_md_minus_postmortems > "$CLAUDE_MD_NO_PMB"
 
 SINGLE_SURFACES_CLAUDE_NO_PMB=(
   "$ARCH_FILE"
+  "${ARCH_FRAGMENTS[@]}"
   "$CLAUDE_MD_NO_PMB"
   "$AGENT_CONTEXT"
   "$README_MD"
@@ -441,7 +453,7 @@ arch_abs_block() {
     $0 ~ ("^### " id ":") { in_sec = 1; print; next }
     in_sec && /^### / { exit }
     in_sec { print }
-  ' "$ARCH_FILE"
+  ' "$ARCH_ABS_FRAG"
 }
 
 assert_marker_in_abs() {

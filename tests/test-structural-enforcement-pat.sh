@@ -40,8 +40,10 @@ else
   fail "R-001b" "PAT-018 title does not contain 'Structural enforcement over prompt-level instruction'"
 fi
 
-# Helper: extract PAT-018 section body (handles being last ### before a ## heading)
-PAT018_BODY=$(awk '/^### PAT-018:/{found=1} found && /^##[#]? [A-Z]/ && !/^### PAT-018:/{exit} found{print}' "$ARCH_FILE")
+# Helper: extract PAT-018 section body (handles being last ### before a ## heading).
+# Body moved to the patterns fragment (index+body-out fragmentation); heading
+# stays in root (R-001a/R-001b above).
+PAT018_BODY=$(awk '/^### PAT-018:/{found=1} found && /^##[#]? [A-Z]/ && !/^### PAT-018:/{exit} found{print}' "docs/architecture/patterns.md")
 
 # R-001c: PAT-018 has a Rule field
 if echo "$PAT018_BODY" | grep -q '^\- \*\*Rule\*\*:'; then

@@ -1618,8 +1618,10 @@ check_inv027() {
   else
     fail "INV-027(e)" "ARCHITECTURE.md missing ### ABS-027: heading"
   fi
-  # ABS-027 body must reference the harness fingerprint store
-  if grep -A 30 '^### ABS-027:' "$ARCH_FILE" | grep -qE 'harness[ -]fingerprint|harness-fingerprint\.json'; then
+  # ABS-027 body must reference the harness fingerprint store.
+  # Body moved to the abstractions fragment (index+body-out fragmentation); the
+  # heading stays in root (checked by INV-027(e) above).
+  if grep -A 30 '^### ABS-027:' docs/architecture/abstractions.md | grep -qE 'harness[ -]fingerprint|harness-fingerprint\.json'; then
     pass "INV-027(f)" "ABS-027 body references harness fingerprint store"
   else
     fail "INV-027(f)" "ABS-027 body missing harness fingerprint references"

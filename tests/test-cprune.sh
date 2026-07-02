@@ -203,6 +203,95 @@ else
 fi
 cleanup_fixture "$TMPDIR_003"
 
+# Tests INV-003 [behavioral]: H-1 regression — a MONOLITHIC ARCHITECTURE.md must
+# still be scanned even when an UNRELATED docs/architecture/ directory exists
+# (ADRs, C4 diagrams). Fragmentation is detected by the index See-link marker,
+# not by mere presence of docs/architecture/*.md.
+TMPDIR_003h1="$(setup_fixture_dir)"
+mkdir -p "$TMPDIR_003h1/docs/architecture"
+printf '# Unrelated ADR\nNot correctless fragments.\n' > "$TMPDIR_003h1/docs/architecture/overview.md"
+cat > "$TMPDIR_003h1/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
+# Architecture
+
+## Abstractions
+
+### ABS-060: Dead entry in monolithic root
+- **Enforced at**: `scripts/deleted-script.sh` (writer)
+- **Test**: `tests/test-deleted.sh`
+ARCH_EOF
+result_003h1="$(bash "$SCANNER" --category architecture --base "$TMPDIR_003h1" 2>/dev/null)" || true
+if [ "$(echo "$result_003h1" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
+  assert_json_field_eq "INV-003-h1" "Monolithic root scanned despite unrelated docs/architecture/ dir" '.[0].id' "ABS-060" "$result_003h1"
+else
+  fail "INV-003-h1" "Monolithic ARCHITECTURE.md must be scanned even when an unrelated docs/architecture/ dir exists"
+fi
+cleanup_fixture "$TMPDIR_003h1"
+
+# Tests INV-003 [behavioral]: fragmented layout (index+body-out) — bodies live in
+# docs/architecture/ fragments; a dead ref in a fragment body is flagged.
+TMPDIR_003fr="$(setup_fixture_dir)"
+mkdir -p "$TMPDIR_003fr/docs/architecture"
+cat > "$TMPDIR_003fr/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
+# Architecture
+
+## Abstractions
+
+### ABS-061: Fragmented entry
+See [docs/architecture/abstractions.md](docs/architecture/abstractions.md).
+ARCH_EOF
+cat > "$TMPDIR_003fr/docs/architecture/abstractions.md" << 'FRAG_EOF'
+# Architecture — Abstractions
+
+> Fragment of [.correctless/ARCHITECTURE.md](../../.correctless/ARCHITECTURE.md). Entry headings are indexed in the root document; full bodies live here.
+
+### ABS-061: Fragmented entry
+- **Enforced at**: `scripts/deleted-script.sh` (writer)
+- **Test**: `tests/test-deleted.sh`
+FRAG_EOF
+result_003fr="$(bash "$SCANNER" --category architecture --base "$TMPDIR_003fr" 2>/dev/null)" || true
+if [ "$(echo "$result_003fr" | jq '(if type == "object" and has("candidates") then .candidates else . end) | length' 2>/dev/null)" -gt 0 ]; then
+  assert_json_field_eq "INV-003-fr" "Dead ref in fragment body is flagged" '.[0].id' "ABS-061" "$result_003fr"
+else
+  fail "INV-003-fr" "Dead ref in a docs/architecture fragment body must be flagged"
+fi
+cleanup_fixture "$TMPDIR_003fr"
+
+# Tests INV-003 [behavioral]: fragmented scan must NOT double-count entries.
+# When fragmented, only the fragment bodies are scanned (the root is a pure
+# index); root + fragment together would double total_entries and cap the
+# bulk-warning ratio at 50%, silently disabling BND-002. With every fragmented
+# entry dead (100% > 50%), bulk_warning must fire true.
+TMPDIR_003bulk="$(setup_fixture_dir)"
+mkdir -p "$TMPDIR_003bulk/docs/architecture"
+cat > "$TMPDIR_003bulk/.correctless/ARCHITECTURE.md" << 'ARCH_EOF'
+# Architecture
+
+## Abstractions
+
+### ABS-070: e1
+See [docs/architecture/abstractions.md](docs/architecture/abstractions.md).
+
+### ABS-071: e2
+See [docs/architecture/abstractions.md](docs/architecture/abstractions.md).
+ARCH_EOF
+cat > "$TMPDIR_003bulk/docs/architecture/abstractions.md" << 'FRAG_EOF'
+# Architecture — Abstractions
+
+### ABS-070: e1
+- **Enforced at**: `scripts/dead-a.sh`
+
+### ABS-071: e2
+- **Enforced at**: `scripts/dead-b.sh`
+FRAG_EOF
+result_003bulk="$(bash "$SCANNER" --category architecture --base "$TMPDIR_003bulk" 2>/dev/null)" || true
+bulk_vals="$(echo "$result_003bulk" | jq -c '[.[].bulk_warning] | unique' 2>/dev/null)"
+if [ "$bulk_vals" = "[true]" ]; then
+  pass "INV-003-bulk" "fragmented all-dead entries trip bulk_warning (no total_entries double-count)"
+else
+  fail "INV-003-bulk" "bulk_warning must fire on 100%-dead fragmented repo — got $bulk_vals (total_entries likely double-counted)"
+fi
+cleanup_fixture "$TMPDIR_003bulk"
+
 # Tests INV-003 [behavioral]: entry with at least one LIVE ref is NOT flagged
 TMPDIR_003b="$(setup_fixture_dir)"
 # Create a file that exists

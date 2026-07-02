@@ -389,13 +389,14 @@ check_inv009() {
     return
   fi
 
-  # ABS-010 consumer list must mention ctdd-green
+  # ABS-010 consumer list must mention ctdd-green. Body moved to the abstractions
+  # fragment (index+body-out fragmentation); heading stays in root.
   local abs010_block
   abs010_block="$(awk '
     /^### ABS-010:/ { found = 1 }
     found { print }
     found && /^### ABS-0[1-9][1-9]:/ && !/^### ABS-010:/ { exit }
-  ' "$ARCH_FILE" 2>/dev/null)"
+  ' "docs/architecture/abstractions.md" 2>/dev/null)"
 
   if echo "$abs010_block" | grep -q "ctdd-green"; then
     pass "INV-009(a)" "ABS-010 entry mentions ctdd-green"

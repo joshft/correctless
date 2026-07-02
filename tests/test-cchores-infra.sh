@@ -369,7 +369,8 @@ section "INV-012: ABS-030 revision names cchores as authorized invoker"
 # "/cauto orchestrator" alone). ---
 if [ -f "$ARCH_FILE" ]; then
   # Pull the ABS-030 entry block (from its heading to the next ### heading).
-  abs030_block="$(awk '/^### ABS-030/{f=1} f{print} /^### ABS-03[1-9]/{if(f && !/^### ABS-030/)exit}' "$ARCH_FILE" 2>/dev/null)"
+  # Body moved to the abstractions fragment (index+body-out fragmentation).
+  abs030_block="$(awk '/^### ABS-030/{f=1} f{print} /^### ABS-03[1-9]/{if(f && !/^### ABS-030/)exit}' "$REPO_DIR/docs/architecture/abstractions.md" 2>/dev/null)"
 
   # The sole-writer line must name cchores as an authorized invoker.
   if echo "$abs030_block" | grep -qi 'cchores' ; then
