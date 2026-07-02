@@ -152,6 +152,15 @@ Run this presentation block (inputs: `IL_LOG` = the instructions-loaded.jsonl pa
 IL_LOG="${IL_LOG:-.correctless/meta/instructions-loaded.jsonl}"
 AUDIT_TRAIL="${AUDIT_TRAIL:-}"
 
+# Repo root for .file canonicalization (MA-R3-001). audit-trail .file values are a
+# MIX of absolute (/home/.../hooks/x.sh) and relative (hooks/x.sh) paths. Each of the
+# 3 hook-edit filter sites strips this "$root/" prefix (ltrimstr) so an ABSOLUTE hook
+# path canonicalizes to repo-relative BEFORE the ^hooks/ anchor — otherwise every
+# absolute .file misses the anchor and the channel silently reads 0 hook edits. Bash(git*)
+# is granted. Empty (non-repo cwd) => ltrimstr "/" is a harmless no-op prefix; relative
+# paths still match, absolute won't (acceptable degradation outside a repo).
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || true
+
 # Every jq over IL_LOG / AUDIT_TRAIL guards with `fromjson? | objects` (MA-001):
 # bare `fromjson?` only catches fromjson's own parse error, so a VALID-but-non-object
 # line (5, "x", [1,2]) or a mistyped field ({"file":5}) would raise a downstream
@@ -161,11 +170,17 @@ AUDIT_TRAIL="${AUDIT_TRAIL:-}"
 # skipped, never fatal, on jq 1.7 AND 1.8. Fields used in matching are also coerced
 # (`(.file // "") | tostring`) so a non-string field can never error.
 #
-# Hook-edit filter (MA-002 / MA-R2-002): match ONLY the real Correctless hook roots —
-# `hooks/...` at the repo root (source tree) or `.correctless/hooks/...` (installed,
-# anywhere in the path). This deliberately EXCLUDES src/hooks/ (React), .git/hooks/,
-# node_modules/**/hooks/, app/hooks/ and the legacy Claude hooks dir so a downstream
-# project's unrelated "hooks" directory is never miscounted as a Correctless hook edit.
+# Hook-edit filter (MA-002 / MA-R2-002 / MA-R3-001): .file is FIRST canonicalized to
+# repo-relative via `ltrimstr($root + "/")` (audit-trail records .file as a MIX of
+# absolute and relative paths — without this, every absolute /home/.../hooks/x.sh path
+# misses the anchor and the channel silently reads 0). Then match ONLY the real
+# Correctless hook roots: `^hooks/` (source tree) or `^\.correctless/hooks/` (installed).
+# Both anchors are start-anchored because the path is now repo-relative. This deliberately
+# EXCLUDES src/hooks/ (React), .git/hooks/, node_modules/**/hooks/, app/hooks/, the legacy
+# Claude hooks dir, AND the `correctless/hooks/` sync-mirror dir (a nested prefix that no
+# longer matches ^hooks/ — mirror edits are secondary, acceptable to exclude) so a
+# downstream project's unrelated "hooks" directory is never miscounted as a Correctless
+# hook edit.
 # A write-tool gate (.tool in Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash)
 # further excludes Read/Grep of hook files, which audit-trail.sh ALSO records with a
 # .file (MA-CC-03). Bash IS included: a hook edited via a Bash redirect/writer command
@@ -191,9 +206,17 @@ if [ -z "$AUDIT_TRAIL" ] || [ ! -f "$AUDIT_TRAIL" ]; then
   # suffix. This is a scoped lexicographic pick within THIS branch's trails, NOT an
   # mtime/most-recent pick.
   br="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || true
-  slug="$(printf '%s' "$br" | tr '/' '-')"
+  # slug must mirror branch_slug() (scripts/lib.sh) char-class transform EXACTLY so the
+  # glob prefix matches the real filename (MA-R3-002): ${branch//[^a-zA-Z0-9]/-} then
+  # truncate to 80. The md5 suffix branch_slug appends can't be recomputed without
+  # md5sum (not granted), so the trailing terminal-hash glob below matches it instead.
+  slug="${br//[^a-zA-Z0-9]/-}"; slug="${slug:0:80}"
   if [ -n "$slug" ]; then
-    AUDIT_TRAIL="$(find .correctless/artifacts -maxdepth 1 -name "audit-trail-${slug}*.jsonl" -type f 2>/dev/null | sort | tail -1)"
+    # Terminal-hash anchor (MA-R3-003): only accept a filename where $slug is IMMEDIATELY
+    # followed by the 6-hex-char branch_slug hash + .jsonl, so a longer sibling slug
+    # sharing this prefix (e.g. audit-trail-${slug}-extra-abc123.jsonl) is NOT matched.
+    # slug is [a-zA-Z0-9-] only (after the transform above), safe inside grep -E.
+    AUDIT_TRAIL="$(find .correctless/artifacts -maxdepth 1 -type f -name "audit-trail-${slug}-*.jsonl" 2>/dev/null | grep -E "/audit-trail-${slug}-[0-9a-f]{6}\\.jsonl$" | sort | tail -1)"
   else
     AUDIT_TRAIL=""
   fi
@@ -210,11 +233,11 @@ edit_sessions=""
 if [ "$audit_located" -eq 1 ]; then
   # hook-edit entries = write-tool ops whose .file is under a real Correctless hook
   # root (MA-002 / MA-R2-002 / MA-CC-03); time read as .ts // .timestamp (RS-030).
-  hook_edits="$(jq -R 'fromjson? | objects | select(((.file // "") | tostring | (test("^hooks/") or test("(^|/)\\.correctless/hooks/"))) and ((.tool // "") | tostring | test("^(Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash)$"))) | 1' "$AUDIT_TRAIL" 2>/dev/null | grep -c .)" || true
+  hook_edits="$(jq -R --arg root "$root" 'fromjson? | objects | select(((.file // "") | tostring | ltrimstr($root + "/") | (test("^hooks/") or test("^\\.correctless/hooks/"))) and ((.tool // "") | tostring | test("^(Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash)$"))) | 1' "$AUDIT_TRAIL" 2>/dev/null | grep -c .)" || true
   # edit-session ids (missing/null/empty session_id -> unattributed), de-duplicated.
   # `// "unattributed"` alone does NOT catch "" (jq // only catches null/false), so
   # empty-string sessions are folded into unattributed explicitly (QA-001 / INV-015).
-  edit_sessions="$(jq -Rr 'fromjson? | objects | select(((.file // "") | tostring | (test("^hooks/") or test("(^|/)\\.correctless/hooks/"))) and ((.tool // "") | tostring | test("^(Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash)$"))) | (.session_id // "" | if . == "" then "unattributed" else . end)' "$AUDIT_TRAIL" 2>/dev/null | sort -u)"
+  edit_sessions="$(jq -Rr --arg root "$root" 'fromjson? | objects | select(((.file // "") | tostring | ltrimstr($root + "/") | (test("^hooks/") or test("^\\.correctless/hooks/"))) and ((.tool // "") | tostring | test("^(Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash)$"))) | (.session_id // "" | if . == "" then "unattributed" else . end)' "$AUDIT_TRAIL" 2>/dev/null | sort -u)"
 fi
 edit_session_count="$(printf '%s\n' "$edit_sessions" | grep -c .)" || true
 
@@ -256,7 +279,10 @@ fi
 if [ "$audit_located" -eq 1 ]; then
   # read K reconciles: attributed (to this workflow's real edit-sessions) + other
   # (rule-loads from unrelated sessions) + null rule_file (MA-011).
-  rl_breakdown="read ${rule_loads} rule-load event(s) (${attributed} attributed to this workflow's edit-sessions, $(( rule_loads - attributed )) from other sessions, ${null_rules} with null rule_file)"
+  # MA-R3-004: clamp the "from other sessions" figure at 0 so a forged newline-inflated
+  # attributed count can't render a negative rule-load breakdown.
+  other=$(( rule_loads - attributed )); [ "$other" -lt 0 ] && other=0
+  rl_breakdown="read ${rule_loads} rule-load event(s) (${attributed} attributed to this workflow's edit-sessions, ${other} from other sessions, ${null_rules} with null rule_file)"
   if [ "$audit_autoresolved" -eq 1 ]; then
     # MA-R2-001 provenance: source was auto-resolved by fallback — name it, do NOT
     # assert it authoritatively describes "the target workflow".
@@ -284,8 +310,8 @@ printf '%s\n' "$edit_sessions" | while IFS= read -r sess; do
   if [ "$sess" = "unattributed" ]; then
     echo "  these edits predate session_id instrumentation — rule-loads cannot be attributed to them; absence of rule-loads here is NOT evidence the rule was unloaded."
   fi
-  jq -Rr --arg s "$sess" 'fromjson? | objects
-     | select(((.file // "") | tostring | (test("^hooks/") or test("(^|/)\\.correctless/hooks/"))) and ((.tool // "") | tostring | test("^(Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash)$")))
+  jq -Rr --arg s "$sess" --arg root "$root" 'fromjson? | objects
+     | select(((.file // "") | tostring | ltrimstr($root + "/") | (test("^hooks/") or test("^\\.correctless/hooks/"))) and ((.tool // "") | tostring | test("^(Edit|Write|MultiEdit|NotebookEdit|CreateFile|Bash)$")))
      | select((.session_id // "" | if . == "" then "unattributed" else . end) == $s)
      | "  hook-edit: \(.file) at \((.ts // .timestamp) // "?")"' "$AUDIT_TRAIL" 2>/dev/null
   # Rule-loads are only attributed to real (non-unattributed) sessions. The key is

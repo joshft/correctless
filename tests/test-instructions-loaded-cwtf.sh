@@ -664,7 +664,10 @@ else
   # on a branch whose slug matches the fixture name (a bare mktemp -d has no repo,
   # so the slug is empty and the glob finds nothing).
   ma4_iso="$(make_git_iso feature/ma4demo)"
-  cat "$AUDIT_SESS" > "$ma4_iso/.correctless/artifacts/audit-trail-feature-ma4demo.jsonl"
+  # Terminal-hash suffix (MA-R3-003): branch feature/ma4demo -> slug feature-ma4demo,
+  # and the self-glob accepts ONLY audit-trail-<slug>-[0-9a-f]{6}.jsonl, so the fixture
+  # carries a valid 6-hex suffix mirroring real branch_slug() output.
+  cat "$AUDIT_SESS" > "$ma4_iso/.correctless/artifacts/audit-trail-feature-ma4demo-a1b2c3.jsonl"
   out_ma4b="$( cd "$ma4_iso" && IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="" bash "$MA_BLK" 2>/dev/null )"
   rm -rf "$ma4_iso"
   if grep -qE '[0-9]+ hook-edit entries across' <<< "$out_ma4b" \
@@ -674,7 +677,7 @@ else
     fail "MA-004-glob-hit" "branch-scoped self-glob did not attribute hook-edits from this branch's audit-trail"
   fi
   # FIX 1 provenance: an auto-resolved source must be NAMED with the verify caveat.
-  if grep -q 'hook-edit source auto-resolved to audit-trail-feature-ma4demo.jsonl' <<< "$out_ma4b" \
+  if grep -q 'hook-edit source auto-resolved to audit-trail-feature-ma4demo-a1b2c3.jsonl' <<< "$out_ma4b" \
      && grep -q 'verify it matches the workflow you are auditing' <<< "$out_ma4b"; then
     pass "MA-004-glob-provenance" "auto-resolved liveness names the resolved basename + verify caveat (FIX 1)"
   else
@@ -776,11 +779,13 @@ else
   gs_iso="$(make_git_iso feature/alpha)"
   # THIS branch (slug feature-alpha): distinctive hook-edit.
   printf '%s\n' '{"ts":"2026-06-20T01:00:00Z","tool":"Edit","file":"hooks/x-branch-marker.sh","session_id":"11111111-1111-1111-1111-111111111111"}' \
-    > "$gs_iso/.correctless/artifacts/audit-trail-feature-alpha.jsonl"
-  # A DIFFERENT branch's trail that sorts LEXICOGRAPHICALLY LATER — an unscoped
-  # global sort|tail (the round-1 bug) would wrongly pick THIS one.
+    > "$gs_iso/.correctless/artifacts/audit-trail-feature-alpha-a1b2c3.jsonl"
+  # A DIFFERENT branch's trail (slug zzzz-otherbranch, NOT the current feature-alpha)
+  # that sorts LEXICOGRAPHICALLY LATER — an unscoped global sort|tail (the round-1 bug)
+  # would wrongly pick THIS one. It also carries a valid terminal 6-hex suffix so it is
+  # a well-formed trail; branch-scoping (not suffix shape) is what must exclude it.
   printf '%s\n' '{"ts":"2026-06-20T02:00:00Z","tool":"Edit","file":"hooks/other-branch-marker.sh","session_id":"22222222-2222-2222-2222-222222222222"}' \
-    > "$gs_iso/.correctless/artifacts/audit-trail-zzzz-otherbranch.jsonl"
+    > "$gs_iso/.correctless/artifacts/audit-trail-zzzz-otherbranch-b2c3d4.jsonl"
   out_gs="$( cd "$gs_iso" && IL_LOG="$NOLOG" AUDIT_TRAIL="" bash "$MA_BLK" 2>/dev/null )"
   rm -rf "$gs_iso"
   if grep -qF 'hooks/x-branch-marker.sh' <<< "$out_gs"; then
@@ -802,10 +807,11 @@ else
   section "MA-R2-provenance: auto-resolved names the source + verify caveat; explicit says 'for the target workflow' (MA-R2-001)"
 
   pv_iso="$(make_git_iso feature/prov)"
-  cat "$AUDIT_SESS" > "$pv_iso/.correctless/artifacts/audit-trail-feature-prov.jsonl"
+  # Terminal-hash suffix (MA-R3-003): slug feature-prov + valid 6-hex hash.
+  cat "$AUDIT_SESS" > "$pv_iso/.correctless/artifacts/audit-trail-feature-prov-a1b2c3.jsonl"
   out_pv_auto="$( cd "$pv_iso" && IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="" bash "$MA_BLK" 2>/dev/null )"
   rm -rf "$pv_iso"
-  if grep -qF 'hook-edit source auto-resolved to audit-trail-feature-prov.jsonl' <<< "$out_pv_auto" \
+  if grep -qF 'hook-edit source auto-resolved to audit-trail-feature-prov-a1b2c3.jsonl' <<< "$out_pv_auto" \
      && grep -qF 'verify it matches the workflow you are auditing' <<< "$out_pv_auto"; then
     pass "MA-R2-provenance-auto" "auto-resolved liveness names the basename + verify caveat"
   else
@@ -949,6 +955,101 @@ else
     fail "MA-R2-nullratio-50-not100" "50%-null wrongly emitted the 100% 'all with null rule_file' wording"
   else
     pass "MA-R2-nullratio-50-not100" "50%-null does not emit the 100% 'all with null rule_file' wording"
+  fi
+
+  # ========================================================================
+  # MINI-AUDIT ROUND-3 REGRESSION TESTS (MA-R3-*) — lock the 3 round-3 source
+  # fixes. Rounds 1-3 fixtures all used RELATIVE .file paths and short/no-hash
+  # trail names, so these classes went uncovered until now.
+  # ========================================================================
+
+  # ------------------------------------------------------------------------
+  # MA-R3-absolute [integration] (MA-R3-001 — the HIGH 3 rounds missed): real
+  # audit-trail.sh records .file as a MIX of absolute and relative paths. The
+  # hook-edit filter canonicalizes .file to repo-relative via ltrimstr($root+"/")
+  # (root = git rev-parse --show-toplevel) BEFORE the ^hooks/ anchor. Without
+  # canonicalization, every ABSOLUTE /.../hooks/x.sh path misses the start-anchored
+  # ^hooks/ and the channel silently reads 0 hook-edits. This fixture writes
+  # ABSOLUTE paths under the temp repo's REAL toplevel: an absolute hooks/ and an
+  # absolute .correctless/hooks/ MUST be counted; an absolute src/hooks/ MUST NOT.
+  # ------------------------------------------------------------------------
+  section "MA-R3-absolute: absolute .file paths canonicalized to repo-relative before ^hooks/ anchor (MA-R3-001)"
+
+  abs_iso="$(make_git_iso feature/absroot)"
+  # Use the temp repo's ACTUAL toplevel so the block's ltrimstr($root+"/") strips it.
+  abs_top="$( cd "$abs_iso" && git rev-parse --show-toplevel 2>/dev/null )"
+  {
+    printf '%s\n' "{\"ts\":\"2026-06-21T01:00:00Z\",\"tool\":\"Edit\",\"file\":\"${abs_top}/hooks/foo.sh\",\"session_id\":\"11111111-1111-1111-1111-111111111111\"}"
+    printf '%s\n' "{\"ts\":\"2026-06-21T02:00:00Z\",\"tool\":\"Edit\",\"file\":\"${abs_top}/.correctless/hooks/bar.sh\",\"session_id\":\"22222222-2222-2222-2222-222222222222\"}"
+    printf '%s\n' "{\"ts\":\"2026-06-21T03:00:00Z\",\"tool\":\"Edit\",\"file\":\"${abs_top}/src/hooks/useAuth.ts\",\"session_id\":\"33333333-3333-3333-3333-333333333333\"}"
+  } > "$abs_iso/.correctless/artifacts/audit-abs.jsonl"
+  out_abs="$( cd "$abs_iso" && IL_LOG="$NOLOG" AUDIT_TRAIL="$abs_iso/.correctless/artifacts/audit-abs.jsonl" bash "$MA_BLK" 2>/dev/null )"
+  rm -rf "$abs_iso"
+  if grep -qF 'hooks/foo.sh' <<< "$out_abs" && grep -qF '.correctless/hooks/bar.sh' <<< "$out_abs"; then
+    pass "MA-R3-absolute-counted" "absolute hooks/ + .correctless/hooks/ paths canonicalized and counted (MA-R3-001)"
+  else
+    fail "MA-R3-absolute-counted" "absolute hook paths missed the ^hooks/ anchor — ltrimstr canonicalization not applied (MA-R3-001)"
+  fi
+  if grep -qF 'src/hooks/useAuth.ts' <<< "$out_abs"; then
+    fail "MA-R3-absolute-excluded" "absolute src/hooks/useAuth.ts counted — anchored hook-root filter over-matched"
+  else
+    pass "MA-R3-absolute-excluded" "absolute src/hooks/useAuth.ts NOT counted (only ^hooks/ or ^.correctless/hooks/)"
+  fi
+  if grep -qE 'and 2 hook-edit entries across 2 edit-session' <<< "$out_abs"; then
+    pass "MA-R3-absolute-count" "exactly 2 absolute hook-edits counted (hooks/foo.sh + .correctless/hooks/bar.sh); src/hooks excluded"
+  else
+    fail "MA-R3-absolute-count" "hook-edit count wrong — expected 2 (absolute hooks/ + .correctless/hooks/)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-R3-slug-punct [integration] (MA-R3-002): the self-glob slug must mirror
+  # branch_slug()'s ${branch//[^a-zA-Z0-9]/-} char-class transform EXACTLY — a
+  # `tr / -` would rewrite '/' but leave '_' intact, so branch feature/add_foo
+  # would glob 'feature-add_foo' and miss the real 'feature-add-foo' filename.
+  # ------------------------------------------------------------------------
+  section "MA-R3-slug-punct: underscore in branch normalizes to '-' in self-glob slug (MA-R3-002)"
+
+  sp_iso="$(make_git_iso feature/add_foo)"
+  # branch feature/add_foo -> slug feature-add-foo ('/' AND '_' -> '-') + 6-hex suffix.
+  printf '%s\n' '{"ts":"2026-06-21T04:00:00Z","tool":"Edit","file":"hooks/slug-punct-marker.sh","session_id":"44444444-4444-4444-4444-444444444444"}' \
+    > "$sp_iso/.correctless/artifacts/audit-trail-feature-add-foo-a1b2c3.jsonl"
+  out_sp="$( cd "$sp_iso" && IL_LOG="$NOLOG" AUDIT_TRAIL="" bash "$MA_BLK" 2>/dev/null )"
+  rm -rf "$sp_iso"
+  if grep -qF 'hooks/slug-punct-marker.sh' <<< "$out_sp" \
+     && grep -qF 'hook-edit source auto-resolved to audit-trail-feature-add-foo-a1b2c3.jsonl' <<< "$out_sp"; then
+    pass "MA-R3-slug-punct" "underscore branch resolves audit-trail-feature-add-foo-<hash>.jsonl (slug mirrors char-class transform, not tr '/' '-') (MA-R3-002)"
+  else
+    fail "MA-R3-slug-punct" "underscore branch not resolved — slug used tr '/' '-' instead of the [^a-zA-Z0-9]->- transform (MA-R3-002)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-R3-siblingcollision [integration] (MA-R3-003): a sibling trail whose slug
+  # EXTENDS this branch's slug (feat vs feat-extra) shares the audit-trail-feat-
+  # prefix, so the -name glob matches BOTH. The terminal-hash anchor
+  # (/audit-trail-${slug}-[0-9a-f]{6}\.jsonl$) accepts ONLY the exact-slug + 6-hex
+  # form, so the current branch's trail resolves and the longer-slug sibling does not.
+  # ------------------------------------------------------------------------
+  section "MA-R3-siblingcollision: terminal-hash anchor rejects a longer sibling slug sharing the prefix (MA-R3-003)"
+
+  sc_iso="$(make_git_iso feat)"
+  # Current branch slug 'feat' -> audit-trail-feat-<6hex>.jsonl (accepted).
+  printf '%s\n' '{"ts":"2026-06-21T05:00:00Z","tool":"Edit","file":"hooks/feat-current-marker.sh","session_id":"55555555-5555-5555-5555-555555555555"}' \
+    > "$sc_iso/.correctless/artifacts/audit-trail-feat-a1b2c3.jsonl"
+  # Sibling with a LONGER slug 'feat-extra' sharing the audit-trail-feat- prefix;
+  # after 'feat-' comes 'extra-...', not 6 hex, so the terminal-hash anchor rejects it.
+  printf '%s\n' '{"ts":"2026-06-21T06:00:00Z","tool":"Edit","file":"hooks/feat-extra-sibling-marker.sh","session_id":"66666666-6666-6666-6666-666666666666"}' \
+    > "$sc_iso/.correctless/artifacts/audit-trail-feat-extra-b2c3d4.jsonl"
+  out_sc="$( cd "$sc_iso" && IL_LOG="$NOLOG" AUDIT_TRAIL="" bash "$MA_BLK" 2>/dev/null )"
+  rm -rf "$sc_iso"
+  if grep -qF 'hooks/feat-current-marker.sh' <<< "$out_sc"; then
+    pass "MA-R3-siblingcollision-current" "current-branch trail audit-trail-feat-a1b2c3.jsonl resolved by the terminal-hash anchor"
+  else
+    fail "MA-R3-siblingcollision-current" "current-branch trail not resolved (terminal-hash anchor too strict)"
+  fi
+  if grep -qF 'hooks/feat-extra-sibling-marker.sh' <<< "$out_sc"; then
+    fail "MA-R3-siblingcollision-sibling" "longer-slug sibling audit-trail-feat-extra-b2c3d4.jsonl leaked — prefix collision not rejected (MA-R3-003)"
+  else
+    pass "MA-R3-siblingcollision-sibling" "longer-slug sibling NOT resolved (terminal-hash anchor rejects feat-extra-...)"
   fi
 fi
 
