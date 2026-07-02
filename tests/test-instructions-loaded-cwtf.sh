@@ -116,11 +116,13 @@ fi
 #   IL_LOG=instructions-loaded-log-sample.jsonl
 #     sess 111 -> hooks-pretooluse.md ; sess 222 -> canonicalize-path.md ;
 #     malformed line ; sess 999 (NON-edit) -> sfg-deliverable.md
-#   AUDIT_TRAIL=audit-trail-sessioned.jsonl
-#     edit sess 111 (ts, hooks/sensitive-file-guard.sh) ; edit sess 222 (ts,
-#     hooks/workflow-gate.sh) ; session-less hooks/ edit (unattributed) ;
-#     timestamp-shaped skill_completed sess 111 (hooks/audit-trail.sh @21:19:20) ;
-#     malformed line.
+#   AUDIT_TRAIL=audit-trail-sessioned.jsonl (RECONCILED for FIX 6 write-tool gate)
+#     Edit sess 111 (ts, hooks/sensitive-file-guard.sh) ; Edit sess 222 (ts,
+#     hooks/workflow-gate.sh) ; ONE clean session-less EDIT (unattributed,
+#     hooks/workflow-advance.sh) ; a timestamp-shaped Edit sess 111
+#     (hooks/audit-trail.sh @21:19:20 — COUNTED now that it carries a write tool,
+#     proving .ts // .timestamp on a counted edit) ; malformed line.
+#     -> 4 counted hook-edits across 3 edit-sessions {111, 222, unattributed}.
 # ============================================================================
 section "INV-008 executable contract: extracted block groups rule-loads by edit-session (RS-027)"
 
@@ -494,6 +496,25 @@ run_block_iso() {
   printf '%s' "$out"
 }
 
+# Create an ISOLATED git repo on branch $1 (with one commit so
+# `git rev-parse --abbrev-ref HEAD` resolves the branch name — it returns "HEAD"
+# on an unborn branch), with an empty .correctless/artifacts/. Echoes the dir.
+# The caller drops branch-named audit-trail-*.jsonl fixtures under
+# .correctless/artifacts, runs the block with AUDIT_TRAIL="" to exercise the
+# FIX-1 branch-scoped self-glob, then rm -rf's the dir.
+make_git_iso() {
+  local branch="$1" d
+  d="$(mktemp -d)"
+  (
+    cd "$d" \
+      && git init -q \
+      && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init \
+      && git checkout -q -b "$branch"
+  ) >/dev/null 2>&1
+  mkdir -p "$d/.correctless/artifacts"
+  printf '%s' "$d"
+}
+
 if [ ! -s "$MA_BLK" ]; then
   section "MA fix round: extracted block absent — MA-001..MA-008 cannot run"
   fail "MA-block" "cwtf rule-load-extract block absent — mini-audit fixes unverifiable"
@@ -504,6 +525,11 @@ else
   LOG_UNMATCHED="$FIXTURES/instructions-loaded-log-unmatched.jsonl"
   LOG_CORRUPT="$FIXTURES/instructions-loaded-log-corrupt.jsonl"
   LOG_PARTIALNULL="$FIXTURES/instructions-loaded-log-partialnull.jsonl"
+  # Round-2 regression fixtures (TASK B):
+  AUDIT_NONHOOK="$FIXTURES/audit-trail-nonhook-dirs.jsonl"      # MA-R2-srchooks
+  AUDIT_TOOLGATE="$FIXTURES/audit-trail-toolgate.jsonl"         # MA-R2-toolgate
+  AUDIT_ALLUNATTR="$FIXTURES/audit-trail-allunattr.jsonl"       # MA-R2-driftnote-suppressed
+  LOG_HALFNULL="$FIXTURES/instructions-loaded-log-halfnull.jsonl" # MA-R2-nullratio-50
 
   # ------------------------------------------------------------------------
   # MA-001 [integration]: non-object / mistyped JSONL lines are never fatal.
@@ -543,27 +569,31 @@ else
   fi
 
   # ------------------------------------------------------------------------
-  # MA-002 [integration]: hook-edit filter matches a hooks/ path COMPONENT
-  # (test("(^|/)hooks/")) so installed-project paths (.correctless/hooks/...,
-  # absolute /x/hooks/...) count, while scripts/foo.sh and webhooks/x.sh do not.
+  # MA-002 [integration] (RECONCILED for FIX 2 — anchored hook-root filter):
+  # the hook-edit filter now matches ONLY `^hooks/` (source tree) or
+  # `(^|/)\.correctless/hooks/` (installed) PLUS a write-tool gate. So the
+  # installed-project `.correctless/hooks/...` path counts, but an absolute
+  # non-.correctless `/x/hooks/y.sh` is now INTENTIONALLY EXCLUDED, as are
+  # scripts/foo.sh and webhooks/x.sh. Only 1 of the 4 fixture rows counts.
   # ------------------------------------------------------------------------
-  section "MA-002: installed-project hook paths counted; non-hook paths excluded"
+  section "MA-002: .correctless/hooks path counted; absolute/non-hook paths excluded (FIX 2)"
 
   out_ma2="$(IL_LOG="$NOLOG" AUDIT_TRAIL="$AUDIT_CH" bash "$MA_BLK" 2>/dev/null)"
   if grep -q '.correctless/hooks/workflow-advance.sh' <<< "$out_ma2"; then
     pass "MA-002-correctless-hook" "installed-project hook (.correctless/hooks/workflow-advance.sh) appears in output"
   else
-    fail "MA-002-correctless-hook" ".correctless/hooks/... path silently excluded (test('(^|/)hooks/') regression)"
+    fail "MA-002-correctless-hook" ".correctless/hooks/... path silently excluded ((^|/)\\.correctless/hooks/ regression)"
   fi
+  # INVERTED (FIX 2): absolute non-.correctless /x/hooks/y.sh must NOT be counted.
   if grep -q '/x/hooks/y.sh' <<< "$out_ma2"; then
-    pass "MA-002-abs-hook" "absolute hook path (/x/hooks/y.sh) appears in output"
+    fail "MA-002-abs-hook" "absolute non-.correctless /x/hooks/y.sh counted — anchored hook-root filter regressed (FIX 2)"
   else
-    fail "MA-002-abs-hook" "absolute /x/hooks/... path silently excluded"
+    pass "MA-002-abs-hook" "absolute non-.correctless /x/hooks/y.sh EXCLUDED (only ^hooks/ or .correctless/hooks/ match)"
   fi
-  if grep -qE '2 hook-edit entries' <<< "$out_ma2"; then
-    pass "MA-002-count" "exactly 2 hook-edits counted (the two hooks/-component paths)"
+  if grep -qE 'and 1 hook-edit entries across 1 edit-session' <<< "$out_ma2"; then
+    pass "MA-002-count" "exactly 1 hook-edit counted (only .correctless/hooks/...); abs/scripts/webhooks excluded"
   else
-    fail "MA-002-count" "hook-edit count wrong — non-hook path leaked in or hook path dropped"
+    fail "MA-002-count" "hook-edit count wrong — expected 1 (.correctless/hooks/...) with abs/scripts/webhooks excluded"
   fi
   if grep -q 'scripts/foo.sh' <<< "$out_ma2"; then
     fail "MA-002-nonhook" "scripts/foo.sh counted as a hook-edit (over-match)"
@@ -591,10 +621,12 @@ else
   fi
 
   out_ma3_dead="$(IL_LOG="$NOLOG" AUDIT_TRAIL="$AUDIT_CH" bash "$MA_BLK" 2>/dev/null)"
-  if grep -q 'the channel may be dead (hook not registered or not firing)' <<< "$out_ma3_dead"; then
-    pass "MA-003-dead-msg" "empty log + hook-edits>0 emits the dead-channel note (not the benign advisory)"
+  # RECONCILED for FIX 3: the dead-channel cause list now names the benign
+  # harness-too-old cause verbatim.
+  if grep -q 'the channel may be dead (hook not registered, harness <2.1.69 which does not emit InstructionsLoaded, or not firing)' <<< "$out_ma3_dead"; then
+    pass "MA-003-dead-msg" "empty log + hook-edits>0 emits the dead-channel note with the harness <2.1.69 benign cause (FIX 3)"
   else
-    fail "MA-003-dead-msg" "dead-channel note absent when hook-edits>0 with empty log"
+    fail "MA-003-dead-msg" "dead-channel note absent or missing the 'harness <2.1.69 which does not emit InstructionsLoaded' cause (FIX 3)"
   fi
   if grep -q 'WARNING:' <<< "$out_ma3_dead" \
      && grep -q 'hook-edit(s) occurred but zero rule-load events' <<< "$out_ma3_dead"; then
@@ -625,17 +657,28 @@ else
     pass "MA-004-not-measured" "does not fabricate a measured '0 hook-edit entries' denominator"
   fi
 
-  # Contrast: a real audit-trail-*.jsonl in artifacts IS found by the self-glob.
-  ma4_iso="$(mktemp -d)"
-  mkdir -p "$ma4_iso/.correctless/artifacts"
-  cat "$AUDIT_SESS" > "$ma4_iso/.correctless/artifacts/audit-trail-glob-hit.jsonl"
+  # Contrast (RECONCILED for FIX 1 — branch-scoped self-glob): a real audit-trail
+  # named for THIS branch's slug IS found. The self-glob now derives the current
+  # branch slug via `git rev-parse --abbrev-ref HEAD | tr / -` and globs
+  # `audit-trail-<slug>*.jsonl` ONLY, so the contrast case needs a real git repo
+  # on a branch whose slug matches the fixture name (a bare mktemp -d has no repo,
+  # so the slug is empty and the glob finds nothing).
+  ma4_iso="$(make_git_iso feature/ma4demo)"
+  cat "$AUDIT_SESS" > "$ma4_iso/.correctless/artifacts/audit-trail-feature-ma4demo.jsonl"
   out_ma4b="$( cd "$ma4_iso" && IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="" bash "$MA_BLK" 2>/dev/null )"
   rm -rf "$ma4_iso"
   if grep -qE '[0-9]+ hook-edit entries across' <<< "$out_ma4b" \
      && ! grep -q 'not located' <<< "$out_ma4b"; then
-    pass "MA-004-glob-hit" "self-glob finds artifacts/audit-trail-*.jsonl and reports measured hook-edits"
+    pass "MA-004-glob-hit" "branch-scoped self-glob finds audit-trail-<slug>.jsonl and reports measured hook-edits"
   else
-    fail "MA-004-glob-hit" "self-glob did not attribute hook-edits from a real audit-trail in artifacts"
+    fail "MA-004-glob-hit" "branch-scoped self-glob did not attribute hook-edits from this branch's audit-trail"
+  fi
+  # FIX 1 provenance: an auto-resolved source must be NAMED with the verify caveat.
+  if grep -q 'hook-edit source auto-resolved to audit-trail-feature-ma4demo.jsonl' <<< "$out_ma4b" \
+     && grep -q 'verify it matches the workflow you are auditing' <<< "$out_ma4b"; then
+    pass "MA-004-glob-provenance" "auto-resolved liveness names the resolved basename + verify caveat (FIX 1)"
+  else
+    fail "MA-004-glob-provenance" "auto-resolved liveness missing 'auto-resolved to <basename>' + verify caveat (FIX 1)"
   fi
 
   # ------------------------------------------------------------------------
@@ -714,6 +757,198 @@ else
     pass "MA-008-allnull-wording" "100%-null log still emits the 'all with null rule_file' field-drift note"
   else
     fail "MA-008-allnull-wording" "100%-null wording changed — 'all with null rule_file' + field drift expected"
+  fi
+
+  # ========================================================================
+  # MINI-AUDIT ROUND-2 REGRESSION TESTS (MA-R2-*) — lock the 7 source fixes made
+  # this round. Each would have caught a round-1 regression; each asserts on the
+  # GREEN agent's reported verbatim output substrings.
+  # ========================================================================
+
+  # ------------------------------------------------------------------------
+  # MA-R2-glob-scope [integration] (FIX 1 / MA-R2-001 core guard): the AUDIT_TRAIL
+  # self-glob is scoped to THIS branch's slug — it must NOT pick another branch's
+  # trail even when that trail sorts lexicographically LATER (which is exactly what
+  # the round-1 unscoped `find audit-trail-*.jsonl | sort | tail -1` did).
+  # ------------------------------------------------------------------------
+  section "MA-R2-glob-scope: branch-scoped self-glob resolves THIS branch, ignores a later-sorting other-branch trail (MA-R2-001)"
+
+  gs_iso="$(make_git_iso feature/alpha)"
+  # THIS branch (slug feature-alpha): distinctive hook-edit.
+  printf '%s\n' '{"ts":"2026-06-20T01:00:00Z","tool":"Edit","file":"hooks/x-branch-marker.sh","session_id":"11111111-1111-1111-1111-111111111111"}' \
+    > "$gs_iso/.correctless/artifacts/audit-trail-feature-alpha.jsonl"
+  # A DIFFERENT branch's trail that sorts LEXICOGRAPHICALLY LATER — an unscoped
+  # global sort|tail (the round-1 bug) would wrongly pick THIS one.
+  printf '%s\n' '{"ts":"2026-06-20T02:00:00Z","tool":"Edit","file":"hooks/other-branch-marker.sh","session_id":"22222222-2222-2222-2222-222222222222"}' \
+    > "$gs_iso/.correctless/artifacts/audit-trail-zzzz-otherbranch.jsonl"
+  out_gs="$( cd "$gs_iso" && IL_LOG="$NOLOG" AUDIT_TRAIL="" bash "$MA_BLK" 2>/dev/null )"
+  rm -rf "$gs_iso"
+  if grep -qF 'hooks/x-branch-marker.sh' <<< "$out_gs"; then
+    pass "MA-R2-glob-scope-this" "self-glob resolved THIS branch's audit-trail (its hook-edit appears)"
+  else
+    fail "MA-R2-glob-scope-this" "THIS branch's audit-trail-feature-alpha.jsonl was not resolved"
+  fi
+  if grep -qF 'hooks/other-branch-marker.sh' <<< "$out_gs"; then
+    fail "MA-R2-glob-scope-other" "later-sorting other-branch trail leaked in — self-glob not branch-scoped (MA-R2-001 regression)"
+  else
+    pass "MA-R2-glob-scope-other" "later-sorting other-branch trail NOT picked (branch-scoped glob, not global sort|tail)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-R2-provenance [integration] (FIX 1): an auto-resolved source is NAMED with a
+  # verify caveat and NOT claimed as "for the target workflow"; an explicitly-
+  # supplied AUDIT_TRAIL keeps "for the target workflow" and omits the auto phrase.
+  # ------------------------------------------------------------------------
+  section "MA-R2-provenance: auto-resolved names the source + verify caveat; explicit says 'for the target workflow' (MA-R2-001)"
+
+  pv_iso="$(make_git_iso feature/prov)"
+  cat "$AUDIT_SESS" > "$pv_iso/.correctless/artifacts/audit-trail-feature-prov.jsonl"
+  out_pv_auto="$( cd "$pv_iso" && IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="" bash "$MA_BLK" 2>/dev/null )"
+  rm -rf "$pv_iso"
+  if grep -qF 'hook-edit source auto-resolved to audit-trail-feature-prov.jsonl' <<< "$out_pv_auto" \
+     && grep -qF 'verify it matches the workflow you are auditing' <<< "$out_pv_auto"; then
+    pass "MA-R2-provenance-auto" "auto-resolved liveness names the basename + verify caveat"
+  else
+    fail "MA-R2-provenance-auto" "auto-resolved provenance line missing basename or verify caveat"
+  fi
+  if grep -qF 'for the target workflow' <<< "$out_pv_auto"; then
+    fail "MA-R2-provenance-auto-notarget" "auto-resolved output wrongly claims 'for the target workflow'"
+  else
+    pass "MA-R2-provenance-auto-notarget" "auto-resolved output does NOT claim 'for the target workflow'"
+  fi
+  out_pv_explicit="$(IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="$AUDIT_SESS" bash "$MA_BLK" 2>/dev/null)"
+  if grep -qF 'for the target workflow' <<< "$out_pv_explicit" \
+     && ! grep -qF 'hook-edit source auto-resolved to' <<< "$out_pv_explicit"; then
+    pass "MA-R2-provenance-explicit" "explicit AUDIT_TRAIL says 'for the target workflow' and omits the auto-resolved phrase"
+  else
+    fail "MA-R2-provenance-explicit" "explicit AUDIT_TRAIL wording wrong (want 'for the target workflow', no auto-resolved phrase)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-R2-srchooks [integration] (FIX 2 / MA-R2-002 / MA-CC-01): src/hooks/,
+  # .git/hooks/, node_modules/**/hooks/, app/hooks/ are all EXCLUDED by the
+  # anchored hook-root filter; a sibling .correctless/hooks/ edit IS counted.
+  # ------------------------------------------------------------------------
+  section "MA-R2-srchooks: src/.git/node_modules/app hooks excluded; .correctless/hooks counted (MA-R2-002)"
+
+  out_nh="$(IL_LOG="$NOLOG" AUDIT_TRAIL="$AUDIT_NONHOOK" bash "$MA_BLK" 2>/dev/null)"
+  nh_leak=""
+  for _p in 'src/hooks/useAuth.ts' '.git/hooks/pre-commit' 'node_modules/x/hooks/y.js' 'app/hooks/z.ts'; do
+    grep -qF "$_p" <<< "$out_nh" && nh_leak="$nh_leak [$_p]"
+  done
+  if [ -z "$nh_leak" ]; then
+    pass "MA-R2-srchooks-excluded" "no non-Correctless hooks dir counted (src/.git/node_modules/app hooks excluded)"
+  else
+    fail "MA-R2-srchooks-excluded" "non-hook path(s) leaked in as hook-edits:$nh_leak"
+  fi
+  if grep -qF '.correctless/hooks/foo.sh' <<< "$out_nh"; then
+    pass "MA-R2-srchooks-included" ".correctless/hooks/foo.sh IS counted (real hook root, sibling to the excluded dirs)"
+  else
+    fail "MA-R2-srchooks-included" ".correctless/hooks/foo.sh not counted — real hook root dropped"
+  fi
+  if grep -qE 'and 1 hook-edit entries across 1 edit-session' <<< "$out_nh"; then
+    pass "MA-R2-srchooks-count" "exactly 1 hook-edit counted (only the .correctless/hooks entry)"
+  else
+    fail "MA-R2-srchooks-count" "hook-edit count wrong — expected exactly 1 (.correctless/hooks/foo.sh)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-R2-toolgate [integration] (FIX 6): Read/Grep entries on a hooks/ file are
+  # NOT counted (write-tool gate); Edit AND Bash entries on a hooks/ file ARE.
+  # ------------------------------------------------------------------------
+  section "MA-R2-toolgate: Read/Grep on a hooks/ file excluded; Edit and Bash counted (FIX 6)"
+
+  out_tg="$(IL_LOG="$NOLOG" AUDIT_TRAIL="$AUDIT_TOOLGATE" bash "$MA_BLK" 2>/dev/null)"
+  tg_leak=""
+  for _p in 'hooks/read-not-an-edit.sh' 'hooks/grep-not-an-edit.sh'; do
+    grep -qF "$_p" <<< "$out_tg" && tg_leak="$tg_leak [$_p]"
+  done
+  if [ -z "$tg_leak" ]; then
+    pass "MA-R2-toolgate-readgrep" "Read/Grep entries on a hooks/ file NOT counted (write-tool gate)"
+  else
+    fail "MA-R2-toolgate-readgrep" "Read/Grep hook access leaked in as hook-edits:$tg_leak"
+  fi
+  if grep -qF 'hooks/edited-via-edit.sh' <<< "$out_tg" \
+     && grep -qF 'hooks/edited-via-bash.sh' <<< "$out_tg"; then
+    pass "MA-R2-toolgate-editbash" "Edit and Bash entries on a hooks/ file ARE counted (Bash is a real write vector)"
+  else
+    fail "MA-R2-toolgate-editbash" "Edit and/or Bash hook edit dropped — write-tool gate over-restrictive"
+  fi
+  if grep -qE 'and 2 hook-edit entries across 2 edit-session' <<< "$out_tg"; then
+    pass "MA-R2-toolgate-count" "exactly 2 hook-edits counted (Edit + Bash); Read/Grep excluded"
+  else
+    fail "MA-R2-toolgate-count" "hook-edit count wrong — expected 2 (Edit + Bash)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-R2-deadchannel-harness [integration] (FIX 3): the dead-channel WARNING now
+  # names the benign "harness <2.1.69 which does not emit InstructionsLoaded" cause.
+  # ------------------------------------------------------------------------
+  section "MA-R2-deadchannel-harness: dead-channel WARNING names the harness <2.1.69 benign cause (FIX 3)"
+
+  out_dc="$(IL_LOG="$NOLOG" AUDIT_TRAIL="$AUDIT_SESS" bash "$MA_BLK" 2>/dev/null)"
+  if grep -qF 'WARNING:' <<< "$out_dc" \
+     && grep -qF 'harness <2.1.69 which does not emit InstructionsLoaded' <<< "$out_dc"; then
+    pass "MA-R2-deadchannel-harness" "dead-channel WARNING includes the harness <2.1.69 benign cause"
+  else
+    fail "MA-R2-deadchannel-harness" "dead-channel WARNING missing the harness <2.1.69 benign cause (FIX 3)"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-R2-driftnote-suppressed [integration] (FIX 4): when EVERY hook-edit is
+  # unattributed (pre-instrumentation), the MA-006 format-drift note is SUPPRESSED
+  # (attributed==0 is benign, not drift) — but the unattributed-group caveat still
+  # renders. rule-loads DO carry session_ids, which the round-1 code would have
+  # misinterpreted as a format-drift signal.
+  # ------------------------------------------------------------------------
+  section "MA-R2-driftnote-suppressed: all-unattributed edits suppress the format-drift note; caveat still shown (FIX 4)"
+
+  out_dn="$(IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="$AUDIT_ALLUNATTR" bash "$MA_BLK" 2>/dev/null)"
+  if grep -qF 'session_id format drift' <<< "$out_dn" \
+     || grep -qF 'none matched an edit-session_id' <<< "$out_dn"; then
+    fail "MA-R2-driftnote-suppressed" "format-drift note fired though ALL edits are unattributed (FIX 4 regression)"
+  else
+    pass "MA-R2-driftnote-suppressed" "no session_id-format-drift note when every edit is unattributed (FIX 4)"
+  fi
+  if grep -qF 'these edits predate session_id instrumentation' <<< "$out_dn"; then
+    pass "MA-R2-driftnote-caveat" "unattributed-group caveat still shown (suppression does not hide the caveat)"
+  else
+    fail "MA-R2-driftnote-caveat" "unattributed-group caveat missing"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-R2-liveness-reconcile [integration] (FIX 5): the liveness rule-load
+  # denominator reconciles as read K = attributed + (K-attributed from other
+  # sessions) + null. LOG_SAMPLE has 3 rule-loads (sess 111,222,999); AUDIT_SESS
+  # real edit-sessions are 111,222 -> 2 attributed, 1 other, 0 null, 2+1+0=3.
+  # ------------------------------------------------------------------------
+  section "MA-R2-liveness-reconcile: read K = attributed + other-session + null (FIX 5)"
+
+  out_lr="$(IL_LOG="$LOG_SAMPLE" AUDIT_TRAIL="$AUDIT_SESS" bash "$MA_BLK" 2>/dev/null)"
+  if grep -qF "read 3 rule-load event(s) (2 attributed to this workflow's edit-sessions, 1 from other sessions, 0 with null rule_file)" <<< "$out_lr"; then
+    pass "MA-R2-liveness-reconcile" "liveness reconciles read 3 = 2 attributed + 1 other + 0 null (A + (K-A) = K)"
+  else
+    fail "MA-R2-liveness-reconcile" "liveness reconciliation wrong (want '2 attributed ... 1 from other sessions, 0 with null rule_file')"
+  fi
+
+  # ------------------------------------------------------------------------
+  # MA-R2-nullratio-50 [integration] (FIX 7 boundary): exactly 50% null rule_file
+  # (2 of 4) fires the high-null-ratio note (null_rules*2 >= rule_loads), but NOT
+  # the 100%-equality 'all with null rule_file' wording.
+  # ------------------------------------------------------------------------
+  section "MA-R2-nullratio-50: exactly 50% null fires the high-null-ratio note (FIX 7 boundary)"
+
+  out_nr="$(run_block_iso "$LOG_HALFNULL" "")"
+  if grep -q 'high null-rule ratio (2/4)' <<< "$out_nr" \
+     && grep -q 'possible harness field drift' <<< "$out_nr"; then
+    pass "MA-R2-nullratio-50" "2-of-4 null (50%) fires 'high null-rule ratio (2/4)' (null*2 >= rule_loads boundary)"
+  else
+    fail "MA-R2-nullratio-50" "50% null did not fire the high-null-ratio note (FIX 7 boundary null*2>=K)"
+  fi
+  if grep -q 'all with null rule_file' <<< "$out_nr"; then
+    fail "MA-R2-nullratio-50-not100" "50%-null wrongly emitted the 100% 'all with null rule_file' wording"
+  else
+    pass "MA-R2-nullratio-50-not100" "50%-null does not emit the 100% 'all with null rule_file' wording"
   fi
 fi
 

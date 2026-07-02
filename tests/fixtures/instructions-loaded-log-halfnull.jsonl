@@ -1,0 +1,4 @@
+{"ts":"2026-06-15T04:01:00Z","session_id":"11111111-1111-1111-1111-111111111111","rule_file":null,"trigger_file_path":null,"load_reason":"path_glob_match"}
+{"ts":"2026-06-15T04:02:00Z","session_id":"11111111-1111-1111-1111-111111111111","rule_file":null,"trigger_file_path":null,"load_reason":"path_glob_match"}
+{"ts":"2026-06-15T04:03:00Z","session_id":"11111111-1111-1111-1111-111111111111","rule_file":".claude/rules/hooks-pretooluse.md","trigger_file_path":"hooks/sensitive-file-guard.sh","load_reason":"path_glob_match"}
+{"ts":"2026-06-15T04:04:00Z","session_id":"11111111-1111-1111-1111-111111111111","rule_file":".claude/rules/canonicalize-path.md","trigger_file_path":"scripts/lib.sh","load_reason":"path_glob_match"}
