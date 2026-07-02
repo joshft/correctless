@@ -356,7 +356,9 @@ test_r011_abs031_architecture_entry() {
   echo ""
   echo "=== R-011: ABS-031 entry in ARCHITECTURE.md ==="
 
-  local arch="$REPO_DIR/.correctless/ARCHITECTURE.md"
+  # ABS-031 body moved to the abstractions fragment (index+body-out fragmentation);
+  # every check below reads ABS-031 content, and the fragment carries heading + body.
+  local arch="$REPO_DIR/docs/architecture/abstractions.md"
 
   # R-011: ARCHITECTURE.md has ABS-031
   file_contains "$arch" "ABS-031" \

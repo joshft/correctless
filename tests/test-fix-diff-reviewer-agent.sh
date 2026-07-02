@@ -835,6 +835,8 @@ check_inv011() {
 
   # A05: Required sub-fields within 40 lines after each heading.
   local abs_body env_body
+  # Body moved to the abstractions fragment (index+body-out fragmentation);
+  # heading stays in root (INV-011(a) above).
   abs_body="$(awk '
     /^### ABS-010:/ { in_block = 1; n = 0; next }
     in_block {
@@ -843,7 +845,7 @@ check_inv011() {
       if (/^### / || /^## /) exit
       print
     }
-  ' "$ARCH_FILE")"
+  ' "docs/architecture/abstractions.md")"
   local sub missing_abs=""
   for sub in "Invariant" "Enforced at" "Violated when" "Test"; do
     if ! printf '%s\n' "$abs_body" | grep -qF "$sub"; then
@@ -856,6 +858,8 @@ check_inv011() {
     fail "INV-011(a-subfields)" "ABS-010 section missing sub-field(s): ${missing_abs%, }"
   fi
 
+  # Body moved to the environment fragment (index+body-out fragmentation);
+  # heading stays in root (INV-011(b) above).
   env_body="$(awk '
     /^### ENV-007:/ { in_block = 1; n = 0; next }
     in_block {
@@ -864,7 +868,7 @@ check_inv011() {
       if (/^### / || /^## /) exit
       print
     }
-  ' "$ARCH_FILE")"
+  ' "docs/architecture/environment.md")"
   local missing_env=""
   for sub in "Assumption" "Consequence if wrong" "Test"; do
     if ! printf '%s\n' "$env_body" | grep -qF "$sub"; then
@@ -2182,12 +2186,15 @@ check_gap008_abs010_narrow_scope() {
     fail "GAP-008" "$ARCH_FILE missing ### ABS-010: heading — cannot extract body"
     return
   fi
+  # Body moved to the abstractions fragment (index+body-out fragmentation).
+  # Read the fragment so this negative check keeps its strength (reading the
+  # now-bodiless root would pass vacuously against an empty body).
   local abs_body
   abs_body="$(awk '
     /^### ABS-010:/ { in_block = 1; next }
     in_block && /^### / { exit }
     in_block { print }
-  ' "$ARCH_FILE")"
+  ' "docs/architecture/abstractions.md")"
   local token bad=""
   for token in TB-005 ABS-011 PAT-011; do
     if printf '%s\n' "$abs_body" | grep -qF "$token"; then
@@ -2759,8 +2766,10 @@ check_class_shaped_bug_detection() {
   local ok21=1 why21=""
   if [ -f "$CS_ARCH" ]; then
     grep -qE '^### ABS-041' "$CS_ARCH" || { ok21=0; why21="${why21}no '### ABS-041' heading; "; }
+    # ABS-041 body moved to the abstractions fragment (index+body-out fragmentation);
+    # heading stays in root (checked above).
     local abs41
-    abs41="$(awk '/^### ABS-041/{p=1;next} p&&/^### /{exit} p{print}' "$CS_ARCH")"
+    abs41="$(awk '/^### ABS-041/{p=1;next} p&&/^### /{exit} p{print}' "docs/architecture/abstractions.md")"
     for field in 'What' 'Invariant' 'Enforced-at' 'Violated-when' 'Test'; do
       printf '%s\n' "$abs41" | grep -qiE "\\b${field}\\b" || { ok21=0; why21="${why21}ABS-041 missing ${field} field; "; }
     done

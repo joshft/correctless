@@ -522,9 +522,11 @@ else
   fail "INV-013c" "cmetrics missing warning for 0 fix rounds across 3+ features"
 fi
 
-# INV-013d: cmetrics listed as consumer of ABS-005 in ARCHITECTURE.md
+# INV-013d: cmetrics listed as consumer of ABS-005 in ARCHITECTURE.md.
+# ABS-005 body moved to the abstractions fragment (index+body-out fragmentation);
+# heading stays in root.
 if grep -q 'ABS-005' "$ARCHITECTURE" && \
-   awk '/### ABS-005/,/### ABS-006/' "$ARCHITECTURE" | grep -qi 'cmetrics'; then
+   awk '/### ABS-005/,/### ABS-006/' "docs/architecture/abstractions.md" | grep -qi 'cmetrics'; then
   pass "INV-013d" "cmetrics listed as consumer of ABS-005 in ARCHITECTURE.md"
 else
   fail "INV-013d" "cmetrics not listed as consumer of ABS-005 in ARCHITECTURE.md"

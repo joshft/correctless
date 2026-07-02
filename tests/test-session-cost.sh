@@ -1320,7 +1320,8 @@ test_r014_abs026() {
   echo ""
   echo "--- R-014: ABS-026 in ARCHITECTURE.md ---"
 
-  local arch="$REPO_DIR/.correctless/ARCHITECTURE.md"
+  # ABS-026 body moved to the abstractions fragment (index+body-out fragmentation).
+  local arch="$REPO_DIR/docs/architecture/abstractions.md"
 
   # Tests R-014 [unit]: ABS-026 entry exists
   if grep -q 'ABS-026' "$arch"; then
@@ -1352,7 +1353,8 @@ test_r015_tb006() {
   echo ""
   echo "--- R-015: TB-006 in ARCHITECTURE.md ---"
 
-  local arch="$REPO_DIR/.correctless/ARCHITECTURE.md"
+  # TB-006 body moved to the trust-boundaries fragment (index+body-out fragmentation).
+  local arch="$REPO_DIR/docs/architecture/trust-boundaries.md"
 
   # Tests R-015 [unit]: TB-006 entry exists
   if grep -q 'TB-006' "$arch"; then
@@ -1384,7 +1386,8 @@ test_r016_abs006_update() {
   echo ""
   echo "--- R-016: ABS-006 update ---"
 
-  local arch="$REPO_DIR/.correctless/ARCHITECTURE.md"
+  # ABS-006 body moved to the abstractions fragment (index+body-out fragmentation).
+  local arch="$REPO_DIR/docs/architecture/abstractions.md"
 
   # Tests R-016 [unit]: ABS-006 mentions zeros / PostToolUse limitation
   if grep -A15 'ABS-006' "$arch" | grep -qi 'zeros\|PostToolUse.*not.*include\|ABS-026\|cost artifact'; then
@@ -1402,7 +1405,8 @@ test_r017_env009() {
   echo ""
   echo "--- R-017: ENV-009 in ARCHITECTURE.md ---"
 
-  local arch="$REPO_DIR/.correctless/ARCHITECTURE.md"
+  # ENV-009 body moved to the environment fragment (index+body-out fragmentation).
+  local arch="$REPO_DIR/docs/architecture/environment.md"
 
   # Tests R-017 [unit]: ENV-009 entry exists
   if grep -q 'ENV-009' "$arch"; then

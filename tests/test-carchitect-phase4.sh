@@ -22,7 +22,9 @@ AGENT_DIST="correctless/agents/architecture-compliance-reviewer.md"
 PR_REVIEW_SKILL="skills/cpr-review/SKILL.md"
 PR_REVIEW_DIST="correctless/skills/cpr-review/SKILL.md"
 PR_REVIEW_DOCS="docs/skills/cpr-review.md"
-ARCHITECTURE_MD=".correctless/ARCHITECTURE.md"
+# ABS-010 body moved to the abstractions fragment (index+body-out fragmentation);
+# both consumers below check ABS-010 body content, so read the fragment.
+ARCHITECTURE_MD="docs/architecture/abstractions.md"
 WORKFLOW_CONFIG=".correctless/config/workflow-config.json"
 
 # ============================================================================

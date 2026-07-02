@@ -658,8 +658,9 @@ if [ -f "$ARCH_FILE" ]; then
     fail "ABS-030" "ARCHITECTURE.md missing ABS-030 (autonomous decisions JSONL contract)"
   fi
 
-  # ABS-030 must reference autonomous-decisions
-  if grep -q 'autonomous-decisions' "$ARCH_FILE" 2>/dev/null; then
+  # ABS-030 must reference autonomous-decisions. Body moved to the abstractions
+  # fragment (index+body-out fragmentation); heading stays in root (checked above).
+  if grep -q 'autonomous-decisions' "$REPO_DIR/docs/architecture/abstractions.md" 2>/dev/null; then
     pass "ABS-030-ref" "ABS-030 references autonomous-decisions artifact"
   else
     fail "ABS-030-ref" "ABS-030 does not reference autonomous-decisions artifact"

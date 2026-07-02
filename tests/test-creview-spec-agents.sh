@@ -412,13 +412,14 @@ check_inv008() {
     return
   fi
 
-  # Extract ABS-010 block
+  # Extract ABS-010 block. Body moved to the abstractions fragment
+  # (index+body-out fragmentation); heading stays in root.
   local abs010_block
   abs010_block="$(awk '
     /^### ABS-010:/ { found = 1 }
     found { print }
     found && /^### ABS-0[1-9]/ && !/^### ABS-010:/ { exit }
-  ' "$ARCH_FILE" 2>/dev/null)"
+  ' "docs/architecture/abstractions.md" 2>/dev/null)"
 
   for agent_name in "${AGENTS[@]}"; do
     if echo "$abs010_block" | grep -q "$agent_name"; then
