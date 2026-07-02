@@ -21,7 +21,8 @@ eval "$(echo "$INPUT" | jq -r '
   @sh "TOOL_INPUT_FILE=\(.tool_input.file_path // "")",
   @sh "TOOL_INPUT_PATH=\(.tool_input.path // "")",
   @sh "TOOL_INPUT_COMMAND=\(.tool_input.command // "")",
-  @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))"
+  @sh "TOOL_INPUT_EDITS=\([.tool_input.edits[]?.file_path // empty] | join("\n"))",
+  @sh "SESSION_ID=\(.session_id // "")"
 ' 2>/dev/null)" || exit 0
 
 # Fast-path bail: no tool name = malformed input
@@ -101,9 +102,12 @@ fi
 
 # Get branch name for audit trail (branch_slug doesn't expose it as a variable)
 _audit_branch="$(git --no-optional-locks branch --show-current 2>/dev/null || true)"
+# INV-015: include the harness stdin session_id (same field the InstructionsLoaded
+# hook reads — the harness-provided id, NOT any PID-based session id from lib.sh)
+# as a display-alignment aid for the /cwtf side-by-side view. Additive + backward-compatible.
 printf '%s\n' "$FILES" | jq -Rnc \
-  --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$_audit_branch" \
-  '[inputs | select(length > 0)] | .[] | {ts:$ts,phase:$phase,tool:$tool,file:.,branch:$branch}' \
+  --arg ts "$TS" --arg phase "$PHASE" --arg tool "$TOOL_NAME" --arg branch "$_audit_branch" --arg session "$SESSION_ID" \
+  '[inputs | select(length > 0)] | .[] | {ts:$ts,phase:$phase,tool:$tool,file:.,branch:$branch,session_id:(if $session == "" then null else $session end)}' \
   >> "$TRAIL" 2>/dev/null
 
 # --- Adherence feedback (Lite: violations only, Full: + coverage tracking) ---

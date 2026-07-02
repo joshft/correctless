@@ -1,0 +1,4 @@
+{"ts":"2026-06-20T02:00:00Z","phase":"tdd-impl","tool":"Read","file":"hooks/read-not-an-edit.sh","branch":"feature/demo","session_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}
+{"ts":"2026-06-20T02:01:00Z","phase":"tdd-impl","tool":"Grep","file":"hooks/grep-not-an-edit.sh","branch":"feature/demo","session_id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}
+{"ts":"2026-06-20T02:02:00Z","phase":"tdd-impl","tool":"Edit","file":"hooks/edited-via-edit.sh","branch":"feature/demo","session_id":"cccccccc-cccc-cccc-cccc-cccccccccccc"}
+{"ts":"2026-06-20T02:03:00Z","phase":"tdd-impl","tool":"Bash","file":"hooks/edited-via-bash.sh","branch":"feature/demo","session_id":"dddddddd-dddd-dddd-dddd-dddddddddddd"}

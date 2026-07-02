@@ -857,6 +857,51 @@
         "tests/test-sfg-rescope.sh"
       ],
       "timestamp": "2026-06-27T04:27:33Z"
+    },
+    {
+      "feature_slug": "instructionsloaded-hook",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 2,
+      "actual_findings_count": 7,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "harness_version": 1,
+      "fix_rounds_triggered": 3,
+      "file_paths_touched": [
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/specs/instructionsloaded-hook.md",
+        ".gitignore",
+        "CONTRIBUTING.md",
+        "correctless/hooks/audit-trail.sh",
+        "correctless/hooks/instructions-loaded.sh",
+        "correctless/setup",
+        "correctless/skills/cwtf/SKILL.md",
+        "hooks/audit-trail.sh",
+        "hooks/instructions-loaded.sh",
+        "setup",
+        "skills/cwtf/SKILL.md",
+        "tests/fixtures/audit-trail-allunattr.jsonl",
+        "tests/fixtures/audit-trail-correctless-hooks.jsonl",
+        "tests/fixtures/audit-trail-emptysession.jsonl",
+        "tests/fixtures/audit-trail-nonhook-dirs.jsonl",
+        "tests/fixtures/audit-trail-real.jsonl",
+        "tests/fixtures/audit-trail-sessioned.jsonl",
+        "tests/fixtures/audit-trail-toolgate.jsonl",
+        "tests/fixtures/instructions-loaded-log-allnull.jsonl",
+        "tests/fixtures/instructions-loaded-log-corrupt.jsonl",
+        "tests/fixtures/instructions-loaded-log-halfnull.jsonl",
+        "tests/fixtures/instructions-loaded-log-partialnull.jsonl",
+        "tests/fixtures/instructions-loaded-log-poison.jsonl",
+        "tests/fixtures/instructions-loaded-log-sample.jsonl",
+        "tests/fixtures/instructions-loaded-log-unmatched.jsonl",
+        "tests/fixtures/instructionsloaded-real-payload.json",
+        "tests/test-audit-trail.sh",
+        "tests/test-ci-hook-wiring.sh",
+        "tests/test-instructions-loaded-cwtf.sh",
+        "tests/test-instructions-loaded.sh"
+      ],
+      "timestamp": "2026-07-02T01:39:44Z"
     }
   ]
 }

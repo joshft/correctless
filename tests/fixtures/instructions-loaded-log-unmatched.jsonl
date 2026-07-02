@@ -1,0 +1,2 @@
+{"ts":"2026-06-15T03:01:00Z","session_id":"ffffffff-ffff-ffff-ffff-ffffffffffff","rule_file":".claude/rules/hooks-pretooluse.md","trigger_file_path":"hooks/sensitive-file-guard.sh","load_reason":"path_glob_match"}
+{"ts":"2026-06-15T03:02:00Z","session_id":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","rule_file":".claude/rules/canonicalize-path.md","trigger_file_path":"scripts/lib.sh","load_reason":"path_glob_match"}

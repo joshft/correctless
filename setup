@@ -439,6 +439,43 @@ install_hooks() {
 # Register hooks in .claude/settings.json (paths point to .correctless/hooks/)
 # ---------------------------------------------------------------------------
 
+# Upsert a command hook into a settings JSON object read on stdin (INV-007):
+# if an entry with the same command already exists, refresh its matcher from the
+# HOOK_MATCHER header; otherwise append a new entry. Timeout is derived from the
+# hook TYPE in this single place — PostToolUse gets 1000ms, every other type
+# (PreToolUse, InstructionsLoaded, and any future type) gets 5000ms — so no
+# timeout literal is duplicated across the fresh-install and existing-update seams
+# (AP-024/PMB-003) and adding a new type needs no new registration statement.
+_upsert_command_hook() {  # args: <type> <command> <matcher> ; settings JSON on stdin -> stdout
+  jq --arg t "$1" --arg cmd "$2" --arg matcher "$3" '
+    .hooks[$t] = (
+      if (.hooks[$t] // [] | any(.hooks[]?.command == $cmd)) then
+        [.hooks[$t][] | if any(.hooks[]?.command; . == $cmd) then .matcher = $matcher else . end]
+      else
+        (.hooks[$t] // []) + [
+          if $t == "PostToolUse"
+          then { matcher: $matcher, hooks: [{ type: "command", command: $cmd, timeout_ms: 1000 }] }
+          else { matcher: $matcher, hooks: [{ type: "command", command: $cmd, timeout_ms: 5000 }] }
+          end
+        ]
+      end
+    )
+  '
+}
+
+# Upsert an agent hook (type: agent) into a settings JSON object read on stdin.
+_upsert_agent_hook() {  # args: <type> <matcher> <prompt> <timeout> ; settings JSON on stdin -> stdout
+  jq --arg ht "$1" --arg matcher "$2" --arg prompt "$3" --argjson timeout "$4" '
+    .hooks[$ht] = (
+      if (.hooks[$ht] // [] | any(.hooks[]?.type == "agent")) then
+        [.hooks[$ht][] | if any(.hooks[]?.type; . == "agent") then .matcher = $matcher | .hooks = [.hooks[] | if .type == "agent" then .prompt = $prompt | .timeout = $timeout else . end] else . end]
+      else
+        (.hooks[$ht] // []) + [{ matcher: $matcher, hooks: [{ type: "agent", prompt: $prompt, timeout: $timeout }] }]
+      end
+    )
+  '
+}
+
 register_hooks() {
   local settings="$REPO_ROOT/.claude/settings.json"
   local advance_path=".correctless/hooks/workflow-advance.sh"
@@ -458,9 +495,19 @@ register_hooks() {
   # Timeout convention: PreToolUse=5000ms, PostToolUse=1000ms.
   # ============================================
 
-  # Build arrays of hook entries from metadata headers
-  local -a pre_hooks=()
-  local -a post_hooks=()
+  # Known hook types (INV-007 / DD-001): a single associative set drives discovery
+  # membership and keeps the type vocabulary in one place — no parallel arrays
+  # (PMB-013). InstructionsLoaded flows through the generalized _upsert_command_hook
+  # with no bespoke case arm (AP-024/PMB-003); per-type timeout lives there.
+  local -A KNOWN_HOOK_TYPES=(
+    [PreToolUse]=1
+    [PostToolUse]=1
+    [InstructionsLoaded]=1
+  )
+
+  # Discover command hooks via metadata headers into one type-tagged array
+  # (entries: "type|cmd|matcher"). Types not in KNOWN_HOOK_TYPES are skipped.
+  local -a discovered_hooks=()
 
   for hook in "$SCRIPT_DIR"/hooks/*.sh; do
     [ -f "$hook" ] || continue
@@ -476,18 +523,12 @@ register_hooks() {
     hook_type="$(echo "$first10" | sed -n 's/^# HOOK_TYPE:[[:space:]]*\([^ ]*\).*/\1/p' | head -1)"
     hook_matcher="$(echo "$first10" | sed -n '/^# HOOK_MATCHER:/{s/^# HOOK_MATCHER:[[:space:]]*//;s/[[:space:]]*$//;p;}' | head -1 | tr -d ' ')"
 
-    # Skip files without HOOK_TYPE header (INV-006)
+    # Skip files without HOOK_TYPE/HOOK_MATCHER (INV-006) or with an unknown type
     [ -n "$hook_type" ] || continue
     [ -n "$hook_matcher" ] || continue
+    [ -n "${KNOWN_HOOK_TYPES[$hook_type]:-}" ] || continue
 
-    case "$hook_type" in
-      PreToolUse)
-        pre_hooks+=("$hook_cmd|$hook_matcher")
-        ;;
-      PostToolUse)
-        post_hooks+=("$hook_cmd|$hook_matcher")
-        ;;
-    esac
+    discovered_hooks+=("$hook_type|$hook_cmd|$hook_matcher")
   done
 
   # ============================================
@@ -521,58 +562,37 @@ register_hooks() {
 
   if [ ! -f "$settings" ]; then
     # ============================================
-    # Fresh install — generate settings.json from discovered hooks
+    # Fresh install — build the base settings object then upsert every discovered
+    # hook through the SAME helpers the existing-settings path uses (INV-007), so
+    # registration logic and timeout literals live in exactly one place.
     # ============================================
 
-    # Build PreToolUse JSON array
-    local pre_json="[]"
-    for entry in "${pre_hooks[@]}"; do
-      local cmd="${entry%%|*}"
-      local matcher="${entry#*|}"
-      pre_json="$(echo "$pre_json" | jq --arg cmd "$cmd" --arg matcher "$matcher" \
-        '. + [{ matcher: $matcher, hooks: [{ type: "command", command: $cmd, timeout_ms: 5000 }] }]')"
+    local result
+    result="$(jq -n --arg sl "$statusline_path" --arg adv "$advance_path" \
+      '{
+        hooks: { PreToolUse: [], PostToolUse: [] },
+        statusLine: { command: $sl },
+        permissions: { allow: [ "Bash(\($adv) *)" ] }
+      }')"
+
+    for entry in "${discovered_hooks[@]}"; do
+      local htype="${entry%%|*}" rest="${entry#*|}"
+      local cmd="${rest%%|*}" matcher="${rest#*|}"
+      result="$(printf '%s' "$result" | _upsert_command_hook "$htype" "$cmd" "$matcher")"
     done
 
-    # Build PostToolUse JSON array
-    local post_json="[]"
-    for entry in "${post_hooks[@]}"; do
-      local cmd="${entry%%|*}"
-      local matcher="${entry#*|}"
-      post_json="$(echo "$post_json" | jq --arg cmd "$cmd" --arg matcher "$matcher" \
-        '. + [{ matcher: $matcher, hooks: [{ type: "command", command: $cmd, timeout_ms: 1000 }] }]')"
-    done
-
-    # Append agent hooks to PreToolUse/PostToolUse arrays
-    # Agent hook entries use tab delimiter (matcher may contain pipes)
+    # Fold agent hooks (type: agent) in — tab-delimited (matcher may contain pipes)
     for entry in "${agent_hooks[@]}"; do
-      local ah_ht ah_mt ah_to ah_src
+      local ah_ht ah_mt ah_to ah_src ah_prompt_val
       ah_ht="$(printf '%s' "$entry" | cut -f1)"
       ah_mt="$(printf '%s' "$entry" | cut -f2)"
       ah_to="$(printf '%s' "$entry" | cut -f3)"
       ah_src="$(printf '%s' "$entry" | cut -f4)"
-      local ah_prompt_val
       ah_prompt_val="$(jq -r '.prompt' "$ah_src" 2>/dev/null)"
-
-      case "$ah_ht" in
-        PreToolUse)
-          pre_json="$(echo "$pre_json" | jq --arg matcher "$ah_mt" --arg prompt "$ah_prompt_val" --argjson timeout "$ah_to" \
-            '. + [{ matcher: $matcher, hooks: [{ type: "agent", prompt: $prompt, timeout: $timeout }] }]')"
-          ;;
-        PostToolUse)
-          post_json="$(echo "$post_json" | jq --arg matcher "$ah_mt" --arg prompt "$ah_prompt_val" --argjson timeout "$ah_to" \
-            '. + [{ matcher: $matcher, hooks: [{ type: "agent", prompt: $prompt, timeout: $timeout }] }]')"
-          ;;
-      esac
+      result="$(printf '%s' "$result" | _upsert_agent_hook "$ah_ht" "$ah_mt" "$ah_prompt_val" "$ah_to")"
     done
 
-    # Assemble the full settings.json
-    jq -n --argjson pre "$pre_json" --argjson post "$post_json" \
-      --arg sl "$statusline_path" --arg adv "$advance_path" \
-      '{
-        hooks: { PreToolUse: $pre, PostToolUse: $post },
-        statusLine: { command: $sl },
-        permissions: { allow: [ "Bash(\($adv) *)" ] }
-      }' > "$settings"
+    printf '%s\n' "$result" > "$settings"
 
     ok "Created $settings with hooks"
     return
@@ -596,40 +616,22 @@ register_hooks() {
   # Check if all discovered hooks are registered (F2: use jq instead of grep for structural check)
   local settings_json
   settings_json="$(cat "$settings")"
-  for entry in "${pre_hooks[@]}"; do
-    local cmd="${entry%%|*}"
-    if ! echo "$settings_json" | jq -e --arg cmd "$cmd" '(.hooks.PreToolUse // [] | any(.hooks[]?.command == $cmd))' >/dev/null 2>&1; then
+  for entry in "${discovered_hooks[@]}"; do
+    local htype="${entry%%|*}" rest="${entry#*|}"
+    local cmd="${rest%%|*}"
+    if ! echo "$settings_json" | jq -e --arg t "$htype" --arg cmd "$cmd" '(.hooks[$t] // [] | any(.hooks[]?.command == $cmd))' >/dev/null 2>&1; then
       needs_update="true"
       break
     fi
   done
-  if [ "$needs_update" = "false" ]; then
-    for entry in "${post_hooks[@]}"; do
-      local cmd="${entry%%|*}"
-      if ! echo "$settings_json" | jq -e --arg cmd "$cmd" '(.hooks.PostToolUse // [] | any(.hooks[]?.command == $cmd))' >/dev/null 2>&1; then
-        needs_update="true"
-        break
-      fi
-    done
-  fi
 
   # Check for matcher drift — matchers are authoritative from HOOK_MATCHER headers (INV-004)
   if [ "$needs_update" = "false" ]; then
-    for entry in "${pre_hooks[@]}"; do
-      local cmd="${entry%%|*}" matcher="${entry#*|}"
+    for entry in "${discovered_hooks[@]}"; do
+      local htype="${entry%%|*}" rest="${entry#*|}"
+      local cmd="${rest%%|*}" matcher="${rest#*|}"
       local current
-      current="$(jq -r --arg cmd "$cmd" '(.hooks.PreToolUse // [] | .[] | select(.hooks[]?.command == $cmd) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
-      if [ -n "$current" ] && [ "$current" != "$matcher" ]; then
-        needs_update="true"
-        break
-      fi
-    done
-  fi
-  if [ "$needs_update" = "false" ]; then
-    for entry in "${post_hooks[@]}"; do
-      local cmd="${entry%%|*}" matcher="${entry#*|}"
-      local current
-      current="$(jq -r --arg cmd "$cmd" '(.hooks.PostToolUse // [] | .[] | select(.hooks[]?.command == $cmd) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
+      current="$(jq -r --arg t "$htype" --arg cmd "$cmd" '(.hooks[$t] // [] | .[] | select(.hooks[]?.command == $cmd) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
       if [ -n "$current" ] && [ "$current" != "$matcher" ]; then
         needs_update="true"
         break
@@ -667,64 +669,25 @@ register_hooks() {
   local result
   result="$(cat "$settings")"
 
-  # Add or update PreToolUse hooks — matchers are authoritative from HOOK_MATCHER headers
-  for entry in "${pre_hooks[@]}"; do
-    local cmd="${entry%%|*}"
-    local matcher="${entry#*|}"
-    result="$(echo "$result" | jq --arg cmd "$cmd" --arg matcher "$matcher" '
-      .hooks.PreToolUse = (
-        if (.hooks.PreToolUse // [] | any(.hooks[]?.command == $cmd)) then
-          [.hooks.PreToolUse[] | if any(.hooks[]?.command; . == $cmd) then .matcher = $matcher else . end]
-        else
-          (.hooks.PreToolUse // []) + [{
-            matcher: $matcher,
-            hooks: [{type: "command", command: $cmd, timeout_ms: 5000}]
-          }]
-        end
-      )
-    ')"
-  done
-
-  # Add or update PostToolUse hooks — matchers are authoritative from HOOK_MATCHER headers
-  for entry in "${post_hooks[@]}"; do
-    local cmd="${entry%%|*}"
-    local matcher="${entry#*|}"
-    result="$(echo "$result" | jq --arg cmd "$cmd" --arg matcher "$matcher" '
-      .hooks.PostToolUse = (
-        if (.hooks.PostToolUse // [] | any(.hooks[]?.command == $cmd)) then
-          [.hooks.PostToolUse[] | if any(.hooks[]?.command; . == $cmd) then .matcher = $matcher else . end]
-        else
-          (.hooks.PostToolUse // []) + [{
-            matcher: $matcher,
-            hooks: [{type: "command", command: $cmd, timeout_ms: 1000}]
-          }]
-        end
-      )
-    ')"
+  # Add or update command hooks — matchers authoritative from HOOK_MATCHER headers.
+  # One generalized loop through the shared _upsert_command_hook (INV-007): covers
+  # every known type, including InstructionsLoaded, and repairs a drifted matcher
+  # back to the header. Timeout lives only in the helper — never duplicated here.
+  for entry in "${discovered_hooks[@]}"; do
+    local htype="${entry%%|*}" rest="${entry#*|}"
+    local cmd="${rest%%|*}" matcher="${rest#*|}"
+    result="$(printf '%s' "$result" | _upsert_command_hook "$htype" "$cmd" "$matcher")"
   done
 
   # Add or update agent hooks (tab-delimited — matcher may contain pipes)
   for entry in "${agent_hooks[@]}"; do
-    local ah_ht ah_mt ah_to ah_src
+    local ah_ht ah_mt ah_to ah_src ah_prompt_val
     ah_ht="$(printf '%s' "$entry" | cut -f1)"
     ah_mt="$(printf '%s' "$entry" | cut -f2)"
     ah_to="$(printf '%s' "$entry" | cut -f3)"
     ah_src="$(printf '%s' "$entry" | cut -f4)"
-    local ah_prompt_val
     ah_prompt_val="$(jq -r '.prompt' "$ah_src" 2>/dev/null)"
-
-    result="$(echo "$result" | jq --arg ht "$ah_ht" --arg matcher "$ah_mt" --arg prompt "$ah_prompt_val" --argjson timeout "$ah_to" '
-      .hooks[$ht] = (
-        if (.hooks[$ht] // [] | any(.hooks[]?.type == "agent")) then
-          [.hooks[$ht][] | if any(.hooks[]?.type; . == "agent") then .matcher = $matcher | .hooks = [.hooks[] | if .type == "agent" then .prompt = $prompt | .timeout = $timeout else . end] else . end]
-        else
-          (.hooks[$ht] // []) + [{
-            matcher: $matcher,
-            hooks: [{type: "agent", prompt: $prompt, timeout: $timeout}]
-          }]
-        end
-      )
-    ')"
+    result="$(printf '%s' "$result" | _upsert_agent_hook "$ah_ht" "$ah_mt" "$ah_prompt_val" "$ah_to")"
   done
 
   # Ensure hardcoded entries (INV-007)

@@ -1,0 +1,4 @@
+{"ts":"2026-06-20T01:00:00Z","phase":"tdd-impl","tool":"Edit","file":".correctless/hooks/workflow-advance.sh","branch":"feature/demo","session_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}
+{"ts":"2026-06-20T01:01:00Z","phase":"tdd-impl","tool":"Edit","file":"/x/hooks/y.sh","branch":"feature/demo","session_id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}
+{"ts":"2026-06-20T01:02:00Z","phase":"tdd-impl","tool":"Edit","file":"scripts/foo.sh","branch":"feature/demo","session_id":"cccccccc-cccc-cccc-cccc-cccccccccccc"}
+{"ts":"2026-06-20T01:03:00Z","phase":"tdd-impl","tool":"Edit","file":"webhooks/x.sh","branch":"feature/demo","session_id":"dddddddd-dddd-dddd-dddd-dddddddddddd"}

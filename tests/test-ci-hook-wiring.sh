@@ -188,7 +188,8 @@ test_inv002_hook_metadata_headers() {
   echo "=== INV-002: Hook metadata headers present ==="
 
   # Hooks that should have metadata headers (auto-registered as PreToolUse/PostToolUse)
-  local -a auto_hooks=(workflow-gate.sh sensitive-file-guard.sh audit-trail.sh token-tracking.sh auto-format.sh)
+  # INV-007: instructions-loaded.sh added so the new InstructionsLoaded hook is iterated
+  local -a auto_hooks=(workflow-gate.sh sensitive-file-guard.sh audit-trail.sh token-tracking.sh auto-format.sh instructions-loaded.sh)
   # Hooks that must NOT have metadata headers
   local -a excluded_hooks=(workflow-advance.sh statusline.sh)
 
@@ -205,7 +206,7 @@ test_inv002_hook_metadata_headers() {
     first10="$(head -10 "$hook_path")"
 
     local has_type="false"
-    if echo "$first10" | grep -qE '^# HOOK_TYPE:[[:space:]]*(PreToolUse|PostToolUse)[[:space:]]*$'; then
+    if echo "$first10" | grep -qE '^# HOOK_TYPE:[[:space:]]*(PreToolUse|PostToolUse|InstructionsLoaded)[[:space:]]*$'; then
       has_type="true"
     fi
     assert_eq "INV-002: $hook has valid HOOK_TYPE header" "true" "$has_type"
@@ -215,7 +216,7 @@ test_inv002_hook_metadata_headers() {
     type_val="$(echo "$first10" | sed -n 's/^# HOOK_TYPE:[[:space:]]*\([^ ]*\).*/\1/p')"
     if [ -n "$type_val" ]; then
       local valid_type="false"
-      if [ "$type_val" = "PreToolUse" ] || [ "$type_val" = "PostToolUse" ]; then
+      if [ "$type_val" = "PreToolUse" ] || [ "$type_val" = "PostToolUse" ] || [ "$type_val" = "InstructionsLoaded" ]; then
         valid_type="true"
       fi
       assert_eq "INV-002: $hook HOOK_TYPE is PreToolUse or PostToolUse" "true" "$valid_type"
@@ -232,7 +233,8 @@ test_inv002_hook_metadata_headers() {
     local matcher_val
     matcher_val="$(echo "$first10" | sed -n 's/^# HOOK_MATCHER:[[:space:]]*//p')"
     local valid_matcher="false"
-    if [ -n "$matcher_val" ] && echo "$matcher_val" | grep -qE '^[A-Za-z]+(\|[A-Za-z]+)*$'; then
+    # INV-007: grammar admits underscores (load-reason vocab) and the `*` wildcard matcher (RS-026)
+    if [ -n "$matcher_val" ] && echo "$matcher_val" | grep -qE '^([A-Za-z_]+|\*)(\|([A-Za-z_]+|\*))*$'; then
       valid_matcher="true"
     fi
     assert_eq "INV-002: $hook HOOK_MATCHER is non-empty pipe-separated list" "true" "$valid_matcher"
@@ -400,7 +402,7 @@ test_inv005_auto_format_in_hooks() {
     first10="$(head -10 "$REPO_DIR/hooks/auto-format.sh")"
 
     local has_type="false"
-    if echo "$first10" | grep -qE '^# HOOK_TYPE:[[:space:]]*(PreToolUse|PostToolUse)[[:space:]]*$'; then
+    if echo "$first10" | grep -qE '^# HOOK_TYPE:[[:space:]]*(PreToolUse|PostToolUse|InstructionsLoaded)[[:space:]]*$'; then
       has_type="true"
     fi
     assert_eq "INV-005: auto-format.sh has valid HOOK_TYPE" "true" "$has_type"
@@ -868,6 +870,181 @@ test_prh002_no_missing_test_suites() {
 }
 
 # ============================================================================
+# IL-INV-006 [integration]: register_hooks emits the InstructionsLoaded entry
+# Spec: .correctless/specs/instructionsloaded-hook.md — INV-006 / INV-007 (RS-026)
+# After register_hooks(), settings.json has an InstructionsLoaded array whose
+# command path ends in instructions-loaded.sh, type == "command", matcher == "*",
+# and the EA-004 timeout field (timeout_ms, per setup:532 convention).
+# ============================================================================
+
+test_il_inv006_instructionsloaded_registered() {
+  echo ""
+  echo "=== IL-INV-006: InstructionsLoaded registered by register_hooks() ==="
+
+  setup_test_project
+  .claude/skills/workflow/setup >/dev/null 2>&1
+
+  local settings=".claude/settings.json"
+  if [ ! -f "$settings" ]; then
+    echo "  FAIL: IL-INV-006: settings.json not created"
+    FAIL=$((FAIL + 1))
+    return
+  fi
+
+  # InstructionsLoaded entry present and pointing at instructions-loaded.sh
+  local il_entry
+  il_entry="$(jq -r '.hooks.InstructionsLoaded[]? | select(.hooks[]?.command | test("instructions-loaded"))' "$settings" 2>/dev/null || echo "")"
+  local il_present="false"
+  [ -n "$il_entry" ] && il_present="true"
+  assert_eq "IL-INV-006: InstructionsLoaded entry present" "true" "$il_present"
+
+  # command path ends in instructions-loaded.sh
+  local il_cmd
+  il_cmd="$(echo "$il_entry" | jq -r '.hooks[0].command // ""' 2>/dev/null || echo "")"
+  local cmd_ok="false"
+  case "$il_cmd" in *instructions-loaded.sh) cmd_ok="true" ;; esac
+  assert_eq "IL-INV-006: command path ends in instructions-loaded.sh" "true" "$cmd_ok"
+
+  # type == command
+  local il_type
+  il_type="$(echo "$il_entry" | jq -r '.hooks[0].type // ""' 2>/dev/null || echo "")"
+  assert_eq "IL-INV-006: hook type is command" "command" "$il_type"
+
+  # matcher == "*" (RS-026 — fire on every load reason)
+  local il_matcher
+  il_matcher="$(echo "$il_entry" | jq -r '.matcher // ""' 2>/dev/null || echo "")"
+  assert_eq "IL-INV-006: matcher is * (RS-026)" "*" "$il_matcher"
+
+  # EA-004 disposition: emit timeout_ms field (setup:532 convention), positive value
+  local il_to
+  il_to="$(echo "$il_entry" | jq -r '.hooks[0].timeout_ms // "<<absent>>"' 2>/dev/null || echo "<<absent>>")"
+  local to_ok="false"
+  if [ "$il_to" != "<<absent>>" ] && [ "$il_to" -gt 0 ] 2>/dev/null; then to_ok="true"; fi
+  assert_eq "IL-INV-006: timeout_ms field present and positive (EA-004)" "true" "$to_ok"
+}
+
+# ============================================================================
+# IL-INV-007 [unit]: generalized type->timeout mechanism (not a per-type arm)
+# register_hooks must handle InstructionsLoaded through the generalized mapping;
+# no third hardcoded case arm; timeout literals collapsed (not duplicated).
+# ============================================================================
+
+test_il_inv007_generalized_mechanism() {
+  echo ""
+  echo "=== IL-INV-007: generalized type->timeout mechanism ==="
+
+  local setup_file="$REPO_DIR/setup"
+
+  # (a) register_hooks path must reference InstructionsLoaded at all (RED: absent)
+  local refs_il="false"
+  grep -q "InstructionsLoaded" "$setup_file" 2>/dev/null && refs_il="true"
+  assert_eq "IL-INV-007: setup references InstructionsLoaded" "true" "$refs_il"
+
+  # (b) no bespoke 'InstructionsLoaded)' case arm (must flow through the map)
+  local has_arm="false"
+  grep -qE '^[[:space:]]*InstructionsLoaded\)' "$setup_file" 2>/dev/null && has_arm="true"
+  assert_eq "IL-INV-007: no hardcoded 'InstructionsLoaded)' case arm" "false" "$has_arm"
+
+  # (c) timeout literals collapsed — a generalized map means each literal is
+  # not duplicated across the fresh-install + update seams (currently 2x each).
+  #
+  # Idiom fix (test-quality bug): `grep -c PAT f || echo 0` is BROKEN — grep -c
+  # prints `0` AND exits 1 on no match, so `|| echo 0` appends a SECOND line and
+  # the count var becomes $'0\n0', which makes `[ "$n" -le 1 ]` throw
+  # "integer expression expected" (a spurious FAIL) the moment a literal reaches
+  # 0 occurrences. Capture the single value and default it instead.
+  local n5000 n1000
+  n5000="$(grep -c 'timeout_ms: 5000' "$setup_file" 2>/dev/null)"; n5000=${n5000:-0}
+  n1000="$(grep -c 'timeout_ms: 1000' "$setup_file" 2>/dev/null)"; n1000=${n1000:-0}
+  local collapsed="false"
+  if [ "$n5000" -le 1 ] && [ "$n1000" -le 1 ]; then collapsed="true"; fi
+  assert_eq "IL-INV-007: timeout literals not duplicated (map, not per-seam literal)" "true" "$collapsed"
+
+  # (d) POSITIVE structural assertion (class-fix for the bespoke-per-type bypass).
+  # The (b) negative grep (no `InstructionsLoaded)` case arm) and the (c) literal
+  # count are BOTH defeated by a bespoke `if [ "$hook_type" = "InstructionsLoaded" ]`
+  # / `elif` block that special-cases the type while passing the timeout via a
+  # variable — reintroducing AP-024/PMB-003 per-type special-casing invisibly.
+  # Enforce that within register_hooks(), the literal `InstructionsLoaded` appears
+  # ONLY inside comments and the generalized KNOWN_HOOK_TYPES associative-array
+  # declaration (the `[InstructionsLoaded]=` element) — NEVER inside executable
+  # code. Any remaining occurrence after stripping those two legitimate homes is a
+  # bespoke per-type statement (if/elif/case/test/[) branching on the hook type.
+  local func_body
+  func_body="$(sed -n '/^register_hooks()/,/^}/p' "$setup_file")"
+  local il_in_code
+  il_in_code="$(printf '%s\n' "$func_body" \
+    | grep -v '^[[:space:]]*#' \
+    | grep -v '^[[:space:]]*\[InstructionsLoaded\]=' \
+    | grep -c 'InstructionsLoaded')"
+  il_in_code=${il_in_code:-0}
+  assert_eq "IL-INV-007: InstructionsLoaded only in KNOWN_HOOK_TYPES + comments (no bespoke per-type branch)" "0" "$il_in_code"
+}
+
+# ============================================================================
+# IL-INV-013 [integration]: registration covers every seam + mirror parity
+# Four distinct states: fresh; pre-existing without entry; drifted matcher; invalid.
+# ============================================================================
+
+il_has_instructionsloaded() {  # $1 = settings path -> echoes true/false
+  local s="$1"
+  jq -e '(.hooks.InstructionsLoaded // []) | any(.hooks[]?.command | test("instructions-loaded"))' "$s" >/dev/null 2>&1 \
+    && echo "true" || echo "false"
+}
+
+test_il_inv013_all_seams() {
+  echo ""
+  echo "=== IL-INV-013: registration covers every seam ==="
+
+  local settings="$TEST_DIR/.claude/settings.json"
+
+  # Seam 1: fresh install
+  setup_test_project
+  (cd "$TEST_DIR" && REPO_ROOT="$TEST_DIR" SCRIPT_DIR="$TEST_DIR/.claude/skills/workflow" \
+    bash "$TEST_DIR/.claude/skills/workflow/setup" >/dev/null 2>&1)
+  assert_eq "IL-INV-013 seam1: fresh install registers InstructionsLoaded" "true" "$(il_has_instructionsloaded "$settings")"
+
+  # Seam 2: pre-existing settings.json WITHOUT the entry -> detection/update path
+  setup_test_project
+  mkdir -p "$TEST_DIR/.claude"
+  cat > "$settings" <<'EOF'
+{ "hooks": { "PreToolUse": [], "PostToolUse": [] }, "statusLine": { "command": "x" }, "permissions": { "allow": [] } }
+EOF
+  (cd "$TEST_DIR" && REPO_ROOT="$TEST_DIR" SCRIPT_DIR="$TEST_DIR/.claude/skills/workflow" \
+    bash "$TEST_DIR/.claude/skills/workflow/setup" >/dev/null 2>&1)
+  assert_eq "IL-INV-013 seam2: existing settings gains InstructionsLoaded" "true" "$(il_has_instructionsloaded "$settings")"
+
+  # Seam 3: drifted InstructionsLoaded matcher -> matcher-drift repair
+  setup_test_project
+  (cd "$TEST_DIR" && REPO_ROOT="$TEST_DIR" SCRIPT_DIR="$TEST_DIR/.claude/skills/workflow" \
+    bash "$TEST_DIR/.claude/skills/workflow/setup" >/dev/null 2>&1)
+  if [ -f "$settings" ]; then
+    jq '(.hooks.InstructionsLoaded[]? | select(.hooks[]?.command | test("instructions-loaded")) | .matcher) = "path_glob_match"' \
+      "$settings" > "$settings.tmp" 2>/dev/null && mv "$settings.tmp" "$settings"
+  fi
+  (cd "$TEST_DIR" && REPO_ROOT="$TEST_DIR" SCRIPT_DIR="$TEST_DIR/.claude/skills/workflow" \
+    bash "$TEST_DIR/.claude/skills/workflow/setup" >/dev/null 2>&1)
+  local repaired
+  repaired="$(jq -r '(.hooks.InstructionsLoaded[]? | select(.hooks[]?.command | test("instructions-loaded")) | .matcher) // ""' "$settings" 2>/dev/null || echo "")"
+  assert_eq "IL-INV-013 seam3: drifted InstructionsLoaded matcher repaired to *" "*" "$repaired"
+
+  # Seam 4: invalid settings.json -> regeneration
+  setup_test_project
+  mkdir -p "$TEST_DIR/.claude"
+  echo '{invalid json' > "$settings"
+  (cd "$TEST_DIR" && REPO_ROOT="$TEST_DIR" SCRIPT_DIR="$TEST_DIR/.claude/skills/workflow" \
+    bash "$TEST_DIR/.claude/skills/workflow/setup" >/dev/null 2>&1)
+  assert_eq "IL-INV-013 seam4: regeneration registers InstructionsLoaded" "true" "$(il_has_instructionsloaded "$settings")"
+
+  # Mirror parity: correctless/setup byte-equal to setup (setup mirrored verbatim)
+  local mirror_ok="false"
+  if [ -f "$REPO_DIR/setup" ] && [ -f "$REPO_DIR/correctless/setup" ]; then
+    diff -q "$REPO_DIR/setup" "$REPO_DIR/correctless/setup" >/dev/null 2>&1 && mirror_ok="true"
+  fi
+  assert_eq "IL-INV-013: correctless/setup mirror byte-equal (sync.sh)" "true" "$mirror_ok"
+}
+
+# ============================================================================
 # Run all tests
 # ============================================================================
 
@@ -884,6 +1061,9 @@ test_qa_existing_settings_update
 test_invalid_json_recovery
 test_prh001_no_hardcoded_hook_filenames
 test_prh002_no_missing_test_suites
+test_il_inv006_instructionsloaded_registered
+test_il_inv007_generalized_mechanism
+test_il_inv013_all_seams
 
 # ============================================================================
 # Summary
