@@ -361,6 +361,30 @@
       "deferred_at": "2026-06-14T00:00:00Z",
       "category": "architecture-missing-abstraction",
       "github_issue": "https://github.com/joshft/correctless/issues/178"
+    },
+    {
+      "id": "DF-029",
+      "finding_id": "MA-R2-INV002",
+      "source_file": ".correctless/artifacts/qa-findings-instructionsloaded-hook.json",
+      "severity": "MEDIUM",
+      "title": "Reconcile INV-002 wording vs hooks/instructions-loaded.sh infix .claude/rules/ match",
+      "description": "INV-002 states .claude/rules/ scope is prefix-checked and substring/suffix matching is prohibited (AP-032), but hooks/instructions-loaded.sh uses an infix case arm `*/.claude/rules/*` that over-matches non-project trees (vendor/.claude/rules/, /tmp/.../.claude/rules/). It correctly rejects the boundary-substring attack and traversal; low practical exposure (harness controls which file_paths it emits). Decide: tighten the code to anchor at the project root, OR amend INV-002 wording to permit a project-rooted .claude/rules/ component. Spec invariant body not edited during /cupdate-arch.",
+      "status": "open",
+      "deferred_at": "2026-07-02T01:47:31Z",
+      "category": "spec-implementation-wording-drift",
+      "github_issue": null
+    },
+    {
+      "id": "DF-030",
+      "finding_id": "MA-R2-INV008",
+      "source_file": ".correctless/artifacts/qa-findings-instructionsloaded-hook.json",
+      "severity": "LOW",
+      "title": "INV-008 wording: /cwtf hook-edit filter now requires a write tool",
+      "description": "The shipped /cwtf hook-edit filter gates on write tools (Edit/Write/MultiEdit/NotebookEdit/CreateFile/Bash), excluding Read/Grep, and canonicalizes .file to repo-relative before anchoring ^hooks/ or ^.correctless/hooks/. This is slightly narrower than INV-008 current wording (entry with a file field under hooks/). Amend INV-008 to add the write-tool + canonicalized-hook-root qualifier so spec matches implementation. Documented in ABS-046.",
+      "status": "open",
+      "deferred_at": "2026-07-02T01:47:31Z",
+      "category": "spec-implementation-wording-drift",
+      "github_issue": null
     }
   ]
 }
