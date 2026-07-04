@@ -159,9 +159,28 @@ test_inv001_cverify_writes_calibration() {
   file_contains_i "$skill_file" "before.*advanc\|before.*state" \
     "INV-001: calibration entry written before advancing workflow state"
 
-  # BLOCKING-1 fix: cverify allowed-tools must grant write permission to calibration file
-  file_contains_i "$skill_file" "Write(.*meta.*calibration\|Write(.*intensity-calibration" \
-    "INV-001: cverify allowed-tools includes write permission for calibration file"
+  # EXT-003 / INV-004 (calibration-writer): the direct Write(...intensity-calibration...)
+  # grant is REPLACED by the sanctioned Bash writer. /cverify now appends the
+  # calibration entry via `bash .correctless/scripts/meta-record.sh calibration-append`,
+  # so allowed-tools must GRANT Bash(*meta-record.sh*) and must NO LONGER carry a
+  # Write(...meta...calibration...) grant. Parallel to test-allowed-tools-check.sh
+  # HF-007-cmu-1/1b and test-harness-fingerprint.sh INV-007c/d.
+  local cverify_allowed
+  cverify_allowed="$(grep -m1 '^allowed-tools:' "$skill_file" 2>/dev/null)"
+  if echo "$cverify_allowed" | grep -qF 'meta-record.sh'; then
+    echo "  PASS: INV-004/EXT-003: cverify allowed-tools grants Bash(*meta-record.sh*)"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: INV-004/EXT-003: cverify allowed-tools must grant Bash(*meta-record.sh*)"
+    FAIL=$((FAIL + 1))
+  fi
+  if echo "$cverify_allowed" | grep -qiE 'Write\([^)]*(meta[^)]*calibration|intensity-calibration)'; then
+    echo "  FAIL: INV-004/EXT-003: cverify must DROP the direct Write(...intensity-calibration...) grant"
+    FAIL=$((FAIL + 1))
+  else
+    echo "  PASS: INV-004/EXT-003: cverify no longer grants Write(...intensity-calibration...)"
+    PASS=$((PASS + 1))
+  fi
 }
 
 # ============================================

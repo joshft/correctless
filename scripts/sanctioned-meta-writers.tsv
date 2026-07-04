@@ -1,0 +1,15 @@
+# Sanctioned meta-writer registry (calibration-writer spec, INV-006 / DD-007)
+#
+# CI/test-only data file — the writer scripts do NOT runtime-read this (they
+# hardcode their per-op destinations, PRH-005). It is consumed ONLY by the
+# INV-006 class-closure test, which asserts every .correctless/meta/*.json path
+# in the SFG DEFAULTS heredoc maps to exactly one registered (writer, operation).
+# Lives OUTSIDE .correctless/meta/ (avoids SFG circularity; a .tsv does not match
+# the *.sh install/sync globs).
+#
+# Columns (TAB-separated): <meta-path>	<writer-script>	<operation>
+.correctless/meta/intensity-calibration.json	meta-record.sh	calibration-append
+.correctless/meta/pat001-measurement-due.json	meta-record.sh	pat001-set-created-at
+.correctless/meta/model-baselines.json	meta-record.sh	baselines-write
+.correctless/meta/harness-fingerprint.json	harness-fingerprint.sh	(store-write)
+.correctless/meta/prune-pattern-baseline.json	prune-scan.sh	--update-baseline

@@ -1,7 +1,7 @@
 ---
 name: cverify
 description: Verify implementation matches spec. Check rule coverage, undocumented dependencies, architecture compliance. Writes verification report and drift debt. Run after /ctdd completes.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(jq*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/meta/intensity-calibration.json), Write(.correctless/artifacts/*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(jq*), Bash(*meta-record.sh*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/artifacts/*)
 context: fork
 interaction_mode: hybrid
 ---
@@ -270,9 +270,9 @@ Reviewers can see this with `git notes show HEAD` or `git log --notes`.
 
 ### Write Calibration Entry
 
-Before advancing the workflow state, write a calibration entry to `.correctless/meta/intensity-calibration.json`. This records outcome data that `/cspec` reads to improve future intensity recommendations.
+Before advancing the workflow state, record a calibration entry into `.correctless/meta/intensity-calibration.json`. This records outcome data that `/cspec` reads to improve future intensity recommendations.
 
-If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`). If the file does not exist, create it with an empty `calibration_entries` array. Append a new entry to the `calibration_entries` array with this schema:
+`intensity-calibration.json` is protected by the sensitive-file-guard (SFG) — a naive Edit/Write to it is blocked (AP-037). Do **not** write or edit the file directly. Instead, build the entry object and hand it to the sanctioned sole-writer `.correctless/scripts/meta-record.sh calibration-append` (ABS-047), which validates, locks, and append-writes it for you. If the file does not exist the writer creates it with an empty `calibration_entries` array (and `mkdir -p` creates the `.correctless/meta/` directory) on first use, then appends. Build a single new entry with this schema (the writer appends it to the `calibration_entries` array):
 
 ```json
 {
@@ -308,6 +308,25 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
 - `fix_rounds_triggered`: Derived value: `max(0, qa_rounds - 1) + mini_audit_fix_rounds`. `qa_rounds` is read from the workflow state — QA round 1 is the initial QA, rounds 2+ are fix rounds (so `qa_rounds - 1` = fix rounds from QA). `mini_audit_fix_rounds` is the count of fix-loop re-entries during the mini-audit phase, derived from qa-findings JSON round entries with `MA-` prefix that triggered fix loops. Default to 0 when not determinable.
 - `file_paths_touched`: Collect from `git diff {default_branch}...HEAD --name-only`.
 - `timestamp`: Current ISO 8601 timestamp.
+
+**Sanctioned write invocation (ABS-047).** Assemble the entry as a compact JSON object and pipe it on **stdin** to the writer — never pass it as an argv token, and never interpolate it into a `bash -c` string (TB-001):
+
+```bash
+printf '%s' "$ENTRY_JSON" | bash .correctless/scripts/meta-record.sh calibration-append
+```
+
+Check the exit status. On success the writer prints a one-line confirmation and exits 0. On failure it exits non-zero and prints a mechanical token — echo that token **verbatim** so the failure is surfaced rather than silently swallowed, then continue with the rest of verification (a calibration-write failure never blocks the primary verification output):
+
+```bash
+rc=$?
+if [ "$rc" -eq 127 ]; then
+  echo "meta-record: FAILED .correctless/meta/intensity-calibration.json: writer script not found — run /csetup to install meta-record.sh"
+elif [ "$rc" -ne 0 ]; then
+  echo "meta-record: FAILED .correctless/meta/intensity-calibration.json: calibration append failed (exit $rc)"
+fi
+```
+
+Do **not** fall back to `Write`/`Edit` on the file if the writer fails — SFG blocks that path and it would silently no-op (PRH-002). Report the failure and move on.
 
 #### Token Summation for actual_tokens
 

@@ -200,6 +200,9 @@ external-review-run.sh
 scripts/config-update.sh
 .correctless/scripts/config-update.sh
 config-update.sh
+scripts/meta-record.sh
+.correctless/scripts/meta-record.sh
+meta-record.sh
 .correctless/ARCHITECTURE_DEPRECATED.md
 .correctless/antipatterns-archived.md
 .correctless/CLAUDE_LEARNINGS_ARCHIVED.md

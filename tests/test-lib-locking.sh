@@ -460,6 +460,90 @@ test_all_state_writers_use_locking() {
 }
 
 # ============================================================================
+# QA-002: Direct N-way concurrency test for the mkdir->O_EXCL lock primitive
+# ============================================================================
+# Regression guard for the O_EXCL pid-file exclusion gate (and the QA-001
+# double-hold hardening). Spawns ~25 genuinely-separate processes (bash -c, each
+# with its own PID — a subshell would share $$), each acquiring the SAME lock,
+# doing a read-modify-write on a shared counter with a widened window, then
+# releasing. Asserts (a) NO lost updates — the final counter equals the number
+# of successful acquisitions, and (b) at no instant were two holders inside the
+# critical section (a single-line "holders" marker that must never exceed 1).
+# WOULD fail if mutual exclusion regressed: both detectors trip (lost counter
+# updates AND a >1 holder marker). Deterministic under the O_EXCL exactly-one-
+# winner regime with a generous 30s timeout, so all N acquire.
+
+test_concurrent_nway_no_lost_update() {
+  echo ""
+  echo "=== QA-002: N-way concurrent _acquire_state_lock — no lost update, single-holder ==="
+
+  setup_test_env
+  source .correctless/scripts/lib.sh
+
+  local shared="$TEST_DIR/.correctless/artifacts/counter-target"
+  local counter_file="$TEST_DIR/counter.val"
+  local holders_file="$TEST_DIR/holders.log"
+  local success_dir="$TEST_DIR/success"
+  local violation_file="$TEST_DIR/violation.log"
+  local lib_path="$TEST_DIR/.correctless/scripts/lib.sh"
+
+  rm -rf "${shared}.lock" "$counter_file" "$holders_file" "$success_dir" "$violation_file"
+  mkdir -p "$success_dir"
+  printf '0' > "$counter_file"
+  : > "$holders_file"
+
+  local N=25 i
+  for i in $(seq 1 "$N"); do
+    bash -c '
+      set -uo pipefail
+      lib="$1"; shared="$2"; counter="$3"; holders="$4"; succ="$5"; viol="$6"; id="$7"
+      source "$lib"
+      export CORRECTLESS_LOCK_TIMEOUT=30
+      if _acquire_state_lock "$shared" 2>/dev/null; then
+        # --- critical section ---
+        # single-holder marker: record entry, then assert exactly one holder.
+        printf "%s\n" "$id" >> "$holders"
+        n_holders="$(wc -l < "$holders" | tr -d "[:space:]")"
+        if [ "$n_holders" != "1" ]; then
+          printf "%s\n" "$id" >> "$viol"
+        fi
+        # read-modify-write with a WIDENED window (the classic lost-update shape).
+        cur="$(cat "$counter")"
+        sleep 0.02
+        printf "%s" "$((cur + 1))" > "$counter"
+        # leave the critical section: clear our holder marker before releasing.
+        : > "$holders"
+        # --- end critical section ---
+        _release_state_lock "$shared"
+        printf "ok" > "$succ/$id"
+      fi
+    ' _ "$lib_path" "$shared" "$counter_file" "$holders_file" "$success_dir" "$violation_file" "$i" &
+  done
+  wait
+
+  local successes final violations
+  successes="$(find "$success_dir" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
+  final="$(cat "$counter_file" 2>/dev/null)"
+  if [ -f "$violation_file" ]; then
+    violations="$(wc -l < "$violation_file" | tr -d '[:space:]')"
+  else
+    violations=0
+  fi
+
+  # (a) NO lost updates: final counter == number of successful acquisitions.
+  assert_eq "QA-002a: counter == successful acquisitions (no lost update)" "$successes" "$final"
+
+  # (b) Exactly-one-winner regime: with a 30s timeout all N processes acquire.
+  assert_eq "QA-002b: all $N processes acquired the lock" "$N" "$successes"
+
+  # (c) At no point were two holders simultaneously inside the critical section.
+  assert_eq "QA-002c: never >1 concurrent holder in the critical section" "0" "$violations"
+
+  # (d) No stale lock left behind after all releases.
+  assert_not_exists "QA-002d: no stale lock dir after all releases" "${shared}.lock"
+}
+
+# ============================================================================
 # Run all tests
 # ============================================================================
 
@@ -470,6 +554,7 @@ test_lock_timeout
 test_lock_cleanup_on_all_paths
 test_no_flock_dependency
 test_all_state_writers_use_locking
+test_concurrent_nway_no_lost_update
 
 # ============================================================================
 # Summary

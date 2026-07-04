@@ -1,7 +1,7 @@
 ---
 name: cdocs
 description: Update project documentation after a feature lands. Updates README, .correctless/AGENT_CONTEXT.md, .correctless/ARCHITECTURE.md, and feature docs. Run before merging.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(*compute-session-cost.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md), Write(.claude/rules/*.md)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(*compute-session-cost.sh*), Bash(*meta-record.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md), Write(.claude/rules/*.md)
 interaction_mode: hybrid
 ---
 
@@ -230,16 +230,29 @@ This ensures future spec and review agents know about established conventions wi
 
 ### Back-fill Deferred Meta Fields
 
-Before advancing the state machine, scan `.correctless/meta/*.json` for any file containing a `created_at_commit` field set to `null`. For each null field, fill it with `git merge-base main HEAD` — the commit the feature branched from on main, which is the pre-feature baseline for post-merge measurement gates that count "PRs landed since feature X merged". If `.correctless/meta/*.json` already has a non-null `created_at_commit`, leave it alone — the value was pre-set during GREEN or an earlier /cdocs run and overriding it would corrupt the baseline.
+The single meta artifact this step back-fills is `.correctless/meta/pat001-measurement-due.json`, created by the path-scoped-rules-pat001-migration feature with a baseline SHA that `/cstatus` uses to count hook-touching PRs landed after merge. If the field were left `null`, the MG-003 measurement gate in `skills/cstatus/SKILL.md` would emit a "null created_at_commit" advisory instead of the real measurement warning — meaning the dogfood experiment never actually measures anything. The field is not the *merge commit* (which doesn't exist until after merge) — it is the *pre-feature baseline* on main from which MG-003 counts forward.
 
-Specifically, `.correctless/meta/pat001-measurement-due.json` is created by the path-scoped-rules-pat001-migration feature with a baseline SHA that `/cstatus` uses to count hook-touching PRs landed after merge. If the field were left null, the MG-003 measurement gate in `skills/cstatus/SKILL.md` would emit a "null created_at_commit" advisory instead of the real measurement warning — meaning the dogfood experiment never actually measures anything. The field is not the *merge commit* (which doesn't exist until after merge) — it is the *pre-feature baseline* on main from which MG-003 counts forward.
+**Target only that one file — never iterate across the meta directory.** Earlier revisions checked every meta artifact for a `created_at_commit` field, which polluted unrelated features' baselines with this feature's merge-base (#226) and added spurious fields to files that never had one (#192, because `jq '.x == null'` also matches an **absent** key). Act on the single path above, and only when it **exists and carries a present-null field**.
 
-Procedure (for each matching file):
-1. Read the file and check whether `created_at_commit` is the literal JSON value `null`.
-2. If non-null, skip this file — do not overwrite.
-3. If null, read `git merge-base main HEAD` for the pre-feature baseline SHA.
-4. Edit the file to replace `"created_at_commit": null` with `"created_at_commit": "<sha>"`.
-5. Do NOT create the file if it does not exist. Only back-fill existing files.
+`pat001-measurement-due.json` is protected by the sensitive-file-guard (SFG) — a naive Edit/Write is blocked (AP-037). Do **not** edit the file directly. Use the sanctioned sole-writer `.correctless/scripts/meta-record.sh pat001-set-created-at <sha>` (ABS-047), which sets the field **only** when it is present and literally `null` (`has("created_at_commit") and .created_at_commit == null`), and is an intended no-op otherwise.
+
+Procedure:
+1. If `.correctless/meta/pat001-measurement-due.json` does **not** exist, silently skip — this is absence-by-design on non-dogfood projects (EXT-004). Do NOT create it and do NOT invoke the writer.
+2. Read the file and check whether `created_at_commit` is the literal JSON value `null` — i.e. present **and** null. If the field is absent, or already non-null, skip: leave the file untouched (do not invoke the writer). This present-null-only guard is the #192/#226 fix.
+3. If present-null, capture the pre-feature baseline SHA: `SHA="$(git merge-base main HEAD)"`.
+4. Invoke the writer, passing the SHA as a **discrete argv token** (never interpolated into a `bash -c` string, TB-001):
+
+```bash
+bash .correctless/scripts/meta-record.sh pat001-set-created-at "$SHA"
+rc=$?
+if [ "$rc" -eq 127 ]; then
+  echo "meta-record: FAILED .correctless/meta/pat001-measurement-due.json: writer script not found — run /csetup to install meta-record.sh"
+elif [ "$rc" -ne 0 ]; then
+  echo "meta-record: FAILED .correctless/meta/pat001-measurement-due.json: set-created-at failed (exit $rc)"
+fi
+```
+
+Echo the `meta-record: FAILED` token verbatim on non-zero so the failure is surfaced. Do **not** fall back to `Write`/`Edit` on the file (SFG-blocked, would silently no-op — PRH-002).
 
 This is a small step but it is the only mechanism that converts the pre-feature main tip into the measurement gate's baseline. Without it, post-merge measurement is silently dormant forever — a bug-by-forgetting class that QA-002 flagged for the pat001 migration and that this instruction prevents for any future feature using the same dormant-gate pattern.
 
