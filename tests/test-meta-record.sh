@@ -262,11 +262,17 @@ test_inv002_validation_under_lock_source() {
   # validation must sit BETWEEN _acquire_state_lock and _release_state_lock (no
   # TOCTOU window; decision-read + validate + write all inside one critical
   # section). Assert acquire < validate < release by line number.
-  local acq rel val
-  acq="$(grep -nE '_acquire_state_lock' "$WRITER" | head -1 | cut -d: -f1)"
-  rel="$(grep -nE '_release_state_lock' "$WRITER" | tail -1 | cut -d: -f1)"
-  # A validation marker: a jq -e required-field/type check.
-  val="$(grep -nE 'jq[[:space:]]+-e|jq[[:space:]].*-e[[:space:]]' "$WRITER" | head -1 | cut -d: -f1)"
+  # Scope to the do_calibration_append FUNCTION BODY — a global grep matches the
+  # file-header comment's `_acquire_state_lock` mention and a _release from a
+  # sibling op, so it would false-pass on a future move of validation out of the
+  # real critical section (codex impl-review 2026-07-04). Match the actual call
+  # form `_acquire_state_lock "` (quoted arg), never a comment.
+  local body acq rel val
+  body="$(awk '/^do_calibration_append\(\)/{f=1} f{print} f&&/^}$/{exit}' "$WRITER")"
+  acq="$(printf '%s\n' "$body" | grep -nE '_acquire_state_lock[[:space:]]+"' | head -1 | cut -d: -f1)"
+  rel="$(printf '%s\n' "$body" | grep -nE '_release_state_lock[[:space:]]+"' | tail -1 | cut -d: -f1)"
+  # A validation marker: a jq -e required-field/type check inside the function.
+  val="$(printf '%s\n' "$body" | grep -nE 'jq[[:space:]]+-e' | head -1 | cut -d: -f1)"
   if [ -n "$acq" ] && [ -n "$rel" ] && [ -n "$val" ] && [ "$acq" -lt "$val" ] && [ "$val" -lt "$rel" ]; then
     pass "INV-002-under-lock" "jq validation sits between _acquire_state_lock and _release_state_lock (no TOCTOU)"
   else

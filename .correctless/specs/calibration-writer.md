@@ -234,7 +234,7 @@ The **forbidden state (PRH-004)** is: exit `0` after a write was *attempted* but
 ### BND-001: Meta-write input and target initialization
 - **Boundary**: ABS-045 (SFG) / TB-001 (skill→script argv)
 - **Input from**: `/cverify`, `/cdocs`, `/cmodelupgrade` (semi-trusted same-tool skills) — a JSON object on stdin (calibration/baselines, size-capped per INV-010) or a `<sha>` argv (pat001).
-- **Validation required**: valid JSON + required-field schema (calibration, INV-002); well-formed 40-or-64-hex SHA as discrete argv (pat001/baselines-key, INV-004/RS-012); destination resolves inside `.correctless/meta/` and is not a symlink (INV-010).
+- **Validation required**: valid JSON + required-field schema (calibration, INV-002); well-formed 40-or-64-hex SHA as discrete argv for **pat001** (INV-004/RS-012); the **baselines** key `<model>|<HARNESS_VERSION>` as discrete argv — non-empty, passed via `jq --arg` (injection-safe string literal, no format constraint, NOT a hex SHA — QA-004/MA-L8); destination resolves inside `.correctless/meta/` and is not a symlink (INV-010).
 - **Target initialization**:
   - calibration: absent OR **zero-byte** file (`[ ! -s ]`, RS-010) → **create** `{"calibration_entries":[]}` then append (the create/mkdir happens AFTER the INV-010 parent-symlink check — EXT-005); root not an object / `calibration_entries` not an array → **fail-loud**.
   - pat001: the skill invokes the op ONLY when the file **exists and carries a present-null `created_at_commit`** — absence-by-design (non-dogfood projects) is a silent skip in `/cdocs`, NOT a writer call (EXT-004). If invoked on a missing/non-object/unparseable target the writer **fails-loud** (corrupt case only); it never creates the file.
