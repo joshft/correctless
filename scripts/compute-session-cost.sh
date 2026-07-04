@@ -188,7 +188,7 @@ AUDIT_TRAIL_FILE="$ARTIFACT_DIR/audit-trail-${BRANCH_SLUG}.jsonl"
 PHASE_TRANSITIONS="[]"
 if [ -f "$AUDIT_TRAIL_FILE" ]; then
   # Extract phase transitions — each entry where phase differs from previous
-  PHASE_TRANSITIONS=$(jq -R 'try (fromjson | {phase: .phase, timestamp: .timestamp}) catch empty' "$AUDIT_TRAIL_FILE" 2>/dev/null | jq -n '
+  PHASE_TRANSITIONS=$(jq -R 'try (fromjson | {phase: .phase, timestamp: (.ts // .timestamp)}) catch empty' "$AUDIT_TRAIL_FILE" 2>/dev/null | jq -n '
     [inputs] | reduce .[] as $entry (
       {transitions: [], last_phase: null};
       if $entry.phase != .last_phase then

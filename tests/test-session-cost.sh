@@ -133,6 +133,14 @@ create_audit_trail() {
   echo "$trail_path"
 }
 
+# Append a hook-edit audit-trail entry in the EXACT shape hooks/audit-trail.sh
+# writes (line 110): the time field is named `ts`, NOT `timestamp`.
+# Arguments: $1=trail_path, $2=phase, $3=ts, $4=file (optional)
+append_hook_edit_entry() {
+  local trail_path="$1" phase="$2" ts="$3" file="${4:-hooks/audit-trail.sh}"
+  echo "{\"ts\":\"$ts\",\"phase\":\"$phase\",\"tool\":\"Edit\",\"file\":\"$file\",\"branch\":\"feature/ts-shape\",\"session_id\":null}" >> "$trail_path"
+}
+
 echo "=== Session Cost Analysis Tests ==="
 
 # ============================================================================
@@ -1459,6 +1467,57 @@ test_r018_agent_context() {
 }
 
 # ============================================================================
+# R-004b: ts-shaped hook-edit audit entries captured as phase boundaries
+# Regression for: compute-session-cost.sh reads .timestamp, but
+# hooks/audit-trail.sh writes .ts — so ts-shaped entries yield a null time
+# and are reordered or dropped during phase attribution.
+# ============================================================================
+
+test_r004b_ts_field_normalization() {
+  echo ""
+  echo "--- R-004b: ts-shaped hook-edit entries captured as phase boundaries ---"
+
+  local TEST_DIR FAKE_HOME
+  TEST_DIR=$(setup_test_env)
+  FAKE_HOME=$(mktemp -d)
+
+  local proj_slug
+  proj_slug=$(echo "$TEST_DIR" | tr '/' '-' | sed 's/^-//')
+  local jsonl_path
+  jsonl_path=$(create_session_dir "$FAKE_HOME" "$proj_slug" "ts-shape-session")
+
+  git -C "$TEST_DIR" checkout -q -b "feature/ts-shape" 2>/dev/null
+  local branch_slug
+  branch_slug=$(cd "$TEST_DIR" && source "$LIB_SH" && branch_slug "feature/ts-shape")
+
+  # Mixed-shape audit trail (as production produces): an orchestration entry
+  # (timestamp shape) at 10:00, then a hook-edit entry (ts shape, exactly what
+  # hooks/audit-trail.sh writes) at 10:10 as the LATER phase boundary.
+  local trail_path
+  trail_path=$(create_audit_trail "$TEST_DIR" "$branch_slug" \
+    "tdd-impl" "2026-04-15T10:00:00Z")
+  append_hook_edit_entry "$trail_path" "tdd-qa" "2026-04-15T10:10:00Z"
+
+  # One transcript turn AFTER the ts-shaped boundary. Its correct bucket is the
+  # phase opened by the ts-shaped entry (tdd-qa at 10:10).
+  write_transcript_entry "$jsonl_path" "claude-sonnet-4-6" 500 250 0 0 "feature/ts-shape" "2026-04-15T10:15:00Z"
+
+  local output
+  output=$(cd "$TEST_DIR" && HOME="$FAKE_HOME" bash "$SCRIPT" "feature/ts-shape" 2>/dev/null)
+
+  # The ts-shaped entry's time MUST be captured as a phase-transition boundary,
+  # so the 10:15 turn buckets into tdd-qa. Under the bug, .timestamp is null for
+  # the ts-shaped entry: the null sorts first and the turn is attributed to the
+  # wrong phase (tdd-impl), leaving tdd-qa with 0 turns. This assertion fails RED
+  # until the ingestion normalizes with (.ts // .timestamp).
+  local qa_turns
+  qa_turns=$(echo "$output" | jq '[.by_phase[] | select(.phase == "tdd-qa") | .turns] | add // 0' 2>/dev/null)
+  assert_eq "R004b-a" "ts-shaped hook-edit entry captured as phase boundary (10:15 turn buckets into tdd-qa)" "1" "$qa_turns"
+
+  rm -rf "$TEST_DIR" "$FAKE_HOME"
+}
+
+# ============================================================================
 # Run all tests
 # ============================================================================
 
@@ -1466,6 +1525,7 @@ test_r001_script_exists_and_outputs_json
 test_r002_session_discovery
 test_r003_cost_computation
 test_r004_phase_attribution
+test_r004b_ts_field_normalization
 test_r005_output_schema
 test_r006_pricing
 test_r007_dashboard_cost
