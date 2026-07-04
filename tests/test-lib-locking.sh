@@ -460,18 +460,20 @@ test_all_state_writers_use_locking() {
 }
 
 # ============================================================================
-# QA-002: Direct N-way concurrency test for the mkdir->O_EXCL lock primitive
+# QA-002: Direct N-way concurrency test for the ln create-with-content lock
 # ============================================================================
-# Regression guard for the O_EXCL pid-file exclusion gate (and the QA-001
-# double-hold hardening). Spawns ~25 genuinely-separate processes (bash -c, each
-# with its own PID — a subshell would share $$), each acquiring the SAME lock,
-# doing a read-modify-write on a shared counter with a widened window, then
+# Regression guard for the `ln` (hard-link) atomic create-with-content exclusion
+# gate. Spawns ~25 genuinely-separate processes (bash -c, each with its own PID —
+# a subshell would share $$ and invalidate the test), each acquiring the SAME
+# lock, doing a read-modify-write on a shared counter with a widened window, then
 # releasing. Asserts (a) NO lost updates — the final counter equals the number
 # of successful acquisitions, and (b) at no instant were two holders inside the
 # critical section (a single-line "holders" marker that must never exceed 1).
 # WOULD fail if mutual exclusion regressed: both detectors trip (lost counter
-# updates AND a >1 holder marker). Deterministic under the O_EXCL exactly-one-
-# winner regime with a generous 30s timeout, so all N acquire.
+# updates AND a >1 holder marker). Deterministic under the `ln` exactly-one-
+# winner regime with a generous 30s timeout, so all N acquire. (An earlier
+# O_EXCL+grace-loop lock passed here locally but FAILED CI under real
+# parallelism; the `ln` content-atomic gate has no empty-pid window to race.)
 
 test_concurrent_nway_no_lost_update() {
   echo ""

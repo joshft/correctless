@@ -279,65 +279,49 @@ _acquire_state_lock() {
   [[ "$timeout" =~ ^[0-9]+$ ]] || timeout=5
   local deadline=$((SECONDS + timeout))
 
-  # Mutual exclusion is gated on the ATOMIC O_EXCL creation of the pid file
-  # (noclobber redirect), NOT on mkdir. mkdir is not guaranteed atomic on every
-  # filesystem/emulation layer (observed non-atomic under some sandboxed test
-  # environments — calibration-writer INV-007), whereas O_EXCL create is. The
-  # ${state_file}.lock DIRECTORY is retained as the lock container (structural
-  # contract for the locking tests); the pid file inside it is the exclusion
-  # gate. $$ inside the ( ) subshell is still the caller's pid, matching the pid
-  # that _release_state_lock checks.
+  # Mutual exclusion is gated on an ATOMIC create-with-content: write our pid to
+  # a private temp file, then hard-link it to the pid path. ln(2) fails if the
+  # target exists, so exactly one contender wins — and the instant the pid file
+  # becomes visible it ALREADY contains the holder's pid. This removes the
+  # create->write "empty pid" window a noclobber redirect (or a post-mkdir echo)
+  # leaves, and with it the grace-loop reclaim race that admitted two holders /
+  # lost updates under real parallelism (observed on CI). mkdir only creates the
+  # ${state_file}.lock CONTAINER (the locking tests assert on it); the
+  # hard-linked pid file inside it is the exclusion gate. ln is atomic on every
+  # POSIX filesystem tested (ext4/CI and the sandbox overlay), unlike mkdir.
+  #
+  # The staging temp is a SIBLING of lock_dir (not inside it) so a releaser's
+  # rmdir of an empty lock_dir cannot destroy a spinning waiter's temp; mkdir -p
+  # runs INSIDE the loop so a waiter re-creates the container if a releaser
+  # removed it (else the waiter's ln target dir would vanish and it would starve).
+  local tmp="${lock_dir}.acq.$$"
+  printf '%s\n' "$$" > "$tmp" 2>/dev/null || {
+    echo "ERROR: could not stage lock pid for $state_file" >&2; return 1; }
+
   while true; do
     mkdir -p "$lock_dir" 2>/dev/null || true
-    if ( set -o noclobber; printf '%s\n' "$$" > "$pid_file" ) 2>/dev/null; then
-      # QA-001: confirm OUR pid is the one that actually landed in the pid file.
-      # The empty-inode reclaim path below (a waiter mv's a stuck empty pid file)
-      # opens a theoretical create->write double-hold window: if this process
-      # created the pid file but stalled before the printf wrote "$$", a waiter
-      # could reclaim the empty inode and O_EXCL-create its own pid file, and both
-      # processes would return 0. Re-read and confirm ownership; a genuine
-      # mismatch means someone else holds it, so `continue` — the next O_EXCL
-      # create fails and we wait to the deadline as normal (no infinite loop).
-      if [ "$(cat "$pid_file" 2>/dev/null)" = "$$" ]; then
-        return 0
-      fi
+    if ln "$tmp" "$pid_file" 2>/dev/null; then
+      rm -f "$tmp" 2>/dev/null
+      return 0
+    fi
+
+    # pid file exists — reclaim ONLY a provably-dead holder. Because ln makes the
+    # pid file content-atomic, a visible pid file always holds a real pid (no
+    # empty-init window to misjudge). An unreadable/empty pid is treated as a
+    # live holder (wait), never reclaimed — fail-closed.
+    local holder_pid
+    holder_pid="$(cat "$pid_file" 2>/dev/null)" || holder_pid=""
+    if [ -n "$holder_pid" ] && ! kill -0 "$holder_pid" 2>/dev/null; then
+      # Dead holder: atomic reclaim (only one waiter's mv wins); the next ln
+      # re-establishes a single holder. Losing mv's fail and fall through to ln.
+      local break_f="${pid_file}.dead.$$"
+      mv "$pid_file" "$break_f" 2>/dev/null && rm -f "$break_f" 2>/dev/null
       continue
     fi
 
-    # pid file present — inspect the holder.
-    if [ -f "$pid_file" ]; then
-      local holder_pid
-      holder_pid="$(cat "$pid_file" 2>/dev/null)" || holder_pid=""
-      if [ -z "$holder_pid" ]; then
-        # Empty pid file: a contender O_EXCL-created it but has not written its
-        # pid yet (create->write window). Grace re-check so a live acquirer
-        # mid-init is not stolen; reclaim only a genuinely stuck empty file.
-        # The reclaim mv is atomic — only one process reclaims a given file —
-        # and the O_EXCL re-create on the next pass re-establishes exclusion.
-        local _g still_empty=1
-        for _g in 1 2 3 4 5; do
-          sleep 0.05
-          holder_pid="$(cat "$pid_file" 2>/dev/null)" || holder_pid=""
-          [ -n "$holder_pid" ] && { still_empty=0; break; }
-          [ -f "$pid_file" ] || { still_empty=0; break; }
-        done
-        if [ "$still_empty" -eq 1 ]; then
-          local break_f="${pid_file}.stuck.$$"
-          mv "$pid_file" "$break_f" 2>/dev/null && rm -f "$break_f" 2>/dev/null
-        fi
-        continue
-      fi
-      if ! kill -0 "$holder_pid" 2>/dev/null; then
-        # Dead holder — reclaim atomically (mv: one winner), then the O_EXCL
-        # create on the next pass re-establishes exclusion for a single winner.
-        local break_f="${pid_file}.dead.$$"
-        mv "$pid_file" "$break_f" 2>/dev/null && rm -f "$break_f" 2>/dev/null
-        continue
-      fi
-    fi
-
-    # Holder is alive or transient — wait and retry
+    # Holder alive (or pid transiently unreadable) — wait and retry.
     if [ "$SECONDS" -ge "$deadline" ]; then
+      rm -f "$tmp" 2>/dev/null
       echo "ERROR: Lock acquisition timeout after ${timeout}s for $state_file" >&2
       return 1
     fi
