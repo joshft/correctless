@@ -60,12 +60,21 @@ LOCK_HELD=""
 TMP_OUT=""
 TMP_IN=""
 _cleanup() {
+  # Idempotent: may run twice — once from the INT/TERM trap's explicit call,
+  # once from the EXIT trap that fires on the subsequent `exit 130`. Each
+  # removal is guarded, so a second invocation on already-gone temps/lock is a
+  # safe no-op. _release_state_lock is holder-checked, so a second release is
+  # a no-op once the lock is gone.
   [ -n "$LOCK_HELD" ] && _release_state_lock "$LOCK_HELD"
   [ -n "$TMP_OUT" ] && rm -f "$TMP_OUT" 2>/dev/null
   [ -n "$TMP_IN" ] && rm -f "$TMP_IN" 2>/dev/null
   return 0
 }
+# `_cleanup` ends with `return 0` (no exit), so on a bare INT/TERM trap bash
+# would run cleanup and then RESUME the script with a released lock. Split the
+# traps so a signal terminates deterministically after cleanup.
 trap _cleanup EXIT
+trap '_cleanup; exit 130' INT TERM
 
 # _fail <dest> <reason> — emit the mechanical FAILED token (stdout) + a stderr
 # diagnostic naming the file, then exit non-zero. The trap releases the lock.
@@ -109,7 +118,7 @@ _verify_dest() {
   _realpath_tool_available || return 3
   local comp
   for comp in ".correctless" "$META_DIR" "$path"; do
-    if [ -e "$comp" ] && [ -h "$comp" ]; then
+    if [ -h "$comp" ]; then
       return 1
     fi
   done
@@ -143,7 +152,9 @@ _guard_dest() {
 _capture_stdin() {
   local path="$1"
   TMP_IN="$(mktemp "${TMPDIR:-/tmp}/mr-in-XXXXXX")" || _fail "$path" "cannot create input temp file"
-  cat > "$TMP_IN"
+  # MA-M1: bound the INGEST — never buffer an unbounded stream to disk. Read at
+  # most MAX_BYTES+1 bytes; the wc -c check below rejects the truncated overflow.
+  head -c "$((MAX_BYTES + 1))" > "$TMP_IN"
   local bytes
   bytes="$(LC_ALL=C wc -c < "$TMP_IN" | tr -d '[:space:]')"
   if [ -z "$bytes" ] || ! [ "$bytes" -ge 0 ] 2>/dev/null; then
@@ -159,8 +170,10 @@ _capture_stdin() {
 # ===========================================================================
 do_calibration_append() {
   local dest="$CAL_DEST"
-  _capture_stdin "$dest"
+  # MA-L2/INV-010: verify the destination (symlink/containment) BEFORE creating
+  # any temp or capturing stdin (creation-order safe).
   _guard_dest "$dest"
+  _capture_stdin "$dest"
   mkdir -p "$META_DIR" 2>/dev/null
 
   _acquire_state_lock "$dest" || _fail "$dest" "could not acquire state lock"
@@ -220,7 +233,10 @@ do_calibration_append() {
   fi
   jq -e . "$TMP_OUT" >/dev/null 2>&1 || _fail "$dest" "post-transform output is not valid JSON"
 
-  if [ -h "$dest" ]; then _fail "$dest" "destination became a symlink before rename"; fi
+  # MA-M6/EXT-005: re-run the FULL destination check (parents + leaf +
+  # containment) under the lock immediately before the rename — identical to the
+  # initial _guard_dest, not a leaf-only [ -h ] re-check.
+  _guard_dest "$dest"
   mv "$TMP_OUT" "$dest" || _fail "$dest" "atomic rename failed"
   TMP_OUT=""
   _release_state_lock "$dest"; LOCK_HELD=""
@@ -254,12 +270,22 @@ do_pat001() {
   fi
 
   # Present-null-only guard: set ONLY when the field is present and literally null.
-  if jq -e 'has("created_at_commit") and .created_at_commit == null' "$dest" >/dev/null 2>&1; then
+  # MA-L3: distinguish jq exit 1 (predicate false -> intended no-op) from jq exit
+  # >=2 (runtime error -> fail-loud); a decision-read error must never be swallowed
+  # into a silent no-op.
+  jq -e 'has("created_at_commit") and .created_at_commit == null' "$dest" >/dev/null 2>&1
+  local dread_rc=$?
+  if [ "$dread_rc" -ge 2 ]; then
+    _fail "$dest" "decision-read failed (jq runtime error rc=$dread_rc on created_at_commit)"
+  fi
+  if [ "$dread_rc" -eq 0 ]; then
     TMP_OUT="${dest}.$$.tmp"
     jq --arg sha "$sha" '.created_at_commit = $sha' "$dest" > "$TMP_OUT" 2>/dev/null \
       || _fail "$dest" "set-created-at transform failed"
     jq -e . "$TMP_OUT" >/dev/null 2>&1 || _fail "$dest" "post-transform output is not valid JSON"
-    if [ -h "$dest" ]; then _fail "$dest" "destination became a symlink before rename"; fi
+    # MA-M6/EXT-005: full destination re-check under the lock immediately before
+    # rename — identical to the initial _guard_dest, not a leaf-only [ -h ].
+    _guard_dest "$dest"
     mv "$TMP_OUT" "$dest" || _fail "$dest" "atomic rename failed"
     TMP_OUT=""
     _release_state_lock "$dest"; LOCK_HELD=""
@@ -282,16 +308,20 @@ do_baselines() {
   if [ -z "$key" ]; then
     _fail "$dest" "missing baseline key (expected <model>|<version>)"
   fi
-  _capture_stdin "$dest"
+  # MA-L2/INV-010: verify the destination BEFORE creating any temp/capturing stdin.
   _guard_dest "$dest"
+  _capture_stdin "$dest"
   mkdir -p "$META_DIR" 2>/dev/null
 
   _acquire_state_lock "$dest" || _fail "$dest" "could not acquire state lock"
   LOCK_HELD="$dest"
 
-  # Validate the incoming value is JSON (under the lock).
-  if ! jq -e . "$TMP_IN" >/dev/null 2>&1; then
-    _fail "$dest" "baseline value on stdin is not valid JSON"
+  # Validate the incoming value is EXACTLY ONE JSON object (under the lock).
+  # MA-M2/QA-003: reject a multi-document stdin — never silently slurp-and-drop
+  # extras. Mirror calibration's exactly-one-document guard; the key-merge below
+  # consumes only $v[0].
+  if ! jq -e -s '(length==1) and (.[0]|type=="object")' "$TMP_IN" >/dev/null 2>&1; then
+    _fail "$dest" "baseline value on stdin is not exactly one JSON object (or multiple documents given)"
   fi
 
   TMP_OUT="${dest}.$$.tmp"
@@ -309,7 +339,10 @@ do_baselines() {
   fi
   jq -e . "$TMP_OUT" >/dev/null 2>&1 || _fail "$dest" "post-transform output is not valid JSON"
 
-  if [ -h "$dest" ]; then _fail "$dest" "destination became a symlink before rename"; fi
+  # MA-M6/EXT-005: re-run the FULL destination check (parents + leaf +
+  # containment) under the lock immediately before the rename — identical to the
+  # initial _guard_dest, not a leaf-only [ -h ] re-check.
+  _guard_dest "$dest"
   mv "$TMP_OUT" "$dest" || _fail "$dest" "atomic rename failed"
   TMP_OUT=""
   _release_state_lock "$dest"; LOCK_HELD=""

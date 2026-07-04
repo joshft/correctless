@@ -98,13 +98,19 @@ Example: `/cmodelupgrade --capture-baseline --auto-confirm` (testing only — by
 
 The `<model>|<HARNESS_VERSION>` key is the same literal string used as the exact-match lookup key (Step 3). Pass it as a **discrete argv token** and pipe the baseline **value object** on **stdin** — never interpolate either into a `bash -c` string (TB-001):
 
+Capture the writer's stdout and exit status **in the same block** (Bash tool calls do not share shell state across separate blocks). On failure, echo the writer's captured `meta-record: FAILED <file>: <reason>` token **verbatim** rather than reconstructing a generic string:
+
 ```bash
-printf '%s' "$BASELINE_VALUE_JSON" | bash .correctless/scripts/meta-record.sh baselines-write "${KEY}"
+out="$(printf '%s' "$BASELINE_VALUE_JSON" | bash .correctless/scripts/meta-record.sh baselines-write "${KEY}")"
 rc=$?
 if [ "$rc" -eq 127 ]; then
+  # writer never ran (script absent on an un-re-setup install)
   echo "meta-record: FAILED .correctless/meta/model-baselines.json: writer script not found — run /csetup to install meta-record.sh"
 elif [ "$rc" -ne 0 ]; then
-  echo "meta-record: FAILED .correctless/meta/model-baselines.json: baselines-write failed (exit $rc)"
+  # relay the writer's verbatim 'meta-record: FAILED <file>: <reason>' token
+  printf '%s\n' "$out"
+else
+  printf '%s\n' "$out"
 fi
 ```
 

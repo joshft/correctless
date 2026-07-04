@@ -3,7 +3,15 @@
 ## When this rule applies
 
 This rule loads when you edit `hooks/sensitive-file-guard.sh` (SFG) or any file
-listed in the SFG `DEFAULTS` list — for example `agents/fix-diff-reviewer.md`.
+listed in the SFG `DEFAULTS` list. Two current deliverables are themselves in
+DEFAULTS and therefore use this lift-and-restore affordance whenever a feature
+develops them:
+
+- `agents/fix-diff-reviewer.md` (the original AP-037 instance).
+- `scripts/meta-record.sh` (the sanctioned sole-writer for `.correctless/meta/*.json`,
+  ABS-047 — added to DEFAULTS by the calibration-writer feature, MA-M7). Its
+  three DEFAULTS forms (`scripts/meta-record.sh`, `.correctless/scripts/meta-record.sh`,
+  and the bare `meta-record.sh`) are all removed on lift and restored together.
 
 The `sensitive-file-guard.sh` hook (SFG) has no per-file allowlist primitive:
 `custom_patterns` only ADDS protection, never excepts a default. When an
@@ -20,11 +28,19 @@ affordance.*
    commit, ADD the sentinel file:
 
    ```sh
+   # Historical form (fix-diff-reviewer): a feature name.
    echo "lift-active: <feature-name>" > .correctless/.sfg-lift-active
+   # Generalized form (MA-M7): name the lifted deliverable PATH so the backstop
+   # checks THAT path rather than the hardcoded fix-diff-reviewer default. Use
+   # this when lifting a non-fix-diff-reviewer deliverable, e.g. meta-record.sh:
+   #   echo "lift-active: scripts/meta-record.sh" > .correctless/.sfg-lift-active
    ```
 
    The sentinel `.correctless/.sfg-lift-active` is itself in SFG DEFAULTS, so the
-   guard's own disable-switch is guarded against agent writes.
+   guard's own disable-switch is guarded against agent writes. When the
+   `lift-active:` value contains a slash it is treated as the lifted deliverable
+   path; a slash-free value falls back to the fix-diff-reviewer default
+   (backward-compatible — see `scripts/check-no-pending-sfg-lift.sh`).
 
 2. **Iterate freely.** While the sentinel is present, the
    `tests/test-fix-diff-reviewer-agent.sh` lift-state assertion SKIPs (so
@@ -46,8 +62,10 @@ Before pushing, run the final-state backstop manually:
 - From an installed project: `bash .correctless/scripts/check-no-pending-sfg-lift.sh`
 
 The script FAILS (non-zero) when `.correctless/.sfg-lift-active` is still in the
-tree and `agents/fix-diff-reviewer.md` is still in SFG DEFAULTS. It NO-OPs
-(exit 0) when the agent path is no longer in DEFAULTS (RS-028 self-deactivation).
+tree and the lifted deliverable's path (read from the sentinel's `lift-active:`
+line when it names a path, else `agents/fix-diff-reviewer.md`) is still in SFG
+DEFAULTS. It NO-OPs (exit 0) when that path is no longer in DEFAULTS (RS-028
+self-deactivation).
 
 The same backstop runs in CI as the dedicated `sfg-lift-check` job and in
 `/cauto` Step 8 before push, and the `cmd_done` workflow-advance gate refuses the

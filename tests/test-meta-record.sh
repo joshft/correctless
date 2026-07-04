@@ -1391,6 +1391,255 @@ test_qa003_multidoc_stdin_rejected() {
 test_qa003_multidoc_stdin_rejected
 
 # ===========================================================================
+# MA-M2 — baselines-write rejects multi-document stdin (exactly-one guard)
+# ===========================================================================
+section "MA-M2: baselines-write rejects multi-document stdin"
+
+test_mam2_baselines_multidoc_rejected() {
+  # Two concatenated JSON objects on stdin. Pre-fix, do_baselines validated with
+  # plain `jq -e .` (accepts a stream) and `--slurpfile v` merged only $v[0],
+  # silently dropping the second document. The writer must now require EXACTLY
+  # ONE document: reject with non-zero + the mechanical FAILED token and perform
+  # NO partial merge (existing file byte-unchanged).
+  local proj; proj="$(new_project)"
+  printf '%s' '{"schema_version":1,"baselines":{"a|1":{"x":1}}}' > "$proj/$BASE_REL"
+  local before; before="$(hash_file "$proj/$BASE_REL")"
+  local two; two="$(printf '%s\n%s\n' '{"escape":0.2}' '{"escape":0.9}')"
+  local in; in="$(write_tmp "$two")"
+  run_baselines_write "$proj" "$in" "opus-4.8" "5"
+  rm -f "$in"
+  local after; after="$(hash_file "$proj/$BASE_REL")"
+  local has_new; has_new="$(jq -r '.baselines["opus-4.8|5"] // "MISSING"' "$proj/$BASE_REL" 2>/dev/null)"
+
+  if [ "$RW_EXIT" -ne 0 ]; then
+    pass "MA-M2-exit" "baselines multi-document stdin rejected (non-zero exit)"
+  else
+    fail "MA-M2-exit" "two concatenated baseline objects must be rejected (got exit 0 — extras silently dropped)"
+  fi
+  if echo "$RW_STDOUT" | grep -qE "^meta-record: FAILED $BASE_REL: .+"; then
+    pass "MA-M2-token" "multi-doc baselines rejection prints the mechanical FAILED token"
+  else
+    fail "MA-M2-token" "multi-doc baselines rejection must print 'meta-record: FAILED $BASE_REL: <reason>'"
+  fi
+  if [ "$before" = "$after" ] && [ "$has_new" = "MISSING" ]; then
+    pass "MA-M2-nopartial" "multi-doc baselines stdin performs NO partial merge; file byte-unchanged"
+  else
+    fail "MA-M2-nopartial" "multi-doc baselines must leave the file unchanged (new=$has_new changed=$([ "$before" != "$after" ] && echo yes || echo no))"
+  fi
+  rm -rf "$proj"
+}
+test_mam2_baselines_multidoc_rejected
+
+# ===========================================================================
+# MA-L4 — dangling parent/leaf symlink is explicitly refused (drop [ -e ] prefix)
+# ===========================================================================
+section "MA-L4: dangling symlink destination/parent refused with a symlink reason"
+
+test_mal4_dangling_symlink_refused() {
+  # A DANGLING symlink (target does not exist) at the meta parent dir. `[ -e ]`
+  # follows the link and is FALSE for a dangling symlink, so the pre-fix
+  # `[ -e $comp ] && [ -h $comp ]` did NOT refuse it (it failed later for the
+  # wrong reason). With the `-e` prefix dropped, `[ -h ]` alone catches it and
+  # the writer fails loud with a symlink reason BEFORE any mkdir/write.
+  local proj; proj="$(mktemp -d "${TMPDIR:-/tmp}/mr-proj-XXXXXX")"
+  mkdir -p "$proj/.correctless"
+  # .correctless/meta -> a non-existent path (dangling).
+  ln -s "$proj/does-not-exist-$$" "$proj/.correctless/meta"
+  local in; in="$(write_tmp "$(typed_entry)")"
+  run_writer "$proj" "$in" calibration-append
+  rm -f "$in"
+  # Nothing should have been created through the dangling link.
+  local created=0
+  [ -e "$proj/does-not-exist-$$/intensity-calibration.json" ] && created=1
+  if [ "$RW_EXIT" -ne 0 ] \
+     && { echo "$RW_STDOUT" | grep -qiE 'symlink'; } \
+     && [ "$created" -eq 0 ]; then
+    pass "MA-L4-dangling" "dangling parent symlink refused with a symlink reason; nothing written"
+  else
+    fail "MA-L4-dangling" "dangling symlink must fail-loud with a symlink reason (exit=$RW_EXIT created=$created out=$RW_STDOUT)"
+  fi
+  rm -rf "$proj"
+}
+test_mal4_dangling_symlink_refused
+
+# ===========================================================================
+# MA-M6 — pre-mv re-check is the FULL _verify_dest (parents+leaf), not leaf-only
+# ===========================================================================
+section "MA-M6: pre-rename re-check uses the full destination guard"
+
+test_mam6_pre_mv_full_recheck_source() {
+  # Source-level assertion (a true TOCTOU by an out-of-band mutator is AP-040 and
+  # not deterministically testable): the leaf-only `[ -h "$dest" ]` pre-mv guard
+  # must be GONE, replaced by a full re-check (_guard_dest, which calls
+  # _verify_dest over parents+leaf+containment) immediately before each `mv`.
+  # No remaining leaf-only "[ -h "$dest" ]; then _fail ... before rename" line.
+  if grep -qE '\[ -h "\$dest" \][^\n]*before rename' "$WRITER"; then
+    fail "MA-M6-noleaf" "a leaf-only [ -h \"\$dest\" ] pre-rename re-check remains (must be the full _guard_dest/_verify_dest)"
+  else
+    pass "MA-M6-noleaf" "no leaf-only [ -h \"\$dest\" ] pre-rename re-check remains"
+  fi
+  # Every `mv "$TMP_OUT" "$dest"` must be immediately preceded (within 3 lines) by
+  # a _guard_dest call — i.e. the full re-check is present at each rename site.
+  local mv_count guard_before
+  mv_count="$(grep -c 'mv "\$TMP_OUT" "\$dest"' "$WRITER")"
+  guard_before="$(awk '
+    /_guard_dest "\$dest"/ { g = NR }
+    /mv "\$TMP_OUT" "\$dest"/ { if (g > 0 && NR - g <= 3) c++ }
+    END { print c+0 }
+  ' "$WRITER")"
+  if [ "$mv_count" -ge 3 ] && [ "$guard_before" = "$mv_count" ]; then
+    pass "MA-M6-fullrecheck" "all $mv_count rename sites are preceded by a full _guard_dest re-check"
+  else
+    fail "MA-M6-fullrecheck" "each mv must be preceded by _guard_dest (mv=$mv_count guarded=$guard_before)"
+  fi
+}
+test_mam6_pre_mv_full_recheck_source
+
+test_mam6_symlinked_parent_before_rename_refused() {
+  # Behavioral companion: a symlinked parent (meta -> outside) is refused and the
+  # outside target is never written — the pre-mv full re-check re-verifies the
+  # parent chain, not just the leaf. (Initial guard already refuses this; this
+  # asserts the outcome stays correct after the MA-M6 change.)
+  local proj; proj="$(mktemp -d "${TMPDIR:-/tmp}/mr-proj-XXXXXX")"
+  mkdir -p "$proj/.correctless"
+  local outside_dir; outside_dir="$(mktemp -d)"
+  ln -s "$outside_dir" "$proj/.correctless/meta"
+  printf '%s' '{"calibration_entries":[]}' > "$outside_dir/intensity-calibration.json"
+  local before; before="$(hash_file "$outside_dir/intensity-calibration.json")"
+  local in; in="$(write_tmp "$(typed_entry)")"
+  run_writer "$proj" "$in" calibration-append
+  rm -f "$in"
+  local after; after="$(hash_file "$outside_dir/intensity-calibration.json")"
+  if [ "$RW_EXIT" -ne 0 ] && [ "$before" = "$after" ]; then
+    pass "MA-M6-parent" "symlinked parent refused through the full pre-rename re-check; outside target untouched"
+  else
+    fail "MA-M6-parent" "symlinked parent must be refused (exit=$RW_EXIT)"
+  fi
+  rm -rf "$outside_dir" "$proj"
+}
+test_mam6_symlinked_parent_before_rename_refused
+
+# ===========================================================================
+# MA-M5 — documented cverify payload matches the writer's parser (bare object)
+#   Regression guard for MA-H1: the SKILL.md example must be the BARE entry
+#   object (no calibration_entries wrapper), and an instance of that documented
+#   shape must land against the REAL writer with exit 0.
+# ===========================================================================
+section "MA-M5: documented cverify calibration payload matches the writer parser"
+
+# Extract the first fenced ```json block in cverify SKILL.md that names
+# feature_slug — the documented calibration entry example.
+_extract_cverify_json_example() {
+  awk '
+    /^```json/ { injson = 1; buf = ""; next }
+    injson && /^```/ { if (buf ~ /feature_slug/) { print buf; exit } ; injson = 0; next }
+    injson { buf = buf $0 "\n" }
+  ' "$CVERIFY_SKILL"
+}
+
+test_mam5_documented_payload_is_bare_and_lands() {
+  local doc; doc="$(_extract_cverify_json_example)"
+  if [ -z "$doc" ]; then
+    fail "MA-M5-extract" "could not extract a fenced json calibration example (with feature_slug) from cverify SKILL.md"
+    return
+  fi
+  # (1) Structural: the documented example MUST be a BARE object — feature_slug at
+  # the top level and NO calibration_entries wrapper. This is exactly what the
+  # writer validates (.[0]|has("feature_slug")); a wrapper would re-freeze #189.
+  if echo "$doc" | jq -e 'type=="object" and has("feature_slug") and (has("calibration_entries")|not)' >/dev/null 2>&1; then
+    pass "MA-M5-bare" "documented cverify example is a bare entry object (no calibration_entries wrapper)"
+  else
+    fail "MA-M5-bare" "documented cverify example must be a BARE entry object the writer validates at top level (MA-H1/wrapper bug)"
+  fi
+  # (2) End-to-end: build a schema-valid INSTANCE of the documented shape (the
+  # example's values are placeholder strings per INV-008; coerce them to typed
+  # values while preserving the documented KEY SET) and pipe it to the REAL
+  # writer. Proves the documented field set is exactly what the parser accepts.
+  local typed
+  typed="$(echo "$doc" | jq -c '
+      .feature_slug="ma-m5-doc"
+    | .recommended_intensity="high" | .actual_intensity="high"
+    | .actual_qa_rounds=1 | .actual_findings_count=0 | .actual_spec_updates=0
+    | .actual_tokens=1 | .file_paths_touched=["x"] | .timestamp="2026-07-04T00:00:00Z"
+    | (if has("actual_cost_usd") then .actual_cost_usd=1.0 else . end)
+    | (if has("harness_version") then .harness_version=1 else . end)
+    | (if has("fix_rounds_triggered") then .fix_rounds_triggered=0 else . end)
+  ' 2>/dev/null)"
+  if [ -z "$typed" ]; then
+    fail "MA-M5-land" "could not coerce the documented example to a typed instance (missing required key?)"
+    return
+  fi
+  local proj; proj="$(new_project)"
+  printf '%s' '{"calibration_entries":[]}' > "$proj/$CAL_REL"
+  local in; in="$(write_tmp "$typed")"
+  run_writer "$proj" "$in" calibration-append
+  rm -f "$in"
+  local n slug
+  n="$(jq '.calibration_entries|length' "$proj/$CAL_REL" 2>/dev/null || echo -1)"
+  slug="$(jq -r '.calibration_entries[-1].feature_slug // ""' "$proj/$CAL_REL" 2>/dev/null)"
+  if [ "$RW_EXIT" -eq 0 ] && [ "$n" = "1" ] && [ "$slug" = "ma-m5-doc" ]; then
+    pass "MA-M5-land" "an instance of the documented bare shape lands via the real writer (exit 0, entry appended)"
+  else
+    fail "MA-M5-land" "documented payload shape must be accepted by the real writer (exit=$RW_EXIT n=$n slug=$slug)"
+  fi
+  rm -rf "$proj"
+}
+test_mam5_documented_payload_is_bare_and_lands
+
+# ===========================================================================
+# MA-H2 — writer invocation + its exit capture live in the SAME fenced block
+#   Bash tool calls do not share shell state across separate fenced blocks; a
+#   split invocation/`rc=$?` reads a fresh shell (rc=0) and swallows failures.
+# ===========================================================================
+section "MA-H2: meta-record invocation + exit capture share one fenced block"
+
+# Emit "SAME" if every meta-record.sh invocation line and its exit capture
+# (rc=$? or an out=$(...) capture wrapping the invocation) sit inside the same
+# ```-fenced block; else emit a diagnostic. Operates on the skill BODY.
+_invocation_capture_same_fence() {
+  local file="$1"
+  skill_body "$file" | awk '
+    BEGIN { infence = 0; bad = 0; last_invoke = 0 }
+    # A fence boundary (open OR close) breaks the invocation->capture adjacency:
+    # an invocation as the last line of fence A must NOT be scored SAME against
+    # an rc=$? that opens fence B. Reset the pending-invocation flag on every
+    # toggle so a genuine cross-fence split is detected.
+    /^```/ { infence = !infence; last_invoke = 0; next }
+    {
+      if (infence == 0) next
+      line = $0
+      # An out=$(...) capture that itself wraps the invocation is self-contained.
+      if (line ~ /meta-record\.sh/ && line ~ /out=\$\(/) { last_invoke = 0; next }
+      if (line ~ /meta-record\.sh/) { last_invoke = 1; next }
+      if (line ~ /rc=\$\?/) {
+        if (last_invoke != 1) { bad = 1 }
+        last_invoke = 0
+      }
+    }
+    END { if (bad) print "SPLIT"; else print "SAME" }
+  '
+}
+
+for pair in \
+  "MA-H2-cverify:$CVERIFY_SKILL" \
+  "MA-H2-cdocs:$CDOCS_SKILL" \
+  "MA-H2-cmu:$CMODELUPGRADE_SKILL"; do
+  id="${pair%%:*}"; f="${pair#*:}"
+  # There must actually BE a meta-record invocation in the body (guards against a
+  # vacuous pass if the skill were rewritten to drop the call).
+  if ! skill_body "$f" | grep -qF 'meta-record.sh'; then
+    fail "$id" "no meta-record.sh invocation found in $(basename "$(dirname "$f")") body"
+    continue
+  fi
+  verdict="$(_invocation_capture_same_fence "$f")"
+  if [ "$verdict" = "SAME" ]; then
+    pass "$id" "meta-record invocation + exit capture are in the same fenced block"
+  else
+    fail "$id" "meta-record invocation and its rc=\$? capture are split across fenced blocks (Bash tool shell-state loss)"
+  fi
+done
+
+# ===========================================================================
 # Summary
 # ===========================================================================
 summary "test-meta-record.sh"

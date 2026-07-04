@@ -67,21 +67,38 @@ EOF
 fi
 
 # ---------------------------------------------------------------------------
-# Legacy single-deliverable path (no `lifted:` lines in the sentinel).
-# RS-028 self-deactivation: if the protected agent path is no longer in SFG
+# Legacy / single-deliverable path (no `lifted:` lines in the sentinel).
+#
+# MA-M7 generalization: the deliverable being lifted is no longer hardcoded to
+# agents/fix-diff-reviewer.md. When the sentinel's `lift-active:` line names a
+# PATH (contains a slash — e.g. `lift-active: scripts/meta-record.sh`), THAT
+# path is the lifted target; otherwise (the historical `lift-active: <feature>`
+# form) fall back to the fix-diff-reviewer default. This lets any SFG-DEFAULTS
+# deliverable (fix-diff-reviewer.md, meta-record.sh, ...) reuse the same
+# lift-and-restore backstop. Backward-compatible: a feature-name value with no
+# slash resolves to $DEFAULTS_LINE exactly as before.
+#
+# RS-028 self-deactivation: if the resolved target path is no longer in SFG
 # DEFAULTS, this backstop is obsolete — NO-OP rather than fail forever.
 # ---------------------------------------------------------------------------
-if [ ! -f "$SFG" ] || ! grep -Fq "$DEFAULTS_LINE" "$SFG"; then
+LIFT_ACTIVE_VAL="$(grep -E '^lift-active:[[:space:]]*' "$SENTINEL" 2>/dev/null | head -1 | sed -E 's/^lift-active:[[:space:]]*//;s/[[:space:]]+$//' || true)"
+TARGET_PATH="$DEFAULTS_LINE"
+case "$LIFT_ACTIVE_VAL" in
+  */*) TARGET_PATH="$LIFT_ACTIVE_VAL" ;;   # value looks like a path -> that deliverable
+  *)   TARGET_PATH="$DEFAULTS_LINE" ;;      # feature-name form -> historical default
+esac
+
+if [ ! -f "$SFG" ] || ! grep -Fq "$TARGET_PATH" "$SFG"; then
   exit 0
 fi
 
-# Sentinel present AND agent path still guarded -> a lift commit is in the tree
-# without its restore commit. FAIL with the remediation message.
+# Sentinel present AND the lifted target path still guarded -> a lift commit is
+# in the tree without its restore commit. FAIL with the remediation message.
 {
   echo "FAIL: $SENTINEL exists."
   echo "A SFG lift commit is in the tree and the restore commit has not landed (AP-037 lift-and-restore)."
   echo "Sentinel lifecycle: the lift commit ADDS $SENTINEL; the restore commit REMOVES it."
-  echo "Required: restore the exact DEFAULTS line '$DEFAULTS_LINE' in $SFG, then remove the sentinel."
+  echo "Required: restore the exact DEFAULTS line '$TARGET_PATH' in $SFG, then remove the sentinel."
   echo "Copy-pasteable restore:"
   echo "  git rm -f $SENTINEL && bash sync.sh && git add $SFG"
   echo "See .claude/rules/sfg-deliverable.md."

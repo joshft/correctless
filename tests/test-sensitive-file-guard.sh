@@ -1932,9 +1932,24 @@ test_inv005_extraction_path_removed
 #            Edit/Write-blocked — this feature only ADDS the writer path.
 # ---------------------------------------------------------------------------
 
+SFG_SENTINEL="$REPO_DIR/.correctless/.sfg-lift-active"
+
 test_metarecord_inv005_writer_edit_write_blocked() {
   echo ""
   echo "=== INV-005 (calibration-writer): meta-record.sh Edit/Write blocked ==="
+
+  # MA-M7 / AP-037 lift-and-restore: if meta-record.sh is currently LIFTED from
+  # SFG DEFAULTS (the sentinel is present and names meta-record.sh), these
+  # protection assertions would spuriously fail mid-iteration because the writer
+  # path has been temporarily removed from DEFAULTS. SKIP them — mirroring the
+  # fix-diff-reviewer lift SKIP — so `commands.test` and /cauto consolidation are
+  # not blocked while iterating. The non-skippable pre-push backstop
+  # (scripts/check-no-pending-sfg-lift.sh) still gates the restore before push.
+  # See .claude/rules/sfg-deliverable.md.
+  if [ -f "$SFG_SENTINEL" ] && grep -qF 'meta-record.sh' "$SFG_SENTINEL" 2>/dev/null; then
+    skip "INV-005-lift" "meta-record.sh lifted (sentinel names it): SFG Edit/Write-block assertion skipped. Restore meta-record.sh to DEFAULTS and remove the sentinel before push (AP-037)."
+    return
+  fi
 
   # Source, .correctless/ mirror, and bare basename must all block Edit/Write.
   local p

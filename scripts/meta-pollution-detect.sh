@@ -3,13 +3,19 @@
 # Spec: .correctless/specs/calibration-writer.md
 #
 # DETECTION ONLY, ADVISORY (2026-05-15 re-derivation/backstop convention). Flags
-# `.correctless/meta/*.json` files carrying a non-null `created_at_commit` whose
-# value diverges from the current feature's merge-base with the default branch —
-# the #226 cross-feature-pollution shape, where an earlier /cdocs blanket-scan
-# stamped one feature's merge-base onto another feature's baseline. Repair is
-# advisory and out of scope (last-write-wins, gitignored local state); this
-# helper only surfaces the divergence for a human. It ALWAYS exits 0 — it never
+# `.correctless/meta/*.json` files carrying a `created_at_commit` that is NOT a
+# known commit in this repo (the unambiguous corruption/pollution signal). Repair
+# is advisory and out of scope (last-write-wins, gitignored local state); this
+# helper only surfaces the anomaly for a human. It ALWAYS exits 0 — it never
 # blocks a phase transition (DD-001).
+#
+# MA-M4: the earlier `created_at_commit != current merge-base` divergence check
+# was REMOVED — it false-positived on ~100% of later feature branches (a
+# legitimately different feature baseline also diverges), so it could not
+# distinguish #226 pollution from the benign later-feature case. A detection-only
+# advisory that cannot separate its target from a common benign state is
+# signal-erosion by construction. Only the unambiguous unknown/corrupt-commit
+# case remains.
 #
 # Usage: bash scripts/meta-pollution-detect.sh [--meta-dir DIR] [--base-ref REF]
 # Output: one advisory line per suspect file on stdout; empty output = clean.
@@ -30,17 +36,10 @@ done
 command -v jq >/dev/null 2>&1 || exit 0   # advisory: no jq -> silently no-op
 [ -d "$META_DIR" ] || exit 0
 
-# Resolve the feature's pre-feature baseline commit (merge-base with the default
-# branch). Best-effort: if git or the base ref is unavailable, skip the compare
-# but still report unknown/invalid commits.
-default_branch="${BASE_REF:-main}"
-merge_base=""
-if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
-  merge_base="$(git merge-base "$default_branch" HEAD 2>/dev/null || echo "")"
-  if [ -z "$merge_base" ] && [ "$default_branch" = "main" ]; then
-    merge_base="$(git merge-base master HEAD 2>/dev/null || echo "")"
-  fi
-fi
+# MA-M4: the merge-base divergence compare was removed (chronic false positive).
+# --base-ref is still accepted for backward compatibility with existing callers,
+# but is no longer consulted for a verdict.
+: "${BASE_REF:=}"
 
 for f in "$META_DIR"/*.json; do
   [ -f "$f" ] || continue
@@ -51,19 +50,14 @@ for f in "$META_DIR"/*.json; do
   sha="$(jq -r '.created_at_commit // ""' "$f" 2>/dev/null)"
   [ -n "$sha" ] || continue
 
-  # Unknown/invalid commit — the strongest pollution/corruption signal.
+  # Unknown/invalid commit — the ONLY unambiguous pollution/corruption signal
+  # (MA-M4). A present, non-null created_at_commit that is not a known commit in
+  # this repo cannot be explained by a benign later-feature baseline.
   if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
     if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
-      printf 'meta-pollution: %s created_at_commit=%s is not a known commit in this repo (possible corruption)\n' "$f" "$sha"
+      printf 'meta-pollution: %s created_at_commit=%s is not a known commit in this repo (possible corruption or a prior /cdocs blanket-scan — #226)\n' "$f" "$sha"
       continue
     fi
-  fi
-
-  # Divergence from the current feature's merge-base (the #226 shape). Advisory:
-  # a legitimately different feature baseline also diverges, so this is a prompt
-  # for human inspection, not an assertion of pollution.
-  if [ -n "$merge_base" ] && [ "$sha" != "$merge_base" ]; then
-    printf 'meta-pollution: %s created_at_commit=%s diverges from this feature merge-base %s (verify it belongs to this feature, not a prior /cdocs blanket-scan — #226)\n' "$f" "$sha" "$merge_base"
   fi
 done
 

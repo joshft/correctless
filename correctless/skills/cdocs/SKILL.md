@@ -239,16 +239,24 @@ The single meta artifact this step back-fills is `.correctless/meta/pat001-measu
 Procedure:
 1. If `.correctless/meta/pat001-measurement-due.json` does **not** exist, silently skip — this is absence-by-design on non-dogfood projects (EXT-004). Do NOT create it and do NOT invoke the writer.
 2. Read the file and check whether `created_at_commit` is the literal JSON value `null` — i.e. present **and** null. If the field is absent, or already non-null, skip: leave the file untouched (do not invoke the writer). This present-null-only guard is the #192/#226 fix.
-3. If present-null, capture the pre-feature baseline SHA: `SHA="$(git merge-base main HEAD)"`.
-4. Invoke the writer, passing the SHA as a **discrete argv token** (never interpolated into a `bash -c` string, TB-001):
+3. If present-null, capture the pre-feature baseline SHA against the repo's **default branch** — do not hardcode `main` (MA-L6: a non-`main` default branch would make `git merge-base main HEAD` empty and then emit a spurious FAILED token) — **and invoke the writer in the same fenced block**. Bash tool calls do not share shell state across separate fenced blocks: a `SHA` derivation split from the writer invocation would read a fresh shell where `$SHA` is empty and the writer would reject it — the same MA-H2 shell-state-loss hazard as the invocation/`rc=$?` pairing. Derive the default branch the same way the rest of the codebase does (origin/HEAD, falling back to `main`), pass the SHA as a **discrete argv token** (never interpolated into a `bash -c` string, TB-001), capture the writer's stdout and exit status, and on failure echo the writer's captured `meta-record: FAILED <file>: <reason>` token **verbatim** rather than reconstructing a generic string:
 
 ```bash
-bash .correctless/scripts/meta-record.sh pat001-set-created-at "$SHA"
+DEFAULT_BRANCH="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')"
+[ -n "$DEFAULT_BRANCH" ] || DEFAULT_BRANCH="$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')"
+[ -n "$DEFAULT_BRANCH" ] || DEFAULT_BRANCH="main"
+SHA="$(git merge-base "$DEFAULT_BRANCH" HEAD)"
+
+out="$(bash .correctless/scripts/meta-record.sh pat001-set-created-at "$SHA")"
 rc=$?
 if [ "$rc" -eq 127 ]; then
+  # writer never ran (script absent on an un-re-setup install)
   echo "meta-record: FAILED .correctless/meta/pat001-measurement-due.json: writer script not found — run /csetup to install meta-record.sh"
 elif [ "$rc" -ne 0 ]; then
-  echo "meta-record: FAILED .correctless/meta/pat001-measurement-due.json: set-created-at failed (exit $rc)"
+  # relay the writer's verbatim 'meta-record: FAILED <file>: <reason>' token
+  printf '%s\n' "$out"
+else
+  printf '%s\n' "$out"
 fi
 ```
 

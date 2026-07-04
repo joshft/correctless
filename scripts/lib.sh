@@ -351,7 +351,14 @@ _release_state_lock() {
   local lock_dir="${state_file}.lock"
   # Only release if we are the holder — prevents EXIT trap from deleting another process's lock
   if [ -f "$lock_dir/pid" ] && [ "$(cat "$lock_dir/pid" 2>/dev/null)" = "$$" ]; then
-    rm -rf "$lock_dir"
+    # MA-L1 / QA fix-diff: silence spurious ENOTEMPTY on the happy-path
+    # teardown under contention. Remove the pid token first, then a best-effort
+    # rmdir. If rmdir fails ENOTEMPTY, a waiter has already O_EXCL-created a
+    # fresh pid and now owns the dir — leaving it is CORRECT. A blind
+    # `rm -rf` fallback would re-scan and delete that live pid → double-hold
+    # race. Genuine orphans are reaped by cmd_gc/cmd_reset stale recovery.
+    rm -f "$lock_dir/pid" 2>/dev/null
+    rmdir "$lock_dir" 2>/dev/null || true
   fi
 }
 
