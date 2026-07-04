@@ -931,6 +931,75 @@ test_non_scalar_tool_name_fails_closed() {
 test_non_scalar_tool_name_fails_closed
 
 # ---------------------------------------------------------------------------
+# Test: sibling-repo file must not be gated by the cwd repo's workflow (#242)
+# ---------------------------------------------------------------------------
+# GitHub issue #242: workflow-gate.sh resolves the repo root (and thus the
+# workflow state/branch it enforces) from the hook's CURRENT WORKING DIRECTORY
+# rather than from the repo that OWNS the file being edited. When the edited
+# file lives in a DIFFERENT git repo/worktree than cwd, the gate wrongly
+# applies the cwd repo's active phase restrictions — false-blocking edits to a
+# file that lives in a separate checkout with no active workflow.
+#
+# Desired fixed behavior: the gate resolves the repo root from the directory of
+# .tool_input.file_path (repo B), not cwd (repo A). Repo B has no
+# .correctless/ config and no workflow-state file, so the edit is ALLOWED.
+#
+# RED assertion (fails on current buggy code): editing a source file inside
+# sibling repo B is ALLOWED (exit 0). Current code returns exit 2 because it
+# applies repo A's restrictive 'review-spec' phase.
+#
+# REGRESSION GUARD (passes before AND after the fix): with repo A still in the
+# restrictive phase, editing a source file that genuinely lives in repo A is
+# STILL blocked (exit 2) — proves the fix narrows behavior to the correct repo
+# rather than disabling gating entirely.
+test_sibling_repo_file_not_gated_by_cwd_workflow() {
+  echo ""
+  echo "=== Sibling-repo file not gated by cwd workflow (#242) ==="
+
+  setup_test_env
+  # Repo A is on its feature branch in a RESTRICTIVE phase that blocks source
+  # edits (review-spec blocks *.ts/*.js per test_review_spec_phase above).
+  set_phase "review-spec"
+
+  # -- Build a fully independent sibling git repo B (no .correctless/ config,
+  #    no workflow-state file). Independent `git init` is more robust in the
+  #    /tmp sandbox than `git worktree add`.
+  local sibling_repo="${TEST_DIR}-sibling-$$"
+  rm -rf "$sibling_repo"
+  mkdir -p "$sibling_repo/src"
+  (
+    cd "$sibling_repo" || exit 1
+    git init -q
+    git branch -M main
+    echo "sibling init" > README.md
+    echo "export const other = 1;" > src/other.ts
+    git add -A && git commit -q -m "init sibling"
+    git checkout -q -b feature/sibling-work
+  )
+
+  local result exit_code
+
+  # -- RED assertion: cwd = repo A (restrictive), but file_path is an ABSOLUTE
+  #    path into repo B which has no active workflow -> must be ALLOWED (exit 0).
+  #    On current buggy code this returns exit 2 (blocked by A's review-spec).
+  result="$(run_gate "Edit" "${sibling_repo}/src/other.ts")"
+  exit_code="$(extract_exit "$result")"
+  assert_eq "sibling(#242): edit to file in repo B allowed (not gated by repo A)" "0" "$exit_code"
+
+  # -- REGRESSION GUARD: repo A is still in review-spec; editing a source file
+  #    that genuinely lives in repo A (relative path) is STILL blocked (exit 2).
+  #    Passes before and after the fix — guards against an over-loosening fix.
+  result="$(run_gate "Edit" "src/app.ts")"
+  exit_code="$(extract_exit "$result")"
+  assert_eq "sibling(#242): edit to file in repo A still blocked (guard)" "2" "$exit_code"
+
+  # -- Cleanup sibling repo B.
+  rm -rf "$sibling_repo"
+}
+
+test_sibling_repo_file_not_gated_by_cwd_workflow
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 

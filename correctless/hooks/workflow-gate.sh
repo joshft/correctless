@@ -70,6 +70,47 @@ if [ -z "$_PARSED" ]; then
 fi
 eval "$_PARSED"
 
+# ---------------------------------------------------------------------------
+# #242: Re-resolve REPO_ROOT from the EDITED FILE's path, not cwd.
+# The initial cwd-based REPO_ROOT (above) bootstraps lib.sh sourcing, but the
+# workflow that governs an edit is the one owning the edited file's repo — not
+# the repo that happens to be cwd. When the edited file lives in a sibling git
+# repo/worktree, resolving from cwd resolves the WRONG workflow phase and
+# false-blocks the edit. Resolve the repo root from the file's nearest existing
+# ancestor directory (the file itself may not exist yet for a new-file
+# Write/CreateFile). Fall back to the cwd-based REPO_ROOT when the file is not
+# in any git repo or its directory is unresolvable — this is the pre-existing
+# behavior, NOT a new fail-open path. A Bash tool call (no file path) keeps the
+# cwd-based REPO_ROOT unchanged.
+# ---------------------------------------------------------------------------
+_ref_path="$TOOL_INPUT_FILE"
+[ -n "$_ref_path" ] || _ref_path="${TOOL_INPUT_EDITS%%$'\n'*}"
+if [ -n "$_ref_path" ]; then
+  # Start from the file's directory, then walk up to the nearest existing
+  # directory. Bounded (<= 40 hops) so pathological input cannot loop forever.
+  case "$_ref_path" in
+    */*) _probe_dir="${_ref_path%/*}" ;;
+    *)   _probe_dir="." ;;
+  esac
+  _walk=0
+  while [ ! -d "$_probe_dir" ] && [ "$_walk" -lt 40 ]; do
+    case "$_probe_dir" in
+      */*) _probe_dir="${_probe_dir%/*}"; [ -n "$_probe_dir" ] || _probe_dir="/" ;;
+      *)   _probe_dir="."; break ;;
+    esac
+    _walk=$((_walk + 1))
+  done
+  if [ -d "$_probe_dir" ]; then
+    _resolved_root="$(git --no-optional-locks -C "$_probe_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$_resolved_root" ]; then
+      REPO_ROOT="$_resolved_root"
+      CONFIG_FILE="$REPO_ROOT/.correctless/config/workflow-config.json"
+      ARTIFACTS_DIR="$REPO_ROOT/.correctless/artifacts"
+      TEST_EDIT_LOG="$ARTIFACTS_DIR/tdd-test-edits.log"
+    fi
+  fi
+fi
+
 # Only gate write operations
 case "$TOOL_NAME" in
   Edit|Write|MultiEdit|NotebookEdit|CreateFile) ;;
@@ -106,10 +147,12 @@ esac
 # fail-open exit 0 allowed complete gate bypass if lib.sh was corrupted or deleted.
 _source_lib || { echo "BLOCKED: lib.sh not found — required for workflow gate" >&2; exit 2; }
 
-_gate_branch="$(git --no-optional-locks branch --show-current 2>/dev/null)"
+# #242: resolve the branch of the file's repo (REPO_ROOT), not cwd.
+_gate_branch="$(git --no-optional-locks -C "$REPO_ROOT" branch --show-current 2>/dev/null)"
 [ -n "$_gate_branch" ] || exit 0  # detached HEAD: no workflow, allow all
 
-STATE_FILE="$ARTIFACTS_DIR/workflow-state-$(branch_slug).json"
+# #242: slug the resolved branch so the state file matches the file's repo.
+STATE_FILE="$ARTIFACTS_DIR/workflow-state-$(branch_slug "$_gate_branch").json"
 
 # No state file → check fail-closed config
 if [ ! -f "$STATE_FILE" ]; then
