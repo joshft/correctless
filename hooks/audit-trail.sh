@@ -337,7 +337,15 @@ case "$TOOL_NAME" in
     fi
     ;;
   MultiEdit)
-    FILES="$TOOL_INPUT_EDITS"
+    # R-248: a real Claude Code MultiEdit carries its single target at top-level
+    # .tool_input.file_path (TOOL_INPUT_FILE); edits[] hold only old/new strings.
+    # Prefer that, mirroring the default Edit/Write branch. Fall back to the
+    # legacy per-edit file_path list (TOOL_INPUT_EDITS) only when it is empty.
+    if [ -n "$TOOL_INPUT_FILE" ]; then
+      FILES="$TOOL_INPUT_FILE"
+    else
+      FILES="$TOOL_INPUT_EDITS"
+    fi
     ;;
   Grep)
     # QA-R2-002: Grep uses .tool_input.path, not .tool_input.file_path.
