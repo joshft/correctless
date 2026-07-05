@@ -1924,6 +1924,86 @@ test_inv013_interpreter_chains_blocked
 test_inv005_extraction_path_removed
 
 # ---------------------------------------------------------------------------
+# calibration-writer (.correctless/specs/calibration-writer.md)
+#   INV-005: scripts/meta-record.sh (source, mirror, basename) is in SFG
+#            DEFAULTS — an agent Edit/Write to the writer is blocked (exit 2).
+#   PRH-003: the three TARGET meta files (intensity-calibration.json,
+#            pat001-measurement-due.json, model-baselines.json) STAY
+#            Edit/Write-blocked — this feature only ADDS the writer path.
+# ---------------------------------------------------------------------------
+
+SFG_SENTINEL="$REPO_DIR/.correctless/.sfg-lift-active"
+
+test_metarecord_inv005_writer_edit_write_blocked() {
+  echo ""
+  echo "=== INV-005 (calibration-writer): meta-record.sh Edit/Write blocked ==="
+
+  # MA-M7 / AP-037 lift-and-restore: if meta-record.sh is currently LIFTED from
+  # SFG DEFAULTS (the sentinel is present and names meta-record.sh), these
+  # protection assertions would spuriously fail mid-iteration because the writer
+  # path has been temporarily removed from DEFAULTS. SKIP them — mirroring the
+  # fix-diff-reviewer lift SKIP — so `commands.test` and /cauto consolidation are
+  # not blocked while iterating. The non-skippable pre-push backstop
+  # (scripts/check-no-pending-sfg-lift.sh) still gates the restore before push.
+  # See .claude/rules/sfg-deliverable.md.
+  if [ -f "$SFG_SENTINEL" ] && grep -qF 'meta-record.sh' "$SFG_SENTINEL" 2>/dev/null; then
+    skip "INV-005-lift" "meta-record.sh lifted (sentinel names it): SFG Edit/Write-block assertion skipped. Restore meta-record.sh to DEFAULTS and remove the sentinel before push (AP-037)."
+    return
+  fi
+
+  # Source, .correctless/ mirror, and bare basename must all block Edit/Write.
+  local p
+  for p in "scripts/meta-record.sh" ".correctless/scripts/meta-record.sh" "meta-record.sh"; do
+    local result
+    result="$(run_hook_capture "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$p\",\"old_string\":\"a\",\"new_string\":\"b\"}}")"
+    assert_eq "INV-005: Edit $p blocked (exit 2)" "2" "$(extract_exit "$result")"
+    result="$(run_hook_capture "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$p\",\"content\":\"x\"}}")"
+    assert_eq "INV-005: Write $p blocked (exit 2)" "2" "$(extract_exit "$result")"
+  done
+
+  # The writer path must actually be present in the hook's DEFAULTS (structural).
+  if grep -qxF 'scripts/meta-record.sh' "$HOOK" \
+     && grep -qxF '.correctless/scripts/meta-record.sh' "$HOOK" \
+     && grep -qxF 'meta-record.sh' "$HOOK"; then
+    assert_eq "INV-005: all three meta-record.sh forms in DEFAULTS" "yes" "yes"
+  else
+    assert_eq "INV-005: all three meta-record.sh forms in DEFAULTS" "yes" "no"
+  fi
+
+  # AP-040 honesty: Bash writes to the writer are NOT inspected (guardrail, not
+  # a security boundary). A Bash redirect to meta-record.sh is ALLOWED (exit 0).
+  local result
+  result="$(run_hook_capture '{"tool_name":"Bash","tool_input":{"command":"echo x > scripts/meta-record.sh"}}')"
+  assert_eq "INV-005: Bash write to meta-record.sh ALLOWED (Bash never inspected, AP-040)" "0" "$(extract_exit "$result")"
+}
+test_metarecord_inv005_writer_edit_write_blocked
+
+test_metarecord_prh003_target_meta_stay_blocked() {
+  echo ""
+  echo "=== PRH-003 (calibration-writer): target meta files stay Edit/Write-blocked ==="
+
+  local p
+  for p in \
+    ".correctless/meta/intensity-calibration.json" \
+    ".correctless/meta/pat001-measurement-due.json" \
+    ".correctless/meta/model-baselines.json"; do
+    local result
+    result="$(run_hook_capture "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$p\",\"old_string\":\"a\",\"new_string\":\"b\"}}")"
+    assert_eq "PRH-003: Edit $p still blocked" "2" "$(extract_exit "$result")"
+    result="$(run_hook_capture "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$p\",\"content\":\"x\"}}")"
+    assert_eq "PRH-003: Write $p still blocked" "2" "$(extract_exit "$result")"
+
+    # protection line remains in DEFAULTS
+    if grep -qxF "$p" "$HOOK"; then
+      assert_eq "PRH-003: $p remains in DEFAULTS" "yes" "yes"
+    else
+      assert_eq "PRH-003: $p remains in DEFAULTS" "yes" "no"
+    fi
+  done
+}
+test_metarecord_prh003_target_meta_stay_blocked
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 

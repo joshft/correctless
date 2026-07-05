@@ -264,51 +264,91 @@ read_intensity() {
 }
 
 # ---------------------------------------------------------------------------
-# State file locking — atomic mkdir + PID-based stale detection
+# State file locking
 # ---------------------------------------------------------------------------
-# Uses mkdir for portability (no flock dependency — works on macOS).
-# Lock directory: ${state_file}.lock with a pid file inside.
+# Two implementations, selected at runtime:
+#   * flock (default when the `flock` binary is present, i.e. Linux/CI): kernel
+#     advisory locking — race-free by construction, and auto-released by the
+#     kernel if the holder dies (no PID stale-detection needed). Uses a
+#     PERSISTENT empty lock file ${state_file}.flock; the exclusion is the
+#     kernel lock on the open fd, not the file's existence, so the file is
+#     never deleted (deleting it while waiters hold fds would reopen a
+#     double-hold window).
+#   * ln fallback (when flock is absent, e.g. macOS default, or when
+#     CORRECTLESS_LOCK_IMPL=ln is forced): an atomic hard-link create-with-content
+#     advisory lock on ${state_file}.lock/pid with PID-based stale detection.
+# Rationale for preferring flock: file-creation advisory locks (mkdir OR ln)
+# with PID stale-detection cannot guarantee mutual exclusion under adversarial
+# scheduling (observed as intermittent lost-update/double-hold on shared CI
+# runners). This reverses the earlier mkdir-only/no-flock choice while KEEPING a
+# portable fallback so macOS still works (R-021 updated accordingly).
+# The fd for a held flock is kept in __CL_LOCK_FDS keyed by state_file.
+
+declare -gA __CL_LOCK_FDS 2>/dev/null || true
+
+_lock_use_flock() {
+  [ "${CORRECTLESS_LOCK_IMPL:-auto}" != "ln" ] && command -v flock >/dev/null 2>&1
+}
 
 # _acquire_state_lock — acquire a lock for the given state file
 _acquire_state_lock() {
   local state_file="$1"
   [ -n "$state_file" ] || { echo "ERROR: _acquire_state_lock called with empty path" >&2; return 1; }
-  local lock_dir="${state_file}.lock"
   local timeout="${CORRECTLESS_LOCK_TIMEOUT:-5}"
   [[ "$timeout" =~ ^[0-9]+$ ]] || timeout=5
-  local deadline=$((SECONDS + timeout))
 
-  while true; do
-    if mkdir "$lock_dir" 2>/dev/null; then
-      echo "$$" > "$lock_dir/pid" || { rm -rf "$lock_dir"; return 1; }
+  if _lock_use_flock; then
+    local lock_file="${state_file}.flock"
+    mkdir -p "$(dirname "$lock_file")" 2>/dev/null || true
+    local fd
+    # Open (create if needed) the persistent lock file on a fresh fd. NOTE: the
+    # 2>/dev/null MUST wrap a { ...; } group, NOT sit on the `exec` itself — a
+    # redirection on `exec` is PERMANENT (it would silence the shell's stderr for
+    # the rest of the process, swallowing later _fail diagnostics). The group is
+    # a non-subshell so the dynamically-allocated fd persists after it.
+    if ! { exec {fd}>"$lock_file"; } 2>/dev/null; then
+      echo "ERROR: could not open lock file $lock_file" >&2
+      return 1
+    fi
+    # Block for an exclusive kernel lock, bounded by the timeout.
+    if flock -x -w "$timeout" "$fd" 2>/dev/null; then
+      __CL_LOCK_FDS["$state_file"]=$fd
       return 0
     fi
+    { exec {fd}>&-; } 2>/dev/null || true
+    echo "ERROR: Lock acquisition timeout after ${timeout}s for $state_file" >&2
+    return 1
+  fi
 
-    # Lock exists — check if holder is alive
-    if [ -f "$lock_dir/pid" ]; then
-      local holder_pid
-      holder_pid="$(cat "$lock_dir/pid" 2>/dev/null)" || holder_pid=""
-      if [ -n "$holder_pid" ] && ! kill -0 "$holder_pid" 2>/dev/null; then
-        # Holder is dead — atomically claim stale lock via mv.
-        # Only one process's mv succeeds; losers retry from the top.
-        local break_dir="${lock_dir}.breaking.$$"
-        if mv "$lock_dir" "$break_dir" 2>/dev/null; then
-          rm -rf "$break_dir"
-        fi
-        continue
-      fi
-    elif [ -d "$lock_dir" ]; then
-      # QA-R1-018: No pid file — lock was interrupted between mkdir and pid write.
-      # Treat as stale and break it to prevent 5s timeout deadlock.
-      local break_dir="${lock_dir}.breaking.$$"
-      if mv "$lock_dir" "$break_dir" 2>/dev/null; then
-        rm -rf "$break_dir"
-      fi
+  # --- ln fallback (no flock available, or forced) --------------------------
+  local lock_dir="${state_file}.lock"
+  local pid_file="${lock_dir}/pid"
+  local deadline=$((SECONDS + timeout))
+  # Atomic create-with-content: write $$ to a private SIBLING temp, then
+  # hard-link it onto the pid path. ln(2) fails if the target exists (single
+  # winner) and the pid content is present the instant the file is visible — no
+  # empty-pid window. The temp is a sibling of lock_dir and mkdir -p runs inside
+  # the loop so a releaser's rmdir cannot destroy a waiter's temp or starve it.
+  local tmp="${lock_dir}.acq.$$"
+  printf '%s\n' "$$" > "$tmp" 2>/dev/null || {
+    echo "ERROR: could not stage lock pid for $state_file" >&2; return 1; }
+  while true; do
+    mkdir -p "$lock_dir" 2>/dev/null || true
+    if ln "$tmp" "$pid_file" 2>/dev/null; then
+      rm -f "$tmp" 2>/dev/null
+      return 0
+    fi
+    # Reclaim ONLY a provably-dead holder (ln makes the pid content-atomic, so a
+    # visible pid file always holds a real pid — no empty-init window).
+    local holder_pid
+    holder_pid="$(cat "$pid_file" 2>/dev/null)" || holder_pid=""
+    if [ -n "$holder_pid" ] && ! kill -0 "$holder_pid" 2>/dev/null; then
+      local break_f="${pid_file}.dead.$$"
+      mv "$pid_file" "$break_f" 2>/dev/null && rm -f "$break_f" 2>/dev/null
       continue
     fi
-
-    # Holder is alive or PID unknown — wait and retry
     if [ "$SECONDS" -ge "$deadline" ]; then
+      rm -f "$tmp" 2>/dev/null
       echo "ERROR: Lock acquisition timeout after ${timeout}s for $state_file" >&2
       return 1
     fi
@@ -316,13 +356,30 @@ _acquire_state_lock() {
   done
 }
 
-# _release_state_lock — release the lock for the given state file
+# _release_state_lock — release a lock we hold for the given state file
 _release_state_lock() {
   local state_file="$1"
+  [ -n "$state_file" ] || return 0
+
+  # flock path: release the kernel lock and close the fd. The persistent
+  # ${state_file}.flock file is intentionally left in place.
+  local fd="${__CL_LOCK_FDS[$state_file]:-}"
+  if [ -n "$fd" ]; then
+    flock -u "$fd" 2>/dev/null || true
+    # { ...; } group, not on `exec` directly — see the acquire note (an `exec`
+    # redirection is permanent and would silence the shell's stderr).
+    { exec {fd}>&-; } 2>/dev/null || true
+    unset '__CL_LOCK_FDS[$state_file]'
+    return 0
+  fi
+
+  # ln fallback: only the holder ($$) releases; remove the pid token then a
+  # best-effort rmdir — never a blind rm -rf (an ENOTEMPTY means a waiter already
+  # re-linked a fresh pid and now owns the dir; leaving it is correct).
   local lock_dir="${state_file}.lock"
-  # Only release if we are the holder — prevents EXIT trap from deleting another process's lock
   if [ -f "$lock_dir/pid" ] && [ "$(cat "$lock_dir/pid" 2>/dev/null)" = "$$" ]; then
-    rm -rf "$lock_dir"
+    rm -f "$lock_dir/pid" 2>/dev/null
+    rmdir "$lock_dir" 2>/dev/null || true
   fi
 }
 

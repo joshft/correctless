@@ -20,7 +20,7 @@ skills/               # Source skills (33 SKILL.md files)
 hooks/                # 9 hooks (bash: gate, sensitive-file-guard, state machine, statusline, audit trail, auto-format, token-tracking, instructions-loaded; agent: import-guard)
 templates/            # Config, doc, and spec templates
 helpers/              # PBT guides per language (high+ intensity)
-tests/                # 107 test files (~5,000 assertions)
+tests/                # 108 test files (~5,000 assertions)
 setup                 # Install script
 sync.sh               # Copies source → correctless/ distribution
 correctless/          # Single distribution (33 skills, intensity-gated)

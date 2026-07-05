@@ -1,7 +1,7 @@
 ---
 name: cmodelupgrade
 description: Compare current model+HARNESS_VERSION pipeline metrics against stored baselines and produce a per-feature regression report. Use after Anthropic ships a model upgrade or when /cspec/cstatus surfaces a harness version_bumped advisory. Read-only on the fingerprint store; writes only the baseline file.
-allowed-tools: Read, Grep, Glob, Bash(jq*), Bash(*workflow-advance.sh*), Bash(*harness-fingerprint*), Bash(git*), Write(.correctless/meta/model-baselines.json), Write(.correctless/artifacts/cmodelupgrade-*)
+allowed-tools: Read, Grep, Glob, Bash(jq*), Bash(*workflow-advance.sh*), Bash(*harness-fingerprint*), Bash(*meta-record.sh*), Bash(git*), Write(.correctless/artifacts/cmodelupgrade-*)
 disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: hybrid
 ---
@@ -94,9 +94,29 @@ Example: `/cmodelupgrade --capture-baseline --auto-confirm` (testing only — by
 
 ## Step 5: Write the baseline file (INV-019 — schema_version from creation)
 
-When persisting a captured baseline, the JSON file at `.correctless/meta/model-baselines.json` MUST include `"schema_version": 1` at the top level on the **first write**. On subsequent writes, **preserve** the field — never remove or modify `schema_version` once present. BND-004's evolution mechanism reads this field on every load.
+`.correctless/meta/model-baselines.json` is protected by the sensitive-file-guard (SFG) — a naive Edit/Write is blocked (AP-037). Do **not** write or edit it directly. Persist a captured baseline through the sanctioned sole-writer `.correctless/scripts/meta-record.sh baselines-write` (ABS-047, ABS-027), which **key-merges** exactly one baseline entry — setting/replacing `baselines["<model>|<HARNESS_VERSION>"]` while **preserving every other key and the top-level `schema_version`**. It creates the file as `{"schema_version": 1, "baselines": {}}` on first use, so `"schema_version": 1` is present from creation; on subsequent writes it **preserves** `schema_version` (never removes or modifies it) and a `schema_version` mismatch fails loud rather than clobbering real data. BND-004's evolution mechanism reads this field on every load.
 
-Schema:
+The `<model>|<HARNESS_VERSION>` key is the same literal string used as the exact-match lookup key (Step 3). Pass it as a **discrete argv token** and pipe the baseline **value object** on **stdin** — never interpolate either into a `bash -c` string (TB-001):
+
+Capture the writer's stdout and exit status **in the same block** (Bash tool calls do not share shell state across separate blocks). On failure, echo the writer's captured `meta-record: FAILED <file>: <reason>` token **verbatim** rather than reconstructing a generic string:
+
+```bash
+out="$(printf '%s' "$BASELINE_VALUE_JSON" | bash .correctless/scripts/meta-record.sh baselines-write "${KEY}")"
+rc=$?
+if [ "$rc" -eq 127 ]; then
+  # writer never ran (script absent on an un-re-setup install)
+  echo "meta-record: FAILED .correctless/meta/model-baselines.json: writer script not found — run /csetup to install meta-record.sh"
+elif [ "$rc" -ne 0 ]; then
+  # relay the writer's verbatim 'meta-record: FAILED <file>: <reason>' token
+  printf '%s\n' "$out"
+else
+  printf '%s\n' "$out"
+fi
+```
+
+Echo the `meta-record: FAILED` token verbatim on non-zero so the failure is surfaced; never fall back to `Write`/`Edit` on the file (SFG-blocked, would silently no-op — PRH-002).
+
+The value object (the merged-in baseline) has this shape; the resulting file:
 
 ```json
 {
@@ -171,7 +191,7 @@ When dispatched by `/cauto`, return autonomous decisions in the `AUTONOMOUS_DECI
 ## Antipattern integration
 
 Direct mitigation of:
-- **AP-022** (dead-code-in-security-paths) — the `Write(.correctless/meta/model-baselines.json)` permission is in the allowed-tools frontmatter and exercised by Step 5; sensitive-file-guard structurally blocks other Edit/Write tool-path writers (PRH-002). Bash-mediated writes to the baseline are accepted non-goals (AP-040) and `model-baselines.json` has no `cmd_*` content gate, so the sole-writer claim is an advisory residual.
+- **AP-022 / AP-037** (dead-code-in-security-paths; protected asset is the deliverable) — Step 5 no longer holds a direct write grant on the baseline file. It writes through the sanctioned `Bash(*meta-record.sh*)` sole-writer (ABS-047), and sensitive-file-guard structurally blocks the naive agent Edit/Write to the baseline file at the tool-path layer (PRH-002). SFG is a cooperative-loop guardrail, not a security boundary: it does not inspect Bash, so Bash-mediated writes to the baseline remain accepted non-goals (AP-040) — the "sole writer" means the sanctioned write path in the agent loop, enforced against Edit/Write by SFG and against wrong content by the writer's key-merge validation.
 - **AP-024** (hardcoded file list instead of glob) — Step 2's cost artifact read MUST glob `cost-*.json`, never hardcode a slug list. PMB-003 root cause.
 - **AP-025 / PMB-004** (skill references workflow artifact by concept without path discovery) — Step 0 derives every artifact path via explicit `workflow-advance.sh status` + `branch_slug` resolution. No conversation-context assumptions.
 - **DA-004** (self-referential metrics) — Step 6a forbids rendering against zero/null baselines.

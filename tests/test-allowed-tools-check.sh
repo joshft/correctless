@@ -63,10 +63,19 @@ echo "=== Structural: skill allowed-tools coverage ==="
 cmodelupgrade="$REPO_DIR/skills/cmodelupgrade/SKILL.md"
 if [ -f "$cmodelupgrade" ]; then
   allowed_cmu="$(sed -n 's/^allowed-tools: //p' "$cmodelupgrade" 2>/dev/null)"
-  if echo "$allowed_cmu" | grep -qF 'model-baselines.json'; then
-    pass "HF-007-cmu-1" "cmodelupgrade allowed-tools includes Write(model-baselines.json)"
+  # EXT-003 (calibration-writer): the direct Write(model-baselines.json) grant is
+  # REPLACED by the sanctioned Bash(*meta-record.sh*) writer path. cmodelupgrade
+  # now writes model-baselines.json via `bash .correctless/scripts/meta-record.sh
+  # baselines-write`, so the direct Write grant must be GONE.
+  if echo "$allowed_cmu" | grep -qF 'meta-record.sh'; then
+    pass "HF-007-cmu-1" "cmodelupgrade allowed-tools grants Bash(*meta-record.sh*) (EXT-003)"
   else
-    fail "HF-007-cmu-1" "cmodelupgrade allowed-tools missing Write(model-baselines.json)"
+    fail "HF-007-cmu-1" "cmodelupgrade allowed-tools must grant Bash(*meta-record.sh*) (EXT-003)"
+  fi
+  if echo "$allowed_cmu" | grep -qF 'Write(.correctless/meta/model-baselines.json)'; then
+    fail "HF-007-cmu-1b" "cmodelupgrade must DROP the direct Write(model-baselines.json) grant (EXT-003)"
+  else
+    pass "HF-007-cmu-1b" "cmodelupgrade no longer grants Write(model-baselines.json) directly"
   fi
   if echo "$allowed_cmu" | grep -qF 'harness-fingerprint.json'; then
     fail "HF-007-cmu-2" "cmodelupgrade allowed-tools must NOT include Write(harness-fingerprint.json) per INV-007"

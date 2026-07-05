@@ -405,11 +405,19 @@ test_inv007_no_fingerprint_writes_in_cmodelupgrade() {
     pass "INV-007b" "/cmodelupgrade body does not write/edit fingerprint file"
   fi
 
-  # Allowed-tools MUST include the baseline write (so the skill can do its actual job)
-  if grep -E '^allowed-tools:' "$CMODELUPGRADE_SKILL" | head -1 | grep -qF 'model-baselines.json'; then
-    pass "INV-007c" "/cmodelupgrade allowed-tools includes baseline write"
+  # EXT-003 (calibration-writer): the baseline write is now done via the
+  # sanctioned Bash writer (`meta-record.sh baselines-write`), NOT a direct
+  # Write(model-baselines.json). Assert the Bash grant is present and the direct
+  # Write grant has been removed (AP-037 closure for model-baselines.json).
+  if grep -E '^allowed-tools:' "$CMODELUPGRADE_SKILL" | head -1 | grep -qF 'meta-record.sh'; then
+    pass "INV-007c" "/cmodelupgrade allowed-tools grants Bash(*meta-record.sh*) for baseline write (EXT-003)"
   else
-    fail "INV-007c" "/cmodelupgrade allowed-tools missing model-baselines.json write"
+    fail "INV-007c" "/cmodelupgrade allowed-tools must grant Bash(*meta-record.sh*) (EXT-003)"
+  fi
+  if grep -E '^allowed-tools:' "$CMODELUPGRADE_SKILL" | head -1 | grep -qF 'Write(.correctless/meta/model-baselines.json)'; then
+    fail "INV-007d" "/cmodelupgrade must DROP direct Write(model-baselines.json) — sole writer is meta-record.sh (EXT-003)"
+  else
+    pass "INV-007d" "/cmodelupgrade no longer grants direct Write(model-baselines.json)"
   fi
 }
 test_inv007_no_fingerprint_writes_in_cmodelupgrade

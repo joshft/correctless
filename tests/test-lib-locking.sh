@@ -12,6 +12,13 @@ GATE_HOOK="$REPO_DIR/hooks/workflow-gate.sh"
 PASS=0
 FAIL=0
 
+# The deterministic R-015..R-019 tests exercise the ln/mkdir FALLBACK lock (the
+# ${state_file}.lock dir + PID-based stale detection), so force that impl for
+# them regardless of whether `flock` is installed on this host. The flock path
+# (kernel advisory locking, the default on Linux/CI) is validated separately by
+# the QA-002 N-way concurrency test, which clears this override.
+export CORRECTLESS_LOCK_IMPL=ln
+
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -372,28 +379,31 @@ EOF
 
 test_no_flock_dependency() {
   echo ""
-  echo "=== R-021: Locking uses mkdir, not flock/lockfile ==="
+  echo "=== R-021: Locking prefers flock, with an ln/mkdir fallback ==="
 
-  # Static analysis: grep lib.sh for flock or lockfile as command invocations
-  # (exclude comments — lines starting with #)
+  # Static analysis (exclude comment lines). Design update: lib.sh now uses
+  # kernel `flock` when available (race-free — file-creation locks cannot
+  # guarantee mutual exclusion under adversarial CI scheduling), falling back to
+  # the ln/mkdir dir-lock where flock is absent (e.g. macOS). So flock IS
+  # expected in lib.sh, AND the mkdir fallback MUST remain for portability.
   local flock_found="no"
   if grep -vE '^[[:space:]]*#' "$LIB_SH" 2>/dev/null | grep -qE '\bflock\b'; then
     flock_found="yes"
   fi
-  assert_eq "R-021a: lib.sh does not invoke flock" "no" "$flock_found"
+  assert_eq "R-021a: lib.sh uses flock (preferred impl)" "yes" "$flock_found"
 
   local lockfile_found="no"
   if grep -vE '^[[:space:]]*#' "$LIB_SH" 2>/dev/null | grep -qE '\blockfile\b'; then
     lockfile_found="yes"
   fi
-  assert_eq "R-021b: lib.sh does not invoke lockfile command" "no" "$lockfile_found"
+  assert_eq "R-021b: lib.sh does not invoke the lockfile(1) command" "no" "$lockfile_found"
 
-  # Verify mkdir IS used in non-comment code (positive check)
+  # The mkdir/ln fallback MUST remain for hosts without flock (portability).
   local mkdir_found="no"
   if grep -vE '^[[:space:]]*#' "$LIB_SH" 2>/dev/null | grep -qE 'mkdir.*lock'; then
     mkdir_found="yes"
   fi
-  assert_eq "R-021c: lib.sh uses mkdir for locking" "yes" "$mkdir_found"
+  assert_eq "R-021c: lib.sh keeps the mkdir/ln fallback for portability" "yes" "$mkdir_found"
 
   # Also check workflow-advance.sh and workflow-gate.sh for flock invocations
   local adv_flock="no"
@@ -460,6 +470,100 @@ test_all_state_writers_use_locking() {
 }
 
 # ============================================================================
+# QA-002: Direct N-way concurrency test for the DEFAULT (flock) lock path
+# ============================================================================
+# Regression guard for kernel `flock` mutual exclusion (the default on Linux/CI;
+# this test clears the file-level CORRECTLESS_LOCK_IMPL=ln override so the worker
+# processes use flock). Spawns ~25 genuinely-separate processes (bash -c, each
+# with its own PID — a subshell would share $$ and invalidate the test), each
+# acquiring the SAME lock, doing a read-modify-write on a shared counter with a
+# widened window, then releasing. Asserts (a) NO lost updates — the final counter
+# equals the number of successful acquisitions, and (b) at no instant were two
+# holders inside the critical section (a single-line "holders" marker that must
+# never exceed 1). flock is race-free by construction, so this is deterministic
+# on CI. (History: mkdir was non-atomic on the sandbox; an O_EXCL+grace lock and
+# even an `ln` content-atomic gate both flaked under CI's adversarial scheduling
+# — file-creation locks can't guarantee exclusion under extreme scheduling. On a
+# host without flock this cleanly exercises the ln fallback instead.)
+
+test_concurrent_nway_no_lost_update() {
+  echo ""
+  echo "=== QA-002: N-way concurrent _acquire_state_lock — no lost update, single-holder ==="
+
+  # Validate the DEFAULT lock impl (flock — kernel advisory locking — on
+  # Linux/CI). Clear the file-level ln override so the worker processes below
+  # (which inherit this env) use flock when available. On a host without flock
+  # this cleanly falls back to the ln lock. flock is race-free by construction,
+  # so this N-way stress is deterministic on CI (a file-creation lock is not).
+  export CORRECTLESS_LOCK_IMPL=
+
+  setup_test_env
+  source .correctless/scripts/lib.sh
+
+  local shared="$TEST_DIR/.correctless/artifacts/counter-target"
+  local counter_file="$TEST_DIR/counter.val"
+  local holders_file="$TEST_DIR/holders.log"
+  local success_dir="$TEST_DIR/success"
+  local violation_file="$TEST_DIR/violation.log"
+  local lib_path="$TEST_DIR/.correctless/scripts/lib.sh"
+
+  rm -rf "${shared}.lock" "$counter_file" "$holders_file" "$success_dir" "$violation_file"
+  mkdir -p "$success_dir"
+  printf '0' > "$counter_file"
+  : > "$holders_file"
+
+  local N=25 i
+  for i in $(seq 1 "$N"); do
+    bash -c '
+      set -uo pipefail
+      lib="$1"; shared="$2"; counter="$3"; holders="$4"; succ="$5"; viol="$6"; id="$7"
+      source "$lib"
+      export CORRECTLESS_LOCK_TIMEOUT=30
+      if _acquire_state_lock "$shared" 2>/dev/null; then
+        # --- critical section ---
+        # single-holder marker: record entry, then assert exactly one holder.
+        printf "%s\n" "$id" >> "$holders"
+        n_holders="$(wc -l < "$holders" | tr -d "[:space:]")"
+        if [ "$n_holders" != "1" ]; then
+          printf "%s\n" "$id" >> "$viol"
+        fi
+        # read-modify-write with a WIDENED window (the classic lost-update shape).
+        cur="$(cat "$counter")"
+        sleep 0.02
+        printf "%s" "$((cur + 1))" > "$counter"
+        # leave the critical section: clear our holder marker before releasing.
+        : > "$holders"
+        # --- end critical section ---
+        _release_state_lock "$shared"
+        printf "ok" > "$succ/$id"
+      fi
+    ' _ "$lib_path" "$shared" "$counter_file" "$holders_file" "$success_dir" "$violation_file" "$i" &
+  done
+  wait
+
+  local successes final violations
+  successes="$(find "$success_dir" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
+  final="$(cat "$counter_file" 2>/dev/null)"
+  if [ -f "$violation_file" ]; then
+    violations="$(wc -l < "$violation_file" | tr -d '[:space:]')"
+  else
+    violations=0
+  fi
+
+  # (a) NO lost updates: final counter == number of successful acquisitions.
+  assert_eq "QA-002a: counter == successful acquisitions (no lost update)" "$successes" "$final"
+
+  # (b) Exactly-one-winner regime: with a 30s timeout all N processes acquire.
+  assert_eq "QA-002b: all $N processes acquired the lock" "$N" "$successes"
+
+  # (c) At no point were two holders simultaneously inside the critical section.
+  assert_eq "QA-002c: never >1 concurrent holder in the critical section" "0" "$violations"
+
+  # (d) No stale lock left behind after all releases.
+  assert_not_exists "QA-002d: no stale lock dir after all releases" "${shared}.lock"
+}
+
+# ============================================================================
 # Run all tests
 # ============================================================================
 
@@ -470,6 +574,7 @@ test_lock_timeout
 test_lock_cleanup_on_all_paths
 test_no_flock_dependency
 test_all_state_writers_use_locking
+test_concurrent_nway_no_lost_update
 
 # ============================================================================
 # Summary

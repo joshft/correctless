@@ -218,6 +218,14 @@ After showing phase and commands, proactively check for issues:
 
 This check is dormant by design: it fires only when the post-merge measurement window has elapsed and the human has not yet run the gate. It is the only merge-time-enforceable signal for MG-003 (the measurement gate is evaluated post-merge via git archaeology, not at PR time).
 
+**Meta baseline pollution advisory (calibration-writer RS-013)**: run the detection-only helper and surface any output:
+
+```bash
+bash .correctless/scripts/meta-pollution-detect.sh 2>/dev/null
+```
+
+Each line it prints flags a `.correctless/meta/*.json` whose `created_at_commit` names an **unknown commit** in this repo — the unambiguous corruption / #226 cross-feature-pollution signal (an earlier /cdocs blanket-scan stamping one feature's merge-base onto another feature's baseline, where that commit is not reachable here). The helper no longer flags a mere merge-base *divergence* (MA-M4): a legitimately different feature baseline also diverges, so that sub-check was chronic false-positive signal-erosion and was removed — this advisory fires only on the unambiguous case, not on every run. This is **advisory and detection-only** (repair is out of scope — gitignored local state, last-write-wins): show the lines verbatim under a "meta baseline advisory" heading and suggest the human verify the flagged baseline. Empty output means clean — say nothing. If the helper is absent (un-re-`setup` install), skip silently.
+
 **No active workflow**: "No active workflow on this branch. You can edit freely — the gate only blocks during active workflows. To start a structured workflow: `git checkout -b feature/my-feature` then `/cspec`."
 
 ### 6a. Incomplete Pipeline Detection (R-009)

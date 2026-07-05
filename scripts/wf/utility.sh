@@ -118,7 +118,7 @@ cmd_reset() {
     rm -f "$ARTIFACTS_DIR/cprune-lock-${slug_hash}" 2>/dev/null
     rm -f "$ARTIFACTS_DIR/harness-notified-"*.flag 2>/dev/null
     # Clean lock dirs and temp files from locking operations
-    rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null
+    rm -rf "${sf}.lock" 2>/dev/null
     rm -f "${sf}."*.tmp "${sf}."[0-9]* 2>/dev/null
     info "Workflow state, audit trail, adherence state, and checkpoints removed for branch '$(current_branch)'"
   else
@@ -164,7 +164,7 @@ cmd_gc() {
         # wildcard deletion here. Checkpoints self-invalidate via 72h staleness
         # and branch-match checks in each skill.
         :
-        rm -rf "${sf}.lock" "${sf}.lock.breaking."* 2>/dev/null
+        rm -rf "${sf}.lock" 2>/dev/null
         rm -f "${sf}."*.tmp "${sf}."[0-9]* 2>/dev/null
       fi
       rm -f "$sf"

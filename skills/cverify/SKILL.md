@@ -1,7 +1,7 @@
 ---
 name: cverify
 description: Verify implementation matches spec. Check rule coverage, undocumented dependencies, architecture compliance. Writes verification report and drift debt. Run after /ctdd completes.
-allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(jq*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/meta/intensity-calibration.json), Write(.correctless/artifacts/*)
+allowed-tools: Read, Grep, Glob, Bash(git*), Bash(*test*), Bash(*coverage*), Bash(diff*), Bash(*workflow-advance.sh*), Bash(jq*), Bash(*meta-record.sh*), Bash(*mutmut*), Bash(*stryker*), Bash(*cargo-mutants*), Bash(*go-mutesting*), Bash(*lint*), Bash(*clippy*), Bash(*ruff*), Bash(*eslint*), Edit, Write(.correctless/verification/*), Write(.correctless/meta/drift-debt.json), Write(.correctless/artifacts/*)
 context: fork
 interaction_mode: hybrid
 ---
@@ -270,28 +270,26 @@ Reviewers can see this with `git notes show HEAD` or `git log --notes`.
 
 ### Write Calibration Entry
 
-Before advancing the workflow state, write a calibration entry to `.correctless/meta/intensity-calibration.json`. This records outcome data that `/cspec` reads to improve future intensity recommendations.
+Before advancing the workflow state, record a calibration entry into `.correctless/meta/intensity-calibration.json`. This records outcome data that `/cspec` reads to improve future intensity recommendations.
 
-If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`). If the file does not exist, create it with an empty `calibration_entries` array. Append a new entry to the `calibration_entries` array with this schema:
+`intensity-calibration.json` is protected by the sensitive-file-guard (SFG) — a naive Edit/Write to it is blocked (AP-037). Do **not** write or edit the file directly. Instead, build a single **bare entry object** and hand it to the sanctioned sole-writer `.correctless/scripts/meta-record.sh calibration-append` (ABS-047), which validates the entry **at the top level**, locks, then **wraps it and appends it to `calibration_entries[]`** for you. If the file does not exist the writer creates it with an empty `calibration_entries` array (and `mkdir -p` creates the `.correctless/meta/` directory) on first use, then appends.
+
+**Assemble THIS bare entry object and pipe it on stdin — do NOT wrap it in a `{ "calibration_entries": [ ... ] }` envelope.** The writer parses the object you send at the top level (`has("feature_slug")`, etc.) and does the wrapping itself; a wrapped payload is rejected. The fields are:
 
 ```json
 {
-  "calibration_entries": [
-    {
-      "feature_slug": "task-slug from spec/workflow state",
-      "recommended_intensity": "standard|high|critical — read from the spec's Recommended-intensity metadata field (the system's pre-override suggestion)",
-      "actual_intensity": "standard|high|critical — read from the spec's Intensity metadata field (the approved post-override level)",
-      "actual_qa_rounds": "number — read from the workflow state file (qa_rounds field)",
-      "actual_findings_count": "number — count of BLOCKING findings only from qa-findings-{slug}.json (not MEDIUM/LOW)",
-      "actual_tokens": "integer — sum of total_tokens from the token log JSONL file (see below)",
-      "actual_cost_usd": "number or absent — read from cost artifact if it exists (see below)",
-      "actual_spec_updates": "number — read from the workflow state file (spec_updates field)",
-      "harness_version": "integer or absent — current HARNESS_VERSION constant from scripts/harness-fingerprint.sh (BND-005 of harness-fingerprint spec)",
-      "fix_rounds_triggered": "integer — derived: max(0, qa_rounds - 1) + mini_audit_fix_rounds (see below)",
-      "file_paths_touched": ["array of file paths from git diff against the default branch"],
-      "timestamp": "ISO 8601 string"
-    }
-  ]
+  "feature_slug": "task-slug from spec/workflow state",
+  "recommended_intensity": "standard|high|critical — read from the spec's Recommended-intensity metadata field (the system's pre-override suggestion)",
+  "actual_intensity": "standard|high|critical — read from the spec's Intensity metadata field (the approved post-override level)",
+  "actual_qa_rounds": "number — read from the workflow state file (qa_rounds field)",
+  "actual_findings_count": "number — count of BLOCKING findings only from qa-findings-{slug}.json (not MEDIUM/LOW)",
+  "actual_tokens": "integer — sum of total_tokens from the token log JSONL file (see below)",
+  "actual_cost_usd": "number or absent — read from cost artifact if it exists (see below)",
+  "actual_spec_updates": "number — read from the workflow state file (spec_updates field)",
+  "harness_version": "integer or absent — current HARNESS_VERSION constant from scripts/harness-fingerprint.sh (BND-005 of harness-fingerprint spec)",
+  "fix_rounds_triggered": "integer — derived: max(0, qa_rounds - 1) + mini_audit_fix_rounds (see below)",
+  "file_paths_touched": ["array of file paths from git diff against the default branch"],
+  "timestamp": "ISO 8601 string"
 }
 ```
 
@@ -308,6 +306,24 @@ If `.correctless/meta/` does not exist, create it (`mkdir -p .correctless/meta`)
 - `fix_rounds_triggered`: Derived value: `max(0, qa_rounds - 1) + mini_audit_fix_rounds`. `qa_rounds` is read from the workflow state — QA round 1 is the initial QA, rounds 2+ are fix rounds (so `qa_rounds - 1` = fix rounds from QA). `mini_audit_fix_rounds` is the count of fix-loop re-entries during the mini-audit phase, derived from qa-findings JSON round entries with `MA-` prefix that triggered fix loops. Default to 0 when not determinable.
 - `file_paths_touched`: Collect from `git diff {default_branch}...HEAD --name-only`.
 - `timestamp`: Current ISO 8601 timestamp.
+
+**Sanctioned write invocation (ABS-047).** Assemble the bare entry as a compact JSON object and pipe it on **stdin** to the writer — never pass it as an argv token, and never interpolate it into a `bash -c` string (TB-001). Capture the writer's stdout and exit status **in the same shell** (the invocation and its `rc=$?` must stay in one block — Bash tool calls do not share shell state across separate blocks). On success the writer prints a one-line confirmation and exits 0. On failure it exits non-zero and prints its mechanical `meta-record: FAILED <file>: <reason>` token — echo that captured token **verbatim** so the actionable reason is surfaced rather than reconstructed or swallowed, then continue with the rest of verification (a calibration-write failure never blocks the primary verification output):
+
+```bash
+out="$(printf '%s' "$ENTRY_JSON" | bash .correctless/scripts/meta-record.sh calibration-append)"
+rc=$?
+if [ "$rc" -eq 127 ]; then
+  # writer never ran (script absent on an un-re-setup install)
+  echo "meta-record: FAILED .correctless/meta/intensity-calibration.json: writer script not found — run /csetup to install meta-record.sh"
+elif [ "$rc" -ne 0 ]; then
+  # relay the writer's verbatim 'meta-record: FAILED <file>: <reason>' token
+  printf '%s\n' "$out"
+else
+  printf '%s\n' "$out"
+fi
+```
+
+Do **not** fall back to `Write`/`Edit` on the file if the writer fails — SFG blocks that path and it would silently no-op (PRH-002). Report the failure and move on.
 
 #### Token Summation for actual_tokens
 
