@@ -615,4 +615,38 @@ else
   fail "R-006-newline" "A trail=$cA_nl B trail=$cB_nl (want 0/0), rc=$RC — newline injection forged a cross-repo record"
 fi
 
+# ============================================================================
+# R-248 [integration]: REAL-shape single-file MultiEdit is logged.
+# Issue #248: a REAL Claude Code MultiEdit call carries its single target at the
+# TOP-LEVEL `.tool_input.file_path`; its `edits[]` entries hold only
+# {old_string, new_string} — there is NO per-edit `.file_path`. The hook builds
+# FILES from `.tool_input.edits[]?.file_path`, which is EMPTY for the real shape,
+# so `[ -n "$FILES" ] || exit 0` bails and the MultiEdit is NEVER logged.
+# Expected: a MultiEdit is attributed to `.tool_input.file_path`, like Edit/Write.
+#
+# NOTE: deliberately does NOT use payload_multiedit() (line 259) — that helper
+# builds the SYNTHETIC {edits:[{file_path:...}]} shape that MASKS this bug. We
+# construct the REAL top-level-file_path shape by hand with jq -nc.
+# RED: fails today (FILES empty -> hook bails, trail stays 0).
+# GREEN: passes once the MultiEdit branch reads top-level .tool_input.file_path.
+# ============================================================================
+section "R-248: real-shape single-file MultiEdit is logged (top-level file_path)"
+R248_R="$(new_root)"; R248="$R248_R/R"
+mk_repo "$R248" feature/repo-r yes            # real git repo + artifacts + state
+tf248="$(trail_file "$R248")"
+before248="$(count_lines "$tf248")"           # expect 0 (no trail yet)
+# REAL MultiEdit shape: single target at TOP-LEVEL .tool_input.file_path; the
+# edits[] entries carry ONLY {old_string,new_string} — NO per-edit file_path.
+R248_TARGET="$R248/hooks/foo.sh"
+R248_PAYLOAD="$(jq -nc --arg f "$R248_TARGET" \
+  '{tool_name:"MultiEdit",tool_input:{file_path:$f,edits:[{old_string:"a",new_string:"b"}]},session_id:"s"}')"
+run_hook "$R248" "$R248_PAYLOAD"
+after248="$(count_lines "$tf248")"
+file248="$(jq -r '.file' "$tf248" 2>/dev/null | tail -1)"
+if [ "$before248" = 0 ] && [ "$after248" = 1 ] && [ "$RC" = 0 ] && [ "$file248" = "$R248_TARGET" ]; then
+  pass "R-248" "real-shape MultiEdit logged 1 record attributed to top-level file_path ($before248->$after248)"
+else
+  fail "R-248" "trail $before248->$after248 (want 0->1), rc=$RC, .file='$file248' (want '$R248_TARGET') — real MultiEdit dropped (FILES empty, hook bailed)"
+fi
+
 summary "test-audit-trail"
