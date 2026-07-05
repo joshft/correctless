@@ -4,6 +4,9 @@ All notable changes to Correctless are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- **audit-trail attributes events to the edited file's own git repo, not the shell's cwd (#244)** — `hooks/audit-trail.sh` (PostToolUse, fail-open telemetry) previously derived the artifacts dir, slug, state/trail/config paths, record `branch`, and adherence file from the hook's **cwd**. When the harness edited a file in a sibling git repo/worktree while cwd was a different repo, the event was logged under the **wrong** repo's trail or **dropped entirely** — the silent-telemetry-failure class. The hook now resolves each edited file to its **own** git repo (a local `_resolve_file_repo` walk-up + `git -C <dir> rev-parse --show-toplevel`, memoized per nearest-existing directory) and attributes every derivation to that repo. A file in no git repo, or in a repo with no active workflow state, is a clean **no-op** (never wrongly logged under cwd). **Cross-repo metrics may show a one-time attribution discontinuity after upgrade; single-repo projects are unaffected** (the common cwd==repo case writes to the same trail as before). Nested repos/submodules attribute to the innermost repo. Fail-open posture preserved; no security hardening added (telemetry, not a boundary). Narrowed from the original #244 (workflow-gate already fixed by #242; the sensitive-file-guard `custom_patterns` residual is left as-is). See `.correctless/specs/hook-repo-root-for.md`.
+
 ## [3.1.1] - 2026-06-27
 
 ### Fixed
