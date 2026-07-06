@@ -1,7 +1,7 @@
 ---
 name: cdocs
 description: Update project documentation after a feature lands. Updates README, .correctless/AGENT_CONTEXT.md, .correctless/ARCHITECTURE.md, and feature docs. Run before merging.
-allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(*compute-session-cost.sh*), Bash(*meta-record.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md), Write(.claude/rules/*.md)
+allowed-tools: Read, Grep, Glob, Edit, Bash(git*), Bash(*workflow-advance.sh*), Bash(*compute-session-cost.sh*), Bash(*meta-record.sh*), Bash(bash .correctless/scripts/gen-test-inventory.sh*), Bash(bash scripts/gen-test-inventory.sh*), Write(docs/*), Write(README.md), Write(.correctless/ARCHITECTURE.md), Write(.correctless/AGENT_CONTEXT.md), Write(CLAUDE.md), Write(.claude/rules/*.md)
 interaction_mode: hybrid
 ---
 
@@ -89,6 +89,33 @@ Update:
 - **Quick Reference**: verify commands are still accurate
 
 Target: under 1500 words. Keep it concise and current.
+
+The `.correctless/AGENT_CONTEXT.md` Tests-row figure is **informational** (`~N test scripts`, INV-007) — the
+authoritative test-file count lives in the generated `tests/test-inventory.json`, read by the
+`tests/test-ap031-fixture-divergence.sh` R-006(c) gate. When the docs phase adds or removes
+`tests/test-*.sh` files, keep that artifact current with the same stage → regen → stage-artifact
+ordering the RED/chore phases use (INV-006 / EXT-001/002), consumer-scoped so it no-ops on any
+repo lacking the R-006(c) marker:
+
+```bash
+git add tests/test-*.sh                                     # stage docs-phase test changes first
+if [ -f tests/test-ap031-fixture-divergence.sh ]; then
+  # Installed-path form when Correctless is installed; source-form fallback for
+  # the correctless dev repo, where .correctless/scripts/ is absent pre-setup
+  # (QA-002). BOTH literal `bash …gen-test-inventory.sh write` strings kept.
+  if [ -f .correctless/scripts/gen-test-inventory.sh ]; then
+    bash .correctless/scripts/gen-test-inventory.sh write \
+      || { echo "gen-test-inventory: FAILED — surface the token and stop"; exit 1; }
+  else
+    bash scripts/gen-test-inventory.sh write \
+      || { echo "gen-test-inventory: FAILED — surface the token and stop"; exit 1; }
+  fi
+  git add tests/test-inventory.json                        # stage the artifact into the index
+fi
+```
+
+Inspect the exit status; on non-zero surface the `gen-test-inventory: FAILED` token verbatim
+and fail the step (RS-006). The `no consumer — skipped` no-op is exit 0.
 
 ### 4. Feature Documentation
 

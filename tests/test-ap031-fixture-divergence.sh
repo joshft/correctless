@@ -568,30 +568,50 @@ else
     fail "R-006(b)" "AGENT_CONTEXT.md missing real-fixture/real-artifact in agents row or Design Patterns"
   fi
 
-  # Tests R-006 [unit]: test count documented in AGENT_CONTEXT.md is up-to-date.
-  # TA-008: (a) count must be >= actual AND <= actual + 2 (prevents inflated counts).
-  # (b) extraction is phrasing-tolerant and case-insensitive (test files/scripts).
-  # Distinguishes "extraction failed" (no recognizable phrase) from "count is stale".
-  # In RED phase: adding test-ap031-fixture-divergence.sh increments actual count
-  # past the documented count → fails with "stale" message (expected RED state).
-  actual_test_count="$(find "$REPO_DIR/tests" -maxdepth 1 -name "test*.sh" | wc -l | tr -d ' ')"
-  documented_count_raw="$(grep -oiE "[0-9]+ (test files?|test scripts?)" "$AGENT_CONTEXT" | head -1 || true)"
-  documented_count="$(grep -oE "^[0-9]+" <<< "$documented_count_raw" || true)"
+  # --- R-006(c) BLOCK START (agent-context-count-sync #219 / INV-002/004, EXT-003) ---
+  # Tests R-006(c) [integration]: test-count freshness is decoupled from the
+  # INV-010-protected AGENT_CONTEXT.md onto the tracked, unprotected, generated
+  # artifact tests/test-inventory.json ({schema_version,test_file_count}).
+  #
+  # R-006(c) reads `test_file_count` from tests/test-inventory.json and asserts it
+  # EQUALS "actual", where "actual" is obtained ONLY from the SHARED count command
+  # `bash scripts/gen-test-inventory.sh count` (INV-002 / PRH-003). This block MUST
+  # NOT re-implement any counting primitive (find / wc -l / grep -c / ls-pipe /
+  # ${#arr[@]}) to compute "actual" — that would let writer and consumer drift.
+  # Exact `==`, NO band (EXT-003). Fail-closed with a copy-pasteable remediation
+  # string containing exactly `bash scripts/gen-test-inventory.sh write` on: missing
+  # artifact, malformed artifact (invalid JSON / missing test_file_count /
+  # string-typed / fractional / schema_version absent or != 1), jq absent, or a
+  # stale count mismatch. R-006(a)/(b) above (AP-031 checks) are UNCHANGED — R-006(c)
+  # no longer reads any figure from AGENT_CONTEXT.md.
+  INVENTORY_ARTIFACT="$REPO_DIR/tests/test-inventory.json"
+  GEN_SCRIPT="$REPO_DIR/scripts/gen-test-inventory.sh"
+  # Copy-pasteable remediation — MUST contain the exact source-repo command.
+  REMEDIATION="regenerate the artifact: bash scripts/gen-test-inventory.sh write"
 
-  if [ -z "$documented_count" ]; then
-    fail "R-006(c)" "AGENT_CONTEXT.md test count extraction failed — no recognizable test-count phrase (e.g., 'N test files')"
-  elif [ "$documented_count" -lt "$actual_test_count" ]; then
-    fail "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) is stale — actual is $actual_test_count; GREEN must update to $actual_test_count"
-  # +2 tolerance: GREEN may add helper test cases alongside the main AP-031 test,
-  # bumping the actual count before the AGENT_CONTEXT.md docs update lands in the
-  # same commit. Prevents a spurious fail when tests and docs are updated together.
-  elif [ "$documented_count" -gt $(( actual_test_count + 2 )) ]; then
-    fail "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) is inflated — actual is $actual_test_count, max allowed $((actual_test_count + 2))"
-  elif [ "$documented_count" -eq "$actual_test_count" ]; then
-    pass "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) exactly matches actual ($actual_test_count)"
+  if ! command -v jq >/dev/null 2>&1; then
+    fail "R-006(c)" "jq not found — cannot validate tests/test-inventory.json fail-closed — $REMEDIATION"
+  elif [ ! -f "$GEN_SCRIPT" ]; then
+    fail "R-006(c)" "scripts/gen-test-inventory.sh missing — cannot compute actual via the shared count command — $REMEDIATION"
+  elif [ ! -f "$INVENTORY_ARTIFACT" ]; then
+    fail "R-006(c)" "tests/test-inventory.json missing — $REMEDIATION"
+  elif ! jq -e '.schema_version == 1' "$INVENTORY_ARTIFACT" >/dev/null 2>&1; then
+    fail "R-006(c)" "tests/test-inventory.json is malformed (invalid JSON or schema_version absent/!=1) — $REMEDIATION"
+  elif ! jq -e '.test_file_count | (type=="number" and . >= 0 and floor == .)' "$INVENTORY_ARTIFACT" >/dev/null 2>&1; then
+    fail "R-006(c)" "tests/test-inventory.json test_file_count is missing or non-integer (string/fractional) — $REMEDIATION"
   else
-    pass "R-006(c)" "AGENT_CONTEXT.md test count ($documented_count) within +2 tolerance — actual is $actual_test_count"
+    inv_count="$(jq -r '.test_file_count' "$INVENTORY_ARTIFACT" 2>/dev/null || true)"
+    # "actual" comes ONLY from the shared generator command (never a local find|wc).
+    actual_count="$(bash "$GEN_SCRIPT" count 2>/dev/null || true)"
+    if ! printf '%s' "$actual_count" | grep -qE '^[0-9]+$'; then
+      fail "R-006(c)" "gen-test-inventory.sh count did not return an integer (got '$actual_count') — $REMEDIATION"
+    elif [ "$inv_count" = "$actual_count" ]; then
+      pass "R-006(c)" "tests/test-inventory.json count ($inv_count) == actual ($actual_count) via shared count command"
+    else
+      fail "R-006(c)" "tests/test-inventory.json count ($inv_count) != actual ($actual_count) — stale; $REMEDIATION"
+    fi
   fi
+  # --- R-006(c) BLOCK END ---
 fi
 
 # ============================================================================

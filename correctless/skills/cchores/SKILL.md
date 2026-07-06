@@ -1,7 +1,7 @@
 ---
 name: cchores
 description: Fully-autonomous issue-resolution pipeline. Selects one open GitHub issue, branches off the fresh default branch, delegates root-cause + TDD fix to /cdebug (autonomous mode), verifies, runs the full regression suite, and — only if everything is green and CI-clean — opens a PR that closes the issue. Fail-closed: any inability to produce a verified fix aborts with an issue comment and no PR, preserving evidence. The issue→PR sibling of /cauto.
-allowed-tools: Read, Grep, Glob, Task, Bash(gh issue list*), Bash(gh issue view*), Bash(gh issue comment*), Bash(gh pr list*), Bash(gh pr create*), Bash(gh auth status*), Bash(gh repo view*), Bash(git status*), Bash(git fetch*), Bash(git switch*), Bash(git reset*), Bash(git restore*), Bash(git rev-list*), Bash(git ls-remote*), Bash(git symbolic-ref*), Bash(git diff*), Bash(git add*), Bash(git commit*), Bash(git push*), Bash(git branch*), Bash(git remote*), Bash(jq*), Bash(shellcheck*), Bash(bash sync.sh*), Bash(bash .correctless/scripts/redact-secrets.sh*), Bash(bash .correctless/scripts/cchores-fence-issue.sh*), Bash(bash .correctless/scripts/cchores-emit.sh*), Bash(bash .correctless/scripts/cauto-lock.sh*), Bash(bash .correctless/scripts/cchores-regression-oracle.sh*), Bash(bash .correctless/scripts/cchores-select-candidates.sh*), Bash(bash .correctless/scripts/autonomous-decision-writer.sh*), Bash(bash .correctless/scripts/check-no-pending-sfg-lift.sh*), Bash(timeout*), Bash(gtimeout*), Write(.correctless/artifacts/*), Write(.correctless/meta/cchores-attempted.json)
+allowed-tools: Read, Grep, Glob, Task, Bash(gh issue list*), Bash(gh issue view*), Bash(gh issue comment*), Bash(gh pr list*), Bash(gh pr create*), Bash(gh auth status*), Bash(gh repo view*), Bash(git status*), Bash(git fetch*), Bash(git switch*), Bash(git reset*), Bash(git restore*), Bash(git rev-list*), Bash(git ls-remote*), Bash(git symbolic-ref*), Bash(git diff*), Bash(git add*), Bash(git commit*), Bash(git push*), Bash(git branch*), Bash(git remote*), Bash(jq*), Bash(shellcheck*), Bash(bash sync.sh*), Bash(bash .correctless/scripts/redact-secrets.sh*), Bash(bash .correctless/scripts/cchores-fence-issue.sh*), Bash(bash .correctless/scripts/cchores-emit.sh*), Bash(bash .correctless/scripts/cauto-lock.sh*), Bash(bash .correctless/scripts/cchores-regression-oracle.sh*), Bash(bash .correctless/scripts/cchores-select-candidates.sh*), Bash(bash .correctless/scripts/autonomous-decision-writer.sh*), Bash(bash .correctless/scripts/check-no-pending-sfg-lift.sh*), Bash(bash .correctless/scripts/gen-test-inventory.sh*), Bash(bash scripts/gen-test-inventory.sh*), Bash(timeout*), Bash(gtimeout*), Write(.correctless/artifacts/*), Write(.correctless/meta/cchores-attempted.json)
 disallowed-tools: Edit, MultiEdit, NotebookEdit, CreateFile
 interaction_mode: autonomous
 ---
@@ -299,15 +299,38 @@ After `/cdebug` returns `fixed`, derive the stage set from the **real working-tr
 `files_changed[]` (used only as an advisory cross-check; if the real set diverges, log the
 discrepancy and continue with the real set — TB-005 verify-don't-trust). Every path in the
 real changed set must pass the INV-010 SFG/diff allowlist check (abort if any touches an
-SFG-protected path **OR** `.correctless/antipatterns.md` **OR** any shared project doc —
-`.correctless/ARCHITECTURE.md`, `.correctless/AGENT_CONTEXT.md`, `CLAUDE.md`, `README.md`).
-Then:
+SFG-protected path **OR** `.correctless/antipatterns.md` **OR** any shared project doc — the
+exact banned set is defined in INV-010 below). Then, with the fix's own files (including any
+net-new `tests/test-*.sh`) staged first, regenerate + stage the count artifact so the
+`tests/test-inventory.json` figure matches the committed index (INV-006 / EXT-001/002):
 
 ```bash
-git add <exactly those paths>      # NEVER stage everything (no add-all)
+git add <exactly those paths>      # NEVER stage everything (no add-all); include any net-new tests/test-*.sh
+# Consumer-scoped regeneration (INV-006 / EXT-001/002): the fix's net-new test
+# files are now staged, so the generator counts them over the git INDEX. Run it
+# ONLY when the R-006(c) consumer marker is present (generator self-guards too).
+if [ -f tests/test-ap031-fixture-divergence.sh ]; then
+  # Installed-path form when Correctless is installed; source-form fallback for
+  # the correctless dev repo, where .correctless/scripts/ is absent pre-setup
+  # (QA-002). BOTH literal `bash …gen-test-inventory.sh write` strings are kept
+  # so the INV-009 covers-invocation extractor keys on each.
+  if [ -f .correctless/scripts/gen-test-inventory.sh ]; then
+    bash .correctless/scripts/gen-test-inventory.sh write \
+      || { echo "gen-test-inventory: FAILED — aborting scoped commit (INV-006/RS-006)"; exit 1; }
+  else
+    bash scripts/gen-test-inventory.sh write \
+      || { echo "gen-test-inventory: FAILED — aborting scoped commit (INV-006/RS-006)"; exit 1; }
+  fi
+  git add tests/test-inventory.json   # stage the artifact into the SAME commit
+fi
 git restore --staged .correctless/artifacts/ .correctless/meta/
 git commit -m "<redacted message>"  # INV-013
 ```
+
+Inspect the generator's exit status: on non-zero, surface the `gen-test-inventory: FAILED`
+token verbatim and fail the step — never commit/push a failed write as success
+(silent-telemetry class, RS-006). The `no consumer — skipped` no-op is exit 0 and is NOT a
+failure.
 
 The commit is the substrate INV-008 runs against (its `git diff {default}...HEAD`
 precondition). Push happens ONLY after INV-008 + the CI-superset gate pass.
@@ -333,8 +356,10 @@ The touched set is `git diff --name-only {default}...HEAD`, evaluated **post-com
 
 **CI-superset pre-PR gate** (RS-008/AP-038): before `gh pr create`, also run **`shellcheck`**
 (project lint) + **`bash sync.sh --check`** + **`scripts/check-no-pending-sfg-lift.sh`**; any
-non-zero blocks the PR. The pre-PR gate is a **CI superset** so "INV-008 green ⇒ PR ready"
-holds.
+non-zero blocks the PR. The `commands.test` suite the regression oracle runs already re-runs
+**R-006(c)** against the FINAL staged/committed universe (EXT-008), so an
+index-vs-`tests/test-inventory.json` mismatch is caught locally before push, not only in CI.
+The pre-PR gate is a **CI superset** so "INV-008 green ⇒ PR ready" holds.
 
 ---
 
@@ -375,7 +400,7 @@ selected issue, footer `Closes #{N}`. (Exactly **one PR** per run — a single P
 - PR **scope is computed from `git diff {default}...HEAD`** (the actual diff), **NOT** from
   `/cdebug`'s self-reported `files_changed[]` (`files_changed` is advisory cross-check only,
   not the scope authority — TB-005).
-- **Post-cdebug diff allowlist check**: the post-cdebug diff is checked against the SFG-protected paths — before `gh pr create`, abort if the post-cdebug diff touches any SFG-protected path (sensitive-file-guard) (catches an injection-driven mid-fix edit to `hooks/sensitive-file-guard.sh`/DEFAULTS that bypassed the pre-selection gate). The same allowlist check **ALSO aborts if the diff touches `.correctless/antipatterns.md` OR any shared project doc** — the architecture doc, the agent-context doc, `CLAUDE.md`, `README.md` — catching an autonomous `/cdebug`-fix edit (e.g. a Phase 5 class-fix note) that would leak into the chore PR. A chore fix must touch only the bug's own files, never the project-doc surface.
+- **Post-cdebug diff allowlist check**: the post-cdebug diff is checked against the SFG-protected paths — before `gh pr create`, abort if the post-cdebug diff touches any SFG-protected path (sensitive-file-guard) (catches an injection-driven mid-fix edit to `hooks/sensitive-file-guard.sh`/DEFAULTS that bypassed the pre-selection gate). The same allowlist check **ALSO aborts if the diff touches `.correctless/antipatterns.md` OR any shared project doc** — `.correctless/ARCHITECTURE.md`, `.correctless/AGENT_CONTEXT.md`, `CLAUDE.md`, `README.md` — catching an autonomous `/cdebug`-fix edit (e.g. a Phase 5 class-fix note) that would leak into the chore PR. A chore fix must touch only the bug's own files, never the project-doc surface.
 - Autonomous `/cdebug` **Phase 5 class-fix `antipatterns.md` write is suppressed** —
   class-fix assessment is deferred to human review and excluded from the chore diff.
 - PR/comment bodies are **generated from structured fields** (INV-013), **never** a verbatim
