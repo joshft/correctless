@@ -294,6 +294,89 @@ else
 fi
 
 # ============================================================================
+# INV-002 [integration] NUL-safety (MA-H1): a committed filename containing an
+# embedded newline must NOT inflate the count. The prior `git ls-files -z | tr
+# '\0' '\n'` linearizer split such a name into 2+ counted lines (writer AND
+# R-006(c) consumer inflated identically -> a silently-wrong PASS). The
+# NUL-delimited awk (RS="\0") makes one git record contribute at most one count.
+# Property asserted: NO INFLATION (count <= base+1) AND writer==consumer parity —
+# NOT that the newline file counts as exactly 1 (awk builds vary on whether
+# [^/]* matches an embedded newline; either 0 or 1 is acceptable).
+# ============================================================================
+
+section "INV-002: NUL-safety — embedded-newline tracked filename does not inflate (MA-H1)"
+
+if ! gen_present; then
+  fail "INV-002(univ-newline)"        "scripts/gen-test-inventory.sh missing (RED)"
+  fail "INV-002(univ-newline-parity)" "scripts/gen-test-inventory.sh missing (RED)"
+elif ! have_git || ! command -v jq >/dev/null 2>&1; then
+  skip "INV-002(univ-newline)"        "git or jq unavailable"
+  skip "INV-002(univ-newline-parity)" "git or jq unavailable"
+else
+  FXNL="$TMPROOT/inv002-newline"
+  K=3
+  build_fixture "$FXNL" "$K" with_consumer     # K fx + consumer
+  base="$(_oracle_count "$FXNL")"              # K+1, BEFORE adding the newline file
+  # Add a tracked test file whose NAME contains an embedded newline (git allows
+  # it). git ls-files -z emits it as ONE NUL-terminated record.
+  nlfile="$(printf 'test-a\ntest-b').sh"
+  ( cd "$FXNL" && touch "tests/$nlfile" && git add -A ) >/dev/null 2>&1
+  c_nl="$( ( cd "$FXNL" && bash scripts/gen-test-inventory.sh count ) 2>/dev/null | tr -d ' ' )"
+  if printf '%s' "$c_nl" | grep -qE '^[0-9]+$' && [ "$c_nl" -le "$(( base + 1 ))" ]; then
+    pass "INV-002(univ-newline)" "embedded-newline filename does not inflate count (got $c_nl <= $(( base + 1 )); base $base)"
+  else
+    fail "INV-002(univ-newline)" "embedded-newline filename inflated count (got '$c_nl', ceiling $(( base + 1 )); base $base)"
+  fi
+  # writer==consumer parity: the write path shares _compute_count, so the recorded
+  # test_file_count MUST equal the count output exactly (no writer/consumer drift).
+  ( cd "$FXNL" && bash scripts/gen-test-inventory.sh write ) >/dev/null 2>&1
+  rec="$(jq -r '.test_file_count' "$FXNL/tests/test-inventory.json" 2>/dev/null || echo x)"
+  if [ "$rec" = "$c_nl" ]; then
+    pass "INV-002(univ-newline-parity)" "writer-recorded count ($rec) == count output ($c_nl) — no drift"
+  else
+    fail "INV-002(univ-newline-parity)" "writer count ($rec) != count output ($c_nl) — writer/consumer drift"
+  fi
+fi
+
+# ============================================================================
+# INV-002 [integration] layout discriminator (MA-M2): a SOURCE repo checked out
+# into a directory literally named `.correctless` must resolve as SOURCE
+# (ROOT=scriptdir/.., targeting <fix>/tests), NOT misread as INSTALLED
+# (ROOT=scriptdir/../..). The bare `basename(parent)==".correctless"` check
+# alone is ambiguous; the marker-confirmation (consumer marker at the installed
+# candidate ROOT) breaks the tie back to SOURCE.
+# ============================================================================
+
+section "INV-002: source repo in a '.correctless'-named dir resolves as SOURCE (MA-M2)"
+
+if ! gen_present; then
+  fail "INV-002(ctx-dotcorrectless)" "scripts/gen-test-inventory.sh missing (RED)"
+elif ! have_git; then
+  skip "INV-002(ctx-dotcorrectless)" "git unavailable"
+else
+  # <fix> is itself named `.correctless`; the generator lives at <fix>/scripts/
+  # and the consumer marker at <fix>/tests/ (SOURCE-form locations).
+  DCROOT="$TMPROOT/dotc"
+  FIX="$DCROOT/.correctless"
+  mkdir -p "$FIX/scripts" "$FIX/tests"
+  cp "$GEN" "$FIX/scripts/gen-test-inventory.sh"; chmod +x "$FIX/scripts/gen-test-inventory.sh"
+  printf '#\n' > "$FIX/tests/test-ap031-fixture-divergence.sh"   # consumer marker (source location)
+  printf '#\n' > "$FIX/tests/test-fx1.sh"
+  printf '#\n' > "$FIX/tests/test-fx2.sh"
+  ( cd "$FIX" && git init -q >/dev/null 2>&1 && git config user.email t@t && git config user.name t \
+      && git add -A && git commit -qm init ) >/dev/null 2>&1
+  # SOURCE resolution targets <fix>/tests = consumer + fx1 + fx2 = 3. An INSTALLED
+  # misread (ROOT=$DCROOT, not a git repo and lacking the marker) yields a git
+  # failure or a 'no consumer — skipped' no-op — never a bare 3.
+  c_dc="$( bash "$FIX/scripts/gen-test-inventory.sh" count 2>/dev/null | tr -d ' ' )"
+  if [ "$c_dc" = "3" ]; then
+    pass "INV-002(ctx-dotcorrectless)" "source-in-.correctless resolves as SOURCE (count=3 over <fix>/tests, not misread as installed)"
+  else
+    fail "INV-002(ctx-dotcorrectless)" "source-in-.correctless misresolved (count='$c_dc', want 3 — targeted wrong tests/ dir)"
+  fi
+fi
+
+# ============================================================================
 # INV-003 [unit]: generator contract — consumer guard, atomic glob-safe write,
 # tri-state fail-loud, count prints only the integer.
 # ============================================================================

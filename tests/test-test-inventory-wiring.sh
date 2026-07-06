@@ -255,6 +255,25 @@ for _sk in "cchores:$CCHORES" "ctdd:$CTDD" "cdocs:$CDOCS"; do
   fi
 done
 
+# INV-006 guard-scoping (MA-M1): in /ctdd and /cdocs the `git add tests/test-*.sh`
+# must sit INSIDE the `if [ -f tests/test-ap031-fixture-divergence.sh ]` consumer
+# guard (block-scoped, like INV-006(cchores-order)). Placed BEFORE the guard it
+# would hard-fail (`fatal: pathspec did not match`, exit 128) on a downstream
+# repo lacking matching tests/test-*.sh. The generator invocation still runs
+# AFTER the staging (stage -> regen -> stage-artifact order preserved).
+for _sk in "ctdd:$CTDD" "cdocs:$CDOCS"; do
+  _name="${_sk%%:*}"; _file="${_sk#*:}"
+  guard_ln="$(grep -nF 'if [ -f tests/test-ap031-fixture-divergence.sh ]; then' "$_file" | head -1 | cut -d: -f1)"
+  addtest_ln="$(grep -nE 'git add tests/test-\*\.sh' "$_file" | head -1 | cut -d: -f1)"
+  gen_ln="$(grep -nF 'gen-test-inventory.sh write' "$_file" | head -1 | cut -d: -f1)"
+  if [ -n "$guard_ln" ] && [ -n "$addtest_ln" ] && [ -n "$gen_ln" ] \
+     && [ "$addtest_ln" -gt "$guard_ln" ] && [ "$addtest_ln" -lt "$gen_ln" ]; then
+    pass "INV-006(guard-scopes-testadd-$_name)" "$_name stages tests INSIDE the guard, before regen (guard=$guard_ln < add=$addtest_ln < gen=$gen_ln — MA-M1)"
+  else
+    fail "INV-006(guard-scopes-testadd-$_name)" "$_name 'git add tests/test-*.sh' not scoped inside the guard before regen (guard=$guard_ln add=$addtest_ln gen=$gen_ln)"
+  fi
+done
+
 # ============================================================================
 # INV-007 [unit] structural: no file under tests/ scrapes the AGENT_CONTEXT.md
 # Tests-row count. (Becomes true once R-006(c) is repointed to the artifact —
@@ -274,6 +293,27 @@ if [ -z "$scrape_hits" ]; then
   pass "INV-007(no-scrape)" "no tests/ file greps/extracts the AGENT_CONTEXT.md test-count row"
 else
   fail "INV-007(no-scrape)" "a tests/ file still scrapes the AGENT_CONTEXT.md test count: $scrape_hits"
+fi
+
+# INV-007 positive (MA-H2): the AGENT_CONTEXT.md Tests row must be CONVERTED to
+# the informational form — its count starts with `~` (NO leading bare digit, so
+# prune-scan's digit-anchored extractor skips it) AND it carries a
+# tests/test-inventory.json authoritative-source pointer. An unconverted/stale
+# exact figure ("108 test files") FAILS here — this is the positive complement
+# to the negative no-scrape property above.
+AGENT_CTX="$REPO_DIR/.correctless/AGENT_CONTEXT.md"
+if [ ! -f "$AGENT_CTX" ]; then
+  fail "INV-007(row-converted)" ".correctless/AGENT_CONTEXT.md not found"
+else
+  tests_row="$(grep -E '^\| *Tests *\|' "$AGENT_CTX" | head -1)"
+  # count field = 4th pipe-delimited column ($1 is empty, before the first pipe).
+  count_field="$(printf '%s' "$tests_row" | awk -F'|' '{print $4}' | sed 's/^[[:space:]]*//')"
+  if printf '%s' "$count_field" | grep -qE '^~' \
+     && grep -qF 'test-inventory.json' <<< "$tests_row"; then
+    pass "INV-007(row-converted)" "AGENT_CONTEXT Tests row is informational (~-prefixed count + test-inventory.json pointer)"
+  else
+    fail "INV-007(row-converted)" "AGENT_CONTEXT Tests row not converted (count_field='$count_field' — needs ~-prefix AND test-inventory.json pointer)"
+  fi
 fi
 
 # ============================================================================

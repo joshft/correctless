@@ -47,9 +47,27 @@ while [ -h "$_src" ]; do
   esac
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$_src")" >/dev/null 2>&1 && pwd)"
+# MA-L4: a relative BASH_SOURCE run from a cwd where `cd -P` fails leaves
+# SCRIPT_DIR empty; without this guard ROOT would silently become '.' (a wrong
+# tree, only sometimes caught by git-fail-loud). Fail loud with the tri-state
+# FAILED token instead. `_fail` is not defined yet here, so inline its contract.
+if [ -z "$SCRIPT_DIR" ]; then
+  printf 'gen-test-inventory: FAILED %s\n' "could not resolve script directory from BASH_SOURCE (run from a stable path)"
+  printf 'gen-test-inventory: FAILED %s\n' "could not resolve script directory from BASH_SOURCE (run from a stable path)" >&2
+  exit 1
+fi
+# Structural layout discriminator (MA-M2): the INSTALLED form is
+# <root>/.correctless/scripts/gen-test-inventory.sh, so require BOTH
+# basename(SCRIPT_DIR)=="scripts" AND basename(parent)==".correctless" AND —
+# because a SOURCE repo checked out into a dir literally named `.correctless`
+# has the same two basenames — confirm the R-006(c) consumer marker actually
+# lives at the installed candidate ROOT's project tests/ (never .correctless/
+# tests/). Any mismatch falls back to the SOURCE form (ROOT=scriptdir/..).
 _PARENT="$(dirname "$SCRIPT_DIR")"
-if [ "$(basename "$_PARENT")" = ".correctless" ]; then
-  ROOT="$(dirname "$_PARENT")"       # installed: scriptdir/../..
+if [ "$(basename "$SCRIPT_DIR")" = "scripts" ] \
+   && [ "$(basename "$_PARENT")" = ".correctless" ] \
+   && [ -f "$(dirname "$_PARENT")/tests/test-ap031-fixture-divergence.sh" ]; then
+  ROOT="$(dirname "$_PARENT")"       # installed: scriptdir/../.. (marker-confirmed)
 else
   ROOT="$_PARENT"                    # source:    scriptdir/..
 fi
@@ -66,8 +84,19 @@ TARGET="$TESTS_DIR/test-inventory.json"
 # ---------------------------------------------------------------------------
 TMP=""
 _cleanup() { [ -n "$TMP" ] && rm -f "$TMP" 2>/dev/null; return 0; }
+# MA-L2: clean up the temp on ANY exit path, including the full fatal-signal set
+# (HUP on terminal close, QUIT, PIPE — not just EXIT/INT/TERM). An untrapped
+# fatal signal between mktemp and the TMP='' reset would otherwise orphan a
+# `.test-inventory.json.tmp.*`. Re-raise each signal after cleanup so the exit
+# status reflects the signal (128+n); the EXIT trap still fires on the `no
+# change` early-return path.
+_on_signal() { _cleanup; trap - "$1"; kill -s "$1" "$$"; }
 trap _cleanup EXIT
-trap '_cleanup; exit 130' INT TERM
+trap '_on_signal INT'  INT
+trap '_on_signal TERM' TERM
+trap '_on_signal HUP'  HUP
+trap '_on_signal QUIT' QUIT
+trap '_on_signal PIPE' PIPE
 
 # _fail <reason> — mechanical FAILED token on stdout (echoed verbatim by
 # callers per INV-006), diagnostic on stderr, then exit non-zero. The trap
@@ -99,20 +128,25 @@ _fail() {
 # ---------------------------------------------------------------------------
 COUNT=""
 _compute_count() {
-  local raw
-  # NUL->newline INSIDE the capture subshell (bash drops NULs on variable
-  # capture), so git's exit status is observable via pipefail while the
-  # newline-delimited direct-children filter below stays byte-identical.
-  if ! raw="$( set -o pipefail
-               cd "$ROOT" 2>/dev/null \
-                 && LC_ALL=C git ls-files --cached -z -- 'tests/test*.sh' \
-                    | tr '\0' '\n' )"; then
+  # NUL-delimited end-to-end (MA-H1): the prior `git ls-files -z | tr '\0' '\n'`
+  # linearized the records, so a committed filename containing a newline split
+  # into extra counted lines and inflated the count identically in writer AND
+  # R-006(c) consumer -> a silently-wrong PASS. Keeping RS="\0" in awk means one
+  # git record contributes at most one count. The `/^tests\/test[^/]*\.sh$/`
+  # record filter re-asserts the direct-child + test-prefix + .sh shape that the
+  # dropped `awk -F/ 'NF==2'` + .sh suffix used to.  `set -o pipefail` keeps a
+  # git failure (ROOT not a repo / corrupt-locked index) fail-loud (INV-003).
+  # `env -u GIT_DIR -u GIT_WORK_TREE` pins the count to ROOT rather than an
+  # ambient GIT_DIR/GIT_WORK_TREE (EA-004 / MA-M3), the way the resolver already
+  # pins ROOT. Capturing awk's numeric output in $(...) is NUL-safe (no NUL in a
+  # number). A git SUCCESS with zero matches still yields a valid '0'.
+  if ! COUNT="$( set -o pipefail
+                 cd "$ROOT" 2>/dev/null \
+                   && env -u GIT_DIR -u GIT_WORK_TREE LC_ALL=C \
+                        git ls-files --cached -z -- 'tests/test*.sh' \
+                      | awk 'BEGIN{RS="\0"} /^tests\/test[^/]*\.sh$/{c++} END{print c+0}' )"; then
     _fail "git ls-files failed in $ROOT"
   fi
-  COUNT="$( printf '%s\n' "$raw" \
-              | awk -F/ 'NF==2 && $0 != ""' \
-              | grep -c . \
-              | tr -d ' ' )"
 }
 
 do_count() {
@@ -159,8 +193,9 @@ do_write() {
     return 0
   fi
 
-  # Real change: atomic same-fs rename onto the target.
-  mv "$TMP" "$TARGET" 2>/dev/null || _fail "atomic rename onto $TARGET failed"
+  # Real change: atomic same-fs rename onto the target. `-f` (MA-L3) so a
+  # write-protected destination never prompts on an interactive tty.
+  mv -f "$TMP" "$TARGET" 2>/dev/null || _fail "atomic rename onto $TARGET failed"
   TMP=""
   printf 'gen-test-inventory: wrote tests/test-inventory.json (test_file_count=%s)\n' "$n"
   return 0

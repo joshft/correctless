@@ -98,8 +98,8 @@ ordering the RED/chore phases use (INV-006 / EXT-001/002), consumer-scoped so it
 repo lacking the R-006(c) marker:
 
 ```bash
-git add tests/test-*.sh                                     # stage docs-phase test changes first
 if [ -f tests/test-ap031-fixture-divergence.sh ]; then
+  git add tests/test-*.sh 2>/dev/null || true               # stage docs-phase test changes first (consumer-scoped, tolerant of no matches — MA-M1)
   # Installed-path form when Correctless is installed; source-form fallback for
   # the correctless dev repo, where .correctless/scripts/ is absent pre-setup
   # (QA-002). BOTH literal `bash …gen-test-inventory.sh write` strings kept.

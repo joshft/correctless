@@ -592,9 +592,17 @@ else
   if ! command -v jq >/dev/null 2>&1; then
     fail "R-006(c)" "jq not found — cannot validate tests/test-inventory.json fail-closed — $REMEDIATION"
   elif [ ! -f "$GEN_SCRIPT" ]; then
-    fail "R-006(c)" "scripts/gen-test-inventory.sh missing — cannot compute actual via the shared count command — $REMEDIATION"
+    # MA-L5: the generator itself is what's missing — pointing the user at `write`
+    # (running the very script reported absent) is self-contradictory. Point at
+    # restore/reinstall instead. Still fail-closed and legible.
+    fail "R-006(c)" "scripts/gen-test-inventory.sh missing — cannot compute actual via the shared count command — restore scripts/gen-test-inventory.sh (re-run setup or: bash sync.sh)"
   elif [ ! -f "$INVENTORY_ARTIFACT" ]; then
     fail "R-006(c)" "tests/test-inventory.json missing — $REMEDIATION"
+  elif ! jq -e -s 'length == 1' "$INVENTORY_ARTIFACT" >/dev/null 2>&1; then
+    # MA-L1: reject a multi-document stream (`{...}{...}`) fail-closed, mirroring
+    # meta-record.sh's single-document guard — a future `| head -1` refactor of
+    # the value read must not turn a multi-doc artifact into a false PASS.
+    fail "R-006(c)" "tests/test-inventory.json is not a single JSON document (multi-document stream) — $REMEDIATION"
   elif ! jq -e '.schema_version == 1' "$INVENTORY_ARTIFACT" >/dev/null 2>&1; then
     fail "R-006(c)" "tests/test-inventory.json is malformed (invalid JSON or schema_version absent/!=1) — $REMEDIATION"
   elif ! jq -e '.test_file_count | (type=="number" and . >= 0 and floor == .)' "$INVENTORY_ARTIFACT" >/dev/null 2>&1; then
@@ -608,7 +616,10 @@ else
     elif [ "$inv_count" = "$actual_count" ]; then
       pass "R-006(c)" "tests/test-inventory.json count ($inv_count) == actual ($actual_count) via shared count command"
     else
-      fail "R-006(c)" "tests/test-inventory.json count ($inv_count) != actual ($actual_count) — stale; $REMEDIATION"
+      # MA-M4: the stale-mismatch branch is the highest-frequency case. Running
+      # `write` alone updates the on-disk artifact but leaves it UNSTAGED, so CI
+      # re-checks the committed (still stale) file. Tell the user to stage too.
+      fail "R-006(c)" "tests/test-inventory.json count ($inv_count) != actual ($actual_count) — stale; $REMEDIATION && git add tests/test-inventory.json (then commit into the same change)"
     fi
   fi
   # --- R-006(c) BLOCK END ---

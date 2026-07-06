@@ -204,8 +204,8 @@ same index the suite runs against. Do this only when the R-006(c) consumer marke
 (the generator self-guards and no-ops otherwise, so this is safe on any repo):
 
 ```bash
-git add tests/test-*.sh                                     # stage RED's test files first
 if [ -f tests/test-ap031-fixture-divergence.sh ]; then
+  git add tests/test-*.sh 2>/dev/null || true               # stage RED's test files first (consumer-scoped, tolerant of no matches — MA-M1)
   # Installed-path form when Correctless is installed; source-form fallback for
   # the correctless dev repo, where .correctless/scripts/ is absent pre-setup
   # (QA-002). BOTH literal `bash …gen-test-inventory.sh write` strings kept.
