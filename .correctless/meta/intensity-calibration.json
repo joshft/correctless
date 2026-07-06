@@ -902,6 +902,35 @@
         "tests/test-instructions-loaded.sh"
       ],
       "timestamp": "2026-07-02T01:39:44Z"
+    },
+    {
+      "feature_slug": "agent-context-count-sync",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 1,
+      "actual_findings_count": 0,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "harness_version": 1,
+      "fix_rounds_triggered": 1,
+      "file_paths_touched": [
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/specs/agent-context-count-sync.md",
+        "CONTRIBUTING.md",
+        "correctless/scripts/gen-test-inventory.sh",
+        "correctless/skills/cchores/SKILL.md",
+        "correctless/skills/cdocs/SKILL.md",
+        "correctless/skills/ctdd/SKILL.md",
+        "scripts/gen-test-inventory.sh",
+        "skills/cchores/SKILL.md",
+        "skills/cdocs/SKILL.md",
+        "skills/ctdd/SKILL.md",
+        "tests/test-ap031-fixture-divergence.sh",
+        "tests/test-gen-test-inventory.sh",
+        "tests/test-inventory.json",
+        "tests/test-test-inventory-wiring.sh"
+      ],
+      "timestamp": "2026-07-06T07:41:09Z"
     }
   ]
 }
