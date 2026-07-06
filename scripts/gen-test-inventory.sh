@@ -136,15 +136,19 @@ _compute_count() {
   # record filter re-asserts the direct-child + test-prefix + .sh shape that the
   # dropped `awk -F/ 'NF==2'` + .sh suffix used to.  `set -o pipefail` keeps a
   # git failure (ROOT not a repo / corrupt-locked index) fail-loud (INV-003).
-  # `env -u GIT_DIR -u GIT_WORK_TREE` pins the count to ROOT rather than an
-  # ambient GIT_DIR/GIT_WORK_TREE (EA-004 / MA-M3), the way the resolver already
-  # pins ROOT. Capturing awk's numeric output in $(...) is NUL-safe (no NUL in a
-  # number). A git SUCCESS with zero matches still yields a valid '0'.
+  # The count is pinned to ROOT via `env -i` clear-and-allowlist (EA-004 / MA-M3 /
+  # MA-R2-001): enumerating GIT_* vars to unset is class-incomplete by construction
+  # (the earlier `env -u GIT_DIR -u GIT_WORK_TREE` missed GIT_INDEX_FILE, which
+  # `--cached` honors over the in-tree index, plus GIT_COMMON_DIR/GIT_OBJECT_DIRECTORY
+  # — the 2026-04-28 enumeration-incompleteness lesson). `env -i` clears the ENTIRE
+  # ambient environment so NO GIT_* var can redirect the index/objectstore, then
+  # allowlists only PATH/HOME/LC_ALL; `git -C "$ROOT"` targets ROOT's own repo.
+  # `set -o pipefail` keeps a git failure fail-loud (INV-003); capturing awk's
+  # numeric output in $(...) is NUL-safe; a git SUCCESS with zero matches yields '0'.
   if ! COUNT="$( set -o pipefail
-                 cd "$ROOT" 2>/dev/null \
-                   && env -u GIT_DIR -u GIT_WORK_TREE LC_ALL=C \
-                        git ls-files --cached -z -- 'tests/test*.sh' \
-                      | awk 'BEGIN{RS="\0"} /^tests\/test[^/]*\.sh$/{c++} END{print c+0}' )"; then
+                 env -i PATH="$PATH" HOME="$HOME" LC_ALL=C \
+                     git -C "$ROOT" ls-files --cached -z -- 'tests/test*.sh' \
+                   | awk 'BEGIN{RS="\0"} /^tests\/test[^/]*\.sh$/{c++} END{print c+0}' )"; then
     _fail "git ls-files failed in $ROOT"
   fi
 }

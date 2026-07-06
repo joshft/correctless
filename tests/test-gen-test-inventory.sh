@@ -376,6 +376,42 @@ else
   fi
 fi
 
+section "INV-002: count pinned to ROOT under ambient GIT_* poisoning (MA-R2-001)"
+
+if ! gen_present; then
+  fail "INV-002(env-pin-index)" "scripts/gen-test-inventory.sh missing (RED)"
+  fail "INV-002(env-pin-dir)"   "scripts/gen-test-inventory.sh missing (RED)"
+elif ! have_git; then
+  skip "INV-002(env-pin-index)" "git unavailable"
+  skip "INV-002(env-pin-dir)"   "git unavailable"
+else
+  # A real fixture (3 fx + consumer = 4) whose count must NOT be swayed by an
+  # ambient GIT_INDEX_FILE / GIT_DIR pointing at a DIFFERENT (6-file) index —
+  # enumerating GIT_* to unset was class-incomplete (missed GIT_INDEX_FILE), so
+  # `env -i` clear-and-allowlist now pins `git ls-files --cached` to ROOT's index.
+  FXEP="$TMPROOT/envpin"
+  build_fixture "$FXEP" 3 with_consumer          # ROOT tests/ = consumer + fx1..3 = 4
+  FOREIGN="$TMPROOT/envpin-foreign"
+  mkdir -p "$FOREIGN/tests"
+  for i in 1 2 3 4 5 6; do printf '#\n' > "$FOREIGN/tests/test-foreign-$i.sh"; done
+  ( cd "$FOREIGN" && git init -q >/dev/null 2>&1 && git config user.email t@t && git config user.name t \
+      && git add -A && git commit -qm init ) >/dev/null 2>&1
+
+  c_idx="$( GIT_INDEX_FILE="$FOREIGN/.git/index" bash "$FXEP/scripts/gen-test-inventory.sh" count 2>/dev/null | tr -d ' ' )"
+  if [ "$c_idx" = "4" ]; then
+    pass "INV-002(env-pin-index)" "count pinned to ROOT under ambient GIT_INDEX_FILE (got 4, not the foreign 6)"
+  else
+    fail "INV-002(env-pin-index)" "GIT_INDEX_FILE leaked into count (got '$c_idx', want 4 — enumeration-incomplete env pin)"
+  fi
+
+  c_dir="$( GIT_DIR="$FOREIGN/.git" GIT_WORK_TREE="$FOREIGN" bash "$FXEP/scripts/gen-test-inventory.sh" count 2>/dev/null | tr -d ' ' )"
+  if [ "$c_dir" = "4" ]; then
+    pass "INV-002(env-pin-dir)" "count pinned to ROOT under ambient GIT_DIR/GIT_WORK_TREE (got 4, not the foreign 6)"
+  else
+    fail "INV-002(env-pin-dir)" "GIT_DIR/GIT_WORK_TREE leaked into count (got '$c_dir', want 4)"
+  fi
+fi
+
 # ============================================================================
 # INV-003 [unit]: generator contract — consumer guard, atomic glob-safe write,
 # tri-state fail-loud, count prints only the integer.
