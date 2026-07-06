@@ -195,6 +195,35 @@ bash .correctless/hooks/workflow-advance.sh status  # confirm phase still tdd-te
 # Run commands.test to confirm tests fail (expected RED state)
 ```
 
+**Test-count artifact regeneration (INV-006 / EXT-001/002, agent-context-count-sync).** When
+RED adds or removes `tests/test-*.sh` files, the `tests/test-inventory.json` count must track
+the git **index** so the `tests/test-ap031-fixture-divergence.sh` R-006(c) gate stays green.
+The ordering is load-bearing: RED first **stages** its new/removed test files, THEN the
+generator runs (so the index count includes them), THEN the artifact is **staged** into the
+same index the suite runs against. Do this only when the R-006(c) consumer marker is present
+(the generator self-guards and no-ops otherwise, so this is safe on any repo):
+
+```bash
+if [ -f tests/test-ap031-fixture-divergence.sh ]; then
+  git add tests/test-*.sh 2>/dev/null || true               # stage RED's test files first (consumer-scoped, tolerant of no matches — MA-M1)
+  # Installed-path form when Correctless is installed; source-form fallback for
+  # the correctless dev repo, where .correctless/scripts/ is absent pre-setup
+  # (QA-002). BOTH literal `bash …gen-test-inventory.sh write` strings kept.
+  if [ -f .correctless/scripts/gen-test-inventory.sh ]; then
+    bash .correctless/scripts/gen-test-inventory.sh write \
+      || { echo "gen-test-inventory: FAILED — stop and surface the token"; exit 1; }
+  else
+    bash scripts/gen-test-inventory.sh write \
+      || { echo "gen-test-inventory: FAILED — stop and surface the token"; exit 1; }
+  fi
+  git add tests/test-inventory.json                        # stage the artifact into the index
+fi
+```
+
+Inspect the generator's exit status and, on non-zero, surface the `gen-test-inventory: FAILED`
+token verbatim and fail the step (RS-006). This regen is prompt-level; R-006(c) firing in CI
+is the mechanical backstop.
+
 After the test agent completes and tests exist, run the **test audit** before advancing to GREEN.
 
 ## Between RED and GREEN: Test Audit
