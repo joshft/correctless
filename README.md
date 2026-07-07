@@ -6,35 +6,56 @@
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Skills: 33](https://img.shields.io/badge/skills-33-blue.svg)](docs/skills/)
-[![Version: 3.0.0](https://img.shields.io/badge/version-3.0.0-green.svg)](CHANGELOG.md)
+[![Version: 3.1.1](https://img.shields.io/badge/version-3.1.1-green.svg)](CHANGELOG.md)
 
-Composable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that enforce a correctness-oriented development workflow. Spec before you code. Test before you implement. Never let an agent grade its own work.
+# Correctless
 
-Built with Correctless.
+AI coding agents are velocity machines. Correctless is the correctness system around them.
 
-## The Problem
+It does not try to make one agent smarter, faster, and more confident. It makes wrong answers harder to merge. A spec agent defines what correct means, a reviewer attacks the spec, a test agent writes failing tests without seeing the implementation plan, an auditor checks whether those tests would catch real bugs, a separate implementer makes them pass, QA hunts for defects, and verification checks the final code against the original rules.
 
-AI coding assistants are fast but sloppy. They write code that works for the happy path, skip edge cases, and silently introduce bugs that don't surface until production. The same model that wrote the code will review it and say "looks good" — because it's confirming its own decisions.
+Most AI workflows optimize for throughput. Correctless optimizes for trust.
 
-Correctless fixes this by structuring the workflow so that **every phase is executed by a different agent with a different lens**:
+## Why This Exists
 
-- The **spec agent** asks "what does correct mean?" and researches current best practices before any code exists
-- The **review agent** reads the spec cold and checks for security gaps, unstated assumptions, and untestable rules
-- The **test agent** writes tests from the spec without knowing the implementation plan
-- The **test auditor** checks whether those tests would actually catch bugs or just pass against mocks
-- The **implementation agent** makes the tests pass without having written them
-- The **QA agent** hunts for bugs with neither the test author's nor the implementer's blind spots
-- The **verification agent** checks spec-to-code correspondence without insider knowledge
+Fast AI development has a recurring failure mode: the same model plans the work, writes the code, writes the tests, reviews the result, and then reports that everything looks good. That is not review. That is self-confirmation with extra steps.
 
-Same model — but the framing determines what the agent finds.
+Correctless breaks that loop.
+
+| Velocity-first workflow | Correctless workflow |
+|-------------------------|----------------------|
+| "Build the feature and test it." | "Define correctness before code exists." |
+| One long-lived agent accumulates assumptions. | Fresh agents run each phase with different instructions. |
+| Tests often mirror the implementation. | RED tests are written before the implementation plan. |
+| Reviews happen after code exists. | Specs are attacked before code can bias the reviewer. |
+| Prompt discipline fades as context fills. | Bash hooks enforce phase gates and log violations. |
+| Escaped bugs become tribal memory. | Escaped bugs become antipatterns, spec rules, tests, and future review checks. |
+
+The point is not ceremony. The point is to create independent pressure from multiple angles before bad code reaches main.
+
+## What Correctless Gives You
+
+**A spec-to-merge correctness pipeline.** `/cspec -> /creview -> /ctdd -> /cverify -> /cdocs` turns vague requests into testable rules, adversarial review, enforced TDD, verification, and documentation.
+
+**Agent separation by design.** The spec author, reviewer, test writer, implementer, QA agent, mini-audit agents, and verifier are different agents with different lenses. The test writer does not know the implementation plan. The QA agent did not write the code. The verifier checks against the spec, not against the implementer's story.
+
+**Mechanical enforcement where prompts are weak.** `workflow-gate.sh` blocks source edits during RED and all writes during QA. `audit-trail.sh` records what actually happened. `sensitive-file-guard.sh` catches naive Edit/Write tool calls to protected paths. `workflow-advance.sh` owns phase transitions.
+
+**Adversarial depth when risk is high.** High intensity adds 6-agent spec review, convergence audits, architecture adherence checks, review-driven mini-audit lenses, mutation/config probes, and architecture maintenance. Critical intensity adds Alloy modeling and live red-team assessment.
+
+**A memory loop that compounds.** Postmortems, QA findings, audit findings, deferred review items, and antipatterns feed back into future specs and reviews. Correctless gets more project-specific over time.
+
+**Autonomy with brakes.** `/cauto` can run from approved spec to PR. `/cchores` can pick one suitable issue, fix it via `/cdebug`, run a regression oracle, redact outbound text, and open one PR. Both are bounded by explicit gates, manifests, decision logs, and fail-closed behavior.
+
+**Visibility into the workflow itself.** `/cstatus`, `/csummary`, `/cmetrics`, `/cdashboard`, and `/cwtf` show current phase, cost, findings, shortcuts, stale artifacts, and whether agents actually followed the process.
 
 ## Quick Start
 
-You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and a Claude Max subscription ($100-200/mo).
+You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code), a Claude Max subscription, `jq`, Bash 4+, and a project with a test runner.
 
 ### Install
 
-```
+```text
 /plugin marketplace add joshft/correctless
 /plugin install correctless
 /csetup
@@ -50,393 +71,301 @@ git clone https://github.com/joshft/correctless.git .claude/skills/workflow
 ```
 </details>
 
-Standard intensity by default. To increase: add `"intensity": "high"` or `"critical"` to the `workflow` section of `.correctless/config/workflow-config.json`.
+### Start a Feature
 
-### First Feature
-
-```
+```bash
 git checkout -b feature/my-feature
+```
+
+```text
 /cspec
 ```
 
+Standard intensity is the default. To raise the floor, set `"intensity": "high"` or `"critical"` under `workflow` in `.correctless/config/workflow-config.json`.
+
 ### Update
 
-```
+```text
 /plugin uninstall correctless
 /plugin marketplace remove correctless
 /plugin marketplace add joshft/correctless
 /plugin install correctless
 ```
 
-Then restart Claude Code. Git clone users: `cd .claude/skills/workflow && git pull && ./setup`
+Then restart Claude Code and run `/csetup`. Git clone users can update with:
 
-## One Plugin, Three Intensity Levels
+```bash
+cd .claude/skills/workflow
+git pull
+./setup
+```
 
-Correctless ships as a single plugin with 33 skills. You choose the intensity that matches your project's risk profile. Seven skills are gated behind intensity thresholds — they check your project's `workflow.intensity` setting and warn if invoked below their minimum.
-
-| Intensity | Overhead | What You Get | Best For |
-|-----------|----------|--------------|----------|
-| **standard** | ~10-15 min | 19 core skills: spec, review, TDD, verify, docs, debug, refactor, release | SaaS, APIs, CLI tools, content sites |
-| **high** | ~30-60 min | + adversarial spec review, convergence auditing, architecture tracking | Auth, payments, sensitive data |
-| **critical** | ~1-2 hours | + Alloy formal modeling, live red team assessment | Security infrastructure, crypto, proxies |
-
-Skills like `/cpostmortem` and `/cdevadv` are available at all intensity levels — they're about learning from the past, not adding rigor to the present.
-
-**Put another way:** Standard intensity is like having someone next to you going through a checklist to make sure your project has some sanity. Critical intensity is like taking your Claude Max subscription tokens, setting them on fire, collecting the ash, and using it to create a tiny diamond.
-
-## How It Works
-
-### The Standard Workflow
+## The Core Pipeline
 
 ```mermaid
 graph LR
-    A["/cspec<br/>Write spec"] --> B["/creview<br/>Skeptical review"]
-    B --> C["/ctdd"]
-    C --> D["/cverify<br/>Rule coverage"]
-    D --> E["/cdocs<br/>Update docs"]
-    E --> F["Merge"]
+    A["/cspec<br/>write testable spec"] --> B["/creview<br/>attack the spec"]
+    B --> C["/ctdd<br/>enforced TDD"]
+    C --> D["/cverify<br/>prove spec coverage"]
+    D --> E["/cdocs<br/>update docs"]
+    E --> F["merge"]
 
-    subgraph "/ctdd — Enforced TDD"
+    subgraph TDD["/ctdd"]
         direction LR
-        C1["RED<br/>Write tests"] --> C2["Test Audit<br/>Would tests catch bugs?"]
-        C2 --> C3["GREEN<br/>Implement"]
-        C3 --> C4["/simplify"]
-        C4 --> C5["QA<br/>Hostile review"]
-        C5 -.->|"Issues found"| C3
+        C1["RED<br/>fresh test agent"] --> C2["test audit<br/>would tests catch bugs?"]
+        C2 --> C3["GREEN<br/>fresh implementer"]
+        C3 --> C4["/simplify<br/>validated cleanup"]
+        C4 --> C5["QA<br/>hostile review"]
+        C5 --> C6["mini-audit<br/>specialist lenses"]
+        C5 -.->|"findings"| C3
     end
 
     C --- C1
-
-    style A fill:#339af0,color:#fff
-    style B fill:#e599f7,color:#000
-    style C1 fill:#ff6b6b,color:#fff
-    style C3 fill:#51cf66,color:#fff
-    style C5 fill:#ffd43b,color:#000
-    style F fill:#51cf66,color:#fff
 ```
 
-Each box is a separate agent. The test writer doesn't know the implementation plan. The QA agent didn't write the tests. A PreToolUse hook blocks source code edits until tests exist — this isn't a suggestion, it's enforced by bash. See the [Standard Workflow Guide](docs/standard-workflow.md) for state machine diagrams, hook architecture, and phase gating details.
+Passing tests are not the finish line. Correctless asks:
 
-### The Critical Workflow
+- Did every spec rule get a meaningful test?
+- Would the test fail if the implementation were subtly wrong?
+- Did QA read the changed files and hunt for edge cases?
+- Did the implementation introduce dependencies or architecture drift not justified by the spec?
+- Did any agent edit files in a phase where it should have been read-only?
+- Did documentation and architecture stay current enough for the next feature?
 
-```mermaid
-graph LR
-    A["/cspec<br/>Typed invariants"] --> B["/cmodel<br/>Alloy modeling"]
-    B --> C["/creview-spec<br/>6-agent adversarial"]
-    C --> D["/ctdd<br/>+ mutation testing"]
-    D --> E["/cverify<br/>+ drift detection"]
-    E --> F["/cupdate-arch"]
-    F --> G["/cdocs"]
-    G --> H["/caudit<br/>Olympics"]
+## Intensity Levels
 
-    style B fill:#ff922b,color:#fff
-    style C fill:#e599f7,color:#000
-    style H fill:#ff922b,color:#fff
-```
+Correctless ships as a single plugin with 33 skills. Intensity controls how much rigor activates for a feature.
 
-### Intensity Detection
+| Intensity | Typical Cost | What Activates | Best For |
+|-----------|--------------|----------------|----------|
+| `standard` | ~10-15 min | Core spec, review, TDD, verify, docs, debug, refactor, release | CRUD, CLI tools, internal apps |
+| `high` | ~30-60 min | 6-agent spec review, convergence audit, architecture maintenance, mutation/config probes | Auth, payments, sensitive data, cross-component changes |
+| `critical` | ~1-2 hr | Alloy modeling and live red-team assessment | Security infrastructure, protocols, crypto, high-blast-radius systems |
 
-You don't have to pick intensity manually for every feature. `/cspec` evaluates signals in your spec — file paths touching auth/payments, STRIDE threat keywords, compliance references, antipattern history — and recommends the right intensity. You confirm or override.
+`/cspec` recommends intensity from feature signals: touched paths, STRIDE language, compliance requirements, invariant density, historical antipatterns, and prior phase effectiveness. The recommendation is advisory; the human decides.
 
-```mermaid
-graph LR
-    A["Feature request"] --> B["/cspec"]
-    B --> C{"Intensity<br/>detection"}
-    C -->|"CRUD endpoint"| D["standard"]
-    C -->|"Auth + payments"| E["high"]
-    C -->|"Crypto + HIPAA"| F["critical"]
-    D --> G["Review + TDD"]
-    E --> H["+ /caudit, /creview-spec"]
-    F --> I["+ /cmodel, /credteam"]
-
-    style D fill:#51cf66,color:#fff
-    style E fill:#ffd43b,color:#000
-    style F fill:#ff6b6b,color:#fff
-```
-
-### Defense in Depth
-
-Prompt-level instructions fade as context fills — enforcement that depends on the model is a suggestion. Correctless uses four independent layers:
-
-```mermaid
-graph TD
-    A["Agent wants to<br/>edit source file<br/>during QA phase"] --> B["Layer 1: Gate<br/>PreToolUse hook"]
-    B -->|"BLOCK"| C["Edit prevented<br/>Model can't bypass bash"]
-    B -->|"ALLOW<br/>(Bash slip-through)"| D["File modified"]
-    D --> E["Layer 2: Audit Trail<br/>PostToolUse hook"]
-    E --> F["Logged with phase context<br/>Alert shown to user"]
-    F --> G["/cwtf reads trail<br/>reports deviations"]
-
-    P["Layer 3: Path-scoped rules<br/>(higher-adherence advisory)"] -.->|"Loaded when a<br/>scoped file is opened"| A
-    H["Layer 4: Skill Instructions<br/>(prompt-level, advisory)"] -.->|"Subject to<br/>context fade"| A
-
-    style B fill:#ff6b6b,color:#fff
-    style C fill:#ff6b6b,color:#fff
-    style E fill:#ffd43b,color:#000
-    style P fill:#ffa94d,color:#000
-    style H fill:#dee2e6,color:#000
-```
-
-**Fresh agents per phase** add resilience: each phase spawns a new agent at 0% context with fresh instructions via `context: fork`. A QA agent at 0% follows hostile-lens instructions perfectly. A single agent at 70% may have forgotten it was supposed to be hostile.
-
-### The Compounding Effect
-
-Escaped bugs become antipatterns. Antipatterns become spec rules. Spec rules become tests. Six months in, the workflow knows your project's failure modes better than any individual developer.
-
-```mermaid
-graph LR
-    A["Bug escapes"] --> B["/cpostmortem"]
-    B --> C["antipatterns.md<br/>(class fix)"]
-    B --> D["CLAUDE.md<br/>(learning)"]
-    C --> E["/cspec reads<br/>antipatterns"]
-    D --> F["Every future<br/>session loads"]
-    E --> G["Feature N+1<br/>prevents<br/>same bug class"]
-    F --> G
-
-    style B fill:#ff922b,color:#fff
-    style G fill:#51cf66,color:#fff
-```
-
-## Skills
-
-Correctless provides 33 skills across the workflow. Each is a slash command you invoke directly; the tables below group them by purpose.
+## Capability Map
 
 ### Core Workflow
 
-| Skill | When to Use | What It Does |
-|-------|------------|--------------|
-| [`/csetup`](docs/skills/csetup.md) | First run, or re-run for health check | 19-point health check, convention mining, project scaffolding |
-| [`/cspec`](docs/skills/cspec.md) | Starting a new feature | Testable rules with research agent, intensity detection |
-| [`/creview`](docs/skills/creview.md) | After /cspec | Skeptical review + OWASP security checklist |
-| [`/ctdd`](docs/skills/ctdd.md) | After review approves spec | RED, test audit, GREEN, /simplify, QA, probes, mini-audit — all enforced |
-| [`/cverify`](docs/skills/cverify.md) | After /ctdd completes | Spec-to-code verification, drift detection |
-| [`/cdocs`](docs/skills/cdocs.md) | After /cverify | Update README, AGENT_CONTEXT, ARCHITECTURE, feature docs |
-| [`/carchitect`](docs/skills/carchitect.md) | New project or missing architecture doc | Structured ARCHITECTURE.md — reverse-engineer or greenfield, entrypoints YAML |
-| [`/cauto`](docs/skills/cauto.md) | After spec review approved | Orchestrate full pipeline: TDD, verify, docs, PR — with flexible phase resume |
-| [`/crelease`](docs/skills/crelease.md) | Ready to tag a version | Version bump, changelog, sanity checks, annotated tag |
+| Skill | Use It For |
+|-------|------------|
+| [`/csetup`](docs/skills/csetup.md) | Project health check, convention mining, setup, hook registration |
+| [`/cspec`](docs/skills/cspec.md) | Testable specs, research, intensity recommendation, integration contracts |
+| [`/creview`](docs/skills/creview.md) | Skeptical spec review with security, assumptions, testability, and historical-pattern checks |
+| [`/ctdd`](docs/skills/ctdd.md) | RED, test audit, GREEN, `/simplify`, QA, probes, mini-audit |
+| [`/cverify`](docs/skills/cverify.md) | Rule coverage, mutation signal, dependency review, architecture adherence, drift detection |
+| [`/cdocs`](docs/skills/cdocs.md) | README, AGENT_CONTEXT, ARCHITECTURE, feature docs, cost artifacts |
+| [`/carchitect`](docs/skills/carchitect.md) | Reverse-engineer or design structured architecture with machine-readable entrypoints |
+| [`/cauto`](docs/skills/cauto.md) | Run the implementation pipeline through PR creation with resume and decision logging |
+| [`/crelease`](docs/skills/crelease.md) | Version bump, changelog, release sanity checks, annotated tag |
 
 ### Code Quality
 
-| Skill | When to Use | What It Does |
-|-------|------------|--------------|
-| [`/cquick`](docs/skills/cquick.md) | Small, well-understood changes | TDD without the ceremony — scope-guarded at 50 LOC / 3 files |
-| [`/crefactor`](docs/skills/crefactor.md) | Restructuring without behavior change | Characterization tests, behavioral equivalence, agent separation |
-| [`/cdebug`](docs/skills/cdebug.md) | Stuck on a bug | Root cause, hypothesis, git bisect, TDD fix, class fix |
-| [`/cpr-review`](docs/skills/cpr-review.md) | Reviewing an incoming PR | Architecture, security, tests, antipatterns, dep bumps |
+| Skill | Use It For |
+|-------|------------|
+| [`/cquick`](docs/skills/cquick.md) | Small TDD fixes without full spec ceremony |
+| [`/cdebug`](docs/skills/cdebug.md) | Reproduce, diagnose, bisect, and fix bugs with a TDD loop |
+| [`/crefactor`](docs/skills/crefactor.md) | Behavior-preserving refactors with characterization tests |
+| [`/cpr-review`](docs/skills/cpr-review.md) | Multi-lens PR review, including dependency-bump review |
+| [`/cexplain`](docs/skills/cexplain.md) | Guided codebase exploration with diagrams and confidence markers |
+
+### High-Rigor Analysis
+
+| Skill | Use It For |
+|-------|------------|
+| [`/creview-spec`](docs/skills/creview-spec.md) | 6-agent adversarial spec review: red team, assumptions, testability, design contract, upgrade compatibility, UX |
+| [`/caudit`](docs/skills/caudit.md) | Olympics-style convergence audits for QA, hacker, performance, UX, or custom lenses |
+| [`/cupdate-arch`](docs/skills/cupdate-arch.md) | Keep trust boundaries, abstractions, patterns, and assumptions current |
+| [`/cmodel`](docs/skills/cmodel.md) | Alloy formal modeling for state machines, protocols, and invariants |
+| [`/credteam`](docs/skills/credteam.md) | Live adversarial red-team assessment in an isolated environment |
+| [`/cpostmortem`](docs/skills/cpostmortem.md) | Convert escaped bugs into class fixes and future review pressure |
+| [`/cdevadv`](docs/skills/cdevadv.md) | Challenge architecture and strategy with a devil's-advocate lens |
+| [`/cmodelupgrade`](docs/skills/cmodelupgrade.md) | Compare model/harness behavior against historical pipeline baselines |
+
+### Observability and Maintenance
+
+| Skill | Use It For |
+|-------|------------|
+| [`/cstatus`](docs/skills/cstatus.md) | Current phase, next steps, stale state, harness advisories |
+| [`/chelp`](docs/skills/chelp.md) | Compact command reference |
+| [`/csummary`](docs/skills/csummary.md) | What the workflow caught on a feature |
+| [`/cmetrics`](docs/skills/cmetrics.md) | Token cost, phase metrics, override health, audit staleness, ROI |
+| [`/cdashboard`](docs/skills/cdashboard.md) | HTML dashboard with metrics and artifact browser |
+| [`/cwtf`](docs/skills/cwtf.md) | Workflow accountability: did agents follow instructions or shortcut? |
+| [`/ctriage`](docs/skills/ctriage.md) | Wizard-style triage of deferred review findings |
+| [`/cprune`](docs/skills/cprune.md) | Archive stale docs, clean orphaned artifacts, fix count drift |
+| [`/cchores`](docs/skills/cchores.md) | Autonomous one-issue backlog grooming with fail-closed PR creation |
 
 ### Open Source
 
-| Skill | When to Use | What It Does |
-|-------|------------|--------------|
-| [`/ccontribute`](docs/skills/ccontribute.md) | Contributing to another project | Learn conventions first, match patterns, pre-flight, generate PR |
-| [`/cmaintain`](docs/skills/cmaintain.md) | Reviewing a contribution | Scope check, conventions, maintenance burden, pre-written comments |
+| Skill | Use It For |
+|-------|------------|
+| [`/ccontribute`](docs/skills/ccontribute.md) | Learn another project's conventions and produce maintainer-friendly PRs |
+| [`/cmaintain`](docs/skills/cmaintain.md) | Review external contributions through a maintainer lens |
 
-### Observability
+## What Happens Under the Hood
 
-| Skill | When to Use | What It Does |
-|-------|------------|--------------|
-| [`/cstatus`](docs/skills/cstatus.md) | Anytime | Current phase, next steps, problem detection |
-| [`/chelp`](docs/skills/chelp.md) | Need a quick reference | Workflow pipeline, all commands |
-| [`/csummary`](docs/skills/csummary.md) | After a feature or mid-feature | What the workflow caught, by phase |
-| [`/cmetrics`](docs/skills/cmetrics.md) | Monthly or for ROI analysis | Token cost, bugs caught, session analytics, trends |
-| [`/cwtf`](docs/skills/cwtf.md) | Suspect agents took shortcuts | Did agents actually follow instructions? |
-| [`/cexplain`](docs/skills/cexplain.md) | Onboarding or exploring a codebase | Guided mermaid diagrams, prose walkthroughs, HTML export |
-| [`/cdashboard`](docs/skills/cdashboard.md) | Visualize project health | HTML dashboard with metrics + artifact browser |
-| [`/ctriage`](docs/skills/ctriage.md) | Deferred findings piling up | Wizard-style bulk triage of deferred review findings |
-| [`/cprune`](docs/skills/cprune.md) | Periodic maintenance | Archive stale docs, clean orphaned artifacts, fix count drift |
-| [`/cchores`](docs/skills/cchores.md) | Autonomous backlog grooming | Picks one suitable open issue (or `/cchores <N>` for a specific one), fixes it via /cdebug TDD, opens a single PR. Explicit-issue mode can fix a conservative set of protected infra files under a scoped, per-run authorization marker (never secrets) |
+### Fresh Lenses
 
-### Analysis
-
-| Skill | When to Use | What It Does |
-|-------|------------|--------------|
-| [`/cpostmortem`](docs/skills/cpostmortem.md) | After a bug escapes | Trace which phase missed it, add antipattern + class fix |
-| [`/cdevadv`](docs/skills/cdevadv.md) | Periodic deep analysis | Devil's advocate — challenge architecture and strategy |
-| [`/cmodelupgrade`](docs/skills/cmodelupgrade.md) | After a model upgrade or `version_bumped` advisory | Per-feature regression report comparing pipeline metrics against the baseline for the current `{model}+HARNESS_VERSION` |
-
-### Intensity-Gated
-
-| Skill | Min Intensity | What It Does |
-|-------|---------------|--------------|
-| [`/caudit`](docs/skills/caudit.md) | high | Olympics convergence audit (QA / Hacker / Performance / UX presets) |
-| [`/creview-spec`](docs/skills/creview-spec.md) | high | 6-agent adversarial spec review (+ optional cross-model codex review) |
-| [`/cupdate-arch`](docs/skills/cupdate-arch.md) | high | Keep ARCHITECTURE.md current after features land |
-| [`/cmodel`](docs/skills/cmodel.md) | critical | Alloy formal modeling for state machines and protocols |
-| [`/credteam`](docs/skills/credteam.md) | critical | Live adversarial red team with source code access |
-
-## Platform Integration
-
-Correctless hooks into Claude Code's infrastructure for real-time feedback and long-term learning. All features below are **automatic** after `/csetup`.
+Correctless uses 16 plugin agents with narrow roles and pinned tool access, including RED/GREEN TDD agents, a research agent, architecture reviewers, 6 spec-review agents, a fix-diff reviewer, a supervisor, a decision agent, and a `/cchores` issue classifier. The tool allowlists are not just safety limits; they shape the agent into the job it is supposed to do.
 
 ### Hooks
 
+Correctless installs 9 hooks/config hooks after `/csetup`:
+
+| Hook | Role |
+|------|------|
+| `workflow-gate.sh` | Phase-gated file writes: RED blocks source edits, QA blocks writes, verified phases block implementation changes |
+| `sensitive-file-guard.sh` | Edit/Write tool-path guard for secrets, protected config, and sanctioned-writer files. It does not inspect Bash commands |
+| `audit-trail.sh` | PostToolUse event log with phase and file context |
+| `auto-format.sh` | Best-effort formatting after edits |
+| `token-tracking.sh` | Subagent token, duration, cost, phase, and skill logging |
+| `statusline.sh` | Live phase, cost, context, QA round, and line delta display |
+| `workflow-advance.sh` | State machine, transition checks, spec integrity, audit persistence gates |
+| `instructions-loaded.sh` | Rule-load telemetry for `/cwtf` accountability |
+| `import-guard.json` | Agent hook that discourages integration-test bypasses |
+
+The sensitive-file guard is intentionally honest about its boundary: it catches naive `Edit`/`Write`/`MultiEdit`/`NotebookEdit`/`CreateFile` writes to protected paths. Bash-mediated writes are accepted non-goals. Correctless treats hooks as cooperative-loop guardrails, then backs important contracts with diff gates, phase gates, tests, and reviewer pressure where needed.
+
+### Defense in Depth
+
+Correctless does not bet the project on a single prompt, hook, or reviewer pass. It uses four independent layers that cross-check the work before code is treated as done:
+
 ```mermaid
-graph TB
-    subgraph "Claude Code Hooks"
-        A["PreToolUse"] --> H["sensitive-file-guard.sh<br/>Edit/Write tool-path guard"]
-        A --> B["workflow-gate.sh<br/>Phase enforcement"]
-        C["PostToolUse"] --> D["audit-trail.sh<br/>Adherence feedback"]
-        C --> G["auto-format.sh<br/>Auto-formatting"]
-        E["Statusline"] --> F["statusline.sh<br/>Phase + cost + context"]
-    end
+flowchart LR
+    gate[Gate]
+    audit[Audit Trail]
+    path[Path-scoped rules]
+    skill[Skill Instructions]
 
-    H -->|"block/allow Edit/Write only"| M[".env, keys, credentials<br/>(Bash writes unguarded)"]
-    B -->|"block/allow"| I["Every file edit"]
-    D -->|"alerts"| J["Real-time violations"]
-    G -->|"formats"| L["Edited files"]
-    F -->|"live display"| K["Always visible"]
-
-    style H fill:#e64980,color:#fff
-    style B fill:#ff6b6b,color:#fff
-    style D fill:#ffd43b,color:#000
-    style G fill:#74c0fc,color:#000
-    style F fill:#51cf66,color:#fff
+    gate --> audit
+    audit --> path
+    path --> skill
+    skill -.-> gate
 ```
 
-| Hook | Runs | Purpose |
-|------|------|---------|
-| **sensitive-file-guard.sh** | Before every Edit/Write tool call (Bash is never inspected) | Edit/Write tool-path guardrail: blocks `Edit`/`Write`/`MultiEdit`/`NotebookEdit`/`CreateFile` writes to `.env`, credentials, keys, certificates. Catches accidental/naive Edit/Write tool calls; ALL Bash-mediated writes (redirects, writer commands, interpreters, git) are unguarded accepted non-goals (AP-040). The input-parse path fails closed; an unparsable `custom_patterns` config degrades to DEFAULTS-only matching (never fully open) |
-| **workflow-gate.sh** | Before every file edit | Blocks writes that violate the current phase (RED blocks source, QA blocks everything) |
-| **audit-trail.sh** | After every tool call | Logs modifications with phase context, alerts on violations |
-| **token-tracking.sh** | After Agent tool completion | Logs subagent token usage, cost, and duration to JSONL for `/cmetrics` analysis |
-| **auto-format.sh** | After Edit/Write/MultiEdit | Runs project formatter (Prettier, Black, gofmt, etc.) with allowlist validation |
-| **statusline.sh** | Continuously | Shows phase, QA round, cost, context %, lines delta |
-| **workflow-advance.sh** | On command | State machine — validates transitions, enforces gates |
+### Project Memory
+
+Correctless keeps local artifacts that future skills consume:
+
+- `.correctless/specs/` for feature specs
+- `.correctless/artifacts/` for review findings, QA findings, audit rounds, summaries, costs, trails, and pipeline manifests
+- `.correctless/meta/` for calibration, deferred findings, drift debt, model baselines, and cross-feature intelligence
+- `.correctless/antipatterns.md` for known bug classes
+- `.correctless/ARCHITECTURE.md` for trust boundaries, abstractions, patterns, and environment assumptions
+
+The result is a feedback loop: a bug caught in QA becomes a finding, a repeated finding becomes an antipattern, an antipattern becomes a spec/review check, and the next feature starts with that knowledge loaded.
+
+### Architecture-Aware Development
+
+`/carchitect` and `/cupdate-arch` make architecture machine-referenceable. Entrypoints feed `/cspec` integration contracts and `/ctdd` test-writing constraints. `/cverify` and `/caudit` then check changed code against documented trust boundaries, abstractions, and patterns. Architecture is not a static diagram; it becomes input to the workflow.
+
+### Test Strength, Not Just Test Count
+
+Correctless includes several defenses against impressive-looking but weak tests:
+
+- Test audit before implementation asks whether tests would catch real bugs.
+- RED-phase real-fixture rules prevent tests from parsing imaginary producer formats.
+- Integration contracts push tests through documented entrypoints.
+- Mutation and config probes at high+ intensity try to keep tests from passing after adversarial changes.
+- `/cverify` maps every rule to tests and implementation evidence.
+
+## Autonomous Modes
+
+Correctless can run hands-off, but autonomy is bounded.
+
+`/cauto` orchestrates the main pipeline from approved spec to PR. It writes a pipeline manifest, checks install freshness, resumes interrupted phases, records decisions, validates `/simplify` output, stages only expected paths, and escalates on architectural decisions, persistent failures, security concerns, or budget exhaustion.
+
+`/cchores` handles one suitable issue at a time. It classifies candidates, fences untrusted issue text, branches from a fresh default branch, delegates the fix to `/cdebug`, runs a regression oracle, redacts outbound text, runs a CI-superset pre-PR gate, and opens exactly one PR. Ambiguity means abort, not guess.
+
+## Platform Integration
 
 ### Statusline
 
-The statusline shows your workflow state at a glance:
-```
+```text
 project/  feature/auth  Opus  34%  RED  QA:R0  $0.42  +87/-12
 ```
-Phase (color-coded), QA round count, session cost, feature cost (background-cached), lines delta, context usage with warnings at 70%.
 
-### Real-Time Adherence Feedback
+The statusline surfaces phase, QA round, session and feature cost, context usage, and line delta. Cost data comes from Claude Code session transcripts and is cached for lightweight display.
 
-The audit trail hook monitors every modification and alerts immediately:
-- `tdd-qa: Source file modified — middleware.ts (this phase should be read-only)`
-- `GREEN: Test file edited — auth.test.ts (prohibited — TEST_BUG escalation expected)`
-- `QA: Read middleware.ts (3 of 7 modified files reviewed)` (high+ intensity)
+### Dashboard and Metrics
 
-### Session Analytics
+`/cmetrics` and `/cdashboard` report token cost, phase counts, QA rounds, audit staleness, override health, deferred findings, and artifact history. This is useful for answering the practical question: "What did the workflow catch, and what did it cost?"
 
-[`/cmetrics`](docs/skills/cmetrics.md) reads Claude Code's session data for exact token costs, outcome rates, and a **Correctless vs Freeform** comparison table.
+### Optional MCP
 
-### Compounding Learning
+`/csetup` can configure:
 
-Postmortem findings, conventions, and audit learnings append to CLAUDE.md and load into every future session automatically. The spec agent just *knows* that "auth features in this project need middleware ordering checks" without being told.
+- **Serena** for symbol-level code queries and call graph analysis.
+- **Context7** for current library documentation during spec research.
 
-### Git Integration (opt-in)
-
-- **Git trailers** in commit messages: `Spec:`, `Rules-covered:`, `Verified-by:`
-- **Git notes** attaching verification summaries to commits
-- **Git bisect** in `/cdebug` for automated regression finding
-
-### MCP Servers (opt-in)
-
-`/csetup` offers to configure two MCP servers that improve analysis across all skills:
-
-- **Serena** — symbol-level code queries (call graphs, references, symbol lookup). 15 skills use it for precise analysis with 40-60% token savings on larger projects.
-- **Context7** — current library documentation on demand. The `/cspec` research agent gets real docs for real versions.
-
-Both are free, open source, run locally, and fall back silently when unavailable.
-
-### Output Redaction
-
-External-facing skills ([`/cpr-review`](docs/skills/cpr-review.md), [`/ccontribute`](docs/skills/ccontribute.md), [`/cmaintain`](docs/skills/cmaintain.md)) automatically redact paths, credentials, hostnames, and session IDs before posting.
-
-## Project Health Check
-
-`/csetup` runs 19 checks across 6 categories on first run:
-
-| Category | Checks |
-|----------|--------|
-| **Security** | Hardcoded secrets, API keys in source, .env committed, missing .gitignore patterns |
-| **Code Quality** | Linter configured, formatter configured, dependency audit |
-| **Testing** | Test runner detected, test files exist, coverage configured |
-| **CI/CD** | CI pipeline exists, runs tests, runs linter |
-| **Documentation** | README exists, ARCHITECTURE.md, CONTRIBUTING.md |
-| **Git Hygiene** | .gitignore present, no large binaries, branch protection |
-
-For existing projects, setup also mines your codebase for conventions (commit message style, test patterns, import ordering) and bootstraps architecture documentation.
-
-## State Management
-
-Check your workflow with [`/cstatus`](docs/skills/cstatus.md) or the statusline. For advanced debugging:
-
-```bash
-.correctless/hooks/workflow-advance.sh diagnose "file" # Why a file is blocked
-.correctless/hooks/workflow-advance.sh override "why"  # Temporary gate bypass (10 tool calls)
-.correctless/hooks/workflow-advance.sh spec-update "why"  # Spec was wrong mid-TDD
-.correctless/hooks/workflow-advance.sh reset           # Remove all state for current branch
-```
-
-### Quick Fixes During an Active Workflow
-
-If the gate is blocking a typo fix:
-
-```bash
-.correctless/hooks/workflow-advance.sh override "quick bugfix: fixing typo in error message"
-```
-
-Bypasses the gate for 10 tool calls. When no workflow is active, the gate allows all edits freely.
+Both degrade gracefully when unavailable.
 
 ## Language Support
 
+Standard intensity works with any project that has a test command. High+ intensity has helper guidance and mutation support for common stacks:
+
 | Language | Test Runner | Mutation Tool | PBT Library |
 |----------|-------------|---------------|-------------|
-| Go | `go test` | go-mutesting | rapid |
-| TypeScript | jest/vitest | Stryker | fast-check |
-| Python | pytest | mutmut | hypothesis |
-| Rust | cargo test | cargo-mutants | proptest |
-
-Mutation testing and PBT helpers are available at high+ intensity. Standard intensity works with any language that has a test runner.
+| Go | `go test` | `go-mutesting` | `rapid` |
+| TypeScript | Jest/Vitest | Stryker | `fast-check` |
+| Python | pytest | mutmut | Hypothesis |
+| Rust | `cargo test` | cargo-mutants | proptest |
 
 ## Requirements
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
-- A **Claude Max subscription** ($100/mo or $200/mo plan). Correctless spawns multiple agents per feature — $200/mo is recommended at high+ intensity.
-- A project with a test runner
-- **jq** (JSON processor) — required for all hooks. Install: `brew install jq` (macOS), `apt install jq` (Ubuntu)
-- **Bash 4+** — required for hooks. macOS ships Bash 3.2 by default; install modern bash: `brew install bash`
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+- Claude Max subscription. High+ intensity intentionally spends tokens on independent review pressure
+- `jq` 1.7+
+- Bash 4+
+- Git
+- A project test command
 
-Optional (high+/critical):
-- [Alloy Analyzer](https://alloytools.org/) for formal modeling
-- Mutation testing tool for your language
-- Isolated environment (Docker/VPS) for red team assessments
+Optional:
 
-## Good to Know
+- Alloy Analyzer for `/cmodel`
+- Mutation tool for your language
+- Docker, VM, or equivalent isolated environment for `/credteam`
+- `gh` for PR creation and `/cchores`
 
-**Opt-in per feature.** Correctless is passive when no workflow is active. Start a workflow with `/cspec` on a feature branch — skip it on branches where you don't need it. All normal Claude Code behavior is unchanged outside active workflows.
+## Good To Know
 
-**CI unchanged.** Correctless runs entirely inside Claude Code sessions via local hooks. It does not modify your CI pipeline, add CI steps, or require any CI changes.
+**Correctless is opt-in per branch.** It is passive when no workflow is active. Start with `/cspec` on a feature branch.
 
-**After merge.** Delete the feature branch and start fresh with a new branch + `/cspec`. Workflow state files in `.correctless/artifacts/` are branch-scoped and harmless — they provide history for `/cmetrics` and `/csummary`.
+**It does not require CI changes.** Correctless runs inside Claude Code via local hooks, scripts, skills, and artifacts.
 
-### Uninstall
+**It is built for uncomfortable evidence.** A good run may produce blocking findings. That is the point. The workflow is doing its job when it finds the bug before your users do.
 
-To fully remove Correctless from a project, follow these steps **in order** (the order matters — removing `.correctless/` before cleaning settings.json will lock you out of Claude Code because the fail-closed hooks point to scripts inside `.correctless/`):
+**It is not a security perimeter.** Correctless improves the cooperative agent loop. It does not sandbox the operating system, prevent all Bash writes, or replace code review for high-risk systems.
+
+## Project Scale
+
+The current release packages 33 skills with the agents, hooks, scripts, and docs that make the workflow enforceable.
+
+Current source tree:
+
+- 33 skills
+- 16 plugin agents
+- 9 hooks/config hooks
+- 40 shared scripts plus workflow modules
+- 111 tracked test scripts
+- 22 feature docs
+- 3 intensity levels
+
+## Uninstall
+
+Order matters. Remove hook references before deleting `.correctless/`, or Claude Code may still point at missing fail-closed hook scripts.
+
+```text
+/plugin uninstall correctless
+```
+
+Then clean `.claude/settings.json` of hook entries that reference `.correctless/hooks/` or `hooks/`.
+
+After that, remove Correctless sections from `CLAUDE.md`, remove Correctless MCP entries from `.mcp.json`, remove `.serena.yml` if created by setup, remove Correctless `.gitignore` entries, and delete:
 
 ```bash
-# 1. Remove the plugin registration
-/plugin uninstall correctless
-
-# 2. Clean .claude/settings.json FIRST — remove all hook entries that reference
-#    .correctless/hooks/ or hooks/ (workflow-gate, sensitive-file-guard,
-#    audit-trail, auto-format, statusline, token-tracking, workflow-advance).
-#    Edit manually with a text editor, or delete .claude/settings.json entirely
-#    if you have no other Claude Code hooks.
-
-# 3. Remove the "## Correctless" and "## Correctless Learnings" sections from CLAUDE.md
-
-# 4. Remove Correctless-added entries from .mcp.json (serena, context7) if present
-#    — keep the file if you have other MCP servers configured
-
-# 5. Remove .serena.yml if it exists (created by /csetup Serena integration)
-
-# 6. Remove Correctless .gitignore entries (.correctless/artifacts/*, .serena/, etc.)
-
-# 7. NOW remove the project files
 rm -rf .correctless/
 ```
 
@@ -444,23 +373,21 @@ rm -rf .correctless/
 
 | Term | Meaning |
 |------|---------|
-| **Agent separation** | Each workflow phase runs in a fresh Claude session. The test writer doesn't know the implementation plan; the QA agent didn't write the tests. Prevents confirmation bias. |
-| **Instance fix** | Fix the one bug here and now. |
-| **Class fix** | Fix the entire category of this bug — add a structural test that prevents recurrence. |
-| **Convergence** | Run multiple audit rounds until findings stabilize (no new critical/high issues). |
-| **Drift** | Code that no longer matches documented architecture. Detected by `/cverify`, tracked in drift-debt.json. |
-| **Antipattern** | A known bug class from your project's history. Stored in `.correctless/antipatterns.md`, checked by every future spec and review. |
-| **Spec** | A document defining what "correct" means for a feature: testable rules, edge cases, security assumptions. A spec that can't be tested is incomplete. |
-| **Invariant** | A rule that must always be true: "auth tokens expire after 24 hours." Specs are lists of invariants. |
-| **Intensity** | The configured rigor level: standard, high, or critical. Higher intensity unlocks more skills but costs more tokens and time. |
-| **Mini-audit** | After QA clears, six default adversarial specialist agents (cross-component interaction, hostile input, resource bounds, upgrade compatibility, UX review, integration depth) hunt for issues the QA lens misses — plus up to 2 recommended lenses from the review phase tailored to the feature's risk profile. Runs at the end of `/ctdd`. |
-| **Mutation testing** | Introduce small bugs into code and check if tests catch them. If a test passes with a mutation, that test is weak. Available at high+ intensity via the adversarial probe round. |
-| **STRIDE** | Threat modeling framework: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege. |
-| **RED / GREEN** | TDD phases. RED = write tests that fail. GREEN = write code to make tests pass. |
+| Agent separation | Each phase uses a different agent/lens so no agent grades its own work |
+| Class fix | A fix for the whole bug category, not just the observed instance |
+| Convergence | Repeated audit rounds until no new critical/high findings appear |
+| Drift | Code or docs that no longer match the spec or architecture |
+| Invariant | A property that must always hold |
+| Mini-audit | Specialist review at the end of `/ctdd` after QA |
+| Mutation testing | Introduce small bugs and check whether tests fail |
+| Spec | A testable definition of correctness for a feature |
+| STRIDE | Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege |
 
 ## Status
 
-**Correctless 3.0.0 — Early release.** 33 skills, 3 intensity levels, ~5,000 automated tests, 8 hooks. Real-world usage ongoing — [file issues as you find them](https://github.com/joshft/correctless/issues).
+Correctless 3.1.1 is an early release with real-world dogfooding. It is opinionated, token-hungry at high intensity, and deliberately slower than freeform agent coding. That is the trade: less raw velocity, more evidence.
+
+File issues at <https://github.com/joshft/correctless/issues>.
 
 ## License
 
