@@ -228,6 +228,23 @@ Correctless installs 9 hooks/config hooks after `/csetup`:
 
 The sensitive-file guard is intentionally honest about its boundary: it catches naive `Edit`/`Write`/`MultiEdit`/`NotebookEdit`/`CreateFile` writes to protected paths. Bash-mediated writes are accepted non-goals. Correctless treats hooks as cooperative-loop guardrails, then backs important contracts with diff gates, phase gates, tests, and reviewer pressure where needed.
 
+### Defense in Depth
+
+Correctless does not bet the project on a single prompt, hook, or reviewer pass. It uses four independent layers that cross-check the work before code is treated as done:
+
+```mermaid
+flowchart LR
+    gate[Gate]
+    audit[Audit Trail]
+    path[Path-scoped rules]
+    skill[Skill Instructions]
+
+    gate --> audit
+    audit --> path
+    path --> skill
+    skill -.-> gate
+```
+
 ### Project Memory
 
 Correctless keeps local artifacts that future skills consume:
