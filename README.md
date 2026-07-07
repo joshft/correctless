@@ -341,6 +341,8 @@ Optional:
 
 ## Project Scale
 
+The current release packages 33 skills with the agents, hooks, scripts, and docs that make the workflow enforceable.
+
 Current source tree:
 
 - 33 skills
