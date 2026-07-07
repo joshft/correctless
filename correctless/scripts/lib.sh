@@ -518,6 +518,38 @@ canonicalize_path() {
 }
 
 # ---------------------------------------------------------------------------
+# require_canonicalize_or_die — SHARED canonicalize_path capability probe
+# (MA-001, cchores-protected-affordance mini-audit round 3).
+# ---------------------------------------------------------------------------
+# Runs the PAT-017 v1 sentinel probe (`declare -f canonicalize_path` present AND
+# a `__canonicalize_path_v1_probe__/foo` round-trip returns the expected
+# canonical form). Returns 0 when canonicalize_path is available and correct;
+# otherwise prints a `bash setup` remediation to stderr (prefixed with the
+# caller-supplied context) and returns non-zero.
+#
+# This is the single source of the probe used by BOTH consumers that depend on
+# canonicalize_path being live before they can classify a path — the SFG hook
+# STEP 4a and scripts/cchores-diff-check.sh — so the guard travels with the
+# helper (MA-001). Without a live canonicalize_path, is_secret_floor() and the
+# diff-check's _canon() return empty and EVERY gate leg would silently PASS
+# (fail OPEN). Callers decide the exit code (hook: exit 2; diff-check: exit 3);
+# this helper only signals capability, it does not exit.
+#
+# Note on the lib-absent case: because this function lives in lib.sh, a consumer
+# whose lib.sh failed to source entirely will not have this function defined
+# either. Such a consumer MUST retain an inline fallback that fails closed when
+# `require_canonicalize_or_die` is itself undefined (see the two call sites).
+require_canonicalize_or_die() {
+  local ctx="${1:-canonicalize_path}"
+  if ! declare -f canonicalize_path >/dev/null 2>&1 \
+     || [ "$(canonicalize_path '__canonicalize_path_v1_probe__/foo' 2>/dev/null || true)" != "__canonicalize_path_v1_probe__/foo" ]; then
+    echo "BLOCKED [${ctx}]: canonicalize_path missing or version mismatch — re-run 'bash setup' to refresh installed scripts" >&2
+    return 1
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # _has_write_pattern — detect write/destructive shell command patterns
 # ---------------------------------------------------------------------------
 # Returns 0 if the command contains a write pattern, 1 otherwise.

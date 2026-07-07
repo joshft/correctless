@@ -29,6 +29,24 @@ GROUP_A_DISALLOWED="Edit, Write, MultiEdit, NotebookEdit, CreateFile"
 GROUP_B_SKILLS="cexplain cwtf cmetrics csummary cpr-review cmaintain cmodel cmodelupgrade ctriage cchores"
 GROUP_B_DISALLOWED="Edit, MultiEdit, NotebookEdit, CreateFile"
 
+# QA-002 / INV-014 R2-K defense-in-depth: /cchores carries an EXTRA scoped Write
+# exclusion for the affordance authorization marker on top of the Group B
+# baseline. allowed-tools globs have no exclusion syntax (Write(.correctless/
+# artifacts/*) cannot be narrowed to "except the marker"), so the marker is
+# excluded via a scoped disallowed-tools entry (precedence makes disallow win).
+# This is still Group B (bare Write is NOT disallowed — R-005 addendum).
+CCHORES_MARKER_EXCLUSION="Write(.correctless/artifacts/chores-protected-authorized.json)"
+GROUP_B_DISALLOWED_CCHORES="${GROUP_B_DISALLOWED}, ${CCHORES_MARKER_EXCLUSION}"
+
+# expected_disallowed_for <skill> <group-default> — the exact-equality expected
+# value for a skill, applying per-skill overrides (cchores marker exclusion).
+expected_disallowed_for() {
+  case "$1" in
+    cchores) printf '%s' "$GROUP_B_DISALLOWED_CCHORES" ;;
+    *)       printf '%s' "$2" ;;
+  esac
+}
+
 # Skills that legitimately use Edit/Write and should NOT have disallowed-tools
 EXEMPT_SKILLS="carchitect caudit cauto ccontribute cdebug cdevadv cdocs cpostmortem cprune cquick credteam crefactor crelease creview-spec creview csetup cspec ctdd cupdate-arch cverify"
 
@@ -76,12 +94,13 @@ check_group_disallowed() {
     fi
 
     actual="$(get_disallowed_tools "$skill_file")"
+    local skill_expected; skill_expected="$(expected_disallowed_for "$skill" "$expected")"
     if [ -z "$actual" ]; then
       fail "${rule_prefix}-$skill" "$skill missing disallowed-tools frontmatter"
-    elif [ "$actual" = "$expected" ]; then
+    elif [ "$actual" = "$skill_expected" ]; then
       pass "${rule_prefix}-$skill" "$skill has correct disallowed-tools for $group_name"
     else
-      fail "${rule_prefix}-$skill" "$skill disallowed-tools is '$actual', expected '$expected'"
+      fail "${rule_prefix}-$skill" "$skill disallowed-tools is '$actual', expected '$skill_expected'"
     fi
   done
 }
@@ -277,6 +296,8 @@ for skill_dir in "$SKILLS_DIR"/*/; do
     else
       expected="$GROUP_B_DISALLOWED"
     fi
+    # Apply per-skill overrides (cchores marker exclusion, QA-002).
+    expected="$(expected_disallowed_for "$skill" "$expected")"
 
     if [ "$actual_disallowed" = "$expected" ]; then
       pass "R007-$skill-classified" "$skill correctly classified as Group $group"

@@ -771,9 +771,14 @@ test_inv008_override_bypasses_with_log_entry() {
 # ============================================================================
 
 test_inv009_writer_script_in_defaults() {
-  # Permissive about trailing heredoc quote (last line of DEFAULTS)
-  if grep -qE '^scripts/audit-record\.sh"?$' "$SENSITIVE_GUARD" \
-     && grep -qE '^\.correctless/scripts/audit-record\.sh"?$' "$SENSITIVE_GUARD"; then
+  # QA-001: DEFAULTS lines now carry an inline ` # <tag>` classification suffix
+  # (single source of truth — the untagged mirror was deleted), so strip the tag
+  # before the anchored whole-line match. Intent unchanged: assert both
+  # audit-record.sh paths are present in the authoritative tagged DEFAULTS block.
+  # (Permissive about a trailing heredoc quote on the last DEFAULTS line.)
+  local bare; bare="$(sed -E 's/[[:space:]]+#.*$//' "$SENSITIVE_GUARD" 2>/dev/null)"
+  if printf '%s\n' "$bare" | grep -qE '^scripts/audit-record\.sh"?$' \
+     && printf '%s\n' "$bare" | grep -qE '^\.correctless/scripts/audit-record\.sh"?$'; then
     pass "INV-009-defaults" "both audit-record.sh paths in DEFAULTS"
   else
     fail "INV-009-defaults" "audit-record.sh missing from sensitive-file-guard DEFAULTS (one or both paths)"

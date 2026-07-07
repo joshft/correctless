@@ -422,13 +422,17 @@ covers_invocation "INV-009(cchores-covers)" "$CCHORES"
 covers_invocation "INV-009(ctdd-covers)"    "$CTDD"
 covers_invocation "INV-009(cdocs-covers)"   "$CDOCS"
 
-# cchores disallowed-tools == exactly the 4-item Group B set, UNCHANGED.
+# cchores disallowed-tools == the 4-item Group B set PLUS the scoped affordance
+# marker Write exclusion (QA-002 / INV-014 R2-K defense-in-depth). The four Group
+# B items must all be present, bare Write must remain ALLOWED (only the marker path
+# is excluded, via scoped Write(...)), and the marker exclusion must be present.
 cchores_dis="$(get_frontmatter_field "$CCHORES" "disallowed-tools" 2>/dev/null || true)"
 norm_dis="$(printf '%s' "$cchores_dis" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' | sort | tr '\n' ',' )"
-if [ "$norm_dis" = "CreateFile,Edit,MultiEdit,NotebookEdit," ]; then
-  pass "INV-009(groupB)" "cchores disallowed-tools == exactly Group B (Edit, MultiEdit, NotebookEdit, CreateFile)"
+expected_dis="CreateFile,Edit,MultiEdit,NotebookEdit,Write(.correctless/artifacts/chores-protected-authorized.json),"
+if [ "$norm_dis" = "$expected_dis" ]; then
+  pass "INV-009(groupB)" "cchores disallowed-tools == Group B + scoped affordance-marker Write exclusion (bare Write still allowed)"
 else
-  fail "INV-009(groupB)" "cchores disallowed-tools changed from Group B (got: '$cchores_dis')"
+  fail "INV-009(groupB)" "cchores disallowed-tools not Group B + marker exclusion (got: '$cchores_dis')"
 fi
 
 # any new test script this feature adds matches tests/test-*.sh.

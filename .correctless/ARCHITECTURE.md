@@ -184,6 +184,9 @@ See [docs/architecture/abstractions.md](docs/architecture/abstractions.md).
 ### ABS-048: Generated test-count artifact (deliberately NOT a sole-writer)
 See [docs/architecture/abstractions.md](docs/architecture/abstractions.md).
 
+### ABS-049: Branch- and file-scoped SFG conditional-allow allowlist + per-run authorization marker (/cchores affordance)
+See [docs/architecture/abstractions.md](docs/architecture/abstractions.md).
+
 ## Patterns
 
 > **Reader note**: Some PAT entries below are migrated index lines — the heading is followed by a single See-link pointing to a canonical rule file under `.claude/rules/`. Full rule bodies live in the rule file; this document retains the stable ID and title. See **ABS-009** for the governing contract and the measurement gate that decides whether this pattern becomes the default. New PAT entries default to full-body form in this file until the rules-canonical experiment (PAT-001 migration, 2026-04-10) proves out its measurement gate.

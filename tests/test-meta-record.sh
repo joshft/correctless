@@ -478,8 +478,12 @@ test_inv006_verbatim_fixture_matches_live_defaults() {
   # subset of the LIVE SFG DEFAULTS heredoc — guards fixture drift from the
   # producer (hooks/sensitive-file-guard.sh).
   local re='^\.correctless/meta/[^/]+\.json$'
-  # Extract the live DEFAULTS meta set (anchored) from the real hook.
-  local live; live="$(grep -oE "$re" "$GUARD" 2>/dev/null | sort -u)"
+  # Extract the live DEFAULTS meta set (anchored) from the real hook. QA-001:
+  # DEFAULTS lines now carry an inline ` # <tag>` classification suffix (single
+  # source of truth), so strip the tag before applying the end-anchored regex —
+  # the assertion intent (bare meta-json paths in DEFAULTS) is unchanged, only
+  # retargeted onto the authoritative tagged block.
+  local live; live="$(sed -E 's/[[:space:]]+#.*$//' "$GUARD" 2>/dev/null | grep -oE "$re" | sort -u)"
   local fixture; fixture="$(printf '%s\n' "$SFG_DEFAULTS_META_FIXTURE" | sort -u)"
   local missing=0 f
   while IFS= read -r f; do
@@ -500,7 +504,9 @@ test_inv006_every_defaults_meta_has_registry_row() {
   # pass-list). Registry columns: <meta-path>\t<writer-script>\t<operation>.
   # RED: the registry file does not exist yet -> every mapping fails.
   local re='^\.correctless/meta/[^/]+\.json$'
-  local live; live="$(grep -oE "$re" "$GUARD" 2>/dev/null | sort -u)"
+  # QA-001: strip the inline ` # <tag>` DEFAULTS classification suffix before the
+  # end-anchored match (single source of truth = the tagged DEFAULTS block).
+  local live; live="$(sed -E 's/[[:space:]]+#.*$//' "$GUARD" 2>/dev/null | grep -oE "$re" | sort -u)"
   if [ ! -f "$REGISTRY" ]; then
     # Absence is the RED signal — assert per-file so the failing count is clear.
     local f
