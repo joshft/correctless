@@ -58,6 +58,18 @@
           }
         ]
       }
+    ],
+    "InstructionsLoaded": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".correctless/hooks/instructions-loaded.sh",
+            "timeout_ms": 5000
+          }
+        ]
+      }
     ]
   },
   "permissions": {
