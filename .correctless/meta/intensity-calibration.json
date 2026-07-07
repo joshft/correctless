@@ -931,6 +931,50 @@
         "tests/test-test-inventory-wiring.sh"
       ],
       "timestamp": "2026-07-06T07:41:09Z"
+    },
+    {
+      "feature_slug": "cchores-protected-affordance",
+      "recommended_intensity": "high",
+      "actual_intensity": "high",
+      "actual_qa_rounds": 2,
+      "actual_findings_count": 1,
+      "actual_tokens": 0,
+      "actual_spec_updates": 0,
+      "harness_version": 1,
+      "fix_rounds_triggered": 3,
+      "file_paths_touched": [
+        ".claude/rules/hooks-pretooluse.md",
+        ".claude/rules/sfg-deliverable.md",
+        ".correctless/AGENT_CONTEXT.md",
+        ".correctless/ARCHITECTURE.md",
+        ".correctless/specs/cchores-protected-affordance.md",
+        "CONTRIBUTING.md",
+        "correctless/hooks/sensitive-file-guard.sh",
+        "correctless/rules/sfg-deliverable.md",
+        "correctless/scripts/cchores-diff-check.sh",
+        "correctless/scripts/cchores-emit.sh",
+        "correctless/scripts/chores-authorize.sh",
+        "correctless/scripts/lib.sh",
+        "correctless/skills/cchores/SKILL.md",
+        "docs/architecture/abstractions.md",
+        "hooks/sensitive-file-guard.sh",
+        "scripts/cchores-diff-check.sh",
+        "scripts/cchores-emit.sh",
+        "scripts/chores-authorize.sh",
+        "scripts/lib.sh",
+        "scripts/sanctioned-chores-writers.tsv",
+        "skills/cchores/SKILL.md",
+        "tests/fixtures/cchores-noarg-preselect-abort.golden",
+        "tests/test-audit-findings-persistence.sh",
+        "tests/test-cchores-protected-affordance.sh",
+        "tests/test-disallowed-tools.sh",
+        "tests/test-fix-diff-reviewer-agent.sh",
+        "tests/test-helpers.sh",
+        "tests/test-meta-record.sh",
+        "tests/test-sensitive-file-guard.sh",
+        "tests/test-test-inventory-wiring.sh"
+      ],
+      "timestamp": "2026-07-07T02:06:32Z"
     }
   ]
 }

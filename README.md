@@ -244,7 +244,7 @@ Correctless provides 33 skills across the workflow. Each is a slash command you 
 | [`/cdashboard`](docs/skills/cdashboard.md) | Visualize project health | HTML dashboard with metrics + artifact browser |
 | [`/ctriage`](docs/skills/ctriage.md) | Deferred findings piling up | Wizard-style bulk triage of deferred review findings |
 | [`/cprune`](docs/skills/cprune.md) | Periodic maintenance | Archive stale docs, clean orphaned artifacts, fix count drift |
-| [`/cchores`](docs/skills/cchores.md) | Autonomous backlog grooming | Picks one suitable open issue, fixes it via /cdebug TDD, opens a single PR |
+| [`/cchores`](docs/skills/cchores.md) | Autonomous backlog grooming | Picks one suitable open issue (or `/cchores <N>` for a specific one), fixes it via /cdebug TDD, opens a single PR. Explicit-issue mode can fix a conservative set of protected infra files under a scoped, per-run authorization marker (never secrets) |
 
 ### Analysis
 
