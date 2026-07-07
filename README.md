@@ -134,7 +134,7 @@ Passing tests are not the finish line. Correctless asks:
 
 ## Intensity Levels
 
-Correctless ships as one plugin with 33 skills. Intensity controls how much rigor activates for a feature.
+Correctless ships as a single plugin with 33 skills. Intensity controls how much rigor activates for a feature.
 
 | Intensity | Typical Cost | What Activates | Best For |
 |-----------|--------------|----------------|----------|
