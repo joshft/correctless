@@ -164,6 +164,38 @@ parse_tools_list() {
 }
 
 # ============================================================================
+# glob_covers — SHARED tool-grant coverage helper with bare-verb normalization
+# (MA-010, cchores-protected-affordance mini-audit round 3).
+# ============================================================================
+# Answers: does the allowed-tools/tools grant $1 COVER the target string $2?
+#
+# Bare-verb normalization (the load-bearing fix): a BARE verb token is the
+# maximal glob for that verb, so it covers everything the parenthesized form
+# could scope. A frontmatter provenance test that only inspects the
+# parenthesized form (`Write(...)`, `Bash(...)`) is VACUOUS against a bare
+# `Write` / `Bash` grant — exactly the false-green MA-010 fixes. Any
+# provenance/coverage test (fix-diff-reviewer, disallowed-tools, cchores) that
+# sources this helper inherits the normalization.
+#
+#   glob_covers "Write"            <anything>  -> 0 (bare Write == Write(**))
+#   glob_covers "Bash"             <anything>  -> 0 (bare Bash covers every Bash(...))
+#   glob_covers "Write(inner)"     "$path"     -> [[ $path == inner ]]
+#   glob_covers "Bash(inner)"      "$cmd"      -> [[ $cmd  == inner ]]
+#   glob_covers "Edit"/"Edit(..)"  ...          (same shape as Write)
+#   anything else                              -> 1
+glob_covers() {
+  local g="$1" t="$2"
+  case "$g" in
+    Write|Bash|Edit|MultiEdit|NotebookEdit|CreateFile) return 0 ;;  # bare verb = maximal glob
+    Write\(*\)|Bash\(*\)|Edit\(*\)|MultiEdit\(*\)|NotebookEdit\(*\)|CreateFile\(*\))
+      local inner="${g#*\(}"; inner="${inner%\)}"
+      # shellcheck disable=SC2053
+      [[ "$t" == $inner ]] && return 0 || return 1 ;;
+    *) return 1 ;;
+  esac
+}
+
+# ============================================================================
 # Summary
 # ============================================================================
 

@@ -1,0 +1,10 @@
+# Sanctioned /cchores-affordance writer registry
+# (cchores-protected-affordance spec, INV-014 — sole-writer contract).
+#
+# CI/test-only data file — the writer does NOT runtime-read this. It records the
+# single sanctioned cooperative-loop writer for the branch+file-scoped
+# authorization marker. Lives OUTSIDE .correctless/ (a .tsv does not match the
+# *.sh install/sync globs, and the marker itself is SFG-protected).
+#
+# Columns (TAB-separated): <marker-path>	<writer-script>	<operation>
+.correctless/artifacts/chores-protected-authorized.json	chores-authorize.sh	write

@@ -64,9 +64,40 @@ exception sits at the `custom_patterns` config layer, not the JSON-parse layer.
 It is documented here so the shipped hook does not silently contradict its own
 governing rule file.
 
+## Second narrow exception: sensitive-file-guard conditional-allow affordance (2026-07)
+
+`hooks/sensitive-file-guard.sh` has a SECOND documented narrow exception, added
+by the `cchores-protected-affordance` feature (ABS-049): a **conditional-allow**
+carve-out on the Edit/Write path. An Edit/Write to an `# affordance`-tagged
+DEFAULTS path exits **0** (allow) ONLY when a fully-verified, branch- AND
+file-scoped authorization marker binds the current `chore/issue-<N>-*` branch AND
+names the specific path. This is the `/cchores` v2 affordance — the human's
+explicit `/cchores <N>` invocation is the authorization.
+
+**This does NOT loosen clause 5.** The conditional-allow exit-0 is gated on a
+**fully-verified marker predicate**; EVERY failure or ambiguity path stays
+**exit-2** (fail-closed):
+
+- no marker, present-but-unparsable marker, missing/corrupt run manifest,
+- a marker missing any of `branch`/`issue`/`run_id`/`allowed_paths`,
+- a non-numeric `issue`, a branch that does not byte-match `marker.branch`,
+- a branch name that does not match `chore/issue-<marker.issue>-*`,
+- a `run_id` that does not equal the manifest's `run_id`,
+- a target not in `marker.allowed_paths`,
+- ANY `# secret-floor` / `# other-floor` / `custom_patterns` / untagged pattern
+  (deny-by-default — only an explicit `# affordance` tag is ever eligible),
+- any `git`/`jq` read failure (all are guarded `2>/dev/null || …`; the hook
+  exits only 0 or 2, never 128/1 — cross-link INV-011).
+
+So the affordance widens exit-0 by exactly one precisely-scoped case and leaves
+the "unexpected input → exit 2" posture intact. Like the `custom_patterns`
+exception above, this is a deliberate, reviewable loosening documented here so
+the shipped hook does not silently contradict its governing rule file.
+
 ## Tests
 
 - `tests/test-sensitive-file-guard.sh` — sensitive-file-guard.sh shape + fail-closed behavior.
+- `tests/test-cchores-protected-affordance.sh` — the conditional-allow affordance (INV-002/003/011).
 - `tests/test-workflow-gate.sh` — workflow-gate.sh shape + fail-closed behavior.
 - `tests/test-dynamic-rigor.sh` — exercises both hooks across intensity levels.
 

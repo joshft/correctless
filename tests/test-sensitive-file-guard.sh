@@ -1962,9 +1962,14 @@ test_metarecord_inv005_writer_edit_write_blocked() {
   done
 
   # The writer path must actually be present in the hook's DEFAULTS (structural).
-  if grep -qxF 'scripts/meta-record.sh' "$HOOK" \
-     && grep -qxF '.correctless/scripts/meta-record.sh' "$HOOK" \
-     && grep -qxF 'meta-record.sh' "$HOOK"; then
+  # QA-001: DEFAULTS lines carry an inline ` # <tag>` classification suffix (single
+  # source of truth — the untagged _SFG_LEGACY_EXACT_LINE_MIRROR was deleted), so
+  # strip the tag before the whole-line-exact match. Intent unchanged: assert all
+  # three meta-record.sh forms are present in the authoritative DEFAULTS block.
+  local _hook_bare; _hook_bare="$(sed -E 's/[[:space:]]+#.*$//' "$HOOK" 2>/dev/null)"
+  if printf '%s\n' "$_hook_bare" | grep -qxF 'scripts/meta-record.sh' \
+     && printf '%s\n' "$_hook_bare" | grep -qxF '.correctless/scripts/meta-record.sh' \
+     && printf '%s\n' "$_hook_bare" | grep -qxF 'meta-record.sh'; then
     assert_eq "INV-005: all three meta-record.sh forms in DEFAULTS" "yes" "yes"
   else
     assert_eq "INV-005: all three meta-record.sh forms in DEFAULTS" "yes" "no"
@@ -1993,8 +1998,10 @@ test_metarecord_prh003_target_meta_stay_blocked() {
     result="$(run_hook_capture "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$p\",\"content\":\"x\"}}")"
     assert_eq "PRH-003: Write $p still blocked" "2" "$(extract_exit "$result")"
 
-    # protection line remains in DEFAULTS
-    if grep -qxF "$p" "$HOOK"; then
+    # protection line remains in DEFAULTS. QA-001: strip the inline ` # <tag>`
+    # classification suffix before the whole-line-exact match (single source of
+    # truth = the tagged DEFAULTS block).
+    if sed -E 's/[[:space:]]+#.*$//' "$HOOK" 2>/dev/null | grep -qxF "$p"; then
       assert_eq "PRH-003: $p remains in DEFAULTS" "yes" "yes"
     else
       assert_eq "PRH-003: $p remains in DEFAULTS" "yes" "no"

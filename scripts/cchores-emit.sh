@@ -53,6 +53,15 @@ fi
 # ============================================
 MAX_BYTES=""
 SINK=""
+# Affordance-mode PR banner inputs (cchores-protected-affordance INV-010). When
+# --affordance-paths is given, a prominent review banner naming the
+# under-authorization protected path(s) + the authorizing issue is PREPENDED to
+# the emitted (already-redacted) body; --guard-touched escalates the banner to
+# the guard-self-edit form. The banner is trusted, script-generated text (paths
+# + numeric issue), not untrusted content, so it is emitted verbatim.
+AFFORDANCE_PATHS=""
+GUARD_TOUCHED=0
+ISSUE=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -72,12 +81,49 @@ while [ "$#" -gt 0 ]; do
       SINK="${1#--sink=}"
       shift
       ;;
+    --affordance-paths)
+      AFFORDANCE_PATHS="${2:-}"
+      shift 2 || { echo "cchores-emit: --affordance-paths requires a value" >&2; exit 3; }
+      ;;
+    --affordance-paths=*)
+      AFFORDANCE_PATHS="${1#--affordance-paths=}"
+      shift
+      ;;
+    --guard-touched)
+      GUARD_TOUCHED=1
+      shift
+      ;;
+    --issue)
+      ISSUE="${2:-}"
+      shift 2 || { echo "cchores-emit: --issue requires a value" >&2; exit 3; }
+      ;;
+    --issue=*)
+      ISSUE="${1#--issue=}"
+      shift
+      ;;
     *)
       echo "cchores-emit: unknown argument '$1'" >&2
       exit 3
       ;;
   esac
 done
+
+# Build the affordance banner (INV-010). Empty when --affordance-paths is absent
+# — an ordinary (non-affordance) PR carries NO banner.
+BANNER=""
+if [ -n "$AFFORDANCE_PATHS" ]; then
+  _issue_txt="${ISSUE:-?}"
+  BANNER="⚠ AFFORDANCE-MODE PR — this chore edited SFG-protected path(s) under explicit authorization (issue #${_issue_txt}): ${AFFORDANCE_PATHS}. These are normally protected; review with care."
+  if [ "$GUARD_TOUCHED" -eq 1 ]; then
+    BANNER="${BANNER}
+⚠ This chore edits sensitive-file-guard.sh / its trust dependency — the guard that authorized this run. Review with extra care."
+  fi
+fi
+
+emit_banner() {
+  [ -n "$BANNER" ] && printf '%s\n\n' "$BANNER"
+  return 0
+}
 
 # Resolve the cap. Explicit --max-bytes wins; else map --sink to its INV-013
 # default; else the conservative 4096 floor.
@@ -133,6 +179,7 @@ fi
 byte_len="$(wc -c < "$REDACTED_FILE" | tr -d ' ')"
 
 if [ "$byte_len" -le "$MAX_BYTES" ]; then
+  emit_banner
   cat "$REDACTED_FILE"
   exit 0
 fi
@@ -149,6 +196,7 @@ fi
 # `head -c` truncates on a byte boundary. A multi-byte UTF-8 char split at the
 # boundary would yield an invalid tail byte; trim any trailing partial UTF-8
 # continuation bytes (0x80-0xBF) with a perl pass when perl is available.
+emit_banner
 head -c "$keep" "$REDACTED_FILE" > "${REDACTED_FILE}.cap"
 if command -v perl >/dev/null 2>&1; then
   perl -0777 -pe 's/[\x80-\xBF]+\z//' "${REDACTED_FILE}.cap" > "${REDACTED_FILE}.cap2" \

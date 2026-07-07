@@ -12,6 +12,13 @@ develops them:
   ABS-047 — added to DEFAULTS by the calibration-writer feature, MA-M7). Its
   three DEFAULTS forms (`scripts/meta-record.sh`, `.correctless/scripts/meta-record.sh`,
   and the bare `meta-record.sh`) are all removed on lift and restored together.
+- `scripts/chores-authorize.sh` (the sanctioned sole-writer for the /cchores
+  protected-file affordance marker, ABS-049 — added to DEFAULTS by the
+  cchores-protected-affordance feature, R2-L / EA-004). Its three DEFAULTS forms
+  (`scripts/chores-authorize.sh`, `.correctless/scripts/chores-authorize.sh`, and
+  the bare `chores-authorize.sh`) are all removed on lift and restored together.
+  Developing it uses the generalized `lift-active:<path>` sentinel
+  (`echo "lift-active: scripts/chores-authorize.sh" > .correctless/.sfg-lift-active`).
 
 The `sensitive-file-guard.sh` hook (SFG) has no per-file allowlist primitive:
 `custom_patterns` only ADDS protection, never excepts a default. When an

@@ -2458,8 +2458,14 @@ check_class_shaped_bug_detection() {
     local ok12=1 why12=""
     for f in "$CS_SFG" "$CS_SFG_DIST"; do
       if [ -f "$f" ]; then
-        grep -Fxq 'agents/fix-diff-reviewer.md' "$f" || { ok12=0; why12="${why12}${f}:agent-path missing; "; }
-        grep -Fxq '.correctless/.sfg-lift-active' "$f" || { ok12=0; why12="${why12}${f}:sentinel-in-DEFAULTS missing (RS-018); "; }
+        # QA-001: DEFAULTS lines carry an inline ` # <tag>` classification suffix
+        # (single source of truth — the untagged _SFG_LEGACY_EXACT_LINE_MIRROR was
+        # deleted), so strip the tag before the whole-line-exact match. Intent
+        # unchanged: assert the agent path + lift sentinel are present in the
+        # authoritative DEFAULTS block of both SFG files.
+        local _bare; _bare="$(sed -E 's/[[:space:]]+#.*$//' "$f" 2>/dev/null)"
+        printf '%s\n' "$_bare" | grep -Fxq 'agents/fix-diff-reviewer.md' || { ok12=0; why12="${why12}${f}:agent-path missing; "; }
+        printf '%s\n' "$_bare" | grep -Fxq '.correctless/.sfg-lift-active' || { ok12=0; why12="${why12}${f}:sentinel-in-DEFAULTS missing (RS-018); "; }
       else
         ok12=0; why12="${why12}${f} absent; "
       fi
