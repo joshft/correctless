@@ -4,8 +4,33 @@ All notable changes to Correctless are documented here.
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-07-11
+
+### Added
+- **`/cchores` protected-file affordance with explicit-issue authorization (#255)** — `/cchores <N>` can now fix an `# affordance`-tagged SFG-protected infra file under a branch- and file-scoped authorization marker minted by the sanctioned sole-writer `scripts/chores-authorize.sh` (ABS-049), gated by a post-cdebug diff check `scripts/cchores-diff-check.sh`. The no-arg auto-select lane still degrades to v1 and never lifts protection; `# secret-floor`/`# other-floor` targets stay non-auto-fixable even with explicit authorization. See `.correctless/specs/cchores-protected-affordance.md`.
+- **Design Contract Checker lens registry (#261)** — the 8 documented Design Contract Checker lenses (DCL-001…DCL-008, derived from PMB-013…PMB-020) are wired into a structural registry TSV (`agents/design-contract-lenses.tsv`) bound to the review agent by set-equality, closing the DA-001/AP-036 "corrective-action documented but not implemented" class (ABS-050). See `.correctless/specs/design-contract-lens-sync.md`.
+- **Sanctioned sole-writer for SFG-protected meta artifacts (#246)** — `scripts/meta-record.sh` is the sole cooperative-loop write path for `.correctless/meta/*.json`, closing the AP-037 "protected asset is the deliverable" class with a kernel `flock` lock and a fail-loud stdout contract (ABS-047).
+- **InstructionsLoaded hook for PAT-001 rule-load observability (#221)** — a direct runtime signal that a path-scoped rule loaded into agent context, registered in project settings.
+- **Generated test-count artifact (#253)** — breaks the #219 `/cchores` deadlock by deriving the AGENT_CONTEXT.md test count from a generated artifact instead of a hand-edited figure.
+- **Real single-file MultiEdit audit-trail events (#248)** — `hooks/audit-trail.sh` logs the actual edited file for single-file MultiEdit calls.
+
 ### Fixed
+- **`/cchores` affordance capability probe self-defeated on a relative hook path (#264, closes #263)** — `do_check_capability` in `scripts/chores-authorize.sh` validated the hook at repo-root cwd but ran it inside a subshell that `cd`s into a temp probe dir, so the relative hook path the v2 skill passes failed exit 127 and the whole affordance silently degraded to v1. The hook path is now resolved to absolute before the probe subshell. Regression test `INV-012-d` exercises the relative path (the absolute-path fixture had masked the bug — AP-031).
 - **audit-trail attributes events to the edited file's own git repo, not the shell's cwd (#244)** — `hooks/audit-trail.sh` (PostToolUse, fail-open telemetry) previously derived the artifacts dir, slug, state/trail/config paths, record `branch`, and adherence file from the hook's **cwd**. When the harness edited a file in a sibling git repo/worktree while cwd was a different repo, the event was logged under the **wrong** repo's trail or **dropped entirely** — the silent-telemetry-failure class. The hook now resolves each edited file to its **own** git repo (a local `_resolve_file_repo` walk-up + `git -C <dir> rev-parse --show-toplevel`, memoized per nearest-existing directory) and attributes every derivation to that repo. A file in no git repo, or in a repo with no active workflow state, is a clean **no-op** (never wrongly logged under cwd). **Cross-repo metrics may show a one-time attribution discontinuity after upgrade; single-repo projects are unaffected** (the common cwd==repo case writes to the same trail as before). Nested repos/submodules attribute to the innermost repo. Fail-open posture preserved; no security hardening added (telemetry, not a boundary). Narrowed from the original #244 (workflow-gate already fixed by #242; the sensitive-file-guard `custom_patterns` residual is left as-is). See `.correctless/specs/hook-repo-root-for.md`.
+- **workflow-gate resolves repo root from the edited file's path, not cwd (#243)** — the sibling-worktree class fix matching #244, applied to the workflow-gate hook.
+- **Mixed-shape audit-trail time field normalized in `compute-session-cost` (#229)** — phase attribution coalesces `(.ts // .timestamp)` so `ts`-shaped hook-edit entries are no longer nulled.
+- **`build-caudit-prompt.sh` dropped the finding-description fence on object-shaped artifacts (#218)**.
+- **Intermittent GREEN-gate flake under output-capture (#220, closes #186)**.
+- **`setup` migration guarded against deleting tracked source files (#213, closes #197)**.
+- **ARG_MAX overflow in `build-dashboard.sh` `read_file_json` (#212, closes #144)** — large artifacts pass via `--rawfile` instead of argv.
+- **ARG_MAX overflow in `cchores-select-candidates.sh` (#211, closes #209)**.
+- **`workflow-gate.sh` fail-open on non-scalar `tool_name` (#208, closes #207)**.
+
+### Internal
+- **ARCHITECTURE.md fragmented into a root index + per-section body files (#223)** — keeps the architecture doc under size thresholds; body files load into editing context per section.
+- **README positioning revised (#259)**.
+- **Recorded the DA-001/AP-036 convention learning in CLAUDE.md (#262)** — prose-documented enforcement additions must ship with a structural registry + set-equality test.
+- **Bumped `github/codeql-action/upload-sarif` (#224)**.
 
 ## [3.1.1] - 2026-06-27
 
