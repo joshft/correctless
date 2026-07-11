@@ -250,6 +250,12 @@ do_check_capability() {
     echo "chores-authorize: hook not found at '${hook:-<none>}' — affordance unavailable; run 'bash setup' to install the current hooks/scripts" >&2
     return 3
   fi
+  # Resolve $hook to an ABSOLUTE path before the probe subshell below cd's into a
+  # temp dir. Callers (the v2 /cchores skill, PRH-003) pass a RELATIVE hook path;
+  # left relative, `bash "$hook"` inside the `cd "$probe"` subshell resolves against
+  # the temp dir instead of the repo, fails exit 127, and the probe wrongly reports the
+  # hook as "not affordance-capable" — silently degrading the affordance to v1 (#263).
+  hook="$(cd "$(dirname "$hook")" 2>/dev/null && pwd)/$(basename "$hook")"
   command -v jq >/dev/null 2>&1 || { echo "chores-authorize: jq not found — cannot probe capability" >&2; return 3; }
   command -v git >/dev/null 2>&1 || { echo "chores-authorize: git not found — cannot probe capability" >&2; return 3; }
 
