@@ -233,7 +233,7 @@ write_workflow_effectiveness() {
   "post_merge_bugs": [
     {
       "id": "PMB-001",
-      "date": "2026-04-10",
+      "date": "@@DATE_PMB001@@",
       "description": "jq 1.7 vs 1.8 operator precedence for `as $var` bindings",
       "severity": "medium",
       "found_by": "GitHub Actions CI",
@@ -252,7 +252,7 @@ write_workflow_effectiveness() {
     },
     {
       "id": "PMB-003",
-      "date": "2026-04-21",
+      "date": "@@DATE_PMB003@@",
       "description": "Hardcoded file list in setup silently skips new scripts",
       "severity": "medium",
       "found_by": "Manual discovery",
@@ -271,7 +271,7 @@ write_workflow_effectiveness() {
     },
     {
       "id": "PMB-005",
-      "date": "2026-04-27",
+      "date": "@@DATE_PMB005@@",
       "description": "caudit findings persistence is advisory prose not gate-enforced",
       "severity": "high",
       "found_by": "Manual discovery during cmetrics",
@@ -291,6 +291,16 @@ write_workflow_effectiveness() {
   ]
 }
 FIXTURE
+  # Dates are generated relative to today so these fixture entries stay inside
+  # the intel script's 90-day recency window. They were previously hardcoded
+  # absolute dates (2026-04-10/-21/-27); PMB-001's 2026-04-10 crossed 90 days
+  # on ~2026-07-09, silently reddening INV-016e (audit entry filtered out) —
+  # the classic bound-drift/AP-024 class. Relative dates never drift.
+  sed -i \
+    -e "s/@@DATE_PMB001@@/$(date -d '30 days ago' +%Y-%m-%d)/" \
+    -e "s/@@DATE_PMB003@@/$(date -d '20 days ago' +%Y-%m-%d)/" \
+    -e "s/@@DATE_PMB005@@/$(date -d '10 days ago' +%Y-%m-%d)/" \
+    "$base/.correctless/meta/workflow-effectiveness.json"
 }
 
 # Helper: write lens recommendation fixtures

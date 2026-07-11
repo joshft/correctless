@@ -1,0 +1,9 @@
+lens_id	keyword	source_pmb	summary
+DCL-001	cardinality	PMB-013	Pin implementation-level cardinality when a semantic invariant spans parallel arrays or lockstep sets.
+DCL-002	tool-surface	PMB-014	Pin agent tool surfaces and isolate concurrent subagents sharing a mutable substrate.
+DCL-003	content-fidelity	PMB-015	Require a derived artifact (worktree, snapshot, fork) to reflect the source it is checked against.
+DCL-004	extraction-rejection	PMB-016	Require an extraction primitive over a prose document to name the adversarial substrings it must reject.
+DCL-005	authoring-affordance	PMB-017	Require a new protection mechanism to name how the protected asset is legitimately developed thereafter.
+DCL-006	gate-scope	PMB-018	Require a pre-deliver gate to be a superset of the post-deliver CI gate it precedes.
+DCL-007	unbounded-input-bounded-medium	PMB-019	Require unbounded input flowing into a bounded medium such as argv to name the bound or passthrough.
+DCL-008	mechanism-capability-mismatch	PMB-020	Require a mechanism threat model to match what its enforcement layer can structurally deliver.
