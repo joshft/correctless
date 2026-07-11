@@ -1120,10 +1120,26 @@ if [ -f "$CHORES_AUTH" ]; then
   else
     fail "INV-012-c" "absent hook path must yield a clean degrade (exit=$ec)"
   fi
+
+  # --- INV-012-d [regression, #263]: check-capability must ALSO pass when handed a
+  # RELATIVE hook path. The v2 /cchores skill (PRH-003) invokes the probe with a
+  # relative path (`check-capability .correctless/hooks/sensitive-file-guard.sh`),
+  # but do_check_capability cd's into a temp probe dir before `bash "$hook"`, so a
+  # relative $hook resolves against the temp dir and fails (exit 127 → false
+  # "not affordance-capable" → degrade-to-v1). The hook path must be resolved to
+  # absolute BEFORE the probe subshell. The absolute-path fixture in INV-012-a
+  # masked this (AP-031 real-fixture divergence). ---
+  ec=0; ( cd "$REPO_DIR" && bash "$CHORES_AUTH" check-capability hooks/sensitive-file-guard.sh >/dev/null 2>&1 ) || ec=$?
+  if [ "$ec" -eq 0 ]; then
+    pass "INV-012-d" "check-capability passes with a RELATIVE hook path (matches v2 skill invocation, #263)"
+  else
+    fail "INV-012-d" "relative hook path must resolve to absolute before the probe cd (exit=$ec, #263)"
+  fi
 else
   fail "INV-012-a" "scripts/chores-authorize.sh not found (check-capability unimplemented)"
   fail "INV-012-b" "scripts/chores-authorize.sh not found"
   fail "INV-012-c" "scripts/chores-authorize.sh not found"
+  fail "INV-012-d" "scripts/chores-authorize.sh not found"
 fi
 
 # ============================================================================
