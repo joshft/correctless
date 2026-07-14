@@ -75,6 +75,8 @@ Read the spec (path from step 3) and verification report at `.correctless/verifi
 
 **Every corrective action must be a class fix, not an instance fix.** The question is never "how do we fix this bug?" — the implementation team handles that. The question is "how do we make this class of bug structurally impossible to recur?"
 
+> **Design Contract Checker lens convention:** if this PMB's corrective action documents a new `/creview-spec` Design Contract Checker lens, it must also add a registry row to `agents/design-contract-lenses.tsv` (the single source of truth) and a matching bullet in `agents/review-spec-design-contract.md` — otherwise the documented lens never reaches the enforcer (the AP-036 gap). Do not leave the lens as prose only.
+
 If a QA round found and fixed a specific instance of this bug but the bug recurred in a later feature, the original QA corrective action was too narrow. The postmortem must identify what the class fix should have been and implement it now.
 
 For each miss, propose one or more of:

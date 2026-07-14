@@ -12,3 +12,17 @@ BLOCKINGs = "BLOCKINGs"
 promot = "promot"
 # grep prefix pattern matching both "truncated" and "truncation" in test assertions
 truncat = "truncat"
+# Design Contract lens keywords (agents/design-contract-lenses.tsv) — compound
+# tokens the typos hook must not mangle (esp. the long hyphenated ones).
+cardinality = "cardinality"
+tool-surface = "tool-surface"
+content-fidelity = "content-fidelity"
+extraction-rejection = "extraction-rejection"
+authoring-affordance = "authoring-affordance"
+gate-scope = "gate-scope"
+unbounded-input-bounded-medium = "unbounded-input-bounded-medium"
+mechanism-capability-mismatch = "mechanism-capability-mismatch"
+
+[files]
+# The lens registry is a source-only TSV of curated tokens — never spell-check it.
+extend-exclude = ["agents/design-contract-lenses.tsv"]

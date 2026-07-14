@@ -6,7 +6,7 @@
 [![CI](https://github.com/joshft/correctless/actions/workflows/ci.yml/badge.svg)](https://github.com/joshft/correctless/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Skills: 33](https://img.shields.io/badge/skills-33-blue.svg)](docs/skills/)
-[![Version: 3.1.1](https://img.shields.io/badge/version-3.1.1-green.svg)](CHANGELOG.md)
+[![Version: 3.1.1](https://img.shields.io/badge/version-3.2.0-green.svg)](CHANGELOG.md)
 
 # Correctless
 
