@@ -222,17 +222,17 @@ You are rewarded for depth, not volume. A single finding that reveals a fundamen
 
 | Category | Bounty | Description |
 |----------|--------|-------------|
-| Paradigm | $50,000 | Core assumption of the project is wrong |
-| Architecture | $25,000 | Design pattern or abstraction is inadequate |
-| Strategy | $15,000 | Testing, security, or operational approach has a systematic blind spot |
+| Paradigm | USD 50,000 | Core assumption of the project is wrong |
+| Architecture | USD 25,000 | Design pattern or abstraction is inadequate |
+| Strategy | USD 15,000 | Testing, security, or operational approach has a systematic blind spot |
 
 **Penalties:**
 
 | Violation | Penalty | Description |
 |-----------|---------|-------------|
-| Surface observation as deep insight | -$25,000 | "This function doesn't check nil" is Olympics, not devil's advocate |
-| Speculation without evidence | -$15,000 | "Might not scale" without proof from code, benchmarks, or dependencies |
-| Rehashing known issues | -$10,000 | Presenting antipatterns or drift debt items as novel insights |
+| Surface observation as deep insight | -USD 25,000 | "This function doesn't check nil" is Olympics, not devil's advocate |
+| Speculation without evidence | -USD 15,000 | "Might not scale" without proof from code, benchmarks, or dependencies |
+| Rehashing known issues | -USD 10,000 | Presenting antipatterns or drift debt items as novel insights |
 
 ## Handling the Report
 

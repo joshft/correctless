@@ -205,15 +205,15 @@ DO:
 - Document everything — every attempt, response, failure
 
 SCORING:
-  Objective achieved with full reproduction:        $50,000
+  Objective achieved with full reproduction:        USD 50,000
   Partially achieved (proved critical weakness
-    in the defense chain):                          $25,000
+    in the defense chain):                          USD 25,000
   Not achieved but identified exact defense that
-    stopped you + plausible bypass:                 $10,000
+    stopped you + plausible bypass:                 USD 10,000
 
-  Claimed achieved but reproduction doesn't work:  -$50,000
+  Claimed achieved but reproduction doesn't work:  -USD 50,000
   Wasted time on generic scanning instead of
-    pursuing the objective:                         -$10,000
+    pursuing the objective:                         -USD 10,000
 
 REPORT FORMAT:
 

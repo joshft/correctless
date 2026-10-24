@@ -367,7 +367,7 @@ This shows where the budget goes. If 65% goes to TDD and TDD catches 60% of bugs
 
 **3. Bug escape rate**: From `workflow-effectiveness.json`: `post_merge_bugs` count / (total caught + escaped). "Escape rate: {N}%. {M} caught pre-merge, {K} escaped."
 
-**4. Estimated production fix cost avoided**: Each caught bug saves an estimated 2-10 hours of production debugging, hotfixes, rollbacks, and incident response. "{N} bugs caught × 2-10 hours = {range} hours saved. At $150/hr developer cost, that's ${range} saved." This is a rough estimate — say so. But even the conservative end usually exceeds the token cost.
+**4. Estimated production fix cost avoided**: Each caught bug saves an estimated 2-10 hours of production debugging, hotfixes, rollbacks, and incident response. "{N} bugs caught × 2-10 hours = {range} hours saved. At USD 150/hr developer cost, that's ${range} saved." This is a rough estimate — say so. But even the conservative end usually exceeds the token cost.
 
 **5. Tokens per LOC**: Total tokens / total lines added (from git diff --stat across features). Track over time — should be stable if overhead scales linearly.
 
@@ -423,7 +423,7 @@ The table is sorted by total tokens descending. If no token log files exist, ski
 - **Pre-merge bugs caught:** {N}
 - **Post-merge bugs escaped:** {M}
 - **Escape rate:** {%}
-- **Estimated production fix cost avoided:** {N bugs} × 2-10 hours = {range} hours (~${range} at $150/hr)
+- **Estimated production fix cost avoided:** {N bugs} × 2-10 hours = {range} hours (~${range} at USD 150/hr)
 
 ### Efficiency
 - **Tokens per LOC:** {N} (total tokens / lines added across features)
