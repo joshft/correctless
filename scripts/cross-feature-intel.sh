@@ -98,9 +98,14 @@ _file_mtime_epoch() {
   echo "$epoch"
 }
 
-# Current epoch
+# Current epoch. CORRECTLESS_NOW_EPOCH pins the clock so test fixtures with
+# absolute dates cannot age out of the staleness window.
 _now_epoch() {
-  date +%s 2>/dev/null
+  if [[ "${CORRECTLESS_NOW_EPOCH:-}" =~ ^[0-9]+$ ]]; then
+    echo "$CORRECTLESS_NOW_EPOCH"
+  else
+    date +%s 2>/dev/null
+  fi
 }
 
 # 90-day staleness threshold in seconds

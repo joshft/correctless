@@ -22,6 +22,13 @@ SETUP_SCRIPT="$REPO_DIR/setup"
 SYNC_SCRIPT="$REPO_DIR/sync.sh"
 WORKFLOW_ADVANCE="$REPO_DIR/hooks/workflow-advance.sh"
 
+# Pin the intel script's clock. Fixtures use absolute May 2026 dates; against
+# the real clock they aged out of the 90-day staleness window on ~2026-08-18
+# and reddened 24 checks. All fixture dates are relative to this pin.
+FIXTURE_NOW="2026-05-25"
+CORRECTLESS_NOW_EPOCH=$(date -u -d "$FIXTURE_NOW" +%s)
+export CORRECTLESS_NOW_EPOCH
+
 # Test workspace
 WORK_BASE="/tmp/correctless-cfi-$$"
 cleanup() { rm -rf "$WORK_BASE"; }
@@ -291,15 +298,12 @@ write_workflow_effectiveness() {
   ]
 }
 FIXTURE
-  # Dates are generated relative to today so these fixture entries stay inside
-  # the intel script's 90-day recency window. They were previously hardcoded
-  # absolute dates (2026-04-10/-21/-27); PMB-001's 2026-04-10 crossed 90 days
-  # on ~2026-07-09, silently reddening INV-016e (audit entry filtered out) —
-  # the classic bound-drift/AP-024 class. Relative dates never drift.
+  # Dates are generated relative to the pinned FIXTURE_NOW so these entries
+  # stay inside the intel script's 90-day recency window.
   sed -i \
-    -e "s/@@DATE_PMB001@@/$(date -d '30 days ago' +%Y-%m-%d)/" \
-    -e "s/@@DATE_PMB003@@/$(date -d '20 days ago' +%Y-%m-%d)/" \
-    -e "s/@@DATE_PMB005@@/$(date -d '10 days ago' +%Y-%m-%d)/" \
+    -e "s/@@DATE_PMB001@@/$(date -u -d "$FIXTURE_NOW 30 days ago" +%Y-%m-%d)/" \
+    -e "s/@@DATE_PMB003@@/$(date -u -d "$FIXTURE_NOW 20 days ago" +%Y-%m-%d)/" \
+    -e "s/@@DATE_PMB005@@/$(date -u -d "$FIXTURE_NOW 10 days ago" +%Y-%m-%d)/" \
     "$base/.correctless/meta/workflow-effectiveness.json"
 }
 
