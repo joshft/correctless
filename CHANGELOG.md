@@ -4,6 +4,9 @@ All notable changes to Correctless are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- **`_read_spec_hash` passed a left-padded `wc -l` count to jq `tonumber` (#290)** — BSD/macOS `wc -l < file` left-pads its output (`      42`); `cmd_tests` (`review` → `tdd-tests`) in `scripts/wf/transitions.sh` and the spec-update path in `scripts/wf/metadata.sh` feed that string into `jq --arg lines … ($lines | tonumber)`, which jq ≥ 1.7 rejects, so both transitions died on macOS with only the generic `Failed to update state for tdd-tests phase` (jq's stderr is swallowed inside `locked_update_state`). The count is now trimmed at the source in `hooks/workflow-advance.sh` and an empty result defaults to `0`. Regression test `#290.1–3` in `tests/test-bugfixes.sh` emulates BSD padding with a PATH shim around `wc`, so it reproduces on GNU userland too. On macOS the fix also clears the cascading failures the existing suites showed, where every post-review transition sat at `review`.
+
 ## [3.2.0] - 2026-07-11
 
 ### Added

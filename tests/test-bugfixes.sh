@@ -516,6 +516,50 @@ test_sync_check() {
 }
 
 # ---------------------------------------------------------------------------
+# Bug 6: padded `wc -l` count rejected by jq tonumber (issue #290)
+# ---------------------------------------------------------------------------
+# BSD/macOS `wc -l < file` left-pads its count ("       4"); GNU wc does not.
+# _read_spec_hash fed that string to `jq --arg lines ... ($lines | tonumber)`,
+# which jq >= 1.7 rejects, so review -> tdd-tests died on macOS with only the
+# generic "Failed to update state for tdd-tests phase" (jq's stderr is swallowed
+# inside locked_update_state). The padding is emulated with a PATH shim around
+# the real wc so the regression reproduces on GNU userland (CI) too.
+
+test_padded_wc_spec_lines() {
+  echo ""
+  echo "=== Bug 6: padded wc -l count vs jq tonumber (#290) ==="
+
+  setup_test_project
+  .claude/skills/workflow/setup >/dev/null 2>&1
+  git checkout -q -b feature/padded-wc
+
+  ADV init "padded wc" >/dev/null 2>&1
+  mkdir -p .correctless/specs
+  printf '# Spec\n\nR-001: one\nR-002: two\n' > .correctless/specs/padded-wc.md   # 4 lines
+  ADV review >/dev/null 2>&1
+
+  # wc shim: real wc output with the count column left-padded the way BSD wc prints it
+  # Resolve the real wc before the shim shadows it (not every system has /usr/bin/wc)
+  local real_wc
+  real_wc="$(command -v wc)"
+  mkdir -p "$TEST_DIR/padbin"
+  cat > "$TEST_DIR/padbin/wc" <<WCSHIM
+#!/usr/bin/env bash
+"$real_wc" "\$@" | awk '{ \$1 = sprintf("%8s", \$1); print }'
+WCSHIM
+  chmod +x "$TEST_DIR/padbin/wc"
+
+  local tests_exit
+  ( export PATH="$TEST_DIR/padbin:$PATH"; ADV tests ) >/dev/null 2>&1 && tests_exit=0 || tests_exit=$?
+  assert_eq "#290.1: review -> tdd-tests succeeds when wc -l left-pads its count (BSD/macOS)" "0" "$tests_exit"
+
+  local state_file
+  state_file="$(ls .correctless/artifacts/workflow-state-feature-padded-wc-*.json 2>/dev/null | head -1)"
+  assert_eq "#290.2: phase advanced to tdd-tests" "tdd-tests" "$(jq -r '.phase' "$state_file" 2>/dev/null)"
+  assert_eq "#290.3: spec_line_count stored as the JSON number 4" "4" "$(jq -c '.spec_line_count' "$state_file" 2>/dev/null)"
+}
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
@@ -529,6 +573,7 @@ test_red_gate_test_new
 test_green_gate_retry_once
 test_qa_findings_status
 test_sync_check
+test_padded_wc_spec_lines
 
 echo ""
 echo "====================================="
