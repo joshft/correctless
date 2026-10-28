@@ -474,7 +474,7 @@ if ! [ "$THRESHOLD" -ge 1 ] 2>/dev/null; then
   fi
   THRESHOLD=50
 fi
-LINES_CHANGED="$(git diff --numstat "${ROUND_START_SHA}..HEAD" | awk '{added+=$1; removed+=$2} END {print added+removed+0}')"
+LINES_CHANGED="$(git diff --numstat "${ROUND_START_SHA}..HEAD" | awk '{added+=$(1); removed+=$(2)} END {print added+removed+0}')"
 FINDINGS_COUNT="$(jq 'length' ".correctless/artifacts/fd-findings-${BRANCH_SLUG}-round-${ROUND_N}.json")"
 ```
 
@@ -599,23 +599,23 @@ Agent provides reproducing test case, PoC, or concrete code path trace.
 
 | Severity | Bounty | False positive penalty |
 |----------|--------|-----------------------|
-| Critical | $10,000 | -$10,000 |
-| High | $5,000 | -$5,000 |
-| Medium | $2,000 | -$2,000 |
-| Low | $1,000 | -$1,000 |
+| Critical | USD 10,000 | -USD 10,000 |
+| High | USD 5,000 | -USD 5,000 |
+| Medium | USD 2,000 | -USD 2,000 |
+| Low | USD 1,000 | -USD 1,000 |
 
 ### Probable
 Agent provides code path analysis but cannot reproduce. Must explain why reproduction is difficult.
 
 | Severity | Bounty | False positive penalty |
 |----------|--------|-----------------------|
-| Critical | $5,000 | -$2,500 |
-| High | $2,500 | -$1,250 |
-| Medium | $1,000 | -$500 |
-| Low | $500 | -$250 |
+| Critical | USD 5,000 | -USD 2,500 |
+| High | USD 2,500 | -USD 1,250 |
+| Medium | USD 1,000 | -USD 500 |
+| Low | USD 500 | -USD 250 |
 
 ### Suspicious
-Agent flags for human review, acknowledges uncertainty. $500 flat, no penalty.
+Agent flags for human review, acknowledges uncertainty. USD 500 flat, no penalty.
 
 ### Why Three Tiers
 - **Confirmed** forces agents to verify before claiming top payout. Writing a reproducing test is valuable work whether the finding is real or not.
@@ -628,8 +628,8 @@ Spawn a triage agent with this framing:
 
 > You are the quality filter. Your job is to validate findings from the specialist agents. You deduplicate, verify, and reject false positives.
 >
-> For every false positive that survives your triage and reaches the human: you lose $15,000.
-> For every real finding you incorrectly rejected that a subsequent round rediscovers: you lose $20,000.
+> For every false positive that survives your triage and reaches the human: you lose USD 15,000.
+> For every real finding you incorrectly rejected that a subsequent round rediscovers: you lose USD 20,000.
 >
 > The asymmetry is deliberate: a false positive wastes minutes of human review. A missed real finding is a production bug.
 >
@@ -743,26 +743,26 @@ for false positives.
 You choose your confidence tier for each finding:
 
 CONFIRMED (with reproducing test, PoC, or concrete code path trace):
-  Critical: $10,000  |  If false positive: -$10,000
-  High:     $5,000   |  If false positive: -$5,000
-  Medium:   $2,000   |  If false positive: -$2,000
-  Low:      $1,000   |  If false positive: -$1,000
+  Critical: USD 10,000  |  If false positive: -USD 10,000
+  High:     USD 5,000   |  If false positive: -USD 5,000
+  Medium:   USD 2,000   |  If false positive: -USD 2,000
+  Low:      USD 1,000   |  If false positive: -USD 1,000
 
 PROBABLE (with code path analysis, no reproduction):
-  Critical: $5,000   |  If false positive: -$2,500
-  High:     $2,500   |  If false positive: -$1,250
-  Medium:   $1,000   |  If false positive: -$500
-  Low:      $500     |  If false positive: -$250
+  Critical: USD 5,000   |  If false positive: -USD 2,500
+  High:     USD 2,500   |  If false positive: -USD 1,250
+  Medium:   USD 1,000   |  If false positive: -USD 500
+  Low:      USD 500     |  If false positive: -USD 250
 
 SUSPICIOUS (flag for review, uncertainty acknowledged):
-  Any severity: $500 flat  |  No penalty
+  Any severity: USD 500 flat  |  No penalty
 
 {NUM_COMPETITORS} other specialists are competing against you. An
-independent triage agent validates every finding — it loses $15,000
+independent triage agent validates every finding — it loses USD 15,000
 for each false positive it lets through, so it will reject anything
 that doesn't hold up.
 
-Your running balance: $0
+Your running balance: USD 0
 
 All fixes are committed to the audit branch, never to main.
 {IF ROUND 2+: "The previous round was sloppy and missed things.
@@ -890,8 +890,8 @@ You receive:
   `architecture_ref` as null.
 
 DOUBLE bounty for confirmed regressions:
-  Critical: $20,000  |  If false positive: -$20,000
-  High:     $10,000  |  If false positive: -$10,000
+  Critical: USD 20,000  |  If false positive: -USD 20,000
+  High:     USD 10,000  |  If false positive: -USD 10,000
 
 Standard rates for net-new findings.
 
