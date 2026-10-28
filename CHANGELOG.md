@@ -4,8 +4,15 @@ All notable changes to Correctless are documented here.
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-10-27
+
 ### Fixed
-- **`_read_spec_hash` passed a left-padded `wc -l` count to jq `tonumber` (#290)** — BSD/macOS `wc -l < file` left-pads its output (`      42`); `cmd_tests` (`review` → `tdd-tests`) in `scripts/wf/transitions.sh` and the spec-update path in `scripts/wf/metadata.sh` feed that string into `jq --arg lines … ($lines | tonumber)`, which jq ≥ 1.7 rejects, so both transitions died on macOS with only the generic `Failed to update state for tdd-tests phase` (jq's stderr is swallowed inside `locked_update_state`). The count is now trimmed at the source in `hooks/workflow-advance.sh` and an empty result defaults to `0`. Regression test `#290.1–3` in `tests/test-bugfixes.sh` emulates BSD padding with a PATH shim around `wc`, so it reproduces on GNU userland too. On macOS the fix also clears the cascading failures the existing suites showed, where every post-review transition sat at `review`.
+- **`_read_spec_hash` passed a left-padded `wc -l` count to jq `tonumber` (#290, #324)** — BSD/macOS `wc -l < file` left-pads its output (`      42`); `cmd_tests` (`review` → `tdd-tests`) in `scripts/wf/transitions.sh` and the spec-update path in `scripts/wf/metadata.sh` feed that string into `jq --arg lines … ($lines | tonumber)`, which jq ≥ 1.7 rejects, so both transitions died on macOS with only the generic `Failed to update state for tdd-tests phase` (jq's stderr is swallowed inside `locked_update_state`). The count is now trimmed at the source in `hooks/workflow-advance.sh` and an empty result defaults to `0`. Regression test `#290.1–3` in `tests/test-bugfixes.sh` emulates BSD padding with a PATH shim around `wc`, so it reproduces on GNU userland too. On macOS the fix also clears the cascading failures the existing suites showed, where every post-review transition sat at `review`.
+- **`$<digit>` in skill bodies was replaced by invocation arguments (#315, #316)** — when a skill runs with arguments, the host substitutes positional placeholders (`$0`, `$1`, …) in the skill body. `/caudit`'s bounty tables were garbled, and its Step 7 `awk '{added+=$1; removed+=$2}'` read two unset variables, so `LINES_CHANGED` was always 0 and the zero-findings-on-a-non-trivial-diff audit record could never fire. Amounts in `caudit`, `cdevadv`, `cmetrics` and `credteam` are now spelled `USD N`, the awk uses `$(1)`/`$(2)`, and `tests/test-skill-no-dollar-digit.sh` fails on any `$<digit>` in a `SKILL.md`.
+
+### Internal
+- **Cross-feature-intel tests no longer age out (#325)** — fixtures with absolute May 2026 dates fell outside the script's 90-day staleness window on ~2026-08-18 and turned main's CI red. `scripts/cross-feature-intel.sh` now honours a numeric `CORRECTLESS_NOW_EPOCH` override, and both test files pin it.
+- **CI action bumps (#260, #274, #321, #322, #323)** — actions/checkout 7.0.1, actions/upload-artifact 7.0.2, ossf/scorecard-action 2.5.0, github/codeql-action/upload-sarif 4.39.1 (all SHA-pinned).
 
 ## [3.2.0] - 2026-07-11
 
