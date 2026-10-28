@@ -119,7 +119,11 @@ _read_spec_hash() {
   [ -f "$REPO_ROOT/$_spec_path" ] || return 1
 
   _spec_hash="$(sha256_hash_file "$REPO_ROOT/$_spec_path" 2>/dev/null || echo "")"
-  _spec_lines="$(wc -l < "$REPO_ROOT/$_spec_path" 2>/dev/null || echo "0")"
+  # Trim wc output: macOS `wc -l` left-pads its count (e.g. "  42"). Callers pass
+  # this via `jq --arg lines` and convert with `tonumber`; jq >= 1.7 rejects
+  # padded strings, which fails locked_update_state and aborts the transition.
+  _spec_lines="$(wc -l < "$REPO_ROOT/$_spec_path" 2>/dev/null | tr -d ' ')"
+  [ -n "$_spec_lines" ] || _spec_lines="0"
   [ -n "$_spec_hash" ] || return 1
 }
 

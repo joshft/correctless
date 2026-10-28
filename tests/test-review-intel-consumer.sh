@@ -16,6 +16,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-helpers.sh"
 SCRIPTS_DIR="$REPO_DIR/scripts"
 SKILLS_DIR="$REPO_DIR/skills"
 INTEL_SCRIPT="$SCRIPTS_DIR/cross-feature-intel.sh"
+
+# Pin the intel script's clock so the absolute May 2026 fixture dates stay
+# inside its 90-day staleness window (see test-cross-feature-intel.sh).
+CORRECTLESS_NOW_EPOCH=$(date -u -d "2026-05-25" +%s)
+export CORRECTLESS_NOW_EPOCH
 CREVIEW_SPEC_SKILL="$SKILLS_DIR/creview-spec/SKILL.md"
 CREVIEW_SKILL="$SKILLS_DIR/creview/SKILL.md"
 CSTATUS_SKILL="$SKILLS_DIR/cstatus/SKILL.md"
