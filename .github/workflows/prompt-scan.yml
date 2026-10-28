@@ -1,12 +1,12 @@
 name: Prompt Injection Scan
 
+# No paths filter: this is a required check, and a path-filtered required
+# workflow never reports on PRs that skip it, leaving them unmergeable.
 on:
   push:
     branches: [main]
-    paths: ['skills/**', 'templates/**']
   pull_request:
     branches: [main]
-    paths: ['skills/**', 'templates/**']
 
 permissions:
   contents: read
